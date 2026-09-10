@@ -113,6 +113,16 @@ class ResumoDaConferencia:
     origens: list[Origem] = field(default_factory=list)
     por_modelo: list[Fatia] = field(default_factory=list)
     por_operacao: list[Fatia] = field(default_factory=list)
+    por_classificacao: list[Fatia] = field(default_factory=list)
+
+    # ---- o que andou desde a rodada anterior ----
+    # O trabalho não termina na primeira conferência: o cliente manda o que
+    # faltava e ela roda de novo. Sem estes números, a segunda rodada só diz
+    # "ainda faltam 62.973" e ninguém sabe se andou.
+    comparou: bool = False
+    pendencias_resolvidas: int = 0
+    pendencias_que_permanecem: int = 0
+    pendencias_novas: int = 0
 
     @property
     def cobertura(self) -> float:
@@ -136,15 +146,17 @@ class ResumoDaConferencia:
         if self.sem_chave_na_efd:
             avisos.append(
                 f"{_numero(self.sem_chave_na_efd)} documento(s) da EFD estão sem "
-                "chave de acesso e ficaram fora do confronto — costuma ser nota "
-                "modelo 1 ou cupom antigo, que não tem chave."
+                "chave de acesso — costuma ser nota modelo 1 ou cupom antigo. "
+                "Entram na lista marcados como 'conferir à mão': não dá para "
+                "casar por chave, mas eles não somem do controle."
             )
-        fora_da_cobranca = self.sem_documento - self.sem_documento_cobravel
-        if fora_da_cobranca > 0:
+        marcadas = self.sem_documento - self.sem_documento_cobravel
+        if marcadas > 0:
             avisos.append(
-                f"{_numero(fora_da_cobranca)} das notas sem documento estão "
-                "canceladas, denegadas ou com numeração inutilizada, e ficaram "
-                "fora da cobrança: não existe documento a pedir."
+                f"{_numero(marcadas)} das pendências são canceladas, denegadas, "
+                "inutilizadas ou sem chave. Continuam na lista, marcadas — de "
+                "cancelada e denegada não se espera documento, mas quem decide "
+                "pedir ou não é quem trabalha, não o sistema."
             )
         if self.nao_escrituradas:
             avisos.append(
@@ -152,3 +164,14 @@ class ResumoDaConferencia:
                 "EFD e saíram da análise."
             )
         return avisos
+
+    @property
+    def andou(self) -> str:
+        """Uma frase sobre o que mudou desde a rodada anterior."""
+        if not self.comparou:
+            return ""
+        partes = [f"{_numero(self.pendencias_resolvidas)} resolvida(s)"]
+        if self.pendencias_novas:
+            partes.append(f"{_numero(self.pendencias_novas)} nova(s)")
+        partes.append(f"{_numero(self.pendencias_que_permanecem)} ainda pendente(s)")
+        return ", ".join(partes)

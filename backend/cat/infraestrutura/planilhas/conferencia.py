@@ -53,6 +53,9 @@ COLUNAS_SEM_DOCUMENTO = (
     Coluna("emitente", "Emitente", "texto", 14),
     Coluna("participante", "Cód. participante", "texto", 18),
     Coluna("situacao", "Situação", "texto", 10),
+    # o que fazer com a linha. Vem primeiro na ordenação do parquet, então
+    # quem abre a planilha já cai no que há para cobrar
+    Coluna("classificacao", "Classificação", "texto", 30),
     Coluna("arquivo_efd", "Arquivo da EFD", "texto", 34),
 )
 
@@ -71,18 +74,24 @@ _ROTULO_SITUACAO = {
 _ROTULO_ORIGEM = {"xml": "XML", "gerencial": "Relatório do cliente"}
 _ROTULO_OPERACAO = {"entrada": "Entrada", "saida": "Saída"}
 _ROTULO_EMITENTE = {"propria": "Emissão própria", "terceiros": "Terceiros"}
+_ROTULO_CLASSIFICACAO = {
+    "a_cobrar": "A cobrar do cliente",
+    "sem_documento_a_pedir": "Cancelada, denegada ou inutilizada",
+    "sem_chave": "Sem chave — conferir à mão",
+}
 
 _TRADUCOES = {
     "situacao": _ROTULO_SITUACAO,
     "origem": _ROTULO_ORIGEM,
     "operacao": _ROTULO_OPERACAO,
     "emitente": _ROTULO_EMITENTE,
+    "classificacao": _ROTULO_CLASSIFICACAO,
 }
 
 
 def gerar(parquet: str, destino: str, colunas: tuple[Coluna, ...],
-          titulo_da_aba: str, somente_cobraveis: bool = False,
-          modelos: frozenset[str] | None = None) -> int:
+          titulo_da_aba: str, modelos: frozenset[str] | None = None,
+          classificacoes: frozenset[str] | None = None) -> int:
     """Escreve o xlsx a partir do parquet. Devolve quantas linhas gravou.
 
     `modelos` restringe por modelo de documento, e não é detalhe: numa base
@@ -111,9 +120,10 @@ def gerar(parquet: str, destino: str, colunas: tuple[Coluna, ...],
     for lote in pq.ParquetFile(parquet).iter_batches(LINHAS_POR_LEITURA):
         registros = lote.to_pylist()
         for r in registros:
-            if somente_cobraveis and not r.get("cobravel", True):
-                continue
             if modelos is not None and r.get("modelo") not in modelos:
+                continue
+            if (classificacoes is not None
+                    and r.get("classificacao") not in classificacoes):
                 continue
             if na_aba >= LIMITE_POR_ABA:
                 abas += 1
@@ -162,14 +172,22 @@ def _escrever(aba, linha: int, registro: dict, colunas: tuple[Coluna, ...],
 
 
 def gerar_sem_documento(parquet: str, destino: str,
-                        modelos: frozenset[str] | None = None) -> int:
-    """A planilha de cobrança: só o que faz sentido pedir ao cliente."""
-    return gerar(parquet, destino, COLUNAS_SEM_DOCUMENTO,
-                 "Notas a cobrar", somente_cobraveis=True, modelos=modelos)
+                        modelos: frozenset[str] | None = None,
+                        classificacoes: frozenset[str] | None = None) -> int:
+    """A planilha de pendências.
+
+    Sem filtro, sai inteira — cancelada, denegada e sem chave incluídas,
+    cada uma marcada na coluna Classificação. Excluir alguma delas aqui as
+    tiraria do controle para sempre: na rodada seguinte, quando o cliente
+    mandar o que faltava, ninguém voltaria a olhá-las.
+    """
+    return gerar(parquet, destino, COLUNAS_SEM_DOCUMENTO, "Pendências",
+                 modelos=modelos, classificacoes=classificacoes)
 
 
 def gerar_nao_escrituradas(parquet: str, destino: str,
-                           modelos: frozenset[str] | None = None) -> int:
+                           modelos: frozenset[str] | None = None,
+                           classificacoes: frozenset[str] | None = None) -> int:
     # o parquet das não escrituradas não tem modelo: a chave veio da pasta,
     # e o que se sabe dela é a origem
     return gerar(parquet, destino, COLUNAS_NAO_ESCRITURADAS,

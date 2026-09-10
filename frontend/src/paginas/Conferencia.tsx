@@ -10,6 +10,7 @@ import {
   listarConferencias,
   numero,
   type Execucao,
+  type Fatia,
   type ResumoDaConferencia,
 } from "../servicos/conferencia";
 import { tamanho } from "../servicos/lote";
@@ -35,6 +36,7 @@ export default function Conferencia() {
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [modelos, setModelos] = useState<string[]>([]);
+  const [classes, setClasses] = useState<string[]>([]);
   const relogio = useRef<number | null>(null);
 
   const acompanhar = useCallback(async (execucaoId: number) => {
@@ -78,6 +80,7 @@ export default function Conferencia() {
       const nova = await iniciarConferencia(projetoId);
       setExecucao(nova);
       setModelos([]);
+      setClasses([]);
       if (relogio.current !== null) window.clearInterval(relogio.current);
       relogio.current = window.setInterval(() => acompanhar(nova.id), INTERVALO_MS);
     } catch (e) {
@@ -92,7 +95,12 @@ export default function Conferencia() {
     setOcupado(true);
     setErro(null);
     try {
-      await baixarPlanilha(execucao.id, qual, qual === "a-cobrar" ? modelos : []);
+      await baixarPlanilha(
+        execucao.id,
+        qual,
+        qual === "a-cobrar" ? modelos : [],
+        qual === "a-cobrar" ? classes : [],
+      );
     } catch (e) {
       setErro(comoErro(e));
     } finally {
@@ -170,13 +178,9 @@ export default function Conferencia() {
           resumo={resumo}
           execucao={execucao}
           modelos={modelos}
-          aoAlternarModelo={(codigo) =>
-            setModelos((atuais) =>
-              atuais.includes(codigo)
-                ? atuais.filter((c) => c !== codigo)
-                : [...atuais, codigo],
-            )
-          }
+          classes={classes}
+          aoAlternarModelo={(codigo) => setModelos(alternar(codigo))}
+          aoAlternarClasse={(codigo) => setClasses(alternar(codigo))}
           aoBaixar={baixar}
           ocupado={ocupado}
         />
@@ -184,6 +188,12 @@ export default function Conferencia() {
     </div>
   );
 }
+
+/** Liga ou desliga um código na lista de filtros. */
+const alternar = (codigo: string) => (atuais: string[]) =>
+  atuais.includes(codigo)
+    ? atuais.filter((c) => c !== codigo)
+    : [...atuais, codigo];
 
 function Andamento({ e }: { e: Execucao }) {
   const pct = Math.round(e.fracao * 100);
@@ -208,14 +218,18 @@ function Resultado({
   resumo,
   execucao,
   modelos,
+  classes,
   aoAlternarModelo,
+  aoAlternarClasse,
   aoBaixar,
   ocupado,
 }: {
   resumo: ResumoDaConferencia;
   execucao: Execucao | null;
   modelos: string[];
+  classes: string[];
   aoAlternarModelo: (codigo: string) => void;
+  aoAlternarClasse: (codigo: string) => void;
   aoBaixar: (qual: "nao-escrituradas" | "a-cobrar") => void;
   ocupado: boolean;
 }) {
@@ -264,6 +278,12 @@ function Resultado({
           <div className="barra__preenchida" style={{ width: `${cobertura}%` }} />
         </div>
 
+        {resumo.comparou && (
+          <div className="andou">
+            <strong>Desde a conferência anterior:</strong> {resumo.andou}
+          </div>
+        )}
+
         {resumo.avisos.map((a) => (
           <div key={a} className="aviso aviso--atencao">
             {a}
@@ -292,44 +312,94 @@ function Resultado({
         <h2 className="cartao__titulo">Notas a cobrar do cliente</h2>
         <p className="cartao__sub">
           Foram escrituradas e o documento não veio. Sem o XML não há como saber
-          o ICMS-ST retido daquela nota.
+          o ICMS-ST retido daquela nota. A planilha sai inteira: nada é
+          excluído, e o que não se espera cobrar vai marcado do que é.
         </p>
-        <p className="numerao">{numero(resumo.sem_documento_cobravel)}</p>
+        <p className="numerao">{numero(resumo.sem_documento)}</p>
+        <p className="campo__dica">
+          {numero(resumo.sem_documento_cobravel)} esperam documento do cliente.
+        </p>
 
-        {resumo.por_modelo.length > 1 && (
-          <>
-            <p className="campo__dica">
-              Por modelo de documento. Sem escolher nenhum, a planilha sai
-              inteira — e cupom de consumidor costuma dominar o volume.
-            </p>
-            <div className="modelos">
-              {resumo.por_modelo.map((m) => (
-                <label key={m.codigo} className="modelo">
-                  <input
-                    type="checkbox"
-                    checked={modelos.includes(m.codigo)}
-                    onChange={() => aoAlternarModelo(m.codigo)}
-                  />
-                  <span>
-                    {m.rotulo} · {numero(m.documentos)}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </>
-        )}
+        <Filtro
+          titulo="Por classificação"
+          explicacao="Sem escolher nenhuma, a planilha traz todas — inclusive as canceladas e as sem chave, cada uma marcada."
+          fatias={resumo.por_classificacao}
+          escolhidos={classes}
+          aoAlternar={aoAlternarClasse}
+        />
+        <Filtro
+          titulo="Por modelo de documento"
+          explicacao="Cupom de consumidor costuma dominar o volume, e não é XML que se peça um a um."
+          fatias={resumo.por_modelo}
+          escolhidos={modelos}
+          aoAlternar={aoAlternarModelo}
+        />
 
         <button
           type="button"
           className="botao botao--principal"
           onClick={() => aoBaixar("a-cobrar")}
-          disabled={ocupado || resumo.sem_documento_cobravel === 0}
+          disabled={ocupado || resumo.sem_documento === 0}
         >
-          {modelos.length
-            ? `Baixar planilha (${modelos.length} modelo(s))`
+          {modelos.length || classes.length
+            ? "Baixar planilha filtrada"
             : "Baixar planilha"}
         </button>
       </section>
+
+      <section className="cartao">
+        <h2 className="cartao__titulo">O cliente mandou o que faltava?</h2>
+        <p className="cartao__sub">
+          Importe os arquivos novos na base de dados e rode a conferência de
+          novo. A próxima rodada compara com esta e diz quantas pendências
+          saíram, quantas continuam e quantas apareceram — por isso nada é
+          excluído da lista.
+        </p>
+        <Link
+          className="botao botao--secundario"
+          to={`/projetos/${execucao?.projeto_id}/arquivos`}
+        >
+          Importar mais arquivos
+        </Link>
+      </section>
+    </>
+  );
+}
+
+/** Um grupo de filtros da planilha, com a contagem de cada recorte. */
+function Filtro({
+  titulo,
+  explicacao,
+  fatias,
+  escolhidos,
+  aoAlternar,
+}: {
+  titulo: string;
+  explicacao: string;
+  fatias: Fatia[];
+  escolhidos: string[];
+  aoAlternar: (codigo: string) => void;
+}) {
+  // com um recorte só não há o que escolher
+  if (fatias.length < 2) return null;
+  return (
+    <>
+      <p className="filtro__titulo">{titulo}</p>
+      <p className="campo__dica">{explicacao}</p>
+      <div className="modelos">
+        {fatias.map((f) => (
+          <label key={f.codigo} className="modelo">
+            <input
+              type="checkbox"
+              checked={escolhidos.includes(f.codigo)}
+              onChange={() => aoAlternar(f.codigo)}
+            />
+            <span>
+              {f.rotulo} · {numero(f.documentos)}
+            </span>
+          </label>
+        ))}
+      </div>
     </>
   );
 }

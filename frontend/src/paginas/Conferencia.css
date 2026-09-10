@@ -73,3 +73,25 @@
   margin: 0;
   accent-color: var(--marca-azul);
 }
+
+/* ---------- o que andou entre rodadas ---------- */
+/* a segunda conferência precisa responder "andou?", não só "quanto falta" */
+.andou {
+  margin-top: 16px;
+  padding: 12px 15px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--texto);
+  background: var(--sucesso-fundo);
+  border-left: 3px solid var(--sucesso);
+  border-radius: var(--raio);
+}
+
+.filtro__titulo {
+  margin: 18px 0 2px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--texto-fraco);
+}

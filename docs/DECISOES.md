@@ -535,3 +535,63 @@ a mesma rede e o mesmo disco e terminariam as duas mais devagar.
 **Consequência.** Se a API reiniciar no meio, a execução fica com situação
 `rodando` para sempre. Ainda não há varredura de execução órfã na subida — é a
 próxima dívida deste desenho.
+
+---
+
+## 2026-09-10 — Nada sai da lista de pendências (revoga decisão do mesmo dia)
+
+**Decisão.** Documento cancelado, denegado, com numeração inutilizada ou sem
+chave de acesso **continua na lista de pendências**, marcado na coluna
+Classificação. A planilha sai inteira por padrão; filtrar é escolha de quem
+trabalha, e os filtros estão na tela.
+
+**Revoga** as duas decisões de hoje que mandavam excluir cancelada da cobrança
+e deixar documento sem chave fora do confronto.
+
+**Por quê.** O argumento que derrubou a versão anterior é do dono do produto, e
+só aparece quando se olha o ciclo inteiro: **o trabalho não termina na primeira
+conferência**. O cliente manda o que faltava, a conferência roda de novo. O que
+tiver sido excluído nunca mais é olhado — some do controle sem nunca ter sido
+resolvido. Marcar é reversível; excluir não é.
+
+O raciocínio original continua válido como *informação* — de nota cancelada
+realmente não se espera documento —, e é isso que a marcação diz. O erro foi
+transformar informação em exclusão.
+
+**Consequência.** A tela mostra a divisão das pendências em três: a cobrar,
+cancelada/denegada/inutilizada, e sem chave (que precisa de conferência
+manual). Cada uma é um filtro da planilha.
+
+---
+
+## 2026-09-10 — A conferência compara com a rodada anterior
+
+**Decisão.** Toda conferência a partir da segunda compara suas pendências com
+as da última rodada concluída e informa quantas foram **resolvidas**, quantas
+**permanecem** e quantas são **novas**.
+
+**Por quê.** É o que responde "o cliente mandou os documentos, e agora?".
+Sem isso, a segunda rodada só diz "ainda faltam 62.973" e ninguém sabe se
+andou. O ciclo do trabalho é: cobrar → cliente envia → importar os arquivos
+novos na base → conferir de novo → ver o que saiu da lista.
+
+**Como.** A comparação é entre os `sem_documento.parquet` das duas execuções,
+pela chave (ou pelo identificador sintético, quando não há chave). Quando a
+pasta da execução anterior já foi limpa, a comparação não aparece e o resultado
+da rodada atual continua completo.
+
+---
+
+## 2026-09-10 — Condição extra dentro do ON derruba o plano do DuckDB
+
+**Defeito e correção.** O confronto passou de **0,9 s para 512 s** com uma
+mudança que parecia inócua: `LEFT JOIN pasta p ON e.tem_chave AND e.chave =
+p.chave`. Não sendo igualdade pura, o DuckDB deixa de planejar junção por
+dispersão e cai para junção em bloco — 321 mil × 257 mil linhas.
+
+**Regra.** Condição que depende de um lado só vai para o `WHERE` ou para uma
+tabela já filtrada; o `ON` fica com a igualdade e nada mais. E vale materializar
+com `CREATE TABLE AS` o que é consultado várias vezes: como visão, cada consulta
+do resumo refazia o agrupamento inteiro sobre o parquet.
+
+**Voltou a 1,2 s** sobre as mesmas 321.460 linhas.

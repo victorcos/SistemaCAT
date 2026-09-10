@@ -28,7 +28,10 @@ from sqlalchemy.orm import Session
 from cat.config import obter_config
 from cat.dominio.cat42.conferencia import ResumoDaConferencia
 from cat.dominio.lote import TipoDeArquivo
-from cat.infraestrutura.analitico.confronto import confrontar
+from cat.infraestrutura.analitico.confronto import (
+    ARQUIVO_SEM_DOCUMENTO,
+    confrontar,
+)
 from cat.infraestrutura.analitico.extracao import (
     Progresso,
     extrair_efd,
@@ -173,7 +176,8 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     execucao.fracao = 0.97
     sessao.commit()
 
-    resumo = confrontar(caminho_efd, caminho_pasta, destino)
+    resumo = confrontar(caminho_efd, caminho_pasta, destino,
+                        anterior=_pendencias_anteriores(execucao, sessao))
 
     execucao.situacao = "concluida"
     execucao.passo = "Concluída"
@@ -192,6 +196,28 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
                     "nao_escrituradas": resumo.nao_escrituradas})
 
 
+def _pendencias_anteriores(execucao: ExecucaoDB, sessao: Session) -> str | None:
+    """O `sem_documento.parquet` da última rodada concluída deste trabalho.
+
+    É o que permite dizer o que andou. Quando a pasta da rodada anterior já foi
+    limpa, a comparação simplesmente não aparece — o resultado desta rodada
+    continua completo, só não tem com o que se comparar.
+    """
+    anterior = sessao.scalar(
+        select(ExecucaoDB)
+        .where(ExecucaoDB.projeto_id == execucao.projeto_id,
+               ExecucaoDB.etapa == ETAPA,
+               ExecucaoDB.situacao == "concluida",
+               ExecucaoDB.id != execucao.id)
+        .order_by(ExecucaoDB.id.desc())
+        .limit(1)
+    )
+    if anterior is None or not anterior.pasta_de_trabalho:
+        return None
+    caminho = os.path.join(anterior.pasta_de_trabalho, ARQUIVO_SEM_DOCUMENTO)
+    return caminho if os.path.isfile(caminho) else None
+
+
 def _serializar(resumo: ResumoDaConferencia, efd: Progresso,
                 pasta: Progresso) -> dict:
     """O resumo vira JSON no banco. Decimal não é JSON: vai como texto."""
@@ -200,10 +226,11 @@ def _serializar(resumo: ResumoDaConferencia, efd: Progresso,
     for chave in ("valor_conferido", "valor_nao_escriturado",
                   "valor_sem_documento"):
         dados[chave] = str(dados[chave])
-    for lista in ("por_modelo", "por_operacao"):
+    for lista in ("por_modelo", "por_operacao", "por_classificacao"):
         dados[lista] = [{**f, "valor": str(f["valor"])} for f in dados[lista]]
     dados["cobertura"] = round(resumo.cobertura, 4)
     dados["avisos"] = resumo.avisos
+    dados["andou"] = resumo.andou
     dados["recusados"] = (efd.recusados + pasta.recusados)[:20]
     return dados
 

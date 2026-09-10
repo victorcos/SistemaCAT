@@ -29,8 +29,15 @@ export interface ResumoDaConferencia {
   origens: string[];
   por_modelo: Fatia[];
   por_operacao: Fatia[];
+  por_classificacao: Fatia[];
   avisos: string[];
   recusados: string[];
+  /** O que andou desde a rodada anterior. Vazio na primeira. */
+  comparou: boolean;
+  pendencias_resolvidas: number;
+  pendencias_que_permanecem: number;
+  pendencias_novas: number;
+  andou: string;
 }
 
 export interface Execucao {
@@ -72,8 +79,13 @@ export async function baixarPlanilha(
   execucaoId: number,
   qual: "nao-escrituradas" | "a-cobrar",
   modelos: string[] = [],
+  classificacoes: string[] = [],
 ): Promise<void> {
-  const filtro = modelos.length ? `?modelos=${modelos.join(",")}` : "";
+  const parametros = new URLSearchParams();
+  if (modelos.length) parametros.set("modelos", modelos.join(","));
+  if (classificacoes.length)
+    parametros.set("classificacoes", classificacoes.join(","));
+  const filtro = parametros.toString() ? `?${parametros}` : "";
   const cabecalhos = new Headers();
   const token = lerToken();
   if (token) cabecalhos.set("Authorization", `Bearer ${token}`);

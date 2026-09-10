@@ -197,6 +197,7 @@ def baixar_planilha(
     usuario: UsuarioAtual,
     sessao: Annotated[Session, Depends(obter_sessao)],
     modelos: str | None = None,
+    classificacoes: str | None = None,
 ) -> FileResponse:
     if qual not in PLANILHAS:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Planilha desconhecida.")
@@ -209,7 +210,8 @@ def baixar_planilha(
         )
 
     nome, parquet, gerador = PLANILHAS[qual]
-    escolhidos = _modelos(modelos)
+    escolhidos = _conjunto(modelos)
+    classes = _conjunto(classificacoes)
     pasta = execucao.pasta_de_trabalho or ""
     origem = os.path.join(pasta, parquet)
     if not os.path.isfile(origem):
@@ -223,15 +225,17 @@ def baixar_planilha(
 
     # cada recorte vira arquivo próprio: sem isso, o primeiro download
     # ficaria em cache e o filtro seguinte devolveria a planilha errada
-    sufixo = "-" + "_".join(sorted(escolhidos)) if escolhidos else ""
+    partes = sorted(escolhidos or ()) + sorted(classes or ())
+    sufixo = "-" + "_".join(partes) if partes else ""
     raiz, extensao = os.path.splitext(nome)
     destino = os.path.join(pasta, f"{raiz}{sufixo}{extensao}")
     if not os.path.isfile(destino):
         with contexto(etapa=ETAPA, execucao_id=execucao_id, planilha=qual):
-            linhas = gerador(origem, destino, escolhidos)
+            linhas = gerador(origem, destino, escolhidos, classes)
             log.info("planilha da conferência gerada",
                      extra={"planilha": qual, "linhas": linhas,
-                            "modelos": sorted(escolhidos) if escolhidos else "todos"})
+                            "modelos": sorted(escolhidos) if escolhidos else "todos",
+                            "classificacoes": sorted(classes) if classes else "todas"})
 
     return FileResponse(
         destino,
@@ -241,7 +245,7 @@ def baixar_planilha(
     )
 
 
-def _modelos(bruto: str | None) -> frozenset[str] | None:
+def _conjunto(bruto: str | None) -> frozenset[str] | None:
     """"55,65" vira o conjunto; vazio significa todos."""
     if not bruto:
         return None

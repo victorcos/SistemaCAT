@@ -135,10 +135,10 @@ def efd(tmp_path):
         CABECALHO,
         C100,
         C800,
-        # cancelada: entra na EFD, mas não se cobra
+        # cancelada: fica na lista, marcada — não some do controle
         C100.replace("|55|00|001|44623|" + CHAVE_C100,
                      "|55|02|001|44624|" + CHAVE_C100[:-1] + "0"),
-        # sem chave: fica fora do confronto
+        # sem chave: não dá para confrontar, mas entra marcada
         C100.replace(CHAVE_C100, "").replace("|44623|", "|44625|"),
         "|C190|000|1102|18,00|100,00|18,00|0|0|0|0|0||",
     ])
@@ -226,21 +226,26 @@ class TestConfrontar:
         resumo, _ = confronto
         assert resumo.nao_escrituradas == 1
 
-    def test_documento_sem_chave_fica_fora_do_confronto(self, confronto):
-        # nota modelo 1 e cupom antigo não têm chave; cobrá-los mandaria o
-        # cliente atrás de algo que nunca existiu
-        resumo, _ = confronto
+    def test_documento_sem_chave_entra_na_lista_marcado(self, confronto):
+        # não dá para confrontar sem chave, mas excluir o tiraria do controle
+        # para sempre: na rodada seguinte ninguém voltaria a olhá-lo
+        resumo, destino = confronto
         assert resumo.sem_chave_na_efd == 1
-        assert resumo.escriturados == 3
+        assert resumo.escriturados == 4
+        assert _classificacoes(destino)["sem_chave"] == 1
 
-    def test_cancelada_conta_como_pendencia_mas_nao_como_cobranca(self, confronto):
-        resumo, _ = confronto
-        assert resumo.sem_documento == 2
+    def test_cancelada_fica_na_lista_marcada(self, confronto):
+        resumo, destino = confronto
+        assert resumo.sem_documento == 3
+        # só uma espera documento; as outras duas ficam marcadas do que são
         assert resumo.sem_documento_cobravel == 1
+        classes = _classificacoes(destino)
+        assert classes["a_cobrar"] == 1
+        assert classes["sem_documento_a_pedir"] == 1
 
     def test_cobertura(self, confronto):
         resumo, _ = confronto
-        assert resumo.cobertura == pytest.approx(1 / 3)
+        assert resumo.cobertura == pytest.approx(1 / 4)
 
     def test_recorte_por_modelo_traz_o_codigo(self, confronto):
         resumo, _ = confronto
@@ -249,11 +254,19 @@ class TestConfrontar:
 
 
 class TestPlanilhas:
-    def test_cobranca_tira_cancelada(self, confronto, tmp_path):
+    def test_sai_inteira_sem_filtro(self, confronto, tmp_path):
+        # nada é excluído: cancelada e sem chave vão junto, marcadas
         _, destino = confronto
         linhas = gerar_sem_documento(f"{destino}/sem_documento.parquet",
-                                     str(tmp_path / "cobrar.xlsx"))
-        assert linhas == 1
+                                     str(tmp_path / "pendencias.xlsx"))
+        assert linhas == 3
+
+    def test_filtro_por_classificacao(self, confronto, tmp_path):
+        _, destino = confronto
+        so_cobrar = gerar_sem_documento(
+            f"{destino}/sem_documento.parquet", str(tmp_path / "cobrar.xlsx"),
+            classificacoes=frozenset({"a_cobrar"}))
+        assert so_cobrar == 1
 
     def test_filtro_por_modelo(self, confronto, tmp_path):
         # numa base real, 307.319 de 321.337 documentos eram NFC-e; sem filtro
@@ -265,7 +278,7 @@ class TestPlanilhas:
         so_cupom = gerar_sem_documento(f"{destino}/sem_documento.parquet",
                                        str(tmp_path / "so59.xlsx"),
                                        modelos=frozenset({"59"}))
-        assert so_nfe + so_cupom == 1
+        assert so_nfe + so_cupom == 3
 
     def test_nao_escrituradas(self, confronto, tmp_path):
         _, destino = confronto
@@ -288,6 +301,59 @@ class TestPlanilhas:
         assert len(celula.value) == 44
 
 
+def _classificacoes(destino: str) -> dict[str, int]:
+    con = duckdb.connect()
+    try:
+        return dict(con.execute(
+            "SELECT classificacao, count(*) FROM read_parquet(?) GROUP BY 1",
+            [f"{destino}/sem_documento.parquet"]).fetchall())
+    finally:
+        con.close()
+
+
+class TestSegundaRodada:
+    """O trabalho não termina na primeira conferência.
+
+    O cliente manda o que faltava e a conferência roda de novo. Sem comparar
+    com a rodada anterior, a segunda só diz "ainda faltam N" e ninguém sabe se
+    andou — que foi o que motivou não excluir nada da lista.
+    """
+
+    def test_diz_quantas_o_cliente_resolveu(self, efd, tmp_path):
+        caminho_efd = str(tmp_path / "efd.parquet")
+        extrair_efd([efd], caminho_efd)
+
+        primeira = str(tmp_path / "r1")
+        vazia = str(tmp_path / "vazia.parquet")
+        extrair_pasta([], [], vazia)
+        antes = confrontar(caminho_efd, vazia, primeira)
+
+        # agora o cliente mandou o XML de uma das notas
+        xml = tmp_path / "nota.xml"
+        xml.write_text(NFE, encoding="utf-8")
+        com_xml = str(tmp_path / "com_xml.parquet")
+        extrair_pasta([str(xml)], [], com_xml)
+
+        depois = confrontar(caminho_efd, com_xml, str(tmp_path / "r2"),
+                            anterior=f"{primeira}/sem_documento.parquet")
+
+        assert depois.comparou
+        assert depois.pendencias_resolvidas == 1
+        assert depois.pendencias_novas == 0
+        assert depois.sem_documento == antes.sem_documento - 1
+        assert "1 resolvida(s)" in depois.andou
+
+    def test_sem_rodada_anterior_nao_compara(self, efd, tmp_path):
+        caminho_efd = str(tmp_path / "efd.parquet")
+        extrair_efd([efd], caminho_efd)
+        vazia = str(tmp_path / "vazia.parquet")
+        extrair_pasta([], [], vazia)
+        r = confrontar(caminho_efd, vazia, str(tmp_path / "r1"),
+                       anterior=str(tmp_path / "nao_existe.parquet"))
+        assert not r.comparou
+        assert r.andou == ""
+
+
 class TestResumo:
     def test_sem_origem_avisa_que_nao_diz_nada(self):
         r = ResumoDaConferencia(escriturados=10)
@@ -297,7 +363,7 @@ class TestResumo:
         # o separador de milhar é aplicado ao número, não à frase
         r = ResumoDaConferencia(escriturados=1, sem_chave_na_efd=1234)
         aviso = next(a for a in r.avisos if "1.234" in a)
-        assert "modelo 1 ou cupom antigo, que não tem chave." in aviso
+        assert "modelo 1 ou cupom antigo." in aviso
 
     def test_cobertura_sem_documento_nenhum(self):
         assert ResumoDaConferencia().cobertura == 0.0
