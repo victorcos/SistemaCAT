@@ -47,12 +47,33 @@ export interface Projeto {
   id: number;
   empresa_id: number;
   empresa: string;
+  cnpj_matriz: string | null;
+  cnpj_matriz_formatado: string | null;
+  uf: string | null;
   frente: string;
   frente_rotulo: string;
   nome: string;
   competencia_ini: string;
   competencia_fim: string;
   status: string;
+  pre_cadastro: boolean;
+  etapas_feitas: number;
+  etapas_totais: number;
+}
+
+export interface Etapa {
+  chave: string;
+  nome: string;
+  descricao: string;
+  situacao: string;
+  situacao_rotulo: string;
+  implementada: boolean;
+  acessivel: boolean;
+}
+
+export interface ProjetoDetalhe {
+  projeto: Projeto;
+  etapas: Etapa[];
 }
 
 /**
@@ -124,3 +145,6 @@ export const criarProjeto = (dados: {
   });
 
 export const listarProjetos = () => chamar<Projeto[]>("/projetos");
+
+export const detalharProjeto = (id: number) =>
+  chamar<ProjetoDetalhe>(`/projetos/${id}`);

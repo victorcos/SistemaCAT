@@ -24,10 +24,12 @@ from sqlalchemy.orm import Session
 from cat.aplicacao.casos_de_uso.analisar_remessa import RemessaAnalisada, analisar
 from cat.apresentacao.api.seguranca import UsuarioAtual, exigir_capacidade
 from cat.dominio.acesso.usuario import Usuario
+from cat.dominio.cat42 import etapas as etapas_dominio
 from cat.dominio.comum.cnpj import Cnpj, CnpjInvalido
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
 from cat.infraestrutura.repositorios.banco import obter_sessao
 from cat.infraestrutura.repositorios.modelos import (
+    AlocacaoDB,
     EmpresaDB,
     EstabelecimentoDB,
     ProjetoDB,
@@ -120,12 +122,33 @@ class ProjetoDto(BaseModel):
     id: int
     empresa_id: int
     empresa: str
+    cnpj_matriz: str | None = None
+    cnpj_matriz_formatado: str | None = None
+    uf: str | None = None
     frente: str
     frente_rotulo: str
     nome: str
     competencia_ini: date
     competencia_fim: date
     status: str
+    pre_cadastro: bool = False
+    etapas_feitas: int = 0
+    etapas_totais: int = 0
+
+
+class EtapaDto(BaseModel):
+    chave: str
+    nome: str
+    descricao: str
+    situacao: str
+    situacao_rotulo: str
+    implementada: bool
+    acessivel: bool
+
+
+class ProjetoDetalheDto(BaseModel):
+    projeto: ProjetoDto
+    etapas: list[EtapaDto]
 
 
 # ---------------------------------------------------------------------------
@@ -262,12 +285,22 @@ def criar_empresa(
             nome=e.razao_social, uf=e.uf, e_matriz=True,
         )
     )
+    # Quem importou a empresa é alocado a ela na hora. Sem isto a pessoa
+    # cadastraria uma empresa que em seguida não conseguiria enxergar, porque o
+    # escopo de visibilidade vem só das alocações vigentes.
+    sessao.add(
+        AlocacaoDB(
+            usuario_id=usuario.id, empresa_id=e.id,
+            papel_projeto="responsavel", alocado_por=usuario.id,
+        )
+    )
     sessao.commit()
 
     log.info(
         "empresa pré-cadastrada a partir do SPED",
         extra={"empresa_id": e.id, "cnpj_raiz": e.cnpj_raiz,
-               "cnpj_matriz": e.cnpj_matriz, "por_usuario_id": usuario.id},
+               "cnpj_matriz": e.cnpj_matriz, "por_usuario_id": usuario.id,
+               "alocado_automaticamente": True},
     )
     return _empresa_dto(e, 0)
 
@@ -360,15 +393,61 @@ def criar_projeto(
     return _projeto_dto(p)
 
 
+def _etapas_do(p: ProjetoDB) -> list[etapas_dominio.EtapaDoProjeto]:
+    """Por ora só a importação conclui, e conclui por existir o projeto: ele
+    nasceu de uma remessa. As demais entram conforme forem construídas."""
+    return etapas_dominio.montar(concluidas={"importar"})
+
+
 def _projeto_dto(p: ProjetoDB) -> ProjetoDto:
+    e = p.empresa
+    feitas, totais = etapas_dominio.progresso(_etapas_do(p))
     return ProjetoDto(
         id=p.id,
         empresa_id=p.empresa_id,
-        empresa=p.empresa.razao_social if p.empresa else "",
+        empresa=e.razao_social if e else "",
+        cnpj_matriz=e.cnpj_matriz if e else None,
+        cnpj_matriz_formatado=(
+            Cnpj(e.cnpj_matriz).formatado if e and e.cnpj_matriz else None
+        ),
+        uf=e.uf if e else None,
         frente=p.frente,
         frente_rotulo=FRENTES.get(p.frente, p.frente),
         nome=p.nome,
         competencia_ini=p.competencia_ini,
         competencia_fim=p.competencia_fim,
         status=p.status,
+        pre_cadastro=e.pre_cadastro if e else False,
+        etapas_feitas=feitas,
+        etapas_totais=totais,
+    )
+
+
+@router.get("/projetos/{projeto_id}", response_model=ProjetoDetalheDto)
+def detalhar_projeto(
+    projeto_id: int,
+    usuario: UsuarioAtual,
+    sessao: Annotated[Session, Depends(obter_sessao)],
+) -> ProjetoDetalheDto:
+    p = sessao.get(ProjetoDB, projeto_id)
+    if p is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Projeto não encontrado.")
+    if not usuario.enxerga_empresa(p.empresa_id):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Você não tem acesso a esta empresa."
+        )
+    return ProjetoDetalheDto(
+        projeto=_projeto_dto(p),
+        etapas=[
+            EtapaDto(
+                chave=e.definicao.chave,
+                nome=e.definicao.nome,
+                descricao=e.definicao.descricao,
+                situacao=e.situacao.value,
+                situacao_rotulo=e.situacao.rotulo,
+                implementada=e.definicao.implementada,
+                acessivel=e.acessivel,
+            )
+            for e in _etapas_do(p)
+        ],
     )

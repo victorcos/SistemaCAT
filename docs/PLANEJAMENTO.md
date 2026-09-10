@@ -183,3 +183,6 @@ transparência. Paleta corrigida: o laranja estava em `#EE8633` e o oficial é
 móvel. Importação de remessa, pré-cadastro de empresa a partir do SPED e
 cadastro de projeto, com tela. Validado contra 7.036 arquivos reais de EFD
 ICMS/IPI, seis versões de leiaute, sem falha.
+
+**2026-09-10** — Tela de trabalhos com cartões por projeto e página de detalhe
+com o roteiro de processamento da CAT em sete etapas.

@@ -1,0 +1,176 @@
+/* Detalhe do projeto: o roteiro de processamento da CAT. */
+
+.voltar {
+  display: inline-block;
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--link);
+  text-decoration: none;
+}
+
+.voltar:hover {
+  text-decoration: underline;
+}
+
+.projeto__cabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 26px;
+  flex-wrap: wrap;
+  padding-bottom: 18px;
+  margin-bottom: 24px;
+  /* a linha dourada é o divisor da própria marca */
+  border-bottom: 2px solid var(--marca-dourado);
+}
+
+.projeto__cnpj {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: var(--texto-suave);
+}
+
+.projeto__uf {
+  padding: 1px 6px;
+  font-family: var(--fonte);
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--azul-700);
+  background: var(--azul-100);
+  border-radius: 4px;
+}
+
+.projeto__resumo {
+  display: flex;
+  gap: 26px;
+  margin: 0;
+  flex-wrap: wrap;
+}
+
+.projeto__resumo dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--texto-fraco);
+}
+
+.projeto__resumo dd {
+  margin: 3px 0 0;
+  font-size: 14px;
+  color: var(--texto);
+}
+
+.secao__titulo {
+  margin: 0 0 3px;
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--texto);
+}
+
+.secao__sub {
+  margin: 0 0 18px;
+  max-width: 66ch;
+  font-size: 14px;
+  color: var(--texto-suave);
+}
+
+/* ---------- etapas ---------- */
+.etapas {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.etapa {
+  display: flex;
+  gap: 14px;
+  padding: 15px 18px;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-g);
+}
+
+/* o que ainda não existe fica apagado, mas visível: o usuário vê o caminho
+   inteiro e sabe onde o trabalho está */
+.etapa--nao_disponivel,
+.etapa--bloqueada {
+  opacity: 0.62;
+}
+
+.etapa--pendente {
+  border-left: 3px solid var(--marca-laranja);
+}
+
+.etapa--concluida {
+  border-left: 3px solid var(--sucesso);
+}
+
+.etapa__marca {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 50%;
+  color: var(--texto-fraco);
+  background: var(--superficie-alt);
+}
+
+.etapa--concluida .etapa__marca {
+  color: var(--sucesso);
+  background: var(--sucesso-fundo);
+}
+
+.etapa--pendente .etapa__marca {
+  color: var(--acao-texto);
+  background: var(--marca-laranja);
+}
+
+.etapa__corpo {
+  min-width: 0;
+  flex: 1;
+}
+
+.etapa__linha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.etapa__nome {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--texto);
+}
+
+.etapa__descricao {
+  margin: 4px 0 0;
+  max-width: 78ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--texto-suave);
+}
+
+.etapa__acao {
+  display: inline-block;
+  margin-top: 9px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--link);
+  text-decoration: none;
+}
+
+.etapa__acao:hover {
+  text-decoration: underline;
+}
