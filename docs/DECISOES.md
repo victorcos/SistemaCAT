@@ -453,3 +453,85 @@ transferir para o usuário uma checagem que a máquina faz melhor.
 o ERP da própria empresa, e ele não se identifica. Sem CNPJ, o arquivo passa —
 chutar que é de outra empresa deixaria de fora justamente a fonte de quem não
 libera XML.
+
+---
+
+## 2026-09-10 — Conferência de documentos: o confronto é pela chave de acesso
+
+**Decisão.** A primeira análise do trabalho cruza o que a EFD escriturou
+(**C100** e **C800**) com o documento que o cliente entregou (XML ou relatório
+gerencial). O casamento é pela **chave de acesso** de 44 dígitos.
+
+**Por quê.** A chave é única por documento e existe nos quatro lugares:
+`CHV_NFE` no C100, `CHV_CFE` no C800, o atributo `Id` no XML e a coluna
+`Chave DFe` no relatório do ERP. Casar por número e série seria frágil — série
+se repete entre estabelecimentos e número reinicia.
+
+**Consequência.** Documento sem chave fica fora do confronto, e isso é
+deliberado: nota modelo 1 e cupom antigo não têm chave, e tratá-los como
+pendência mandaria o cliente atrás de algo que nunca existiu. Numa amostra
+real, 124 de 321.464 documentos.
+
+**Os dois destinos.** A diferença não é uma lista só; são duas, com destinos
+opostos:
+
+| | O que é | O que se faz |
+|---|---|---|
+| Não escriturada | está na pasta, não está na EFD | sai da análise |
+| Sem documento | está na EFD, o documento não veio | cobra-se do cliente |
+
+Nota não escriturada não compõe apuração: ressarcimento se pede sobre o que foi
+declarado ao fisco, e incluir o que não foi declarado é construir crédito em
+cima de documento que a SEFAZ não vê.
+
+---
+
+## 2026-09-10 — Nota cancelada não entra na cobrança
+
+**Decisão.** Documento com situação 02, 03, 04 ou 05 (cancelado, cancelado
+extemporâneo, denegado, numeração inutilizada) conta como pendência, mas fica
+**fora da planilha de cobrança**.
+
+**Por quê.** Não há documento a pedir. Para cancelado e denegado a operação não
+existe; para numeração inutilizada, documento nenhum chegou a existir. Mandar
+isso ao cliente numa lista de cobrança queima a conversa e atrasa o que
+interessa. Numa amostra real, 92 de 64.268 pendências.
+
+---
+
+## 2026-09-10 — Cupom de consumidor domina o volume, e por isso há filtro
+
+**Decisão.** A planilha de cobrança aceita filtro por modelo de documento, e a
+tela mostra a contagem por modelo ao lado do botão.
+
+**Por quê.** Medido em 20 arquivos reais da Sulamericana: **307.319 dos 321.337
+documentos eram NFC-e** e apenas 14.018 eram NF-e. Uma cobrança sem filtro sai
+dominada por cupom de consumidor — que ninguém vai atrás de XML por XML — e a
+lista inteira perde serventia pelo volume. O sistema não decide por quem
+trabalha: mostra a distribuição e deixa escolher.
+
+---
+
+## 2026-09-10 — Processamento pesado: execução registrada, fila em processo
+
+**Decisão.** Cada rodada pesada vira linha na tabela `execucao`, com passo,
+progresso, bytes lidos, documentos e resumo. A fila é um `ThreadPoolExecutor`
+de uma linha só dentro do processo da API, não Celery.
+
+**Por quê.** A arquitetura pede Celery, e é para lá que vai quando o sistema
+sair da máquina de quem trabalha. Hoje, Celery exigiria subir Redis ou
+RabbitMQ só para enfileirar uma tarefa por vez — mais peça para instalar,
+manter e quebrar do que o problema pede. O que **não** muda com a troca já está
+no lugar: a tarefa não vive na requisição, a rodada é linha no banco e o front
+acompanha por identificador. O dia da migração troca um arquivo.
+
+**Uma execução por vez, de propósito.** Duas extrações simultâneas disputariam
+a mesma rede e o mesmo disco e terminariam as duas mais devagar.
+
+**Medido.** 20 arquivos de EFD, 108 MB: **321.464 documentos em 4,1 s**
+(79 mil/s), parquet de 3,4 MB. Confronto em 0,9 s. Planilha de 64.176 linhas em
+5,1 s.
+
+**Consequência.** Se a API reiniciar no meio, a execução fica com situação
+`rodando` para sempre. Ainda não há varredura de execução órfã na subida — é a
+próxima dívida deste desenho.

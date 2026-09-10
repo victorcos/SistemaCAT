@@ -10,8 +10,8 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 
 from sqlalchemy import (
-    BigInteger, Boolean, Date, DateTime, ForeignKey, Index, Integer, String,
-    Text, UniqueConstraint, func,
+    JSON, BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Index,
+    Integer, String, Text, UniqueConstraint, func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -225,3 +225,42 @@ class ArquivoDoLoteDB(Base):
     competencia: Mapped[date | None] = mapped_column(Date)
     uf: Mapped[str | None] = mapped_column(String(2))
     detalhe: Mapped[str | None] = mapped_column(Text)
+
+
+class ExecucaoDB(Base):
+    """Uma rodada de processamento pesado, com o que ela leu e o que produziu.
+
+    A arquitetura pede isto desde o começo: extração completa de uma empresa lê
+    mais de 100 GB e leva minutos, então não vive dentro da requisição — a API
+    devolve um identificador e o front acompanha.
+
+    A linha fica **para sempre**, mesmo depois de a rodada terminar. Quando um
+    número da apuração for questionado meses depois, é aqui que se responde de
+    qual base ele saiu, quando, por quem e sobre quantos arquivos.
+    """
+
+    __tablename__ = "execucao"
+    __table_args__ = (Index("ix_execucao_projeto", "projeto_id", "etapa"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    projeto_id: Mapped[int] = mapped_column(ForeignKey("projeto.id"), nullable=False)
+    etapa: Mapped[str] = mapped_column(String(30), nullable=False)
+    situacao: Mapped[str] = mapped_column(
+        String(20), default="na_fila", server_default="na_fila", nullable=False
+    )
+    passo: Mapped[str | None] = mapped_column(Text)
+    fracao: Mapped[float] = mapped_column(Float, default=0.0,
+                                          server_default="0", nullable=False)
+    arquivos_totais: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    arquivos_lidos: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    bytes_lidos: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    documentos: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    pasta_de_trabalho: Mapped[str | None] = mapped_column(Text)
+    resumo: Mapped[dict | None] = mapped_column(JSON)
+    erro: Mapped[str | None] = mapped_column(Text)
+    iniciada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, server_default=func.now(),
+        nullable=False,
+    )
+    terminada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    criada_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))

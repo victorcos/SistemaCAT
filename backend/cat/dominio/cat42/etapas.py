@@ -56,6 +56,17 @@ ETAPAS: tuple[DefinicaoEtapa, ...] = (
         implementada=True,
     ),
     DefinicaoEtapa(
+        chave="conferencia",
+        nome="Conferir documentos",
+        descricao=(
+            "Cruzar o que a EFD escriturou (C100 e C800) com o XML e o "
+            "relatório do cliente. Sai daqui o que está na pasta e não foi "
+            "escriturado — que fica fora da análise — e o que foi escriturado "
+            "sem documento, que é o que se cobra do cliente."
+        ),
+        implementada=True,
+    ),
+    DefinicaoEtapa(
         chave="movimentos",
         nome="Extrair movimentos",
         descricao=(

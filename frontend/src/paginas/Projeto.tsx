@@ -99,6 +99,15 @@ export default function Projeto() {
                     : "Importar a base de dados"}
                 </Link>
               )}
+              {e.chave === "conferencia" && e.acessivel && (
+                <Link className="etapa__acao" to={`/projetos/${id}/conferencia`}>
+                  {e.situacao === "concluida"
+                    ? "Ver o resultado e baixar as planilhas"
+                    : e.situacao === "em_andamento"
+                      ? "Acompanhar a conferência"
+                      : "Conferir documentos"}
+                </Link>
+              )}
             </div>
           </li>
         ))}

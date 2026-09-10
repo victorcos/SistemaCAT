@@ -14,10 +14,15 @@ dependencies = [
     "bcrypt",          # só para ler resumo antigo durante a migração
     "python-multipart",
     "psycopg[binary]",
+    # extração e confronto: parquet entre etapas, DuckDB para agregar e
+    # xlsxwriter em memória constante para a entrega (ARQUITETURA §7 e §9)
+    "pyarrow",
+    "duckdb",
+    "xlsxwriter",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "httpx"]
+dev = ["pytest", "httpx", "openpyxl"]   # openpyxl só para conferir o xlsx gerado
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

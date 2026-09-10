@@ -36,6 +36,11 @@ class Config(BaseSettings):
     # pede a listagem de qualquer pasta da máquina.
     pastas_permitidas: str = ""
 
+    # Onde ficam os parquets de cada execução. Disco LOCAL de propósito:
+    # gravação longa em unidade de rede se perde (ARQUITETURA §8), e uma
+    # extração dessas grava por minutos.
+    pasta_de_trabalho: str = "data/trabalho"
+
     @property
     def lista_origens(self) -> list[str]:
         return [o.strip() for o in self.origens_permitidas.split(",") if o.strip()]

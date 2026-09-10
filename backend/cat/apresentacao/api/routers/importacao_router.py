@@ -32,6 +32,7 @@ from cat.infraestrutura.repositorios.modelos import (
     AlocacaoDB,
     EmpresaDB,
     EstabelecimentoDB,
+    ExecucaoDB,
     LoteDB,
     ProjetoDB,
 )
@@ -405,12 +406,31 @@ def _etapas_do(
     Dar a etapa por feita ali dizia ao usuário que havia dado quando não havia.
     Agora conclui quando existe pelo menos um lote com arquivo que a CAT lê.
     """
+    concluidas: set[str] = set()
+    em_andamento: str | None = None
+
     tem_base = sessao.scalar(
         select(func.count())
         .select_from(LoteDB)
         .where(LoteDB.projeto_id == p.id, LoteDB.arquivos_uteis > 0)
     ) or 0
-    return etapas_dominio.montar(concluidas={"importar"} if tem_base else set())
+    if tem_base:
+        concluidas.add("importar")
+
+    # a conferência conclui com uma rodada terminada; enquanto roda, a etapa
+    # aparece em andamento, que é o que explica a espera ao usuário
+    situacao = sessao.scalar(
+        select(ExecucaoDB.situacao)
+        .where(ExecucaoDB.projeto_id == p.id, ExecucaoDB.etapa == "conferencia")
+        .order_by(ExecucaoDB.id.desc())
+        .limit(1)
+    )
+    if situacao == "concluida":
+        concluidas.add("conferencia")
+    elif situacao in ("na_fila", "rodando"):
+        em_andamento = "conferencia"
+
+    return etapas_dominio.montar(concluidas, em_andamento)
 
 
 def _projeto_dto(p: ProjetoDB, sessao: Session) -> ProjetoDto:

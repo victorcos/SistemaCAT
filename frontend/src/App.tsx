@@ -6,6 +6,7 @@ import {
   Routes,
 } from "react-router-dom";
 import Leiaute from "./componentes/Leiaute";
+import Conferencia from "./paginas/Conferencia";
 import Importar from "./paginas/Importar";
 import Inicio from "./paginas/Inicio";
 import Login from "./paginas/Login";
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="/importar" element={<Importar />} />
           <Route path="/projetos/:id" element={<Projeto />} />
           <Route path="/projetos/:id/arquivos" element={<Lote />} />
+          <Route path="/projetos/:id/conferencia" element={<Conferencia />} />
           <Route
             path="/usuarios"
             element={
