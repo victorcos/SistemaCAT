@@ -220,16 +220,7 @@
 @media (max-width: 860px) {
   .login { grid-template-columns: 1fr; }
   .login__marca { display: none; }
-  .login__logo-movel { display: block; }
-  /* sem o lado azul, o formulário fica sobre superfície clara e o logotipo
-     branco sumiria — por isso ganha um fundo azul próprio */
-  .login__logo-movel {
-    padding: 18px 22px;
-    background: var(--marca-azul);
-    border-radius: var(--raio-g);
-    box-sizing: content-box;
-    width: 170px;
-  }
+  .login__logo-movel { display: block; width: 190px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

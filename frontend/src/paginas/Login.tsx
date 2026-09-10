@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { entrar } from "../servicos/auth";
 import { ErroApi, type Usuario } from "../tipos/auth";
-import logo from "../ativos/logo-bms-branco.png";
+import logo from "../ativos/bms-branco.png";
+import logoMarinho from "../ativos/bms-marinho.png";
 import "./Login.css";
 
 interface Props {
@@ -44,8 +45,7 @@ export default function Login({ aoEntrar }: Props) {
 
   return (
     <div className="login">
-      {/* Lado da marca. Fundo azul porque é a única superfície onde o
-          logotipo que temos funciona — ver docs/IDENTIDADE.md seção 7. */}
+      {/* Lado da marca, em marinho: aqui vale a versão de tinta clara. */}
       <aside className="login__marca" aria-hidden="true">
         <img src={logo} alt="" className="login__logo" />
         <p className="login__assinatura">
@@ -55,7 +55,13 @@ export default function Login({ aoEntrar }: Props) {
 
       <main className="login__area">
         <form className="login__caixa" onSubmit={enviar} noValidate>
-          <img src={logo} alt="BMS Consultoria Tributária" className="login__logo-movel" />
+          {/* em tela estreita o formulário fica sobre fundo claro, então
+              entra a versão marinho, sem caixa azul de remendo */}
+          <img
+            src={logoMarinho}
+            alt="BMS Consultoria Tributária"
+            className="login__logo-movel"
+          />
 
           <h1 className="login__titulo">Entrar</h1>
           <p className="login__subtitulo">

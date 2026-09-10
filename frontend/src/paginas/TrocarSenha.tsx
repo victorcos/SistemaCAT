@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { trocarPropriaSenha } from "../servicos/usuarios";
 import { quemSouEu } from "../servicos/auth";
 import { ErroApi, type Usuario } from "../tipos/auth";
-import logo from "../ativos/logo-bms-branco.png";
+import logo from "../ativos/bms-marinho.png";
 import "./TrocarSenha.css";
 
 interface Props {

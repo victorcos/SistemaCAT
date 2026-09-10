@@ -110,7 +110,7 @@ Objetivo: casar produto com custo baixo e sem invenção.
 
 Objetivo: sair do terminal.
 
-- [ ] Obter o logotipo em vetor, nas versões positiva e negativa
+- [x] Obter o logotipo nas versões positiva e negativa (PNG em alta; vetor ainda ajudaria)
 
 - [ ] API com as rotas de projeto, execução e consulta
 - [ ] React com tabela virtualizada, para o detalhe de milhão de linhas
@@ -173,3 +173,7 @@ passam a exigir capacidade em vez de papel. 135 testes.
 **2026-09-10** — Front da gestão de usuários: moldura da aplicação, lista com
 ações, cadastro, e a troca obrigatória de senha que fechava o ciclo da senha
 provisória.
+
+**2026-09-10** — Logotipos oficiais recebidos em alta resolução com
+transparência. Paleta corrigida: o laranja estava em `#EE8633` e o oficial é
+`#FF7F00`.

@@ -19,15 +19,11 @@
   box-shadow: var(--sombra-elevada);
 }
 
-/* o logotipo e branco, entao precisa de fundo azul proprio sobre a caixa clara */
+/* versao marinho: a caixa e clara, nao precisa de fundo proprio */
 .troca__logo {
   display: block;
-  width: 150px;
-  margin: -52px auto 18px;
-  padding: 14px 18px;
-  background: var(--marca-azul);
-  border-radius: var(--raio-g);
-  box-sizing: content-box;
+  width: 175px;
+  margin: 0 auto 20px;
 }
 
 .troca__titulo {

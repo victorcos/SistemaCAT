@@ -276,3 +276,20 @@ assume `submit` quando o botão está dentro de `<form>`. Isso é frouxo em dois
 sentidos: um botão de ação dentro de formulário passa a enviar o formulário sem
 querer, e um seletor por `[type=submit]` não encontra o botão que de fato envia,
 o que fez o teste automatizado falhar sem apontar a causa.
+
+---
+
+## 2026-09-10 — Cores corrigidas a partir dos arquivos oficiais
+
+**Decisão.** A paleta vem dos arquivos oficiais da marca, não de captura de
+tela. Marinho `#021D44` e laranja `#FF7F00`.
+
+**Por quê.** Os primeiros valores saíram de uma captura de tela comprimida e
+estavam deslocados. O marinho errou pouco (`#081C41`), mas o laranja errou
+bastante: `#EE8633` contra o real `#FF7F00`, um tom visivelmente mais apagado.
+Compressão de imagem desloca cor, e captura de tela nunca serve como fonte de
+paleta.
+
+**Consequência.** A escala derivada do laranja foi recalculada. O mínimo para
+texto sobre fundo claro subiu de `#B85E18` para `#B35400`, porque o tom oficial
+é mais claro e precisa escurecer mais para passar em contraste.

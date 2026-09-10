@@ -2,22 +2,26 @@
    Sistema CAT — tokens de cor
    Paleta derivada da marca BMS Consultoria Tributária.
 
-   As quatro cores da marca foram extraídas do arquivo original do logotipo,
-   não estimadas a olho. Contraste conferido pelo critério WCAG AA.
+   Cores extraídas dos arquivos oficiais da marca (docs/marca/), em alta
+   resolução e com transparência. Contraste conferido pelo critério WCAG AA.
+
+   Correção de 10/09/2026: os valores anteriores vinham de uma captura de tela
+   comprimida e estavam deslocados — o laranja em especial (#EE8633 contra o
+   oficial #FF7F00).
 
    Regra: componente NUNCA usa hexadecimal direto. Só variável daqui.
    ========================================================================== */
 
 :root {
   /* ---------- marca, valores exatos do logotipo ---------- */
-  --marca-azul:     #081C41;   /* fundo do logotipo */
-  --marca-laranja:  #EE8633;   /* símbolo */
+  --marca-azul:     #021D44;   /* marinho do logotipo */
+  --marca-laranja:  #FF7F00;   /* símbolo */
   --marca-dourado:  #C19B54;   /* linha divisória */
   --marca-branco:   #FFFFFF;
 
   /* ---------- azul, escala derivada ---------- */
   --azul-900: #050F26;
-  --azul-800: #081C41;         /* a cor da marca */
+  --azul-800: #021D44;         /* a cor da marca */
   --azul-700: #0E2A5C;
   --azul-600: #163B7A;
   --azul-500: #22509B;
@@ -28,18 +32,18 @@
   --azul-050: #EFF4FA;
 
   /* ---------- laranja, escala derivada ----------
-     O laranja da marca reprova contraste sobre branco (2,59:1).
+     O laranja da marca reprova contraste sobre branco (2,53:1).
      Para texto e link em fundo claro, usar 700 ou mais escuro.       */
-  --laranja-900: #7A3C0C;
-  --laranja-800: #9A4D10;      /* 6,10:1 sobre branco */
-  --laranja-700: #B85E18;      /* 4,51:1 sobre branco — mínimo p/ texto */
-  --laranja-600: #D0721F;
-  --laranja-500: #EE8633;      /* a cor da marca */
-  --laranja-400: #F49E5C;
-  --laranja-300: #F8B98A;
-  --laranja-200: #FBD5B8;
-  --laranja-100: #FDE9DA;
-  --laranja-050: #FEF5EE;
+  --laranja-900: #6B3200;
+  --laranja-800: #8F4200;      /* 7,13:1 sobre branco */
+  --laranja-700: #B35400;      /* 5,02:1 sobre branco — mínimo p/ texto */
+  --laranja-600: #E06B00;
+  --laranja-500: #FF7F00;      /* a cor da marca */
+  --laranja-400: #FF9633;
+  --laranja-300: #FFAD5C;
+  --laranja-200: #FFD1A0;
+  --laranja-100: #FFE8D1;
+  --laranja-050: #FFF5EB;
 
   /* ---------- dourado, escala derivada ---------- */
   --dourado-800: #6B5222;
@@ -109,7 +113,8 @@
   --moldura-ativo:      var(--marca-laranja);
   --moldura-borda:      #0E2A5C;
 
-  /* ação primária: laranja da marca com texto azul-escuro (6,46:1) */
+  /* ação primária: laranja da marca com texto marinho (6,57:1).
+     Branco sobre este laranja daria 2,53:1 e reprovaria. */
   --acao-fundo:         var(--marca-laranja);
   --acao-texto:         var(--marca-azul);
   --acao-hover:         var(--laranja-600);
@@ -137,8 +142,8 @@
   --tabela-numero:          var(--cinza-900);
 
   --destaque:           var(--marca-dourado);   /* divisória, faixa de seção */
-  --sombra:             0 1px 2px rgb(8 28 65 / 8%), 0 2px 8px rgb(8 28 65 / 6%);
-  --sombra-elevada:     0 4px 12px rgb(8 28 65 / 12%), 0 12px 32px rgb(8 28 65 / 10%);
+  --sombra:             0 1px 2px rgb(2 29 68 / 8%), 0 2px 8px rgb(2 29 68 / 6%);
+  --sombra-elevada:     0 4px 12px rgb(2 29 68 / 12%), 0 12px 32px rgb(2 29 68 / 10%);
 
   --raio:      6px;
   --raio-g:    10px;

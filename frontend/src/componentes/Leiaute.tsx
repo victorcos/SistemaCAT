@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { sair } from "../servicos/auth";
 import { ADMINISTRA_USUARIOS, PAPEIS, type Usuario } from "../tipos/auth";
-import logo from "../ativos/logo-bms-branco-compacto.png";
+import logo from "../ativos/bms-branco.png";
 import "./Leiaute.css";
 
 interface Props {
