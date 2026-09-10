@@ -1,0 +1,43 @@
+# dados e saídas
+data/entrada/*
+data/trabalho/*
+data/saida/*
+!data/*/.gitkeep
+*.rar
+*.zip
+*.parquet
+*.xlsx
+*.xlsb
+*.csv
+!backend/tests/integracao/amostras/*.csv
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# node
+node_modules/
+dist/
+.vite/
+
+# ambiente e segredo
+.env
+.env.local
+*.pem
+*.key
+
+# logs
+logs/
+*.log
+
+# sistema
+.DS_Store
+Thumbs.db
+desktop.ini
