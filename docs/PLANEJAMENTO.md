@@ -145,3 +145,6 @@ pastas. Projeto criado.
 
 **2026-09-10** — Repositório publicado no GitHub e regra de versionamento
 estabelecida.
+
+**2026-09-10** — Identidade visual definida a partir da marca BMS. Cores
+extraídas do logotipo por amostragem, contraste conferido, tokens criados.

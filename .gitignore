@@ -37,6 +37,9 @@ dist/
 logs/
 *.log
 
+# o logotipo de referencia da marca entra
+!docs/marca/*.png
+
 # sistema
 .DS_Store
 Thumbs.db

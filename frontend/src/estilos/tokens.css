@@ -1,0 +1,277 @@
+/* ==========================================================================
+   Sistema CAT — tokens de cor
+   Paleta derivada da marca BMS Consultoria Tributária.
+
+   As quatro cores da marca foram extraídas do arquivo original do logotipo,
+   não estimadas a olho. Contraste conferido pelo critério WCAG AA.
+
+   Regra: componente NUNCA usa hexadecimal direto. Só variável daqui.
+   ========================================================================== */
+
+:root {
+  /* ---------- marca, valores exatos do logotipo ---------- */
+  --marca-azul:     #081C41;   /* fundo do logotipo */
+  --marca-laranja:  #EE8633;   /* símbolo */
+  --marca-dourado:  #C19B54;   /* linha divisória */
+  --marca-branco:   #FFFFFF;
+
+  /* ---------- azul, escala derivada ---------- */
+  --azul-900: #050F26;
+  --azul-800: #081C41;         /* a cor da marca */
+  --azul-700: #0E2A5C;
+  --azul-600: #163B7A;
+  --azul-500: #22509B;
+  --azul-400: #3C6CB8;
+  --azul-300: #6D93CE;
+  --azul-200: #A8C0E2;
+  --azul-100: #D6E2F1;
+  --azul-050: #EFF4FA;
+
+  /* ---------- laranja, escala derivada ----------
+     O laranja da marca reprova contraste sobre branco (2,59:1).
+     Para texto e link em fundo claro, usar 700 ou mais escuro.       */
+  --laranja-900: #7A3C0C;
+  --laranja-800: #9A4D10;      /* 6,10:1 sobre branco */
+  --laranja-700: #B85E18;      /* 4,51:1 sobre branco — mínimo p/ texto */
+  --laranja-600: #D0721F;
+  --laranja-500: #EE8633;      /* a cor da marca */
+  --laranja-400: #F49E5C;
+  --laranja-300: #F8B98A;
+  --laranja-200: #FBD5B8;
+  --laranja-100: #FDE9DA;
+  --laranja-050: #FEF5EE;
+
+  /* ---------- dourado, escala derivada ---------- */
+  --dourado-800: #6B5222;
+  --dourado-700: #8A6B2E;      /* 4,97:1 sobre branco */
+  --dourado-600: #A6813C;
+  --dourado-500: #C19B54;      /* a cor da marca */
+  --dourado-400: #D3B37C;
+  --dourado-300: #E3CCA6;
+  --dourado-200: #EFE2CB;
+  --dourado-100: #F7F0E4;
+
+  /* ---------- neutros ---------- */
+  --cinza-900: #16181D;
+  --cinza-800: #24272E;
+  --cinza-700: #3A3E48;
+  --cinza-600: #545963;
+  --cinza-500: #767C88;
+  --cinza-400: #9BA1AC;
+  --cinza-300: #C3C8D0;
+  --cinza-200: #DFE2E7;
+  --cinza-100: #EFF1F4;
+  --cinza-050: #F7F8FA;
+
+  /* ---------- semânticas ----------
+     Atenção NÃO usa o laranja da marca. Se o alerta tiver a mesma cor do
+     botão principal, o usuário deixa de distinguir marca de aviso.       */
+  --sucesso:        #1B7A4B;
+  --sucesso-fundo:  #E6F4EC;
+  --atencao:        #A15C00;   /* âmbar, deliberadamente fora do laranja da marca */
+  --atencao-fundo:  #FFF4E0;
+  --erro:           #B3261E;
+  --erro-fundo:     #FCEBEA;
+  --info:           #163B7A;
+  --info-fundo:     #E8EFF9;
+
+  /* ---------- domínio fiscal ----------
+     Cores dos conceitos que aparecem em tabela e gráfico o tempo todo.  */
+  --fiscal-ressarcimento: #1B7A4B;   /* crédito a favor do contribuinte */
+  --fiscal-complemento:   #B3261E;   /* valor devido */
+  --fiscal-verificar:     #A15C00;   /* anomalia, exige julgamento */
+  --fiscal-sem-valor:     var(--cinza-500);
+  --fiscal-estoque:       var(--azul-600);
+
+  /* ==========================================================================
+     Papéis — tema claro, o padrão.
+     Fundo claro porque o analista passa horas lendo tabela.
+     O azul da marca fica na moldura: cabeçalho e menu lateral.
+     ========================================================================== */
+  --fundo:              var(--cinza-050);
+  --superficie:         var(--marca-branco);
+  --superficie-alt:     var(--cinza-100);
+  --superficie-elevada: var(--marca-branco);
+
+  --texto:              var(--cinza-900);
+  --texto-suave:        var(--cinza-600);
+  --texto-fraco:        var(--cinza-500);
+  --texto-invertido:    var(--marca-branco);
+
+  --borda:              var(--cinza-200);
+  --borda-forte:        var(--cinza-300);
+  --borda-foco:         var(--azul-500);
+
+  /* moldura: cabeçalho e menu lateral, em azul da marca */
+  --moldura-fundo:      var(--marca-azul);
+  --moldura-texto:      var(--marca-branco);
+  --moldura-texto-suave:#A8C0E2;
+  --moldura-ativo:      var(--marca-laranja);
+  --moldura-borda:      #0E2A5C;
+
+  /* ação primária: laranja da marca com texto azul-escuro (6,46:1) */
+  --acao-fundo:         var(--marca-laranja);
+  --acao-texto:         var(--marca-azul);
+  --acao-hover:         var(--laranja-600);
+  --acao-ativo:         var(--laranja-700);
+
+  /* ação secundária */
+  --acao2-fundo:        transparent;
+  --acao2-texto:        var(--azul-700);
+  --acao2-borda:        var(--cinza-300);
+  --acao2-hover:        var(--azul-050);
+
+  --link:               var(--azul-600);
+  --link-hover:         var(--azul-700);
+
+  /* tabela, o componente mais usado do sistema */
+  --tabela-cabecalho-fundo: var(--marca-azul);
+  --tabela-cabecalho-texto: var(--marca-branco);
+  --tabela-linha:           var(--marca-branco);
+  --tabela-linha-alt:       var(--cinza-050);
+  --tabela-linha-hover:     var(--azul-050);
+  --tabela-linha-marcada:   var(--laranja-050);
+  --tabela-borda:           var(--cinza-200);
+  --tabela-numero:          var(--cinza-900);
+
+  --destaque:           var(--marca-dourado);   /* divisória, faixa de seção */
+  --sombra:             0 1px 2px rgb(8 28 65 / 8%), 0 2px 8px rgb(8 28 65 / 6%);
+  --sombra-elevada:     0 4px 12px rgb(8 28 65 / 12%), 0 12px 32px rgb(8 28 65 / 10%);
+
+  --raio:      6px;
+  --raio-g:    10px;
+  --fonte:     "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --fonte-num: "IBM Plex Mono", "Consolas", ui-monospace, monospace;
+}
+
+/* ==========================================================================
+   Tema escuro — o azul da marca vira o fundo do sistema inteiro.
+   Só os papéis mudam; a escala de cor continua a mesma.
+   ========================================================================== */
+:root:not([data-tema="claro"]) {
+  @media (prefers-color-scheme: dark) {
+    --fundo:              var(--azul-900);
+    --superficie:         var(--marca-azul);
+    --superficie-alt:     #0B2149;
+    --superficie-elevada: var(--azul-700);
+
+    --texto:              #E8EEF7;
+    --texto-suave:        #A8C0E2;
+    --texto-fraco:        #6D93CE;
+    --texto-invertido:    var(--azul-900);
+
+    --borda:              #14315F;
+    --borda-forte:        #1D4275;
+    --borda-foco:         var(--laranja-400);
+
+    --moldura-fundo:      var(--azul-900);
+    --moldura-texto:      #E8EEF7;
+    --moldura-texto-suave:#6D93CE;
+    --moldura-borda:      #14315F;
+
+    --acao-hover:         var(--laranja-400);
+    --acao-ativo:         var(--laranja-300);
+
+    --acao2-texto:        #A8C0E2;
+    --acao2-borda:        #1D4275;
+    --acao2-hover:        #0E2A5C;
+
+    --link:               var(--laranja-400);
+    --link-hover:         var(--laranja-300);
+
+    --tabela-cabecalho-fundo: var(--azul-700);
+    --tabela-linha:           var(--marca-azul);
+    --tabela-linha-alt:       #0B2149;
+    --tabela-linha-hover:     var(--azul-700);
+    --tabela-linha-marcada:   #3A2410;
+    --tabela-borda:           #14315F;
+    --tabela-numero:          #E8EEF7;
+
+    --sucesso:        #4ECB8B;
+    --sucesso-fundo:  #0C2E1F;
+    --atencao:        #E0A44A;
+    --atencao-fundo:  #33240C;
+    --erro:           #F58179;
+    --erro-fundo:     #3A1512;
+    --info:           #7FA9E8;
+    --info-fundo:     #0E2A5C;
+
+    --fiscal-ressarcimento: #4ECB8B;
+    --fiscal-complemento:   #F58179;
+    --fiscal-verificar:     #E0A44A;
+    --fiscal-sem-valor:     #6D93CE;
+    --fiscal-estoque:       #7FA9E8;
+
+    --sombra:         0 1px 2px rgb(0 0 0 / 40%), 0 2px 8px rgb(0 0 0 / 30%);
+    --sombra-elevada: 0 4px 12px rgb(0 0 0 / 50%), 0 12px 32px rgb(0 0 0 / 40%);
+  }
+}
+
+/* escolha explícita do usuário vence o sistema, nos dois sentidos */
+:root[data-tema="escuro"] {
+  --fundo:              var(--azul-900);
+  --superficie:         var(--marca-azul);
+  --superficie-alt:     #0B2149;
+  --superficie-elevada: var(--azul-700);
+  --texto:              #E8EEF7;
+  --texto-suave:        #A8C0E2;
+  --texto-fraco:        #6D93CE;
+  --texto-invertido:    var(--azul-900);
+  --borda:              #14315F;
+  --borda-forte:        #1D4275;
+  --borda-foco:         var(--laranja-400);
+  --moldura-fundo:      var(--azul-900);
+  --moldura-texto:      #E8EEF7;
+  --moldura-texto-suave:#6D93CE;
+  --moldura-borda:      #14315F;
+  --acao-hover:         var(--laranja-400);
+  --acao-ativo:         var(--laranja-300);
+  --acao2-texto:        #A8C0E2;
+  --acao2-borda:        #1D4275;
+  --acao2-hover:        #0E2A5C;
+  --link:               var(--laranja-400);
+  --link-hover:         var(--laranja-300);
+  --tabela-cabecalho-fundo: var(--azul-700);
+  --tabela-linha:           var(--marca-azul);
+  --tabela-linha-alt:       #0B2149;
+  --tabela-linha-hover:     var(--azul-700);
+  --tabela-linha-marcada:   #3A2410;
+  --tabela-borda:           #14315F;
+  --tabela-numero:          #E8EEF7;
+  --sucesso: #4ECB8B; --sucesso-fundo: #0C2E1F;
+  --atencao: #E0A44A; --atencao-fundo: #33240C;
+  --erro:    #F58179; --erro-fundo:    #3A1512;
+  --info:    #7FA9E8; --info-fundo:    #0E2A5C;
+  --fiscal-ressarcimento: #4ECB8B;
+  --fiscal-complemento:   #F58179;
+  --fiscal-verificar:     #E0A44A;
+  --fiscal-sem-valor:     #6D93CE;
+  --fiscal-estoque:       #7FA9E8;
+  --sombra:         0 1px 2px rgb(0 0 0 / 40%), 0 2px 8px rgb(0 0 0 / 30%);
+  --sombra-elevada: 0 4px 12px rgb(0 0 0 / 50%), 0 12px 32px rgb(0 0 0 / 40%);
+}
+
+/* ---------- base ---------- */
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: var(--fonte);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* número em tabela sempre alinhado à direita e tabular, senão a coluna
+   de valor não fica legível ao percorrer com o olho */
+.numero,
+td.numero,
+.valor {
+  font-family: var(--fonte-num);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+:focus-visible {
+  outline: 2px solid var(--borda-foco);
+  outline-offset: 2px;
+}
