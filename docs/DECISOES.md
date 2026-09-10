@@ -321,3 +321,68 @@ examinamos, com 16.862 itens de documento, **nenhum** trazia valor de ICMS-ST.
 Numa distribuidora que compra de substituído e transfere entre filiais, o ST não
 está na nota de entrada — está no XML, em `vICMSSubstituto` ou no campo de
 informação adicional que a própria CAT 42 define.
+
+---
+
+## 2026-09-10 — Relatório gerencial é lido por descoberta, não por cadastro
+
+**Decisão.** O sistema descobre o leiaute do relatório gerencial do próprio
+arquivo — separador, codificação, onde começa o cabeçalho e quantos níveis ele
+tem — e casa as colunas por **nome**, contra um catálogo fixo de campos-alvo.
+Não existe cadastro de formato por empresa.
+
+**Por quê.** Muitas empresas não liberam o XML, só o relatório do ERP delas, e
+o formato muda de empresa para empresa e de um ano para o outro na mesma
+empresa. Cadastro de formato por cliente envelhece e ninguém mantém: o
+trabalho pararia sempre que o ERP mudasse uma coluna de lugar. O que não muda
+é **o que o trabalho precisa** — data, item, quantidade, CFOP, ICMS, ST. Então
+o que é fixo é a lista de campos, e o que é flexível é onde encontrá-los.
+
+**Medido.** 135 relatórios reais do Amigão: 133 lidos (99 de movimento, 20 de
+resumo, 14 de inventário). Os 2 que sobraram não são relatório — um é de-para
+de fornecedor, outro é log de erro, e o sistema recusa os dois dizendo o que
+faltou. Um arquivo de 194 MB e 191.691 linhas lê em 6 segundos.
+
+**Consequência.** O casamento resolve **toda** correspondência exata antes de
+qualquer parcial. Se fosse campo a campo, `Valor` (do valor do item) levaria a
+coluna `Valor ICMS` só por vir antes no catálogo.
+
+---
+
+## 2026-09-10 — "Relatório gerencial" são três espécies, não um formato
+
+**Decisão.** A pasta de relatório gerencial de uma empresa traz espécies
+diferentes de arquivo — movimento por documento, inventário e resumo por
+produto — e cada uma tem seu catálogo e seus campos obrigatórios. A espécie é
+descoberta pelo que as colunas dizem, não pelo nome do arquivo nem por prefixo
+de ERP, e ganha a espécie mais exigente que fecha.
+
+**Por quê.** Ler as três com o mesmo catálogo reprova arquivo bom por falta de
+campo que aquela espécie nunca teve — foi o que aconteceu na primeira versão.
+O desempate pela mais exigente também é necessário: o resumo por produto tem
+uma coluna `Qtde Perdas Estoque`, que casa com o `estoque` que o inventário
+exige, e cairia como inventário.
+
+**Consequência.** Só o movimento alimenta o razão da Ficha 3 — é o único que
+tem data e CFOP por linha. O inventário serve de estoque de abertura (item
+4.1.1) e o resumo serve de conferência de totais.
+
+---
+
+## 2026-09-10 — Campo em branco e valor corrompido são contados em separado
+
+**Decisão.** Linha com campo obrigatório vazio é **incompleta**: conta, aparece
+no log e segue. Linha cujo valor não converte é **inválida**, e passar de 5%
+delas aborta a leitura do arquivo.
+
+**Por quê.** As duas coisas parecem a mesma e não são. Relatório de ERP vem
+cheio de linha sem CFOP — no Amigão o campo vem escrito `'  .      '`, e são
+milhares. Isso é dado incompleto, normal. Já valor que não converte é sintoma
+de coluna mapeada errada, e seguir em frente aí produz uma apuração inteira em
+cima de coluna trocada — número plausível e errado, que é o pior defeito
+possível num trabalho fiscal. Na primeira versão as duas caíam no mesmo
+contador e o CFOP em branco abortava a leitura de arquivos perfeitos.
+
+**Consequência.** A proporção só passa a valer depois de 500 linhas lidas. Num
+arquivo pequeno, ou nas primeiras linhas de um grande, um punhado de registros
+ruins seguidos estoura qualquer proporção sem que haja nada de errado.

@@ -146,3 +146,36 @@ formato `&|codigo_do_item|valor|&`, sem espaços, com vírgula decimal.
 - Regras de crítica do pré-validador e do pós-validador da SEFAZ. Saber o que é
   rejeitado na prática vale mais que a norma.
 - Manuais das demais CATs que o sistema venha a atender.
+
+## 12. O relatório gerencial como fonte
+
+Nem toda empresa libera o XML. Muitas liberam só o relatório gerencial do ERP,
+e é com ele que o trabalho tem de sair. O formato varia por empresa e por ano;
+o que não varia é o que precisamos dele.
+
+**As três espécies.** A mesma pasta costuma ter arquivos de propósitos
+diferentes:
+
+| Espécie | Uma linha por | Serve para |
+|---|---|---|
+| Movimento | item de documento | é a fonte do razão da Ficha 3 |
+| Inventário | item em estoque | estoque de abertura (item 4.1.1) |
+| Resumo por produto | item no período | conferir totais; **não** monta razão |
+
+O resumo não tem data nem CFOP por linha, e por isso não posiciona movimento
+no razão nem alimenta a média ponderada móvel.
+
+**O relatório pode substituir o XML.** Alguns ERPs já extraem os valores do
+documento e os trazem em colunas próprias — no Amigão são `BC ICMS ST;XML`,
+`VR. ICMS ST;XML` e `Chave DFe`. Quando existem, valem sobre os valores do
+próprio ERP, pela regra de que o XML vence. Quando não existem, o sistema
+avisa que o relatório não substitui o XML.
+
+**O inventário nem sempre traz o imposto.** As colunas de ICMS e ST médios por
+unidade podem existir no cabeçalho e vir vazias — é o caso do Amigão, nas
+842.785 linhas do arquivo. Coluna existir não é coluna preenchida. Quando o
+imposto não vem, o estoque de abertura ainda precisa da derivação do item
+3.3.8, e o sistema tem de dizer isso em vez de somar zero calado.
+
+**O que se lê de cada espécie** está em `cat/dominio/gerencial/campos.py`. A
+lista de campos é o contrato; o mapeamento até as colunas é que é flexível.
