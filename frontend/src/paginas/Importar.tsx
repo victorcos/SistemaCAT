@@ -71,7 +71,7 @@ export default function Importar() {
     <div className="pagina">
       <header className="pagina__topo">
         <div>
-          <h1 className="pagina__titulo">Importar arquivos</h1>
+          <h1 className="pagina__titulo">Cadastrar trabalho</h1>
           <p className="pagina__sub">
             Envie o SPED, solto ou compactado. O sistema lê o cabeçalho de cada
             arquivo e identifica a empresa, sem você digitar CNPJ.
@@ -124,7 +124,7 @@ export default function Importar() {
             leitura do conteúdo dos arquivos entra na próxima etapa.
           </p>
           <button type="button" className="botao botao--principal" onClick={reiniciar}>
-            Importar outra empresa
+            Cadastrar outra empresa
           </button>
         </div>
       )}

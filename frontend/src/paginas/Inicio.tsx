@@ -35,7 +35,7 @@ export default function Inicio({ usuario }: { usuario: Usuario }) {
           </p>
         </div>
         <Link className="botao botao--principal" to="/importar">
-          Importar arquivos
+          Cadastrar trabalho
         </Link>
       </header>
 
@@ -125,7 +125,7 @@ function Vazio() {
         razão social pelo próprio arquivo.
       </p>
       <Link className="botao botao--principal" to="/importar">
-        Importar arquivos
+        Cadastrar trabalho
       </Link>
     </div>
   );
