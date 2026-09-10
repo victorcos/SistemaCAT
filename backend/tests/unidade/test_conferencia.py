@@ -367,3 +367,40 @@ class TestResumo:
 
     def test_cobertura_sem_documento_nenhum(self):
         assert ResumoDaConferencia().cobertura == 0.0
+
+
+class TestFiliaisTrocadas:
+    """O erro de uso mais provável, e o mais confuso quando não é explicado.
+
+    Importar a EFD de uma filial e os XML de outra dá cobertura 0% e uma lista
+    de milhares de pendências que parecem falta de documento — quando na
+    verdade nada podia casar. Aconteceu num uso real: EFD do 0001-89 contra XML
+    do 0004-21, 10.605 pendências e nenhum documento conferido.
+    """
+
+    def test_avisa_quando_os_estabelecimentos_nao_se_cruzam(self):
+        r = ResumoDaConferencia(
+            escriturados=10605, conferidos=0, documentos_na_pasta=882,
+            estabelecimentos_da_efd=["43112531000189"],
+            emitentes_na_pasta=["43112531000421"],
+        )
+        aviso = next(a for a in r.avisos if "filiais diferentes" in a)
+        assert "43112531000189" in aviso
+        assert "43112531000421" in aviso
+
+    def test_nao_avisa_quando_ha_intersecao(self):
+        r = ResumoDaConferencia(
+            escriturados=10, conferidos=0, documentos_na_pasta=5,
+            estabelecimentos_da_efd=["43112531000189"],
+            emitentes_na_pasta=["43112531000189", "99999999000191"],
+        )
+        assert not any("filiais diferentes" in a for a in r.avisos)
+
+    def test_nao_avisa_quando_algo_casou(self):
+        # com pelo menos um casamento, a causa não é filial trocada
+        r = ResumoDaConferencia(
+            escriturados=10, conferidos=1, documentos_na_pasta=5,
+            estabelecimentos_da_efd=["43112531000189"],
+            emitentes_na_pasta=["43112531000421"],
+        )
+        assert not any("filiais diferentes" in a for a in r.avisos)

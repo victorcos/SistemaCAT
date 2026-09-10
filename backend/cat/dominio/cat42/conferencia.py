@@ -28,6 +28,11 @@ from enum import Enum
 ZERO = Decimal("0")
 
 
+def _lista(cnpjs: list[str], ate: int = 3) -> str:
+    mostrados = ", ".join(cnpjs[:ate])
+    return f"{mostrados} e mais {len(cnpjs) - ate}" if len(cnpjs) > ate else mostrados
+
+
 def _numero(n: int) -> str:
     """Milhar com ponto, como se escreve em português.
 
@@ -115,6 +120,12 @@ class ResumoDaConferencia:
     por_operacao: list[Fatia] = field(default_factory=list)
     por_classificacao: list[Fatia] = field(default_factory=list)
 
+    # de quais estabelecimentos é cada lado. Quando não se cruzam, nada
+    # pode casar — e a causa é sempre a mesma: importaram a EFD de uma
+    # filial e os XML de outra.
+    estabelecimentos_da_efd: list[str] = field(default_factory=list)
+    emitentes_na_pasta: list[str] = field(default_factory=list)
+
     # ---- o que andou desde a rodada anterior ----
     # O trabalho não termina na primeira conferência: o cliente manda o que
     # faltava e ela roda de novo. Sem estes números, a segunda rodada só diz
@@ -142,6 +153,18 @@ class ResumoDaConferencia:
             avisos.append(
                 "Nenhum XML nem relatório do cliente no lote. Sem documento "
                 "para confrontar, a conferência não diz nada."
+            )
+        if (self.conferidos == 0 and self.escriturados
+                and self.documentos_na_pasta
+                and self.estabelecimentos_da_efd and self.emitentes_na_pasta
+                and not set(self.estabelecimentos_da_efd)
+                        & set(self.emitentes_na_pasta)):
+            avisos.append(
+                "Nenhum documento casou, e o motivo não é falta de documento: "
+                f"a EFD importada é do(s) estabelecimento(s) "
+                f"{_lista(self.estabelecimentos_da_efd)} e os documentos da "
+                f"pasta são de {_lista(self.emitentes_na_pasta)}. São filiais "
+                "diferentes — importe a EFD e os XML do mesmo estabelecimento."
             )
         if self.sem_chave_na_efd:
             avisos.append(

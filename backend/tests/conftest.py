@@ -24,3 +24,11 @@ os.environ.setdefault(
 os.environ.setdefault("CAT_JWT_SEGREDO", "segredo-so-de-teste-nao-usar-em-producao")
 os.environ.setdefault("CAT_SENHA_PIMENTA", "pimenta-so-de-teste")
 os.environ.setdefault("CAT_LOG_NIVEL", "WARNING")
+
+# O disco precisa ser isolado tanto quanto o banco. Sem isto, a execução
+# número 1 do banco de teste grava na MESMA pasta que a execução número 1
+# do banco de verdade — e a planilha do teste passa a ser servida ao
+# usuário. Aconteceu: um download real veio com CNPJ de fixture e chave de
+# 44 setes.
+os.environ.setdefault("CAT_PASTA_DE_TRABALHO",
+                      os.path.join(_TMP, "trabalho"))

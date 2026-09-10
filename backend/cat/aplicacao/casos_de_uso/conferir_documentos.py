@@ -75,7 +75,7 @@ def caminhos_do_projeto(
 
 
 def pasta_da_execucao(execucao_id: int) -> str:
-    raiz = obter_config().pasta_de_trabalho
+    raiz = obter_config().raiz_de_trabalho
     return os.path.join(raiz, f"execucao-{execucao_id}")
 
 

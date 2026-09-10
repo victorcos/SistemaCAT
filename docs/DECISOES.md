@@ -642,3 +642,50 @@ arquivos com a política de guarda da casa, e não cabe a este sistema apagá-lo
 
 **Consequência.** A confirmação avisa que a conferência precisará ser refeita:
 toda conferência já concluída olhou aquele lote.
+
+---
+
+## 2026-09-10 — A bateria de testes gravou por cima de uma execução real
+
+**O que aconteceu.** Um download real da planilha de notas não escrituradas
+veio com CNPJ `88991122000138` e uma chave de 44 setes — dados de fixture do
+módulo `test_conferencia_api.py`.
+
+**Causa.** `CAT_PASTA_DE_TRABALHO` era `data/trabalho`, **relativo**, e o
+`conftest` isolava o banco mas não o disco. O teste roda com o diretório de
+trabalho no `backend/`, cria a execução número 1 no banco SQLite de teste e
+grava em `backend/data/trabalho/execucao-1` — exatamente a pasta da execução
+número 1 do Postgres de verdade. Dois bancos diferentes, o mesmo disco, os
+mesmos identificadores.
+
+**Correções, três.**
+
+1. O `conftest` define `CAT_PASTA_DE_TRABALHO` para a pasta temporária da
+   bateria. Isolar o banco e não isolar o disco é meio isolamento.
+2. `Config.raiz_de_trabalho` devolve caminho **absoluto**. Relativo depende de
+   onde o processo subiu, e dois processos com diretórios diferentes gravariam
+   em lugares diferentes sem ninguém perceber.
+3. A planilha em cache só vale se for **mais nova que o parquet** que a
+   originou. Guardar por nome e nunca conferir a idade servia planilha velha
+   depois de a conferência rodar de novo — defeito independente do primeiro, e
+   que sozinho já bastaria para entregar número errado.
+
+**Lição.** Isolamento de teste não é só banco de dados. É todo recurso
+compartilhado que tenha nome fixo: disco, porta, fila, arquivo temporário.
+
+---
+
+## 2026-09-10 — Cobertura zero tem uma causa provável, e o sistema passa a dizê-la
+
+**Decisão.** Quando nenhum documento casa, o sistema compara os
+estabelecimentos dos dois lados e, se não houver interseção, avisa que são
+filiais diferentes.
+
+**Por quê.** Num uso real: EFD do estabelecimento `43112531000189` contra XML
+do `43112531000421` — mesma empresa, filiais diferentes. Resultado: 10.605
+pendências e nenhum documento conferido. Sem o aviso, aquilo parece falta
+gigantesca de documento e vira cobrança indevida ao cliente; com o aviso, é o
+que é — importaram a EFD de uma filial e os XML de outra.
+
+**Como.** O CNPJ do emitente já está na chave de acesso, posições 7 a 20. Não
+é preciso reabrir XML nenhum para saber de quem ele é.

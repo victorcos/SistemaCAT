@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -40,6 +41,18 @@ class Config(BaseSettings):
     # gravação longa em unidade de rede se perde (ARQUITETURA §8), e uma
     # extração dessas grava por minutos.
     pasta_de_trabalho: str = "data/trabalho"
+
+    @property
+    def raiz_de_trabalho(self) -> str:
+        """A pasta de trabalho como caminho absoluto.
+
+        Relativo depende de onde o processo subiu, e dois processos com
+        diretórios diferentes gravariam em lugares diferentes sem ninguém
+        perceber. Pior: dois com o MESMO diretório e bancos diferentes
+        gravam no mesmo lugar — foi assim que a bateria de testes
+        sobrescreveu a planilha de uma execução real.
+        """
+        return os.path.abspath(self.pasta_de_trabalho)
 
     @property
     def lista_origens(self) -> list[str]:

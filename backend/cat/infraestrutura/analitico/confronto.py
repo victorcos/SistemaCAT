@@ -212,6 +212,15 @@ def _resumir(con, nao_escrituradas: str) -> ResumoDaConferencia:
         """).fetchall()
     ]
 
+    # a chave carrega o CNPJ do emitente nas posições 7 a 20; não é preciso
+    # abrir o XML de novo para saber de quem ele é
+    estabelecimentos = [c for (c,) in con.execute(
+        "SELECT DISTINCT cnpj FROM por_documento "
+        "WHERE cnpj IS NOT NULL AND cnpj <> '' ORDER BY 1").fetchall()]
+    emitentes = [c for (c,) in con.execute(
+        "SELECT DISTINCT substr(chave, 7, 14) FROM entregues ORDER BY 1"
+    ).fetchall() if c]
+
     return ResumoDaConferencia(
         escriturados=escriturados,
         conferidos=conferidos,
@@ -226,6 +235,8 @@ def _resumir(con, nao_escrituradas: str) -> ResumoDaConferencia:
         por_modelo=por_modelo,
         por_operacao=por_operacao,
         por_classificacao=por_classificacao,
+        estabelecimentos_da_efd=estabelecimentos[:20],
+        emitentes_na_pasta=emitentes[:20],
     )
 
 

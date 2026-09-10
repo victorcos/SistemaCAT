@@ -229,7 +229,7 @@ def baixar_planilha(
     sufixo = "-" + "_".join(partes) if partes else ""
     raiz, extensao = os.path.splitext(nome)
     destino = os.path.join(pasta, f"{raiz}{sufixo}{extensao}")
-    if not os.path.isfile(destino):
+    if _precisa_gerar(destino, origem):
         with contexto(etapa=ETAPA, execucao_id=execucao_id, planilha=qual):
             linhas = gerador(origem, destino, escolhidos, classes)
             log.info("planilha da conferência gerada",
@@ -251,3 +251,19 @@ def _conjunto(bruto: str | None) -> frozenset[str] | None:
         return None
     escolhidos = {m.strip() for m in bruto.split(",") if m.strip()}
     return frozenset(escolhidos) or None
+
+
+def _precisa_gerar(planilha: str, parquet: str) -> bool:
+    """A planilha em cache só vale se for mais nova que o dado que a originou.
+
+    Guardar por nome e nunca conferir a idade servia planilha velha depois de a
+    conferência rodar de novo. Aconteceu de valer: um download real veio com o
+    conteúdo de uma execução anterior, e o número na tela não batia com o do
+    arquivo.
+    """
+    if not os.path.isfile(planilha):
+        return True
+    try:
+        return os.path.getmtime(planilha) < os.path.getmtime(parquet)
+    except OSError:
+        return True
