@@ -157,3 +157,74 @@ portanto a única oportunidade de regravar. Sem isso, endurecer parâmetros no
 futuro obrigaria a redefinir a senha de toda a base, o que é caro e gera
 chamado de suporte. Com isso, a migração acontece sozinha conforme as pessoas
 usam o sistema.
+
+---
+
+## 2026-09-10 — Gestão de usuários só na mão dos gestores
+
+**Decisão.** Não há autocadastro nem redefinição de senha por e-mail. Cadastrar,
+redefinir, alterar papel e desbloquear são atos de gestor.
+
+**Por quê.** O sistema roda na rede interna, a base de usuários é fechada e
+conceder acesso a dado fiscal de cliente precisa ser ato deliberado de quem
+responde pela equipe. Redefinição por e-mail seria pior aqui: moveria a
+confiança para a caixa de e-mail, muitas vezes menos protegida que o próprio
+sistema, e exigiria servidor de envio para um evento raro.
+
+**As três salvaguardas que esse modelo exige**, sem as quais ele vira ponto
+único de falha:
+
+1. **Mínimo de três gestores ativos**, que são direção, gerência e coordenação.
+   O sistema recusa rebaixar ou desativar quem deixaria a conta abaixo disso, e
+   ninguém se rebaixa ou se desativa. É regra de domínio, não de tela, para valer
+   também na API.
+2. **A redefinição gera senha provisória de uso único**, com troca obrigatória no
+   primeiro acesso. O gestor nunca escolhe a senha de ninguém: se escolhesse,
+   passaria a saber a senha da pessoa e o resumo de mão única perderia sentido.
+3. **Saída de emergência por linha de comando no servidor**
+   (`cat.apresentacao.cli.emergencia`), capaz de promover, redefinir e
+   desbloquear. Exigir acesso ao sistema de arquivos é um segundo fator razoável
+   num sistema interno e não depende de ninguém estar disponível.
+
+---
+
+## 2026-09-10 — Bloqueio em dois níveis
+
+**Decisão.** Cinco erros bloqueiam por quinze minutos, e a espera se resolve
+sozinha. Vinte erros bloqueiam de vez e exigem gestor.
+
+**Por quê.** Destravar é muito mais frequente que redefinir senha. Bloqueio
+permanente logo no quinto erro geraria chamado toda semana sem ganho de
+segurança: quinze minutos de espera já inviabilizam tentativa por força bruta.
+
+---
+
+## 2026-09-10 — Cargo é diferente de papel
+
+**Decisão.** `Papel` define permissão. `Cargo` é posição na empresa, informação
+organizacional.
+
+**Por quê.** São eixos independentes e fundi-los engessa. Um diretor pode ter
+papel de leitura num período; um analista pode ser gestor do sistema. Já existe
+um terceiro eixo, a alocação, que diz sobre quais empresas a pessoa enxerga.
+
+---
+
+## 2026-09-10 — Postgres de verdade, com migrações versionadas
+
+**Decisão.** O banco do sistema passa a ser Postgres, em contêiner na porta
+55432, com Alembic para migrações. SQLite fica só na bateria de testes.
+
+**Por quê.** Dois motivos concretos do mesmo dia. Primeiro, um erro de fuso
+horário: o SQLite não guarda fuso e devolve data ingênua, o que quebrou o
+bloqueio temporário. O Postgres usa `timestamp with time zone` e não tem esse
+problema. Segundo, acrescentamos três colunas sem ter ferramenta de migração, e
+`create_all` não altera tabela existente — em produção isso viraria SQL na mão.
+
+**Duas consequências.** A aplicação **não cria mais tabela**: na subida ela
+apenas confere e avisa se faltar, com o comando que resolve. E os testes
+continuam em SQLite de propósito: sem fuso horário, é o ambiente mais severo
+para essa parte, e protege contra regressão daquele mesmo erro.
+
+**Porta 55432 e não 5432.** Esta máquina já tem Postgres local nas portas 5432 e
+5433. Não mexemos neles.

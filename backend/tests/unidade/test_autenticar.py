@@ -4,8 +4,8 @@ import pytest
 
 from cat.aplicacao.casos_de_uso.autenticar import AutenticarUseCase
 from cat.dominio.acesso.usuario import (
-    CredencialInvalida, MAX_TENTATIVAS, Papel, Usuario, UsuarioBloqueado,
-    UsuarioInativo,
+    CredencialInvalida, Papel, TENTATIVAS_BLOQUEIO_PERMANENTE, Usuario,
+    UsuarioBloqueado, UsuarioInativo,
 )
 
 
@@ -109,7 +109,7 @@ def test_inativo_e_recusado_antes_de_conferir_senha():
 
 
 def test_bloqueado_e_recusado_mesmo_com_senha_certa():
-    caso, _ = montar(usuario_padrao(tentativas_falhas=MAX_TENTATIVAS))
+    caso, _ = montar(usuario_padrao(tentativas_falhas=TENTATIVAS_BLOQUEIO_PERMANENTE))
     with pytest.raises(UsuarioBloqueado):
         caso.executar("ana", "certa")
 

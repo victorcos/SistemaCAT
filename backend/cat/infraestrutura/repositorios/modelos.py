@@ -43,8 +43,13 @@ class UsuarioDB(Base):
     nome_exibicao: Mapped[str] = mapped_column(Text, nullable=False)
     senha_hash: Mapped[str] = mapped_column(Text, nullable=False)
     papel: Mapped[str] = mapped_column(String(20), nullable=False, default="leitura")
+    cargo: Mapped[str] = mapped_column(String(20), nullable=False, default="outro")
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     tentativas_falhas: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    bloqueado_ate: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    senha_provisoria: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
     ultimo_acesso: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=agora, nullable=False

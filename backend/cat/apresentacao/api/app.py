@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from cat.config import obter_config
-from cat.infraestrutura.repositorios.banco import criar_tabelas
+from cat.infraestrutura.repositorios.banco import conferir_migracoes
 from cat.log import configurar, contexto, obter_log
 
 log = obter_log(__name__)
@@ -21,7 +21,7 @@ log = obter_log(__name__)
 async def ciclo_de_vida(app: FastAPI):
     cfg = obter_config()
     configurar(cfg.log_nivel)
-    criar_tabelas()
+    conferir_migracoes()
     if cfg.segredo_e_padrao:
         log.error(
             "CAT_JWT_SEGREDO está com o valor padrão. Qualquer um pode forjar "
@@ -94,6 +94,7 @@ def saude() -> dict[str, str]:
     return {"status": "ok", "versao": app.version}
 
 
-from cat.apresentacao.api.routers import auth_router  # noqa: E402
+from cat.apresentacao.api.routers import auth_router, usuarios_router  # noqa: E402
 
 app.include_router(auth_router.router)
+app.include_router(usuarios_router.router)

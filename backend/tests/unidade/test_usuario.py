@@ -3,8 +3,9 @@
 import pytest
 
 from cat.dominio.acesso.usuario import (
-    MAX_TENTATIVAS, Papel, SenhaFraca, Usuario, UsuarioBloqueado, UsuarioInativo,
-    validar_email, validar_nome_de_usuario, validar_politica_de_senha,
+    Cargo, Papel, SenhaFraca, TENTATIVAS_BLOQUEIO_PERMANENTE, Usuario,
+    UsuarioBloqueado, UsuarioInativo, validar_email, validar_nome_de_usuario,
+    validar_politica_de_senha,
 )
 
 
@@ -58,25 +59,15 @@ class TestEntrada:
         with pytest.raises(UsuarioInativo):
             novo(ativo=False).garantir_que_pode_entrar()
 
-    def test_bloqueia_no_limite(self):
-        u = novo()
-        for _ in range(MAX_TENTATIVAS):
-            u.registrar_falha()
-        assert u.bloqueado
-        assert u.tentativas_restantes == 0
-        with pytest.raises(UsuarioBloqueado):
+    def test_inativo_tem_precedencia_sobre_bloqueado(self):
+        """Desativar e decisao do gestor; bloquear e consequencia automatica."""
+        u = novo(ativo=False, tentativas_falhas=TENTATIVAS_BLOQUEIO_PERMANENTE)
+        with pytest.raises(UsuarioInativo):
             u.garantir_que_pode_entrar()
 
-    def test_uma_tentativa_antes_do_limite_ainda_passa(self):
-        u = novo()
-        for _ in range(MAX_TENTATIVAS - 1):
-            u.registrar_falha()
-        assert not u.bloqueado
-        u.garantir_que_pode_entrar()
-
-    def test_inativo_tem_precedencia_sobre_bloqueado(self):
-        u = novo(ativo=False, tentativas_falhas=MAX_TENTATIVAS)
-        with pytest.raises(UsuarioInativo):
+    def test_bloqueio_definitivo_impede_entrada(self):
+        u = novo(tentativas_falhas=TENTATIVAS_BLOQUEIO_PERMANENTE)
+        with pytest.raises(UsuarioBloqueado):
             u.garantir_que_pode_entrar()
 
     def test_sucesso_zera_tentativas_e_marca_acesso(self):
@@ -112,3 +103,28 @@ class TestPapel:
         assert not Papel.LEITURA.pode_escrever
         for p in (Papel.GESTOR, Papel.ANALISTA, Papel.REVISOR):
             assert p.pode_escrever
+
+
+class TestCargo:
+    def test_cargo_nao_e_papel(self):
+        """Cargo e informacao organizacional; papel e permissao."""
+        u = novo(papel=Papel.ANALISTA, cargo=Cargo.DIRETOR)
+        assert u.cargo.e_de_gestao
+        assert not u.papel.administra_usuarios
+
+    def test_cargos_de_gestao(self):
+        for c in (Cargo.DIRETOR, Cargo.GERENTE, Cargo.COORDENADOR):
+            assert c.e_de_gestao
+        for c in (Cargo.ANALISTA, Cargo.ESTAGIARIO, Cargo.OUTRO):
+            assert not c.e_de_gestao
+
+    def test_padrao_e_outro(self):
+        assert novo().cargo is Cargo.OUTRO
+
+
+class TestSenhaProvisoria:
+    def test_marca_troca_obrigatoria(self):
+        assert novo(senha_provisoria=True).precisa_trocar_senha
+
+    def test_senha_normal_nao_pede_troca(self):
+        assert not novo().precisa_trocar_senha

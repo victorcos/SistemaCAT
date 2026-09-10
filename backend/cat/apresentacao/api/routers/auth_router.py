@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from cat.aplicacao.casos_de_uso.autenticar import AutenticarUseCase
 from cat.apresentacao.api.seguranca import UsuarioAtual, obter_tokens
 from cat.dominio.acesso.usuario import (
-    CredencialInvalida, UsuarioBloqueado, UsuarioInativo,
+    CredencialInvalida, UsuarioBloqueado, UsuarioBloqueadoTemporariamente,
+    UsuarioInativo,
 )
 from cat.config import obter_config
 from cat.infraestrutura.auth.senha import SenhasArgon2
@@ -42,7 +43,9 @@ class RespostaUsuario(BaseModel):
     email: str
     nome_exibicao: str
     papel: str
+    cargo: str
     empresas: list[int]
+    senha_provisoria: bool = False
     ultimo_acesso: str | None = None
 
 
@@ -72,7 +75,8 @@ def entrar(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail=str(erro),
                 headers={"WWW-Authenticate": "Bearer"},
             ) from erro
-        except (UsuarioInativo, UsuarioBloqueado) as erro:
+        except (UsuarioInativo, UsuarioBloqueado,
+                UsuarioBloqueadoTemporariamente) as erro:
             _nivelar_tempo(inicio)
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail=str(erro)
@@ -98,7 +102,9 @@ def _para_resposta(u) -> RespostaUsuario:
         email=u.email,
         nome_exibicao=u.nome_exibicao,
         papel=u.papel.value,
+        cargo=u.cargo.value,
         empresas=list(u.empresas),
+        senha_provisoria=u.senha_provisoria,
         ultimo_acesso=u.ultimo_acesso.isoformat() if u.ultimo_acesso else None,
     )
 

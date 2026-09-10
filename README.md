@@ -58,7 +58,8 @@ Backend:
 cd backend
 python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"
 cp ../.env.example .env          # e ajuste CAT_JWT_SEGREDO
-python -m cat.apresentacao.cli.semear    # cria o primeiro gestor
+alembic upgrade head                     # cria o esquema
+python -m cat.apresentacao.cli.semear    # cria os três gestores
 python -m uvicorn cat.apresentacao.api.app:app --reload
 ```
 
@@ -72,6 +73,15 @@ npm run dev
 
 A tela abre em http://localhost:5173 e a documentação da API em
 http://localhost:8000/docs.
+
+Se um gestor perder o acesso e não houver outro disponível, a saída é pelo
+servidor:
+
+```
+python -m cat.apresentacao.cli.emergencia listar-gestores
+python -m cat.apresentacao.cli.emergencia promover <usuario>
+python -m cat.apresentacao.cli.emergencia redefinir <usuario>
+```
 
 Testes:
 

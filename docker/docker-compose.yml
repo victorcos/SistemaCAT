@@ -5,7 +5,10 @@ services:
       POSTGRES_USER: cat
       POSTGRES_PASSWORD: cat
       POSTGRES_DB: cat
-    ports: ["5432:5432"]
+    # 55432 no hospedeiro de proposito. Esta maquina tem Postgres local nas
+    # portas 5432 e 5433 (servicos postgresql-x64-15 e -18) e nao mexemos
+    # neles. Porta alta evita colisao com qualquer instalacao existente.
+    ports: ["55432:5432"]
     volumes: ["banco:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cat"]

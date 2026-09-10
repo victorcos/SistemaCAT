@@ -66,9 +66,11 @@ Objetivo: ter onde apoiar tudo o mais.
 - [ ] Domínio da CAT 42 em código, com as duas fórmulas e os enquadramentos
 - [ ] Testes de unidade do cálculo, rodando em milissegundos sem arquivo grande
 - [x] Log estruturado, conforme ARQUITETURA.md seção 12
-- [ ] Modelo de dados no Postgres: empresa, estabelecimento, projeto, usuário,
-      alocação, atividade, execução — *empresa, usuário e alocação prontos;
-      projeto, atividade e execução entram na etapa 2*
+- [x] Postgres com migrações versionadas (Alembic)
+- [ ] Modelo de dados: empresa, estabelecimento, projeto, usuário, alocação,
+      atividade, execução — *empresa, usuário e alocação prontos; projeto,
+      atividade e execução entram na etapa 2*
+- [x] Gestão de usuários com as três salvaguardas
 - [x] Autenticação com escopo por empresa
 - [x] Tela de login
 
@@ -160,3 +162,6 @@ sendo 35 de unidade rodando em 0,07 s sem banco.
 
 **2026-09-10** — Senha migrada de bcrypt para Argon2id, com pimenta opcional e
 reprocessamento transparente no login. 70 testes.
+
+**2026-09-10** — Gestão de usuários com as três salvaguardas, bloqueio em dois
+níveis e migração para Postgres com Alembic. 122 testes.
