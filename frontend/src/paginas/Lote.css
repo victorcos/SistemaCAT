@@ -1,0 +1,113 @@
+/* Importação da base de dados de um trabalho. Só variáveis de tokens.css. */
+
+.lote__forma {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+/* o caminho é longo e é o que o usuário confere: ocupa o que sobrar */
+.lote__forma .campo {
+  flex: 1 1 460px;
+  margin-top: 0;
+}
+
+.campo__dica {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--texto-fraco);
+}
+
+.lote__subtitulo {
+  margin: 22px 0 8px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--texto);
+}
+
+/* ---------- etiquetas de contagem ---------- */
+.etiquetas {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+/* o que a CAT lê ganha destaque; o resto fica presente mas apagado, porque
+   saber que veio EFD Contribuições junto é informação, não ruído */
+.etiqueta--util {
+  color: var(--azul-700);
+  background: var(--azul-100);
+}
+
+.celula__nota {
+  display: block;
+  font-size: 11px;
+  color: var(--texto-fraco);
+}
+
+/* ---------- histórico ---------- */
+.lote__historico {
+  margin-top: 34px;
+  padding-top: 22px;
+  border-top: 2px solid var(--marca-dourado);
+}
+
+.lotes {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lote-item {
+  padding: 15px 18px;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-left: 3px solid var(--sucesso);
+  border-radius: var(--raio-g);
+}
+
+.lote-item__topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.lote-item__pasta {
+  font-size: 13px;
+  color: var(--texto);
+  word-break: break-all;
+}
+
+.lote-item__data {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--texto-fraco);
+}
+
+.lote-item__numeros {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--texto-suave);
+}
+
+.lote-item__nota {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--texto-suave);
+}
+
+.lote-item .etiquetas {
+  margin-top: 10px;
+}

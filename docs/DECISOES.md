@@ -386,3 +386,70 @@ contador e o CFOP em branco abortava a leitura de arquivos perfeitos.
 **Consequência.** A proporção só passa a valer depois de 500 linhas lidas. Num
 arquivo pequeno, ou nas primeiras linhas de um grande, um punhado de registros
 ruins seguidos estoura qualquer proporção sem que haja nada de errado.
+
+---
+
+## 2026-09-10 — Cadastro e entrada de dados são telas separadas
+
+**Decisão.** Dois caminhos distintos, com telas, rotas e tabelas próprias:
+
+| | Cadastro (`/importar`) | Base de dados (`/projetos/:id/arquivos`) |
+|---|---|---|
+| o que faz | cria empresa e projeto | alimenta um projeto que já existe |
+| entrada | envio de uma amostra do SPED | caminho de uma pasta |
+| quantas vezes | uma por trabalho | quantas a empresa mandar arquivo |
+| grava | empresa, estabelecimento, projeto | lote e arquivos do lote |
+
+**Por quê.** Estavam colapsados, e o link "Importar mais arquivos" de dentro do
+projeto levava de volta ao cadastro — que recomeçaria a criação da empresa.
+Redundância que produzia trabalho duplicado, apontada pelo dono do produto.
+
+**Consequência.** A etapa "Importar base de dados" só conclui quando existe
+lote com arquivo que a CAT lê. Antes concluía por existir o projeto, o que
+dizia ao usuário que havia base quando não havia.
+
+---
+
+## 2026-09-10 — O lote aponta para uma pasta; não sobe arquivo
+
+**Decisão.** A entrada de dados recebe o **caminho** de uma pasta de rede. O
+conteúdo não é copiado para dentro do sistema: guarda-se onde cada arquivo
+está e o que ele é.
+
+**Por quê.** Medido nas bases desta casa: a pasta de EFD ICMS/IPI da
+Sulamericana tem **7.036 arquivos e 100 GB**; a de relatórios do Amigão tem
+**53,9 GB**. Subir isso pelo navegador não é lento, é inviável. E o dado já
+vive no servidor de arquivos, com a política de guarda da casa — duplicá-lo
+dentro do sistema só multiplicaria material sigiloso.
+
+**Consequência 1.** A varredura é paralela: identificar arquivo em disco de
+rede é espera, não cálculo. Na pasta do Amigão, 325 arquivos caíram de **49 s
+para 1,2 s**. O tamanho vem da própria listagem do diretório, o que poupa uma
+ida à rede por arquivo.
+
+**Consequência 2.** Fica a conta a pagar: a pasta de 7.036 SPED leva **~5
+minutos na primeira varredura** e ~50 s depois, com o cache do Windows quente.
+Se isso incomodar no uso, o passo seguinte é rodar a varredura como tarefa de
+fundo com progresso, em vez de segurar a requisição.
+
+**Consequência 3.** O servidor passa a ler caminho que o cliente informa.
+Enquanto o sistema roda na máquina de quem trabalha, isso é o próprio disco do
+usuário. Existe `CAT_PASTAS_PERMITIDAS` para fechar as origens, e ela **precisa
+estar preenchida** no dia em que o sistema virar servidor compartilhado.
+
+---
+
+## 2026-09-10 — Arquivo de outra empresa é barrado sem perguntar
+
+**Decisão.** Ao ler uma pasta, todo arquivo cuja raiz de CNPJ não bate com a do
+projeto fica de fora. O usuário é informado, não consultado.
+
+**Por quê.** Pasta de rede é compartilhada e mistura cliente. Arquivo de uma
+empresa entrar no trabalho de outra contamina a apuração das duas de uma vez —
+é o acidente mais caro que este sistema pode causar. Pedir confirmação seria
+transferir para o usuário uma checagem que a máquina faz melhor.
+
+**Exceção deliberada.** Relatório gerencial não traz CNPJ: quem o produziu foi
+o ERP da própria empresa, e ele não se identifica. Sem CNPJ, o arquivo passa —
+chutar que é de outra empresa deixaria de fora justamente a fonte de quem não
+libera XML.

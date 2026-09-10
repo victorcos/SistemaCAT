@@ -9,6 +9,7 @@ import Leiaute from "./componentes/Leiaute";
 import Importar from "./paginas/Importar";
 import Inicio from "./paginas/Inicio";
 import Login from "./paginas/Login";
+import Lote from "./paginas/Lote";
 import Projeto from "./paginas/Projeto";
 import TrocarSenha from "./paginas/TrocarSenha";
 import Usuarios from "./paginas/Usuarios";
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="/" element={<Inicio usuario={usuario} />} />
           <Route path="/importar" element={<Importar />} />
           <Route path="/projetos/:id" element={<Projeto />} />
+          <Route path="/projetos/:id/arquivos" element={<Lote />} />
           <Route
             path="/usuarios"
             element={

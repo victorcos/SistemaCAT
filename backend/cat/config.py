@@ -29,9 +29,20 @@ class Config(BaseSettings):
     log_nivel: str = "INFO"
     origens_permitidas: str = "http://localhost:5173"
 
+    # De onde o lote pode ler arquivo. Separar por ";".
+    # Vazio libera o disco inteiro, o que serve enquanto o sistema roda na
+    # máquina de quem trabalha. No dia em que virar servidor compartilhado,
+    # isto precisa estar preenchido: sem limite, qualquer usuário do sistema
+    # pede a listagem de qualquer pasta da máquina.
+    pastas_permitidas: str = ""
+
     @property
     def lista_origens(self) -> list[str]:
         return [o.strip() for o in self.origens_permitidas.split(",") if o.strip()]
+
+    @property
+    def lista_pastas_permitidas(self) -> list[str]:
+        return [p.strip() for p in self.pastas_permitidas.split(";") if p.strip()]
 
     @property
     def usa_sqlite(self) -> bool:

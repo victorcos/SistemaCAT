@@ -10,8 +10,8 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 
 from sqlalchemy import (
-    Boolean, Date, DateTime, ForeignKey, Integer, String, Text,
-    UniqueConstraint, func,
+    BigInteger, Boolean, Date, DateTime, ForeignKey, Index, Integer, String,
+    Text, UniqueConstraint, func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -163,3 +163,65 @@ class ProjetoDB(Base):
     criado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
 
     empresa: Mapped[EmpresaDB] = relationship(lazy="joined")
+
+
+class LoteDB(Base):
+    """Uma entrada de arquivos para um trabalho.
+
+    Um projeto tem vários lotes, e é assim que tem de ser: a empresa manda o
+    que faltou, manda o ano seguinte, manda o relatório que o ERP só soltou
+    depois. Cada entrada fica registrada com quem trouxe e de onde, porque
+    quando um número da apuração for questionado meses depois, a primeira
+    pergunta é de qual base ele saiu.
+
+    O conteúdo dos arquivos não é copiado: guarda-se o caminho. Base de cliente
+    tem gigabytes e já vive no servidor de arquivos com a política de guarda da
+    casa; duplicar isso dentro do sistema só multiplicaria o dado sigiloso.
+    """
+
+    __tablename__ = "lote"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    projeto_id: Mapped[int] = mapped_column(ForeignKey("projeto.id"), nullable=False)
+    pasta: Mapped[str] = mapped_column(Text, nullable=False)
+    total_arquivos: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    arquivos_uteis: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    bytes_totais: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    competencia_ini: Mapped[date | None] = mapped_column(Date)
+    competencia_fim: Mapped[date | None] = mapped_column(Date)
+    observacao: Mapped[str | None] = mapped_column(Text)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, server_default=func.now(),
+        nullable=False,
+    )
+    criado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+
+    projeto: Mapped[ProjetoDB] = relationship(lazy="joined")
+
+
+class ArquivoDoLoteDB(Base):
+    """Um arquivo de um lote, já identificado.
+
+    A etapa seguinte lê esta tabela para saber o que abrir: filtra por tipo e
+    por competência em vez de varrer a pasta de novo. Por isso guarda o tipo
+    reconhecido, e não só o caminho.
+    """
+
+    __tablename__ = "arquivo_do_lote"
+    __table_args__ = (
+        # o mesmo arquivo não entra duas vezes no mesmo lote
+        UniqueConstraint("lote_id", "caminho"),
+        # a etapa de movimentos filtra por tipo dentro do lote
+        Index("ix_arquivo_do_lote_tipo", "lote_id", "tipo"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lote_id: Mapped[int] = mapped_column(ForeignKey("lote.id"), nullable=False)
+    caminho: Mapped[str] = mapped_column(Text, nullable=False)
+    nome: Mapped[str] = mapped_column(Text, nullable=False)
+    tamanho: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    tipo: Mapped[str] = mapped_column(String(30), nullable=False)
+    cnpj: Mapped[str | None] = mapped_column(String(14))
+    competencia: Mapped[date | None] = mapped_column(Date)
+    uf: Mapped[str | None] = mapped_column(String(2))
+    detalhe: Mapped[str | None] = mapped_column(Text)

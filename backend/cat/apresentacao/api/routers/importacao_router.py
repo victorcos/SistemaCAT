@@ -18,7 +18,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from cat.aplicacao.casos_de_uso.analisar_remessa import RemessaAnalisada, analisar
@@ -32,6 +32,7 @@ from cat.infraestrutura.repositorios.modelos import (
     AlocacaoDB,
     EmpresaDB,
     EstabelecimentoDB,
+    LoteDB,
     ProjetoDB,
 )
 from cat.log import contexto, obter_log
@@ -333,7 +334,8 @@ def listar_projetos(
 ) -> list[ProjetoDto]:
     linhas = sessao.scalars(select(ProjetoDB).order_by(ProjetoDB.criado_em.desc()))
     return [
-        _projeto_dto(p) for p in linhas if usuario.enxerga_empresa(p.empresa_id)
+        _projeto_dto(p, sessao) for p in linhas
+        if usuario.enxerga_empresa(p.empresa_id)
     ]
 
 
@@ -390,18 +392,30 @@ def criar_projeto(
         extra={"projeto_id": p.id, "empresa_id": p.empresa_id,
                "frente": p.frente, "por_usuario_id": usuario.id},
     )
-    return _projeto_dto(p)
+    return _projeto_dto(p, sessao)
 
 
-def _etapas_do(p: ProjetoDB) -> list[etapas_dominio.EtapaDoProjeto]:
-    """Por ora só a importação conclui, e conclui por existir o projeto: ele
-    nasceu de uma remessa. As demais entram conforme forem construídas."""
-    return etapas_dominio.montar(concluidas={"importar"})
+def _etapas_do(
+    p: ProjetoDB, sessao: Session
+) -> list[etapas_dominio.EtapaDoProjeto]:
+    """A importação conclui quando entrou base, não quando o projeto nasceu.
+
+    Antes concluía só por existir o projeto — mas o projeto nasce do cadastro,
+    que lê uma amostra do SPED para descobrir a empresa e não traz base nenhuma.
+    Dar a etapa por feita ali dizia ao usuário que havia dado quando não havia.
+    Agora conclui quando existe pelo menos um lote com arquivo que a CAT lê.
+    """
+    tem_base = sessao.scalar(
+        select(func.count())
+        .select_from(LoteDB)
+        .where(LoteDB.projeto_id == p.id, LoteDB.arquivos_uteis > 0)
+    ) or 0
+    return etapas_dominio.montar(concluidas={"importar"} if tem_base else set())
 
 
-def _projeto_dto(p: ProjetoDB) -> ProjetoDto:
+def _projeto_dto(p: ProjetoDB, sessao: Session) -> ProjetoDto:
     e = p.empresa
-    feitas, totais = etapas_dominio.progresso(_etapas_do(p))
+    feitas, totais = etapas_dominio.progresso(_etapas_do(p, sessao))
     return ProjetoDto(
         id=p.id,
         empresa_id=p.empresa_id,
@@ -437,7 +451,7 @@ def detalhar_projeto(
             status.HTTP_403_FORBIDDEN, "Você não tem acesso a esta empresa."
         )
     return ProjetoDetalheDto(
-        projeto=_projeto_dto(p),
+        projeto=_projeto_dto(p, sessao),
         etapas=[
             EtapaDto(
                 chave=e.definicao.chave,
@@ -448,6 +462,6 @@ def detalhar_projeto(
                 implementada=e.definicao.implementada,
                 acessivel=e.acessivel,
             )
-            for e in _etapas_do(p)
+            for e in _etapas_do(p, sessao)
         ],
     )

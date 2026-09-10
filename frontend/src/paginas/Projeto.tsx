@@ -90,9 +90,13 @@ export default function Projeto() {
                 </span>
               </div>
               <p className="etapa__descricao">{e.descricao}</p>
+              {/* leva ao lote DESTE trabalho. Antes apontava para /importar,
+                  que é o cadastro: recomeçaria a criação da empresa. */}
               {e.chave === "importar" && e.acessivel && (
-                <Link className="etapa__acao" to="/importar">
-                  Importar mais arquivos
+                <Link className="etapa__acao" to={`/projetos/${id}/arquivos`}>
+                  {e.situacao === "concluida"
+                    ? "Importar mais arquivos"
+                    : "Importar a base de dados"}
                 </Link>
               )}
             </div>

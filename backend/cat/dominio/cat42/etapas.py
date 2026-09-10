@@ -46,10 +46,12 @@ class DefinicaoEtapa:
 ETAPAS: tuple[DefinicaoEtapa, ...] = (
     DefinicaoEtapa(
         chave="importar",
-        nome="Importar arquivos",
+        nome="Importar base de dados",
         descricao=(
-            "Receber o SPED ICMS/IPI e os XML das notas. O cabeçalho identifica "
-            "empresa e competência; o conteúdo alimenta as etapas seguintes."
+            "Apontar a pasta com a base do trabalho: EFD ICMS/IPI, XML das "
+            "notas e relatórios do ERP. O sistema identifica cada arquivo e "
+            "separa o que é de outra empresa. Pode voltar quantas vezes a "
+            "empresa mandar arquivo — o cadastro é que acontece uma vez só."
         ),
         implementada=True,
     ),
