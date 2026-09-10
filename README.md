@@ -60,7 +60,7 @@ python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"
 cp ../.env.example .env          # e ajuste CAT_JWT_SEGREDO
 alembic upgrade head                     # cria o esquema
 python -m cat.apresentacao.cli.semear    # cria os três gestores
-python -m uvicorn cat.apresentacao.api.app:app --reload
+python -m uvicorn cat.apresentacao.api.app:app --reload --port 8010
 ```
 
 Front:
@@ -72,7 +72,7 @@ npm run dev
 ```
 
 A tela abre em http://localhost:5173 e a documentação da API em
-http://localhost:8000/docs.
+http://localhost:8010/docs.
 
 Se um gestor perder o acesso e não houver outro disponível, a saída é pelo
 servidor:
