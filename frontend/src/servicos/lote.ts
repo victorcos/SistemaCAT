@@ -86,6 +86,18 @@ export const registrarLote = (
 export const listarLotes = (projetoId: number) =>
   chamar<Lote[]>(`/projetos/${projetoId}/lotes`);
 
+export interface LoteApagado {
+  pasta: string;
+  arquivos: number;
+  conferencias_invalidadas: number;
+}
+
+/** Desfaz a importação. O arquivo do cliente em disco não é tocado. */
+export const removerLote = (projetoId: number, loteId: number) =>
+  chamar<LoteApagado>(`/projetos/${projetoId}/lotes/${loteId}`, {
+    method: "DELETE",
+  });
+
 /** Tamanho legível. Base de trabalho se mede em GB, não em bytes. */
 export function tamanho(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

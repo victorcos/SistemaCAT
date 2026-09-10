@@ -201,6 +201,21 @@
   cursor: not-allowed;
 }
 
+/* Ação destrutiva. Vermelho sólido, nunca laranja da marca: a cor da marca
+   é a de seguir em frente, e apagar não é seguir em frente. */
+.botao--perigo {
+  color: #FFFFFF;
+  background: var(--erro);
+}
+
+.botao--perigo:hover:not(:disabled) { filter: brightness(0.92); }
+
+.botao--perigo:disabled {
+  background: var(--acao-inativo-fundo);
+  color: var(--acao-inativo-texto);
+  cursor: not-allowed;
+}
+
 /* ---------- rodapé ---------- */
 .login__ajuda {
   margin: 2px 0 0;

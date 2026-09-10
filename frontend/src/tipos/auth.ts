@@ -46,6 +46,12 @@ export const CARGOS: Record<Cargo, string> = {
  *  domínio — a tela usa isto só para esconder o que a API já recusaria. */
 export const ADMINISTRA_USUARIOS: Papel[] = ["dev", "gestor"];
 
+/** Papéis que apagam um trabalho inteiro. Espelha Papel.pode_excluir_trabalho
+ *  no domínio. Analista e revisor escrevem, apuram e entregam — mas não
+ *  desfazem meses de trabalho de uma vez. A tela usa isto só para esconder o
+ *  botão; quem recusa de verdade é a API. */
+export const PODE_EXCLUIR_TRABALHO: Papel[] = ["dev", "gestor"];
+
 export interface Usuario {
   id: number;
   usuario: string;

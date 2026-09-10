@@ -13,6 +13,7 @@ empresa, e guardar gigabytes antes de o usuário confirmar seria desperdício.
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import date
 from typing import Annotated
 
@@ -22,11 +23,22 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from cat.aplicacao.casos_de_uso.analisar_remessa import RemessaAnalisada, analisar
+from cat.aplicacao.casos_de_uso.excluir_trabalho import (
+    SenhaNaoConfere,
+    TrabalhoNaoEncontrado,
+    excluir_trabalho,
+    resumir,
+)
 from cat.apresentacao.api.seguranca import UsuarioAtual, exigir_capacidade
 from cat.dominio.acesso.usuario import Usuario
 from cat.dominio.cat42 import etapas as etapas_dominio
 from cat.dominio.comum.cnpj import Cnpj, CnpjInvalido
+from cat.config import obter_config
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
+from cat.infraestrutura.auth.senha import SenhasArgon2
+from cat.infraestrutura.repositorios.usuario_repositorio import (
+    UsuarioRepositorioSql,
+)
 from cat.infraestrutura.repositorios.banco import obter_sessao
 from cat.infraestrutura.repositorios.modelos import (
     AlocacaoDB,
@@ -485,3 +497,78 @@ def detalhar_projeto(
             for e in _etapas_do(p, sessao)
         ],
     )
+
+
+# ---------------------------------------------------------------------------
+# 5. Excluir o trabalho
+#
+# A única operação do sistema que pede a senha de novo. A sessão fica aberta a
+# jornada inteira, e uma tela deixada em máquina destravada não pode bastar
+# para desfazer meses de apuração.
+# ---------------------------------------------------------------------------
+PodeExcluir = Annotated[
+    Usuario,
+    Depends(exigir_capacidade("pode_excluir_trabalho", "excluir um trabalho")),
+]
+
+
+class ConfirmacaoDeExclusao(BaseModel):
+    senha: str = Field(min_length=1, max_length=200)
+
+
+class OQueSeraApagadoDto(BaseModel):
+    projeto: str
+    empresa: str
+    lotes: int
+    arquivos: int
+    execucoes: int
+
+
+@router.get("/projetos/{projeto_id}/exclusao", response_model=OQueSeraApagadoDto)
+def previa_da_exclusao(
+    projeto_id: int,
+    usuario: PodeExcluir,
+    sessao: Annotated[Session, Depends(obter_sessao)],
+) -> OQueSeraApagadoDto:
+    """O que some se confirmar. A confirmação tem de ser informada."""
+    p = sessao.get(ProjetoDB, projeto_id)
+    if p is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Trabalho não encontrado.")
+    if not usuario.enxerga_empresa(p.empresa_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "Você não tem acesso a esta empresa.")
+    return OQueSeraApagadoDto(**asdict(resumir(projeto_id, sessao)))
+
+
+@router.delete("/projetos/{projeto_id}", response_model=OQueSeraApagadoDto)
+def excluir_projeto(
+    projeto_id: int,
+    confirmacao: ConfirmacaoDeExclusao,
+    usuario: PodeExcluir,
+    sessao: Annotated[Session, Depends(obter_sessao)],
+) -> OQueSeraApagadoDto:
+    p = sessao.get(ProjetoDB, projeto_id)
+    if p is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Trabalho não encontrado.")
+    if not usuario.enxerga_empresa(p.empresa_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "Você não tem acesso a esta empresa.")
+
+    with contexto(etapa="excluir_trabalho", usuario_id=usuario.id,
+                  projeto_id=projeto_id):
+        try:
+            apagado = excluir_trabalho(
+                projeto_id, usuario, confirmacao.senha, sessao,
+                senhas=SenhasArgon2(obter_config().senha_pimenta),
+                repositorio=UsuarioRepositorioSql(sessao),
+            )
+        except SenhaNaoConfere:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Senha incorreta. O trabalho não foi apagado.",
+            ) from None
+        except TrabalhoNaoEncontrado:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "Trabalho não encontrado."
+            ) from None
+    return OQueSeraApagadoDto(**asdict(apagado))

@@ -59,7 +59,7 @@ export default function App() {
         >
           <Route path="/" element={<Inicio usuario={usuario} />} />
           <Route path="/importar" element={<Importar />} />
-          <Route path="/projetos/:id" element={<Projeto />} />
+          <Route path="/projetos/:id" element={<Projeto usuario={usuario} />} />
           <Route path="/projetos/:id/arquivos" element={<Lote />} />
           <Route path="/projetos/:id/conferencia" element={<Conferencia />} />
           <Route

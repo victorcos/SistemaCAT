@@ -90,6 +90,20 @@ class Papel(str, Enum):
         return self in (Papel.DEV, Papel.GESTOR, Papel.ANALISTA, Papel.REVISOR)
 
     @property
+    def pode_excluir_trabalho(self) -> bool:
+        """Apagar um trabalho inteiro é dos cargos que respondem por ele.
+
+        Analista e revisor escrevem, apuram e entregam — mas não desfazem
+        meses de trabalho de uma vez. Fica com quem responde pelo cliente: os
+        gestores (diretor, gerente e coordenador) e a conta de manutenção.
+
+        Capacidade separada de `administra_usuarios` de propósito, embora hoje
+        recaia sobre os mesmos papéis: são responsabilidades diferentes, e no
+        dia em que uma delas mudar a outra não deve mudar junto.
+        """
+        return self in (Papel.DEV, Papel.GESTOR)
+
+    @property
     def ignora_escopo_de_empresa(self) -> bool:
         """Só o dev enxerga empresa sem alocação.
 

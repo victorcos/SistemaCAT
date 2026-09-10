@@ -111,3 +111,62 @@
 .lote-item .etiquetas {
   margin-top: 10px;
 }
+
+/* ---------- cancelar e remover ---------- */
+.cartao__cabecalho {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.lote-item__canto {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* o X. Discreto até o ponteiro chegar perto: destruir não se oferece, se
+   permite */
+.remover {
+  padding: 2px 7px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--texto-fraco);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  cursor: pointer;
+}
+
+.remover:hover:not(:disabled) {
+  color: var(--erro);
+  border-color: var(--erro);
+}
+
+.remover:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.confirmar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--texto);
+  background: var(--erro-fundo);
+  border-radius: var(--raio);
+}
+
+.confirmar__acoes {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}

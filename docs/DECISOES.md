@@ -595,3 +595,50 @@ com `CREATE TABLE AS` o que é consultado várias vezes: como visão, cada consu
 do resumo refazia o agrupamento inteiro sobre o parquet.
 
 **Voltou a 1,2 s** sobre as mesmas 321.460 linhas.
+
+---
+
+## 2026-09-10 — Apagar um trabalho pede a senha de novo
+
+**Decisão.** Excluir um trabalho exige (1) papel com a capacidade
+`pode_excluir_trabalho` — hoje **dev e gestor**, que são o diretor, o gerente e
+o coordenador —, (2) **a senha de acesso digitada outra vez** e (3) uma
+confirmação que mostra o que vai sumir. É a única operação do sistema que pede
+senha de quem já está logado.
+
+**Por quê.** A sessão dura uma jornada de trabalho inteira. Uma tela deixada
+aberta em máquina destravada não pode ser suficiente para desfazer meses de
+apuração. É a mesma razão pela qual banco pede senha para transferir depois de
+você já ter entrado.
+
+**Analista e revisor não apagam.** Eles escrevem, apuram e entregam — a
+capacidade é separada de `pode_escrever` de propósito. E é capacidade própria,
+não `administra_usuarios`: recaem hoje sobre os mesmos papéis, mas são
+responsabilidades diferentes, e no dia em que uma mudar a outra não deve mudar
+junto.
+
+**Errar a senha na confirmação não bloqueia o login.** Contaria como tentativa
+falha e trancaria a pessoa fora do sistema por ter hesitado numa confirmação.
+Fica registrado no log como evento de segurança.
+
+**Não há lixeira.** Manter projeto apagado meio-vivo no banco cria dois estados
+para tudo que consulta projeto, e mais cedo ou mais tarde alguém conta um
+trabalho excluído num relatório. O que resta é o registro no log: quem apagou,
+quando, e quantos lotes, arquivos e execuções havia dentro.
+
+---
+
+## 2026-09-10 — Remover um lote não pede senha, e não toca no arquivo
+
+**Decisão.** Tirar um lote de um trabalho exige só `pode_escrever`, com
+confirmação na própria tela. E remove **o registro da importação**, nunca o
+arquivo do cliente em disco.
+
+**Por quê.** Desfazer uma importação não é o mesmo que apagar meses de
+trabalho: é a correção de quem apontou a pasta errada, e travá-la atrás de
+senha faria o analista chamar o gestor por um engano de dois minutos. Quanto ao
+arquivo: o lote é só o registro de onde ele está — o dado vive no servidor de
+arquivos com a política de guarda da casa, e não cabe a este sistema apagá-lo.
+
+**Consequência.** A confirmação avisa que a conferência precisará ser refeita:
+toda conferência já concluída olhou aquele lote.

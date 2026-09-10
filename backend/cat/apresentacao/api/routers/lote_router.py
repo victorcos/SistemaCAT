@@ -31,6 +31,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from cat.aplicacao.casos_de_uso.excluir_trabalho import excluir_lote
 from cat.aplicacao.casos_de_uso.inspecionar_lote import (
     PastaInvalida,
     inspecionar_pasta,
@@ -352,3 +353,37 @@ def _lote_dto(lote: LoteDB, contagens: list[ContagemDto]) -> LoteDto:
         criado_em=lote.criado_em.isoformat(),
         contagens=contagens,
     )
+
+
+# ---------------------------------------------------------------------------
+# 4. Tirar um lote do trabalho
+#
+# Não pede senha: desfaz uma importação, não o trabalho. Os arquivos do
+# cliente não são tocados — o lote é só o registro de onde eles estão.
+# ---------------------------------------------------------------------------
+class LoteApagadoDto(BaseModel):
+    pasta: str
+    arquivos: int
+    conferencias_invalidadas: int
+
+
+@router.delete("/projetos/{projeto_id}/lotes/{lote_id}",
+               response_model=LoteApagadoDto)
+def remover_lote(
+    projeto_id: int,
+    lote_id: int,
+    usuario: PodeEscrever,
+    sessao: Annotated[Session, Depends(obter_sessao)],
+) -> LoteApagadoDto:
+    _projeto_do_usuario(projeto_id, usuario, sessao)
+
+    lote = sessao.get(LoteDB, lote_id)
+    if lote is None or lote.projeto_id != projeto_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND,
+                            "Lote não encontrado neste trabalho.")
+
+    with contexto(etapa="remover_lote", usuario_id=usuario.id,
+                  projeto_id=projeto_id, lote_id=lote_id):
+        apagado = excluir_lote(lote_id, usuario, sessao)
+    return LoteApagadoDto(pasta=apagado.pasta, arquivos=apagado.arquivos,
+                          conferencias_invalidadas=apagado.conferencias_invalidadas)

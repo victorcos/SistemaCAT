@@ -148,3 +148,27 @@ export const listarProjetos = () => chamar<Projeto[]>("/projetos");
 
 export const detalharProjeto = (id: number) =>
   chamar<ProjetoDetalhe>(`/projetos/${id}`);
+
+export interface OQueSeraApagado {
+  projeto: string;
+  empresa: string;
+  lotes: number;
+  arquivos: number;
+  execucoes: number;
+}
+
+/** O que some se confirmar. A confirmação precisa ser informada. */
+export const previaDaExclusao = (id: number) =>
+  chamar<OQueSeraApagado>(`/projetos/${id}/exclusao`);
+
+/**
+ * Apaga o trabalho. Pede a senha de novo de propósito: a sessão fica aberta a
+ * jornada inteira, e uma tela deixada em máquina destravada não pode bastar
+ * para desfazer meses de apuração.
+ */
+export const excluirProjeto = (id: number, senha: string) =>
+  chamar<OQueSeraApagado>(`/projetos/${id}`, {
+    method: "DELETE",
+    body: JSON.stringify({ senha }),
+    headers: { "Content-Type": "application/json" },
+  });

@@ -6,6 +6,7 @@ import {
   inspecionarPasta,
   listarLotes,
   registrarLote,
+  removerLote,
   tamanho,
   type Lote as LoteRegistrado,
   type ResumoDoLote,
@@ -36,6 +37,8 @@ export default function Lote() {
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [registrado, setRegistrado] = useState<LoteRegistrado | null>(null);
+  // qual lote está com a remoção pendente de confirmação
+  const [aRemover, setARemover] = useState<number | null>(null);
 
   useEffect(() => {
     if (!projetoId) return;
@@ -52,6 +55,27 @@ export default function Lote() {
       setResumo(await inspecionarPasta(projetoId, pasta));
     } catch (e) {
       setResumo(null);
+      setErro(comoErro(e));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  /** Descarta a conferência da pasta sem gravar nada. */
+  function cancelar() {
+    setResumo(null);
+    setObservacao("");
+    setErro(null);
+  }
+
+  async function remover(loteId: number) {
+    setOcupado(true);
+    setErro(null);
+    try {
+      await removerLote(projetoId, loteId);
+      setARemover(null);
+      setLotes(await listarLotes(projetoId));
+    } catch (e) {
       setErro(comoErro(e));
     } finally {
       setOcupado(false);
@@ -154,6 +178,7 @@ export default function Lote() {
           observacao={observacao}
           aoMudarObservacao={setObservacao}
           aoConfirmar={confirmar}
+          aoCancelar={cancelar}
           ocupado={ocupado}
         />
       )}
@@ -171,8 +196,20 @@ export default function Lote() {
               <li key={l.id} className="lote-item">
                 <div className="lote-item__topo">
                   <span className="lote-item__pasta mono">{l.pasta}</span>
-                  <span className="lote-item__data">
-                    {new Date(l.criado_em).toLocaleDateString("pt-BR")}
+                  <span className="lote-item__canto">
+                    <span className="lote-item__data">
+                      {new Date(l.criado_em).toLocaleDateString("pt-BR")}
+                    </span>
+                    <button
+                      type="button"
+                      className="remover"
+                      onClick={() => setARemover(l.id)}
+                      disabled={ocupado}
+                      title="Remover este lote do trabalho"
+                      aria-label="Remover este lote do trabalho"
+                    >
+                      ✕
+                    </button>
                   </span>
                 </div>
                 <div className="lote-item__numeros">
@@ -203,6 +240,34 @@ export default function Lote() {
                   ))}
                 </div>
                 {l.observacao && <p className="lote-item__nota">{l.observacao}</p>}
+
+                {aRemover === l.id && (
+                  <div className="confirmar">
+                    <span>
+                      Remover este lote? Os arquivos do cliente em disco não são
+                      tocados — some só o registro da importação, e a
+                      conferência precisará ser refeita.
+                    </span>
+                    <span className="confirmar__acoes">
+                      <button
+                        type="button"
+                        className="botao botao--perigo"
+                        onClick={() => remover(l.id)}
+                        disabled={ocupado}
+                      >
+                        Remover
+                      </button>
+                      <button
+                        type="button"
+                        className="botao botao--secundario"
+                        onClick={() => setARemover(null)}
+                        disabled={ocupado}
+                      >
+                        Manter
+                      </button>
+                    </span>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -217,20 +282,36 @@ function Conferencia({
   observacao,
   aoMudarObservacao,
   aoConfirmar,
+  aoCancelar,
   ocupado,
 }: {
   resumo: ResumoDoLote;
   observacao: string;
   aoMudarObservacao: (v: string) => void;
   aoConfirmar: () => void;
+  aoCancelar: () => void;
   ocupado: boolean;
 }) {
   const novos = resumo.total_arquivos - resumo.ja_no_trabalho;
 
   return (
     <section className="cartao">
-      <h2 className="cartao__titulo">O que há nesta pasta</h2>
-      <p className="cartao__sub mono">{resumo.pasta}</p>
+      <div className="cartao__cabecalho">
+        <div>
+          <h2 className="cartao__titulo">O que há nesta pasta</h2>
+          <p className="cartao__sub mono">{resumo.pasta}</p>
+        </div>
+        <button
+          type="button"
+          className="remover"
+          onClick={aoCancelar}
+          disabled={ocupado}
+          title="Descartar esta conferência"
+          aria-label="Descartar esta conferência"
+        >
+          ✕
+        </button>
+      </div>
 
       <dl className="ficha">
         <div className="ficha__item">
@@ -331,16 +412,26 @@ function Conferencia({
         />
       </div>
 
-      <button
-        type="button"
-        className="botao botao--principal"
-        onClick={aoConfirmar}
-        disabled={ocupado || !resumo.serve || novos === 0}
-      >
-        {ocupado
-          ? "Registrando…"
-          : `Importar ${novos.toLocaleString("pt-BR")} arquivo(s)`}
-      </button>
+      <div className="cartao__acoes">
+        <button
+          type="button"
+          className="botao botao--principal"
+          onClick={aoConfirmar}
+          disabled={ocupado || !resumo.serve || novos === 0}
+        >
+          {ocupado
+            ? "Registrando…"
+            : `Importar ${novos.toLocaleString("pt-BR")} arquivo(s)`}
+        </button>
+        <button
+          type="button"
+          className="botao botao--secundario"
+          onClick={aoCancelar}
+          disabled={ocupado}
+        >
+          Cancelar
+        </button>
+      </div>
       {!resumo.serve && (
         <p className="campo__dica">
           Nada aqui alimenta a CAT 42, então não há o que importar.
