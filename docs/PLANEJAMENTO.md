@@ -157,3 +157,6 @@ extraídas do logotipo por amostragem, contraste conferido, tokens criados.
 **2026-09-10** — Primeira fatia vertical entregue: domínio de acesso, caso de uso
 de autenticação, JWT com bcrypt, log estruturado, API e tela de login. 46 testes,
 sendo 35 de unidade rodando em 0,07 s sem banco.
+
+**2026-09-10** — Senha migrada de bcrypt para Argon2id, com pimenta opcional e
+reprocessamento transparente no login. 70 testes.

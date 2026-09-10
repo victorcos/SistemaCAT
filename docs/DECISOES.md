@@ -115,3 +115,45 @@ copiar, conferir hash.
 
 **Por quê.** Menor, tipado, e o DuckDB lê muito mais rápido. Um extrato de 470 MB
 em CSV é lento de reler a cada análise.
+
+---
+
+## 2026-09-10 — Senha com Argon2id, não com criptografia
+
+**Decisão.** Senha protegida por resumo de mão única com Argon2id, sal por senha
+e pimenta opcional. Nunca criptografia.
+
+**Por quê.** Criptografia é reversível: quem tem a chave recupera o valor
+original. Guardar senha assim significa que um administrador de banco, um backup
+vazado ou um invasor com a chave recuperaria a senha em claro de todos os
+usuários. Como as pessoas reaproveitam senha, o estrago passaria deste sistema
+para os outros acessos delas. **O sistema não pode ser capaz de descobrir a senha
+de ninguém.**
+
+Argon2id é o vencedor da Password Hashing Competition e a recomendação atual da
+OWASP. É caro em memória, não só em tempo, o que tira a vantagem de quem ataca
+com placa de vídeo — exatamente onde o bcrypt fica atrás. Custa cerca de 50 ms
+por conferência, imperceptível para quem entra e caro para quem tenta milhões de
+combinações.
+
+**Três camadas.** Sal aleatório por senha, para que duas pessoas com a mesma
+senha tenham resumos diferentes. Pimenta em `CAT_SENHA_PIMENTA`, segredo do
+servidor guardado fora do banco. E reprocessamento transparente no login, que
+regrava resumo em formato antigo sem pedir troca de senha a ninguém.
+
+**Onde criptografia é a ferramenta certa**, e aí sim deve ser usada: no tráfego,
+com HTTPS obrigatório; no disco, cifrando o volume do banco e os backups; e no
+segredo do token, que é chave de verdade.
+
+---
+
+## 2026-09-10 — Migração de algoritmo sem forçar troca de senha
+
+**Decisão.** Ao entrar, se o resumo estiver em formato antigo ou com parâmetros
+defasados, ele é regravado no formato atual.
+
+**Por quê.** O login é a única janela em que a senha em claro está em mãos, e
+portanto a única oportunidade de regravar. Sem isso, endurecer parâmetros no
+futuro obrigaria a redefinir a senha de toda a base, o que é caro e gera
+chamado de suporte. Com isso, a migração acontece sozinha conforme as pessoas
+usam o sistema.

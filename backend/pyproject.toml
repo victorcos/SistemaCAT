@@ -10,7 +10,8 @@ dependencies = [
     "pydantic>=2",
     "pydantic-settings",
     "python-jose[cryptography]",
-    "bcrypt",
+    "argon2-cffi",
+    "bcrypt",          # só para ler resumo antigo durante a migração
     "python-multipart",
     "psycopg[binary]",
 ]

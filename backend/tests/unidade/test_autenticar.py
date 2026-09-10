@@ -14,6 +14,7 @@ class RepoFalso:
         self._u = usuario
         self._h = hash_senha
         self.salvou = []
+        self.regravou = []
 
     def buscar_por_usuario(self, usuario):
         return self._u if self._u and self._u.usuario == usuario else None
@@ -24,10 +25,23 @@ class RepoFalso:
     def salvar_tentativa(self, usuario):
         self.salvou.append((usuario.tentativas_falhas, usuario.ultimo_acesso))
 
+    def regravar_hash_senha(self, usuario_id, novo_hash):
+        self.regravou.append((usuario_id, novo_hash))
+        self._h = novo_hash
+
 
 class SenhasFalsas:
+    """Aceita "certa" contra qualquer hash conhecido. O hash "hash-antigo"
+    representa formato defasado, que deve disparar regravação."""
+
     def conferir(self, senha, hash_armazenado):
-        return senha == "certa" and hash_armazenado == "hash-certo"
+        return senha == "certa" and hash_armazenado in ("hash-certo", "hash-antigo")
+
+    def precisa_regravar(self, hash_armazenado):
+        return hash_armazenado == "hash-antigo"
+
+    def gerar(self, senha):
+        return "hash-novo"
 
 
 class TokensFalsos:
@@ -105,3 +119,23 @@ def test_sucesso_apos_falhas_zera_o_contador():
     caso, _ = montar(u)
     caso.executar("ana", "certa")
     assert u.tentativas_falhas == 0
+
+
+def test_resumo_antigo_e_regravado_apos_login_certo():
+    """A migração só cabe aqui: é a única janela com a senha em claro em mãos."""
+    caso, repo = montar(usuario_padrao(), hash_senha="hash-antigo")
+    caso.executar("ana", "certa")
+    assert repo.regravou == [(7, "hash-novo")]
+
+
+def test_resumo_atual_nao_e_regravado():
+    caso, repo = montar(usuario_padrao(), hash_senha="hash-certo")
+    caso.executar("ana", "certa")
+    assert repo.regravou == []
+
+
+def test_senha_errada_nao_regrava_nada():
+    caso, repo = montar(usuario_padrao(), hash_senha="hash-antigo")
+    with pytest.raises(CredencialInvalida):
+        caso.executar("ana", "errada")
+    assert repo.regravou == []

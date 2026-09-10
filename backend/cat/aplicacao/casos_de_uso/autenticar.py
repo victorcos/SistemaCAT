@@ -63,7 +63,8 @@ class AutenticarUseCase:
             )
             raise
 
-        if not self._senhas.conferir(senha, self._repo.obter_hash_senha(usuario.id)):
+        hash_atual = self._repo.obter_hash_senha(usuario.id)
+        if not self._senhas.conferir(senha, hash_atual):
             usuario.registrar_falha()
             self._repo.salvar_tentativa(usuario)
             log.warning(
@@ -77,6 +78,12 @@ class AutenticarUseCase:
 
         usuario.registrar_sucesso()
         self._repo.salvar_tentativa(usuario)
+
+        # migração silenciosa: se o resumo está em formato antigo ou com
+        # parâmetros defasados, regrava agora, enquanto a senha em claro está
+        # em mãos. É a única janela em que isso é possível.
+        if self._senhas.precisa_regravar(hash_atual):
+            self._repo.regravar_hash_senha(usuario.id, self._senhas.gerar(senha))
         token, expira_em = self._tokens.emitir(usuario)
 
         log.info(

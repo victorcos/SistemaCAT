@@ -6,7 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cat.dominio.acesso.usuario import Papel, Usuario
-from cat.infraestrutura.auth.senha import SenhasBcrypt
+from cat.config import obter_config
+from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.log import obter_log
 from cat.infraestrutura.repositorios.modelos import UsuarioDB
 
@@ -42,7 +43,7 @@ def _para_dominio(linha: UsuarioDB) -> Usuario:
 class UsuarioRepositorioSql:
     def __init__(self, sessao: Session) -> None:
         self._s = sessao
-        self._senhas = SenhasBcrypt()
+        self._senhas = SenhasArgon2(obter_config().senha_pimenta)
 
     def buscar_por_usuario(self, usuario: str) -> Usuario | None:
         linha = self._s.scalar(select(UsuarioDB).where(UsuarioDB.usuario == usuario))
@@ -65,6 +66,20 @@ class UsuarioRepositorioSql:
         linha.tentativas_falhas = usuario.tentativas_falhas
         linha.ultimo_acesso = usuario.ultimo_acesso
         self._s.commit()
+
+    def regravar_hash_senha(self, usuario_id: int, novo_hash: str) -> None:
+        """Atualiza o resumo para o formato atual, sem tocar na senha do usuário."""
+        linha = self._s.get(UsuarioDB, usuario_id)
+        if linha is None:
+            log.error("regravação de hash para usuário inexistente",
+                      extra={"usuario_id": usuario_id})
+            return
+        anterior = linha.senha_hash[:7]
+        linha.senha_hash = novo_hash
+        self._s.commit()
+        log.info("resumo de senha migrado para o formato atual",
+                 extra={"usuario_id": usuario_id, "formato_anterior": anterior,
+                        "formato_atual": novo_hash[:7]})
 
     def criar(
         self, usuario: str, email: str, nome_exibicao: str, senha: str, papel: Papel

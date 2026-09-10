@@ -15,7 +15,8 @@ from cat.apresentacao.api.seguranca import UsuarioAtual, obter_tokens
 from cat.dominio.acesso.usuario import (
     CredencialInvalida, UsuarioBloqueado, UsuarioInativo,
 )
-from cat.infraestrutura.auth.senha import SenhasBcrypt
+from cat.config import obter_config
+from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.banco import obter_sessao
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from cat.log import contexto, obter_log
@@ -60,7 +61,7 @@ def entrar(
     with contexto(etapa="login", origem=origem):
         caso = AutenticarUseCase(
             repositorio=UsuarioRepositorioSql(sessao),
-            senhas=SenhasBcrypt(),
+            senhas=SenhasArgon2(obter_config().senha_pimenta),
             tokens=obter_tokens(),
         )
         try:

@@ -28,6 +28,13 @@ async def ciclo_de_vida(app: FastAPI):
             "um token. Definir a variável antes de expor o serviço.",
             extra={"acao": "definir CAT_JWT_SEGREDO"},
         )
+    if cfg.sem_pimenta:
+        log.warning(
+            "CAT_SENHA_PIMENTA não definida. As senhas seguem protegidas por "
+            "Argon2id com sal, mas um vazamento do banco não teria a barreira "
+            "extra do segredo de servidor.",
+            extra={"acao": "definir CAT_SENHA_PIMENTA"},
+        )
     log.info("API no ar", extra={"banco": cfg.banco_url.split("://")[0],
                                  "origens": cfg.lista_origens})
     yield

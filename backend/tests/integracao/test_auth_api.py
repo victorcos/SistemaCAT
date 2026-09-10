@@ -122,3 +122,51 @@ def test_senha_nunca_volta_na_resposta(cliente):
     corpo = entrar(cliente, "ana", SENHA).text.lower()
     assert SENHA.lower() not in corpo
     assert "senha_hash" not in corpo
+
+
+def test_migra_resumo_antigo_no_primeiro_login(cliente):
+    """Usuário com senha em bcrypt entra normalmente e sai com Argon2id.
+
+    A migração só é possível na janela em que a senha em claro está em mãos,
+    isto é, no login. Ninguém precisa trocar de senha.
+    """
+    import bcrypt
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from cat.infraestrutura.repositorios.modelos import UsuarioDB
+
+    motor = create_engine(obter_config().banco_url,
+                          connect_args={"check_same_thread": False})
+    s = sessionmaker(bind=motor, expire_on_commit=False)()
+
+    repo = UsuarioRepositorioSql(s)
+    antigo = repo.criar("legado", "legado@bms.local", "Legado", SENHA, Papel.LEITURA)
+    linha = s.get(UsuarioDB, antigo.id)
+    linha.senha_hash = bcrypt.hashpw(SENHA.encode(), bcrypt.gensalt()).decode()
+    s.commit()
+    assert linha.senha_hash.startswith("$2")
+
+    assert entrar(cliente, "legado", SENHA).status_code == 200
+
+    s.expire_all()
+    assert s.get(UsuarioDB, antigo.id).senha_hash.startswith("$argon2id$")
+    # e continua entrando depois da migração
+    assert entrar(cliente, "legado", SENHA).status_code == 200
+    s.close()
+
+
+def test_senha_nao_e_recuperavel_do_banco(cliente):
+    """O sistema não pode ser capaz de descobrir a senha de ninguém."""
+    from sqlalchemy import create_engine, select
+    from sqlalchemy.orm import sessionmaker
+
+    from cat.infraestrutura.repositorios.modelos import UsuarioDB
+
+    motor = create_engine(obter_config().banco_url,
+                          connect_args={"check_same_thread": False})
+    s = sessionmaker(bind=motor)()
+    for h in s.scalars(select(UsuarioDB.senha_hash)):
+        assert SENHA not in h
+        assert h.startswith(("$argon2", "$2"))
+    s.close()

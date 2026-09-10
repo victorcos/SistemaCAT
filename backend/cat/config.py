@@ -18,12 +18,21 @@ class Config(BaseSettings):
     jwt_algoritmo: str = "HS256"
     jwt_minutos: int = 480          # uma jornada de trabalho
 
+    # pimenta: segredo do servidor que entra no resumo da senha e fica FORA do
+    # banco. Vazar só o banco não basta para atacar as senhas.
+    # Trocar a pimenta invalida todas as senhas existentes — só com plano.
+    senha_pimenta: str = ""
+
     log_nivel: str = "INFO"
     origens_permitidas: str = "http://localhost:5173"
 
     @property
     def lista_origens(self) -> list[str]:
         return [o.strip() for o in self.origens_permitidas.split(",") if o.strip()]
+
+    @property
+    def sem_pimenta(self) -> bool:
+        return not self.senha_pimenta
 
     @property
     def segredo_e_padrao(self) -> bool:
