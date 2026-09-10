@@ -264,3 +264,15 @@ levou 403 na porta. Enumerar papel em rota significa que todo papel novo obriga
 a caçar rotas para atualizar, e a que for esquecida vira bug silencioso de
 permissão. Com capacidade, o domínio continua sendo a única fonte de quem pode
 o quê.
+
+---
+
+## 2026-09-10 — Todo botão declara o `type`
+
+**Decisão.** Nenhum `<button>` sem `type` explícito.
+
+**Por quê.** Descoberto testando a troca de senha. Sem `type`, o navegador
+assume `submit` quando o botão está dentro de `<form>`. Isso é frouxo em dois
+sentidos: um botão de ação dentro de formulário passa a enviar o formulário sem
+querer, e um seletor por `[type=submit]` não encontra o botão que de fato envia,
+o que fez o teste automatizado falhar sem apontar a causa.

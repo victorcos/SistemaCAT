@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/paginas/login.tsx","./src/servicos/api.ts","./src/servicos/auth.ts","./src/tipos/auth.ts","./src/tipos/imagens.d.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/main.tsx","./src/componentes/leiaute.tsx","./src/componentes/senhaprovisoria.tsx","./src/paginas/inicio.tsx","./src/paginas/login.tsx","./src/paginas/trocarsenha.tsx","./src/paginas/usuarios.tsx","./src/servicos/api.ts","./src/servicos/auth.ts","./src/servicos/usuarios.ts","./src/tipos/auth.ts","./src/tipos/imagens.d.ts"],"version":"5.9.3"}

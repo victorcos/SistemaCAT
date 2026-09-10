@@ -73,6 +73,7 @@ Objetivo: ter onde apoiar tudo o mais.
 - [x] Gestão de usuários com as três salvaguardas
 - [x] Autenticação com escopo por empresa
 - [x] Tela de login
+- [x] Tela de gestão de usuários e troca obrigatória de senha
 
 ### Etapa 2 — Ingestão
 
@@ -168,3 +169,7 @@ níveis e migração para Postgres com Alembic. 122 testes.
 
 **2026-09-10** — Papel dev com bypass auditável do escopo de empresa. Rotas
 passam a exigir capacidade em vez de papel. 135 testes.
+
+**2026-09-10** — Front da gestão de usuários: moldura da aplicação, lista com
+ações, cadastro, e a troca obrigatória de senha que fechava o ciclo da senha
+provisória.

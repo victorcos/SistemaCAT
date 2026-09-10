@@ -1,0 +1,69 @@
+/* Troca obrigatoria da senha provisoria. Sem menu e sem saida pelos lados. */
+
+.troca {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px 18px;
+  background: var(--marca-azul);
+}
+
+.troca__caixa {
+  width: 100%;
+  max-width: 430px;
+  padding: 30px 28px 26px;
+  background: var(--superficie);
+  border-radius: var(--raio-g);
+  border-top: 4px solid var(--marca-dourado);
+  box-shadow: var(--sombra-elevada);
+}
+
+/* o logotipo e branco, entao precisa de fundo azul proprio sobre a caixa clara */
+.troca__logo {
+  display: block;
+  width: 150px;
+  margin: -52px auto 18px;
+  padding: 14px 18px;
+  background: var(--marca-azul);
+  border-radius: var(--raio-g);
+  box-sizing: content-box;
+}
+
+.troca__titulo {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 650;
+  color: var(--texto);
+}
+
+.troca__sub {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--texto-suave);
+}
+
+.troca form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.regras {
+  margin: -6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.regras__item {
+  font-size: 13px;
+  color: var(--texto-fraco);
+}
+
+.regras__item--ok {
+  color: var(--sucesso);
+}

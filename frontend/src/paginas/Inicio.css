@@ -1,0 +1,11 @@
+.inicio__aviso {
+  margin-top: 22px;
+  padding: 14px 16px;
+  max-width: 62ch;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--texto-suave);
+  background: var(--info-fundo);
+  border-left: 3px solid var(--info);
+  border-radius: var(--raio);
+}

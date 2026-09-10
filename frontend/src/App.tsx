@@ -1,15 +1,25 @@
 import { useEffect, useState } from "react";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+} from "react-router-dom";
+import Leiaute from "./componentes/Leiaute";
+import Inicio from "./paginas/Inicio";
 import Login from "./paginas/Login";
-import { quemSouEu, sair } from "./servicos/auth";
+import TrocarSenha from "./paginas/TrocarSenha";
+import Usuarios from "./paginas/Usuarios";
 import { lerToken } from "./servicos/api";
-import type { Usuario } from "./tipos/auth";
+import { quemSouEu, sair } from "./servicos/auth";
+import { ADMINISTRA_USUARIOS, type Usuario } from "./tipos/auth";
 
 export default function App() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [verificando, setVerificando] = useState(true);
 
-  // se já houver token guardado, confirma com o servidor antes de mostrar a
-  // aplicação — o token pode ter expirado ou o usuário ter sido desativado
+  // havendo token guardado, confirma com o servidor antes de mostrar a
+  // aplicação: ele pode ter expirado ou o usuário ter sido desativado
   useEffect(() => {
     if (!lerToken()) {
       setVerificando(false);
@@ -29,23 +39,32 @@ export default function App() {
     return <Login aoEntrar={setUsuario} />;
   }
 
-  // provisório: a aplicação em si entra na etapa 5 do roteiro
+  // quem entrou com senha provisória só faz uma coisa: trocar a senha.
+  // Fica antes do roteador de propósito — não existe rota que escape disto.
+  if (usuario.senha_provisoria) {
+    return <TrocarSenha usuario={usuario} aoTrocar={setUsuario} />;
+  }
+
+  const admin = ADMINISTRA_USUARIOS.includes(usuario.papel);
+
   return (
-    <div style={{ padding: 32 }}>
-      <h1>Olá, {usuario.nome_exibicao}</h1>
-      <p>
-        Papel: {usuario.papel} · Empresas no seu escopo:{" "}
-        {usuario.empresas.length}
-      </p>
-      <button
-        className="botao botao--principal"
-        onClick={() => {
-          sair();
-          setUsuario(null);
-        }}
-      >
-        Sair
-      </button>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route
+          element={<Leiaute usuario={usuario} aoSair={() => setUsuario(null)} />}
+        >
+          <Route path="/" element={<Inicio usuario={usuario} />} />
+          <Route
+            path="/usuarios"
+            element={
+              // a tela some para quem não administra; a API recusaria de todo
+              // jeito, mas oferecer o que vai dar 403 é má educação
+              admin ? <Usuarios eu={usuario} /> : <Navigate to="/" replace />
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
