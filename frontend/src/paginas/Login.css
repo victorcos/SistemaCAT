@@ -1,0 +1,237 @@
+/* Tela de login. Só variáveis de tokens.css — nenhum hexadecimal aqui. */
+
+.login {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+/* ---------- lado da marca ---------- */
+.login__marca {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 48px;
+  background: var(--marca-azul);
+  /* a linha dourada da marca, na borda entre os dois lados */
+  border-right: 3px solid var(--marca-dourado);
+}
+
+.login__logo {
+  width: min(340px, 70%);
+  height: auto;
+}
+
+.login__assinatura {
+  margin: 0;
+  max-width: 30ch;
+  color: var(--moldura-texto-suave);
+  font-size: 15px;
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* ---------- lado do formulário ---------- */
+.login__area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 48px 24px;
+  background: var(--fundo);
+}
+
+.login__caixa {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.login__logo-movel {
+  display: none;
+  width: 200px;
+  margin: 0 auto 8px;
+}
+
+.login__titulo {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--texto);
+}
+
+.login__subtitulo {
+  margin: -10px 0 6px;
+  color: var(--texto-suave);
+  font-size: 14px;
+}
+
+/* ---------- campos ---------- */
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.campo__rotulo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texto-suave);
+}
+
+.campo__entrada {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.campo__entrada:hover:not(:disabled) {
+  border-color: var(--texto-fraco);
+}
+
+.campo__entrada:focus {
+  outline: none;
+  border-color: var(--borda-foco);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--borda-foco) 22%, transparent);
+}
+
+.campo__entrada:disabled {
+  background: var(--superficie-alt);
+  cursor: not-allowed;
+}
+
+.campo__com-botao {
+  position: relative;
+  display: flex;
+}
+
+/* o campo precisa de espaço para o botão não cobrir o texto digitado */
+.campo__com-botao .campo__entrada {
+  padding-right: 84px;
+}
+
+.campo__alternar {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 5px 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--acao2-texto);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.campo__alternar:hover:not(:disabled) {
+  background: var(--acao2-hover);
+  border-color: var(--acao2-borda);
+}
+
+.campo__alternar:disabled {
+  color: var(--texto-fraco);
+  cursor: not-allowed;
+}
+
+/* ---------- aviso ---------- */
+.aviso {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 11px 13px;
+  border-radius: var(--raio);
+  font-size: 14px;
+  border-left: 3px solid transparent;
+}
+
+.aviso--erro {
+  color: var(--erro);
+  background: var(--erro-fundo);
+  border-left-color: var(--erro);
+}
+
+.aviso__codigo {
+  font-family: var(--fonte-num);
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+/* ---------- botão ---------- */
+.botao {
+  padding: 11px 16px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+/* laranja da marca com texto azul-escuro: 6,46:1.
+   Branco sobre este laranja daria 2,59:1 e reprovaria. */
+.botao--principal {
+  color: var(--acao-texto);
+  background: var(--acao-fundo);
+}
+
+.botao--principal:hover:not(:disabled) { background: var(--acao-hover); }
+.botao--principal:active:not(:disabled) { background: var(--acao-ativo); }
+
+/* o desabilitado precisa de token proprio: cinza fixo destoa no tema escuro */
+.botao--principal:disabled {
+  background: var(--acao-inativo-fundo);
+  color: var(--acao-inativo-texto);
+  cursor: not-allowed;
+}
+
+/* ---------- rodapé ---------- */
+.login__ajuda {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--texto-fraco);
+}
+
+.login__rodape {
+  font-size: 12px;
+  color: var(--texto-fraco);
+}
+
+/* ---------- telas estreitas ----------
+   O lado da marca some e o logotipo vai para dentro do formulário. Em celular,
+   metade da tela ocupada por identidade tiraria espaço do que importa. */
+@media (max-width: 860px) {
+  .login { grid-template-columns: 1fr; }
+  .login__marca { display: none; }
+  .login__logo-movel { display: block; }
+  /* sem o lado azul, o formulário fica sobre superfície clara e o logotipo
+     branco sumiria — por isso ganha um fundo azul próprio */
+  .login__logo-movel {
+    padding: 18px 22px;
+    background: var(--marca-azul);
+    border-radius: var(--raio-g);
+    box-sizing: content-box;
+    width: 170px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .campo__entrada, .botao { transition: none; }
+}

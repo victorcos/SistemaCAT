@@ -43,3 +43,38 @@ scripts/
 - Gerar em disco local e copiar para a rede depois, conferindo hash.
 - Toda implementação nova sobe versionada. Ver VERSIONAMENTO.md.
 - Dado fiscal de cliente **nunca** entra no repositório.
+
+## Como rodar
+
+Banco, opcional em desenvolvimento (sem ele usa SQLite):
+
+```
+docker compose -f docker/docker-compose.yml up -d
+```
+
+Backend:
+
+```
+cd backend
+python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"
+cp ../.env.example .env          # e ajuste CAT_JWT_SEGREDO
+python -m cat.apresentacao.cli.semear    # cria o primeiro gestor
+python -m uvicorn cat.apresentacao.api.app:app --reload
+```
+
+Front:
+
+```
+cd frontend
+npm install
+npm run dev
+```
+
+A tela abre em http://localhost:5173 e a documentação da API em
+http://localhost:8000/docs.
+
+Testes:
+
+```
+cd backend && .venv/Scripts/python -m pytest
+```

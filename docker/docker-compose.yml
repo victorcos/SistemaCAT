@@ -1,0 +1,16 @@
+services:
+  banco:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: cat
+      POSTGRES_PASSWORD: cat
+      POSTGRES_DB: cat
+    ports: ["5432:5432"]
+    volumes: ["banco:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cat"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  banco:

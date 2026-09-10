@@ -114,6 +114,8 @@
   --acao-texto:         var(--marca-azul);
   --acao-hover:         var(--laranja-600);
   --acao-ativo:         var(--laranja-700);
+  --acao-inativo-fundo: var(--cinza-300);
+  --acao-inativo-texto: var(--cinza-600);
 
   /* ação secundária */
   --acao2-fundo:        transparent;
@@ -171,6 +173,8 @@
 
     --acao-hover:         var(--laranja-400);
     --acao-ativo:         var(--laranja-300);
+    --acao-inativo-fundo: #14315F;
+    --acao-inativo-texto: #6D93CE;
 
     --acao2-texto:        #A8C0E2;
     --acao2-borda:        #1D4275;
@@ -226,6 +230,8 @@
   --moldura-borda:      #14315F;
   --acao-hover:         var(--laranja-400);
   --acao-ativo:         var(--laranja-300);
+  --acao-inativo-fundo: #14315F;
+  --acao-inativo-texto: #6D93CE;
   --acao2-texto:        #A8C0E2;
   --acao2-borda:        #1D4275;
   --acao2-hover:        #0E2A5C;

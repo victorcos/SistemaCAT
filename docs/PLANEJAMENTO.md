@@ -7,9 +7,10 @@
 
 ## Onde estamos
 
-**Fase de descoberta concluída.** O leiaute da CAT 42 foi decifrado e a fórmula
-do ressarcimento validada em mais de 1,8 milhão de linhas reais. A estrutura do
-projeto está criada. Nenhum código de produção foi escrito ainda.
+**Etapa 1 em andamento.** O leiaute da CAT 42 está decifrado e a fórmula do
+ressarcimento validada em mais de 1,8 milhão de linhas reais. A primeira fatia
+vertical está no ar: domínio de acesso, autenticação com escopo por empresa,
+log estruturado e a tela de login, com 46 testes passando.
 
 ---
 
@@ -64,10 +65,12 @@ Objetivo: ter onde apoiar tudo o mais.
 
 - [ ] Domínio da CAT 42 em código, com as duas fórmulas e os enquadramentos
 - [ ] Testes de unidade do cálculo, rodando em milissegundos sem arquivo grande
-- [ ] Log estruturado, conforme ARQUITETURA.md seção 12
+- [x] Log estruturado, conforme ARQUITETURA.md seção 12
 - [ ] Modelo de dados no Postgres: empresa, estabelecimento, projeto, usuário,
-      alocação, atividade, execução
-- [ ] Autenticação portada do reenquadrador, acrescida de escopo por empresa
+      alocação, atividade, execução — *empresa, usuário e alocação prontos;
+      projeto, atividade e execução entram na etapa 2*
+- [x] Autenticação com escopo por empresa
+- [x] Tela de login
 
 ### Etapa 2 — Ingestão
 
@@ -150,3 +153,7 @@ estabelecida.
 
 **2026-09-10** — Identidade visual definida a partir da marca BMS. Cores
 extraídas do logotipo por amostragem, contraste conferido, tokens criados.
+
+**2026-09-10** — Primeira fatia vertical entregue: domínio de acesso, caso de uso
+de autenticação, JWT com bcrypt, log estruturado, API e tela de login. 46 testes,
+sendo 35 de unidade rodando em 0,07 s sem banco.

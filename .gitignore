@@ -1,8 +1,12 @@
-# dados e saídas
+# dados e saídas — nada de dado de cliente no repositório
 data/entrada/*
 data/trabalho/*
 data/saida/*
 !data/*/.gitkeep
+backend/data/
+*.db
+*.sqlite
+*.sqlite3
 *.rar
 *.zip
 *.parquet

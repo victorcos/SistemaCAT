@@ -1,0 +1,23 @@
+[project]
+name = "sistema-cat"
+version = "0.3.0"
+description = "Sistema de apuração das obrigações da CAT — BMS Consultoria Tributária"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]",
+    "sqlalchemy>=2.0",
+    "pydantic>=2",
+    "pydantic-settings",
+    "python-jose[cryptography]",
+    "bcrypt",
+    "python-multipart",
+    "psycopg[binary]",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
