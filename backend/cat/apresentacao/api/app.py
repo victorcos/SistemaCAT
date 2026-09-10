@@ -94,7 +94,10 @@ def saude() -> dict[str, str]:
     return {"status": "ok", "versao": app.version}
 
 
-from cat.apresentacao.api.routers import auth_router, usuarios_router  # noqa: E402
+from cat.apresentacao.api.routers import (  # noqa: E402
+    auth_router, importacao_router, usuarios_router,
+)
 
 app.include_router(auth_router.router)
 app.include_router(usuarios_router.router)
+app.include_router(importacao_router.router)

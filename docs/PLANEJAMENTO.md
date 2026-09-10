@@ -79,7 +79,8 @@ Objetivo: ter onde apoiar tudo o mais.
 
 Objetivo: transformar pacote bruto do cliente em base consultável.
 
-- [ ] Leitura em fluxo de rar e zip, incluindo aninhados
+- [x] Leitura de remessa em zip, sem extrair para disco
+- [ ] Leitura em fluxo de rar, incluindo aninhados
 - [ ] Parser da Ficha 3 e do arquivo digital CAT 5
 - [ ] Gravação em parquet, particionada por empresa e competência
 - [ ] Registro de cada execução em banco, com hash dos arquivos gerados
@@ -177,3 +178,8 @@ provisória.
 **2026-09-10** — Logotipos oficiais recebidos em alta resolução com
 transparência. Paleta corrigida: o laranja estava em `#EE8633` e o oficial é
 `#FF7F00`.
+
+**2026-09-10** — Razão do item (Ficha 3) no domínio, com custo médio ponderado
+móvel. Importação de remessa, pré-cadastro de empresa a partir do SPED e
+cadastro de projeto, com tela. Validado contra 7.036 arquivos reais de EFD
+ICMS/IPI, seis versões de leiaute, sem falha.

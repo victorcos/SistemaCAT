@@ -6,6 +6,7 @@ import {
   Routes,
 } from "react-router-dom";
 import Leiaute from "./componentes/Leiaute";
+import Importar from "./paginas/Importar";
 import Inicio from "./paginas/Inicio";
 import Login from "./paginas/Login";
 import TrocarSenha from "./paginas/TrocarSenha";
@@ -54,6 +55,7 @@ export default function App() {
           element={<Leiaute usuario={usuario} aoSair={() => setUsuario(null)} />}
         >
           <Route path="/" element={<Inicio usuario={usuario} />} />
+          <Route path="/importar" element={<Importar />} />
           <Route
             path="/usuarios"
             element={

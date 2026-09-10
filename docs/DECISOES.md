@@ -293,3 +293,31 @@ paleta.
 **Consequência.** A escala derivada do laranja foi recalculada. O mínimo para
 texto sobre fundo claro subiu de `#B85E18` para `#B35400`, porque o tom oficial
 é mais claro e precisa escurecer mais para passar em contraste.
+
+---
+
+## 2026-09-10 — Importação lê só o cabeçalho, e não grava arquivo
+
+**Decisão.** A tela de importação lê apenas a primeira linha de cada arquivo, e
+nada é gravado em disco nesta etapa.
+
+**Por quê.** O registro 0000 já traz razão social, CNPJ, UF, IE e competência —
+tudo que o pré-cadastro precisa. Uma remessa real desta casa tem 7.036 arquivos;
+ler o conteúdo levaria minutos para responder o que a primeira linha responde em
+segundos. E guardar gigabytes antes de o usuário confirmar seria desperdício.
+
+**Medido:** 180 arquivos analisados em 0,02 s.
+
+---
+
+## 2026-09-10 — XML vence o SPED no valor de ST
+
+**Decisão.** Quando as duas fontes divergirem no ICMS-ST da mesma nota, vale o
+XML. O SPED serve de conferência.
+
+**Por quê.** Decisão do dono do produto, e coerente com o fato de o XML ser o
+documento fiscal. Reforçada por evidência: no maior arquivo de EFD ICMS/IPI que
+examinamos, com 16.862 itens de documento, **nenhum** trazia valor de ICMS-ST.
+Numa distribuidora que compra de substituído e transfere entre filiais, o ST não
+está na nota de entrada — está no XML, em `vICMSSubstituto` ou no campo de
+informação adicional que a própria CAT 42 define.

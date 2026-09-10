@@ -7,10 +7,11 @@ escopo de visibilidade nasce delas.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import (
-    Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint,
+    Boolean, Date, DateTime, ForeignKey, Integer, String, Text,
+    UniqueConstraint, func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -24,14 +25,31 @@ class Base(DeclarativeBase):
 
 
 class EmpresaDB(Base):
+    """Uma empresa cliente, identificada pela raiz do CNPJ.
+
+    A raiz é a chave porque é o que todas as filiais compartilham. O CNPJ da
+    matriz fica ao lado por ser o que as pessoas reconhecem.
+    """
+
     __tablename__ = "empresa"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     cnpj_raiz: Mapped[str] = mapped_column(String(8), unique=True, nullable=False)
+    cnpj_matriz: Mapped[str | None] = mapped_column(String(14))
     razao_social: Mapped[str] = mapped_column(Text, nullable=False)
     grupo_economico: Mapped[str | None] = mapped_column(Text)
     uf: Mapped[str | None] = mapped_column(String(2))
+    inscricao_estadual: Mapped[str | None] = mapped_column(String(20))
+    # verdadeiro enquanto veio só do arquivo e ninguém conferiu
+    pre_cadastro: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
     ativa: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    criada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, server_default=func.now(),
+        nullable=False,
+    )
+    criada_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
 
 
 class UsuarioDB(Base):
@@ -92,3 +110,56 @@ class AlocacaoDB(Base):
     @property
     def vigente(self) -> bool:
         return self.fim is None
+
+
+class EstabelecimentoDB(Base):
+    """Uma filial ou a matriz. Um por CNPJ completo.
+
+    O escopo de confidencialidade é por EMPRESA, não por estabelecimento: quem
+    enxerga a empresa enxerga todas as filiais dela.
+    """
+
+    __tablename__ = "estabelecimento"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), nullable=False)
+    cnpj: Mapped[str] = mapped_column(String(14), unique=True, nullable=False)
+    nome: Mapped[str | None] = mapped_column(Text)
+    ie: Mapped[str | None] = mapped_column(String(20))
+    uf: Mapped[str | None] = mapped_column(String(2))
+    e_matriz: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    ativo: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
+
+    empresa: Mapped[EmpresaDB] = relationship(lazy="joined")
+
+
+class ProjetoDB(Base):
+    """Um trabalho contratado para uma empresa, numa frente e num período.
+
+    Frente e competências são o que delimita o escopo: "CAT 42 da Sulamericana,
+    01/2021 a 12/2025". Toda execução e toda entrega pendura aqui.
+    """
+
+    __tablename__ = "projeto"
+    __table_args__ = (UniqueConstraint("empresa_id", "frente", "nome"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), nullable=False)
+    frente: Mapped[str] = mapped_column(String(20), nullable=False)
+    nome: Mapped[str] = mapped_column(Text, nullable=False)
+    competencia_ini: Mapped[date] = mapped_column(Date, nullable=False)
+    competencia_fim: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), default="em_andamento", nullable=False
+    )
+    observacao: Mapped[str | None] = mapped_column(Text)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, nullable=False
+    )
+    criado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+
+    empresa: Mapped[EmpresaDB] = relationship(lazy="joined")

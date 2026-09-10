@@ -1,0 +1,157 @@
+/* Tela de importação. Só variáveis de tokens.css. */
+
+/* ---------- trilha de passos ---------- */
+.passos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+}
+
+.passos__item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px 7px 8px;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--texto-fraco);
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 999px;
+}
+
+.passos__item--atual {
+  color: var(--texto);
+  border-color: var(--marca-laranja);
+}
+
+.passos__item--feito { color: var(--sucesso); }
+
+.passos__numero {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 50%;
+  color: var(--texto-fraco);
+  background: var(--superficie-alt);
+}
+
+.passos__item--atual .passos__numero {
+  color: var(--acao-texto);
+  background: var(--marca-laranja);
+}
+
+.passos__item--feito .passos__numero {
+  color: var(--sucesso);
+  background: var(--sucesso-fundo);
+}
+
+/* ---------- zona de envio ---------- */
+.zona {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 240px;
+  padding: 34px 24px;
+  text-align: center;
+  background: var(--superficie);
+  /* tracejada de propósito: diz "solte aqui" sem precisar de texto */
+  border: 2px dashed var(--borda-forte);
+  border-radius: var(--raio-g);
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.zona--sobre {
+  border-color: var(--marca-laranja);
+  background: var(--laranja-050);
+}
+
+.zona--ocupada {
+  border-style: solid;
+  color: var(--texto-suave);
+}
+
+.zona__texto {
+  margin: 0;
+  font-size: 16px;
+  color: var(--texto);
+}
+
+.zona__botao {
+  padding: 0;
+  font: inherit;
+  font-weight: 650;
+  color: var(--link);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.zona__dica {
+  margin: 0;
+  max-width: 54ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--texto-fraco);
+}
+
+/* ---------- ficha de conferência ---------- */
+.ficha {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px 24px;
+  margin: 18px 0 0;
+}
+
+.ficha__item { margin: 0; }
+
+.ficha__rotulo {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--texto-fraco);
+}
+
+.ficha__valor {
+  margin: 3px 0 0;
+  font-size: 15px;
+  color: var(--texto);
+}
+
+.ficha__valor--destaque {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.ficha__nota {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  font-family: var(--fonte);
+  color: var(--texto-fraco);
+}
+
+/* ---------- avisos e sucesso ---------- */
+.aviso--atencao {
+  margin-bottom: 10px;
+  color: var(--atencao);
+  background: var(--atencao-fundo);
+  border-left-color: var(--atencao);
+}
+
+.cartao--sucesso {
+  border-left: 4px solid var(--sucesso);
+}
+
+.campo--largo { margin-top: 15px; }

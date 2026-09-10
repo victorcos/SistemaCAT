@@ -17,6 +17,7 @@ interface Item {
 
 const MENU: Item[] = [
   { para: "/", rotulo: "Início" },
+  { para: "/importar", rotulo: "Importar" },
   { para: "/usuarios", rotulo: "Usuários", soAdmin: true },
 ];
 
