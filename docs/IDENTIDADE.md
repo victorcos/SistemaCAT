@@ -81,3 +81,44 @@ para não haver duas telas pintando ressarcimento de cores diferentes.
 Fonte monoespaçada, algarismo tabular e alinhamento à direita. Sem isso, a coluna
 de valor não se lê ao percorrer com o olho, que é exatamente o que o revisor faz
 o dia inteiro.
+
+## 7. Os arquivos do logotipo, e o que falta
+
+| Arquivo | O que é | Onde serve |
+|---|---|---|
+| `docs/marca/logo-bms.png` | original, texto branco sobre azul, sem transparência | superfície azul |
+| `docs/marca/logo-bms-branco.png` | mesmo logotipo com fundo removido | qualquer superfície **escura** |
+| — | **variante com texto azul** | superfície **clara** — **não temos** |
+
+**O logotipo que existe é branco.** Removido o fundo, o que sobra é texto branco
+mais o símbolo laranja. Sobre fundo claro, some. Testado, não suposto.
+
+Isso tem consequência direta no desenho: **enquanto não houver a variante de
+texto azul, a moldura do sistema precisa continuar azul**, porque é a única
+superfície onde o logotipo funciona. Uma barra superior branca deixaria o
+logotipo ilegível ou obrigaria a colar um retângulo azul dentro dela, o que fica
+com cara de adesivo.
+
+**Pedir a quem cuida da marca:** o logotipo em vetor (SVG ou AI), nas duas
+versões, positiva e negativa. Vetor resolve de uma vez a nitidez em qualquer
+tamanho e permite gerar o favicon. O PNG que temos é captura de tela, com
+compressão visível nas bordas.
+
+## 8. A pergunta do fundo claro contra fundo escuro
+
+**O que está implementado:** tema claro por padrão, tema escuro disponível,
+seguindo a preferência do sistema operacional, com a escolha explícita do usuário
+vencendo nos dois sentidos. Não existe versão "azul por padrão".
+
+**O que continua em aberto:** se a moldura, isto é, cabeçalho e menu lateral,
+deve ser azul da marca ou clara no tema claro.
+
+| | Moldura azul (atual) | Moldura clara |
+|---|---|---|
+| Logotipo | funciona com o arquivo que temos | exige a variante que não temos |
+| Identidade | presente o tempo todo | só nos detalhes |
+| Área útil para dado | igual | igual |
+| Descanso visual | a moldura separa navegação de conteúdo | menos contraste entre as áreas |
+
+Mantida a moldura azul por ora, pela razão prática do logotipo. Revisar quando
+chegar o vetor.

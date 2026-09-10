@@ -104,6 +104,8 @@ Objetivo: casar produto com custo baixo e sem invenção.
 
 Objetivo: sair do terminal.
 
+- [ ] Obter o logotipo em vetor, nas versões positiva e negativa
+
 - [ ] API com as rotas de projeto, execução e consulta
 - [ ] React com tabela virtualizada, para o detalhe de milhão de linhas
 - [ ] Acompanhamento de processo longo

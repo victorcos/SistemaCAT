@@ -148,8 +148,8 @@
    Tema escuro — o azul da marca vira o fundo do sistema inteiro.
    Só os papéis mudam; a escala de cor continua a mesma.
    ========================================================================== */
-:root:not([data-tema="claro"]) {
-  @media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
     --fundo:              var(--azul-900);
     --superficie:         var(--marca-azul);
     --superficie-alt:     #0B2149;
