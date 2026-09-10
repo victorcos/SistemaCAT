@@ -165,3 +165,6 @@ reprocessamento transparente no login. 70 testes.
 
 **2026-09-10** — Gestão de usuários com as três salvaguardas, bloqueio em dois
 níveis e migração para Postgres com Alembic. 122 testes.
+
+**2026-09-10** — Papel dev com bypass auditável do escopo de empresa. Rotas
+passam a exigir capacidade em vez de papel. 135 testes.

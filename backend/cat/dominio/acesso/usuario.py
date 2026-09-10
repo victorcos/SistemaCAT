@@ -75,6 +75,7 @@ class Cargo(str, Enum):
 class Papel(str, Enum):
     """O que a pessoa pode fazer. Ortogonal a QUAIS empresas ela enxerga."""
 
+    DEV = "dev"             # manutenção do sistema; ignora o escopo de empresa
     GESTOR = "gestor"       # administra usuários e alocações
     ANALISTA = "analista"   # executa apuração e aprova de-para
     REVISOR = "revisor"     # confere e aprova entrega
@@ -82,11 +83,31 @@ class Papel(str, Enum):
 
     @property
     def administra_usuarios(self) -> bool:
-        return self is Papel.GESTOR
+        return self in (Papel.DEV, Papel.GESTOR)
 
     @property
     def pode_escrever(self) -> bool:
-        return self in (Papel.GESTOR, Papel.ANALISTA, Papel.REVISOR)
+        return self in (Papel.DEV, Papel.GESTOR, Papel.ANALISTA, Papel.REVISOR)
+
+    @property
+    def ignora_escopo_de_empresa(self) -> bool:
+        """Só o dev enxerga empresa sem alocação.
+
+        Existe porque manutenção precisa reproduzir problema em qualquer
+        cliente, e alocar o dev em cada empresa nova na mão seria esquecido na
+        primeira semana. O preço é que todo acesso assim fica registrado como
+        exceção, para nunca virar rotina invisível.
+        """
+        return self is Papel.DEV
+
+    @property
+    def conta_como_gestor(self) -> bool:
+        """DEV NÃO conta para o mínimo de gestores.
+
+        Conta técnica não substitui responsável pelo negócio. Se contasse, dois
+        gestores mais um dev pareceriam três e a salvaguarda estaria furada.
+        """
+        return self is Papel.GESTOR
 
 
 # ---------------------------------------------------------------------------
@@ -296,7 +317,20 @@ class Usuario:
     # ---------- escopo ----------
     def enxerga_empresa(self, empresa_id: int) -> bool:
         """Nenhuma consulta a dado fiscal passa sem esta pergunta."""
+        if self.papel.ignora_escopo_de_empresa:
+            return True
         return empresa_id in self.empresas
+
+    def acessa_por_excecao(self, empresa_id: int) -> bool:
+        """Verdadeiro quando o acesso só passou por ser dev.
+
+        Serve para o log distinguir acesso normal de acesso por exceção. Sem
+        isso, o bypass do dev some no meio do tráfego comum.
+        """
+        return (
+            self.papel.ignora_escopo_de_empresa
+            and empresa_id not in self.empresas
+        )
 
     @property
     def tentativas_restantes(self) -> int:

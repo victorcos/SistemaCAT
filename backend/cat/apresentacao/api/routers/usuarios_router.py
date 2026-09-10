@@ -23,7 +23,7 @@ from cat.aplicacao.casos_de_uso.gerir_usuarios import (
     UsuarioJaExiste,
     UsuarioNaoEncontrado,
 )
-from cat.apresentacao.api.seguranca import UsuarioAtual, exigir_papel
+from cat.apresentacao.api.seguranca import UsuarioAtual, exigir_capacidade
 from cat.config import obter_config
 from cat.dominio.acesso.usuario import (
     Cargo,
@@ -41,7 +41,12 @@ from cat.log import contexto, obter_log
 log = obter_log(__name__)
 router = APIRouter(prefix="/api/usuarios", tags=["usuários"])
 
-SoGestor = Annotated[Usuario, Depends(exigir_papel(Papel.GESTOR))]
+# quem administra usuários: gestor e dev. A lista de papéis mora no domínio,
+# em Papel.administra_usuarios, e não aqui.
+SoGestor = Annotated[
+    Usuario,
+    Depends(exigir_capacidade("administra_usuarios", "administrar usuários")),
+]
 
 
 # ---------------------------------------------------------------------------

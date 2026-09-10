@@ -11,6 +11,7 @@ quem chega até aqui já tem a máquina.
     python -m cat.apresentacao.cli.emergencia promover <usuario>
     python -m cat.apresentacao.cli.emergencia redefinir <usuario>
     python -m cat.apresentacao.cli.emergencia desbloquear <usuario>
+    python -m cat.apresentacao.cli.emergencia criar-dev <usuario> <email> <nome>
 """
 
 from __future__ import annotations
@@ -18,7 +19,9 @@ from __future__ import annotations
 import sys
 
 from cat.config import obter_config
-from cat.dominio.acesso.usuario import Papel, gerar_senha_provisoria
+from cat.dominio.acesso.usuario import (
+    Cargo, Papel, gerar_senha_provisoria, validar_email, validar_nome_de_usuario,
+)
 from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.banco import Sessao, criar_tabelas
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
@@ -96,7 +99,50 @@ def desbloquear(nome: str) -> int:
     return 0
 
 
+def criar_dev(nome_usuario: str, email: str, exibicao: str) -> int:
+    """Cria conta de manutenção, com papel DEV.
+
+    Só pela linha de comando, de propósito: conta que ignora o escopo de
+    empresa não deve nascer por clique na tela.
+    """
+    repo = _repo()
+    nome_usuario = validar_nome_de_usuario(nome_usuario)
+    email = validar_email(email)
+
+    if repo.buscar_por_usuario(nome_usuario) is not None:
+        print(f"Ja existe usuario '{nome_usuario}'.")
+        return 1
+    if repo.buscar_por_email(email) is not None:
+        print(f"Ja existe usuario com o e-mail '{email}'.")
+        return 1
+
+    senha = gerar_senha_provisoria()
+    senhas = SenhasArgon2(obter_config().senha_pimenta)
+    novo = repo.criar(
+        usuario=nome_usuario,
+        email=email,
+        nome_exibicao=exibicao,
+        senha_hash=senhas.gerar(senha),
+        papel=Papel.DEV,
+        cargo=Cargo.OUTRO,
+        senha_provisoria=True,
+    )
+    log.warning(
+        "conta de manutencao criada",
+        extra={"usuario_id": novo.id, "usuario": nome_usuario,
+               "papel": Papel.DEV.value, "via": "cli_emergencia",
+               "ignora_escopo_de_empresa": True},
+    )
+    print(f"\n  Usuario .. {nome_usuario}")
+    print(f"  Senha .... {senha}")
+    print("\n  Papel dev: enxerga toda empresa, com ou sem alocacao.")
+    print("  Cada acesso sem alocacao fica registrado no log como excecao.")
+    print("  Provisoria: a troca e obrigatoria no primeiro acesso.\n")
+    return 0
+
+
 COMANDOS = {
+    "criar-dev": (criar_dev, 3),
     "listar-gestores": (listar_gestores, 0),
     "promover": (promover, 1),
     "redefinir": (redefinir, 1),

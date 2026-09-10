@@ -54,6 +54,32 @@ def usuario_atual(
 UsuarioAtual = Annotated[Usuario, Depends(usuario_atual)]
 
 
+def exigir_capacidade(
+    nome: str, descricao: str
+) -> Callable[[Usuario], Usuario]:
+    """Exige uma CAPACIDADE do domínio, não um papel específico.
+
+    Enumerar papéis na rota faz com que todo papel novo exija caçar rotas para
+    atualizar. Perguntando a capacidade, o domínio continua sendo a única fonte
+    de quem pode o quê.
+    """
+
+    def verificar(usuario: UsuarioAtual) -> Usuario:
+        if not getattr(usuario.papel, nome, False):
+            log.warning(
+                "acesso negado por falta de capacidade",
+                extra={"usuario_id": usuario.id, "papel": usuario.papel.value,
+                       "capacidade_exigida": nome},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Você não tem permissão para {descricao}.",
+            )
+        return usuario
+
+    return verificar
+
+
 def exigir_papel(*papeis: Papel) -> Callable[[Usuario], Usuario]:
     def verificar(usuario: UsuarioAtual) -> Usuario:
         if usuario.papel not in papeis:
@@ -73,6 +99,16 @@ def exigir_papel(*papeis: Papel) -> Callable[[Usuario], Usuario]:
 
 def exigir_empresa(usuario: Usuario, empresa_id: int) -> None:
     """Todo acesso a dado fiscal passa por aqui. Nunca filtrar no front."""
+    if usuario.acessa_por_excecao(empresa_id):
+        # o dev passou sem alocação: registra como exceção para não virar
+        # rotina invisível no meio do tráfego normal
+        log.warning(
+            "acesso a empresa por exceção de dev",
+            extra={"usuario_id": usuario.id, "usuario": usuario.usuario,
+                   "empresa": empresa_id, "papel": usuario.papel.value,
+                   "sem_alocacao": True},
+        )
+        return
     if not usuario.enxerga_empresa(empresa_id):
         log.warning(
             "acesso negado a empresa fora do escopo",

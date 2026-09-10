@@ -228,3 +228,39 @@ para essa parte, e protege contra regressão daquele mesmo erro.
 
 **Porta 55432 e não 5432.** Esta máquina já tem Postgres local nas portas 5432 e
 5433. Não mexemos neles.
+
+---
+
+## 2026-09-10 — Papel DEV, com bypass do escopo de empresa auditável
+
+**Decisão.** Existe um papel `dev` acima de gestor. Ele administra usuários e
+**ignora o escopo de empresa**: enxerga qualquer cliente, com ou sem alocação.
+
+**Por quê.** Manutenção precisa reproduzir problema em qualquer cliente. Alocar
+o dev em cada empresa nova na mão seria esquecido na primeira semana, e aí a
+investigação de um incidente pararia para pedir alocação a um gestor.
+
+**O preço, cobrado explicitamente.** Todo acesso que só passou por ser dev é
+registrado como exceção, com `sem_alocacao: true`. O bypass existe, mas nunca
+vira rotina invisível no meio do tráfego normal.
+
+**DEV não conta para o mínimo de gestores.** Conta técnica não substitui
+responsável pelo negócio. Se contasse, dois gestores mais um dev pareceriam três
+e a salvaguarda estaria furada.
+
+**Só nasce pela linha de comando** (`emergencia criar-dev`). Conta que ignora
+escopo de confidencialidade não deve nascer por clique na tela.
+
+---
+
+## 2026-09-10 — Rota exige capacidade, nunca papel
+
+**Decisão.** As rotas perguntam por uma **capacidade** do domínio, como
+`administra_usuarios`, em vez de enumerar papéis.
+
+**Por quê.** Descoberto ao criar o papel dev: a rota listava `Papel.GESTOR`
+explicitamente, então o dev entrou no sistema com todo o poder no domínio e
+levou 403 na porta. Enumerar papel em rota significa que todo papel novo obriga
+a caçar rotas para atualizar, e a que for esquecida vira bug silencioso de
+permissão. Com capacidade, o domínio continua sendo a única fonte de quem pode
+o quê.

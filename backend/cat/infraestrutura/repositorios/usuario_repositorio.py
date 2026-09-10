@@ -75,6 +75,12 @@ class UsuarioRepositorioSql:
         return [_para_dominio(linha) for linha in linhas]
 
     def contar_gestores_ativos(self) -> int:
+        """Conta só quem tem papel de gestor.
+
+        DEV fica de fora de propósito: conta técnica não substitui responsável
+        pelo negócio. Se contasse, dois gestores mais um dev pareceriam três e
+        a salvaguarda do mínimo estaria furada.
+        """
         return (
             self._s.scalar(
                 select(func.count(UsuarioDB.id)).where(
