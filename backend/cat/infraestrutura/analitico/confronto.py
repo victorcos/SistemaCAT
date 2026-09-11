@@ -290,17 +290,36 @@ def _resumir(con, nao_escrituradas: str,
     E `escriturados` não é contado: as pendências e os conferidos particionam
     o conjunto, então a soma dos dois é o total. Contar de novo seria pagar
     caro por um número que já se tem.
+
+    A única contagem distinta do lado grande é a guarda de chave repetida na
+    saída — `count(DISTINCT chave)` sobre uma coluna só, já escrita em parquet:
+    uns 20 segundos em 37,9 milhões, e é o que impede cobrar o cliente em dobro
+    sem ninguém perceber.
     """
     na_pasta = con.execute("SELECT count(*) FROM entregues").fetchone()[0]
 
     pendencias = _escapar(sem_documento)
-    faltando, valor_faltando, espera, sem_chave, repetidas = con.execute(f"""
+    (faltando, valor_faltando, espera, sem_chave, repetidas,
+     com_chave, chaves_distintas) = con.execute(f"""
         SELECT count(*), coalesce(sum(valor), 0),
                count(*) FILTER (WHERE espera_documento),
                count(*) FILTER (WHERE NOT tem_chave),
-               count(*) FILTER (WHERE ocorrencias > 1)
+               count(*) FILTER (WHERE ocorrencias > 1),
+               count(*) FILTER (WHERE tem_chave),
+               count(DISTINCT chave) FILTER (WHERE tem_chave)
         FROM read_parquet('{pendencias}')
     """).fetchone()
+    # Invariante da saída: uma linha por chave. Não é filtro — é conferência.
+    # Se um dia der diferente, é defeito do pipeline, e tem de aparecer na
+    # tela em vez de virar cobrança em dobro ao cliente. A tentação de
+    # "deduplicar por número" foi medida e rejeitada: número se repete entre
+    # emitentes diferentes e entre equipamentos SAT, e apagaria 10,9 milhões
+    # de documentos legítimos numa base real.
+    chaves_repetidas_na_saida = com_chave - chaves_distintas
+    if chaves_repetidas_na_saida:
+        log.error("a lista de pendências tem chave repetida — defeito do pipeline",
+                  extra={"linhas_a_mais": chaves_repetidas_na_saida,
+                         "arquivo": os.path.basename(sem_documento)})
 
     fora = con.execute(
         f"SELECT count(*) FROM read_parquet('{_escapar(nao_escrituradas)}')"
@@ -361,6 +380,7 @@ def _resumir(con, nao_escrituradas: str,
         estabelecimentos_da_efd=estabelecimentos[:20],
         emitentes_na_pasta=emitentes[:20],
         pendencias_repetidas=repetidas,
+        chaves_repetidas_na_lista=chaves_repetidas_na_saida,
     )
 
 

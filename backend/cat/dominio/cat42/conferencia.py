@@ -135,6 +135,13 @@ class ResumoDaConferencia:
     # parcela grande é o mesmo arquivo importado duas vezes.
     pendencias_repetidas: int = 0
 
+    # linhas a mais na lista de pendências por chave repetida. O pipeline
+    # entrega uma linha por chave (as repetições da EFD viram `ocorrencias`),
+    # então isto é zero por construção — e foi medido: zero em 92.786 e em
+    # 37.097.934 pendências. Se um dia não for, é defeito, não dado: a lista
+    # cobraria o cliente em dobro, e a tela tem de dizer isso.
+    chaves_repetidas_na_lista: int = 0
+
     # ---- o que andou desde a rodada anterior ----
     # O trabalho não termina na primeira conferência: o cliente manda o que
     # faltava e ela roda de novo. Sem estes números, a segunda rodada só diz
@@ -213,6 +220,13 @@ class ResumoDaConferencia:
             avisos.append(
                 f"{_numero(self.nao_escrituradas)} nota(s) da pasta não estão na "
                 "EFD e saíram da análise."
+            )
+        if self.chaves_repetidas_na_lista:
+            avisos.append(
+                f"A lista de pendências tem {_numero(self.chaves_repetidas_na_lista)} "
+                "linha(s) a mais com chave repetida. Isso não deveria acontecer — "
+                "é defeito do sistema, não do dado. Não cobre por esta lista; "
+                "avise o suporte."
             )
         return avisos
 

@@ -252,6 +252,19 @@ class TestConfrontar:
         codigos = {f.codigo for f in resumo.por_modelo}
         assert codigos == {"55", "59"}
 
+    def test_a_lista_tem_uma_linha_por_chave(self, confronto):
+        # a pergunta que veio da operação: "as notas para cobrar não estão
+        # duplicadas?" Não estão, por construção — e a guarda mede isso
+        resumo, destino = confronto
+        con = duckdb.connect()
+        com_chave, distintas = con.execute(
+            f"SELECT count(*), count(DISTINCT chave) "
+            f"FROM read_parquet('{destino}/sem_documento.parquet') WHERE tem_chave"
+        ).fetchone()
+        assert com_chave == distintas
+        assert resumo.chaves_repetidas_na_lista == 0
+        assert not any("chave repetida" in a for a in resumo.avisos)
+
 
 class TestPlanilhas:
     def test_sai_inteira_sem_filtro(self, confronto, tmp_path):
@@ -425,6 +438,14 @@ class TestDuplicidadeDeArquivo:
         r = ResumoDaConferencia(escriturados=100, sem_documento=100,
                                 pendencias_repetidas=2)
         assert not any("em dobro" in a for a in r.avisos)
+
+    def test_chave_repetida_na_lista_e_defeito_e_avisa(self):
+        # nunca deve acontecer; se acontecer, a tela diz para não cobrar
+        r = ResumoDaConferencia(escriturados=10, sem_documento=10,
+                                chaves_repetidas_na_lista=3)
+        aviso = next(a for a in r.avisos if "chave repetida" in a)
+        assert "3 linha(s) a mais" in aviso
+        assert "Não cobre" in aviso
 
     def test_sem_pendencia_nao_divide_por_zero(self):
         assert ResumoDaConferencia(escriturados=5, sem_documento=0).avisos == [

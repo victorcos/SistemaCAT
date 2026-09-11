@@ -863,3 +863,40 @@ segundos engoliu o tique final da EFD (por isso 885 e não 960).
 execução e gravados na hora; a fase seguinte só avança o contador de arquivos.
 Ao entrar no confronto, o contador fecha em `totais/totais`. O teto de 95%
 antes do confronto continua: os últimos 5% são o confronto de verdade.
+
+---
+
+## 2026-09-11 — A lista de cobrança não se deduplica por número
+
+**A pergunta.** "As notas que encontramos para cobrar o cliente provavelmente
+estão duplicadas." Foi medido antes de decidir, em duas bases reais
+(`sem_documento.parquet` das execuções 3 e 6, com 92.786 e 37.097.934
+pendências).
+
+**Por chave: zero repetição, nas duas.** É por construção — as repetições da
+EFD (a mesma nota escriturada em duas filiais, ou o mesmo arquivo importado em
+dobro) já viram a coluna `Ocorrências na EFD`, uma linha por chave.
+
+**Por número: parecia duplicado, e não era.** Agrupando por
+(estabelecimento, modelo, série, número) apareceram 109 "notas repetidas" na
+base pequena e 2.384.075 na grande (10.958.509 linhas). Olhando de perto:
+
+* **Modelo 59 (2.368.348 grupos):** o número do CF-e reinicia em cada
+  equipamento SAT. O mesmo número 4555 aparece em dezenas de chaves, cada uma
+  com um `nrSAT` diferente (posições 23 a 31 da chave). São cupons distintos.
+* **Modelo 55:** o C100 não traz o CNPJ do emitente, só o `COD_PART`; o CNPJ
+  na extração é o do estabelecimento (registro 0000). Uma saída própria e uma
+  entrada de fornecedor podem ter o mesmo número e série — e foi exatamente
+  isso nos exemplos (saída de jan/2022 e entrada de jun/2022, mesmo número).
+
+**Decisão.** Não há o que remover, e uma "validação por número" apagaria
+10,9 milhões de documentos legítimos. O que entrou foi uma **guarda**: o
+resumo mede `count(DISTINCT chave)` na lista escrita e, se um dia houver chave
+repetida, registra erro no log e avisa na tela para não cobrar por aquela
+lista. É conferência do pipeline, não filtro do dado — coerente com a regra
+de marcar em vez de excluir. Custo: uns 20 segundos em 37,9 milhões.
+
+**Se um dia for preciso casar por identidade de nota** (sem chave, por
+exemplo), a identidade tem de ser (CNPJ do emitente tirado da chave, posições
+7 a 20; modelo; série; número; e `nrSAT` para o modelo 59). Nunca
+(estabelecimento, modelo, série, número).
