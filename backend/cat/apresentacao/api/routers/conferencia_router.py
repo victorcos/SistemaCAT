@@ -7,6 +7,9 @@ listas que o trabalho precisa:
 * **notas não escrituradas** — estão na pasta e não na EFD, saem da análise;
 * **notas a cobrar** — estão na EFD e o documento não veio.
 
+* **notas conferidas** — estão na EFD e o documento veio; é o resultado
+  positivo, o que segue para a apuração.
+
 A rodada não cabe numa requisição: são 7.036 arquivos e 100 GB numa base desta
 casa. Aqui se cria a execução, se devolve o identificador e o front acompanha.
 As planilhas saem depois, por download, geradas a partir dos parquets da
@@ -37,10 +40,12 @@ from cat.apresentacao.api.seguranca import (
 )
 from cat.dominio.acesso.usuario import Usuario
 from cat.infraestrutura.analitico.confronto import (
+    ARQUIVO_CONFERIDOS,
     ARQUIVO_NAO_ESCRITURADAS,
     ARQUIVO_SEM_DOCUMENTO,
 )
 from cat.infraestrutura.planilhas.conferencia import (
+    gerar_conferidas,
     gerar_nao_escrituradas,
     gerar_sem_documento,
 )
@@ -64,6 +69,8 @@ PLANILHAS = {
                          gerar_nao_escrituradas),
     "a-cobrar": ("notas_a_cobrar.xlsx", ARQUIVO_SEM_DOCUMENTO,
                  gerar_sem_documento),
+    "conferidas": ("notas_conferidas.xlsx", ARQUIVO_CONFERIDOS,
+                   gerar_conferidas),
 }
 
 
@@ -188,7 +195,7 @@ def detalhar(
 
 
 # ---------------------------------------------------------------------------
-# 3. As duas planilhas
+# 3. As três planilhas
 # ---------------------------------------------------------------------------
 @router.get("/conferencias/{execucao_id}/planilhas/{qual}")
 def baixar_planilha(
@@ -216,12 +223,16 @@ def baixar_planilha(
     origem = os.path.join(pasta, parquet)
     if not os.path.isfile(origem):
         # os parquets são de disco local e podem ter sido limpos; a linha da
-        # execução fica para sempre, o material de trabalho não
-        raise HTTPException(
-            status.HTTP_410_GONE,
-            "Os arquivos desta conferência não estão mais em disco. "
-            "Rode a conferência de novo.",
+        # execução fica para sempre, o material de trabalho não. Ou a
+        # execução é de antes de esta lista existir: a pasta está lá, a lista
+        # não. Nos dois casos a saída é a mesma — rodar de novo.
+        motivo = (
+            "Esta conferência é de uma versão anterior e não tem esta lista."
+            if os.path.isdir(pasta)
+            else "Os arquivos desta conferência não estão mais em disco."
         )
+        raise HTTPException(status.HTTP_410_GONE,
+                            f"{motivo} Rode a conferência de novo.")
 
     # cada recorte vira arquivo próprio: sem isso, o primeiro download
     # ficaria em cache e o filtro seguinte devolveria a planilha errada

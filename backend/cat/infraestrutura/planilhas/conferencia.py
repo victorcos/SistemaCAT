@@ -1,4 +1,4 @@
-"""As duas planilhas que saem da conferência.
+"""As três planilhas que saem da conferência.
 
 Regras de Excel desta casa (ARQUITETURA §9), e cada uma existe por um motivo
 que já custou retrabalho:
@@ -60,6 +60,28 @@ COLUNAS_SEM_DOCUMENTO = (
     # o que fazer com a linha. Vem primeiro na ordenação do parquet, então
     # quem abre a planilha já cai no que há para cobrar
     Coluna("classificacao", "Classificação", "texto", 30),
+    Coluna("arquivo_efd", "Arquivo da EFD", "texto", 34),
+)
+
+# a lista positiva: escriturada E com documento. As mesmas colunas da
+# pendência, sem classificação (quem casou, casou) e com de onde veio o
+# documento — é o que se abre quando alguém questiona a nota
+COLUNAS_CONFERIDAS = (
+    Coluna("cnpj", "CNPJ do estabelecimento", "texto", 20),
+    Coluna("competencia", "Competência", "data", 13),
+    Coluna("chave", "Chave de acesso", "texto", 46),
+    Coluna("modelo", "Modelo", "texto", 9),
+    Coluna("serie", "Série", "texto", 8),
+    Coluna("numero", "Número", "texto", 12),
+    Coluna("data", "Emissão", "data", 12),
+    Coluna("valor", "Valor do documento", "numero", 18),
+    Coluna("operacao", "Operação", "texto", 11),
+    Coluna("emitente", "Emitente", "texto", 14),
+    Coluna("participante", "Cód. participante", "texto", 18),
+    Coluna("situacao", "Situação", "texto", 10),
+    Coluna("ocorrencias", "Ocorrências na EFD", "numero", 12),
+    Coluna("origem", "Origem do documento", "texto", 20),
+    Coluna("arquivo_do_documento", "Arquivo do documento", "texto", 44),
     Coluna("arquivo_efd", "Arquivo da EFD", "texto", 34),
 )
 
@@ -187,6 +209,18 @@ def gerar_sem_documento(parquet: str, destino: str,
     """
     return gerar(parquet, destino, COLUNAS_SEM_DOCUMENTO, "Pendências",
                  modelos=modelos, classificacoes=classificacoes)
+
+
+def gerar_conferidas(parquet: str, destino: str,
+                     modelos: frozenset[str] | None = None,
+                     classificacoes: frozenset[str] | None = None) -> int:
+    """A lista positiva: está na EFD e o documento veio.
+
+    É o que segue para a apuração. Não tem classificação; o filtro por modelo
+    vale pelo mesmo motivo da cobrança — cupom domina o volume.
+    """
+    return gerar(parquet, destino, COLUNAS_CONFERIDAS, "Conferidas",
+                 modelos=modelos)
 
 
 def gerar_nao_escrituradas(parquet: str, destino: str,

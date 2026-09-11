@@ -147,10 +147,10 @@ class TestFluxo:
         etapa = next(e for e in d["etapas"] if e["chave"] == "conferencia")
         assert etapa["situacao"] == "concluida"
 
-    def test_baixa_as_duas_planilhas(self, cliente, cabecalhos, projeto_id):
+    def test_baixa_as_tres_planilhas(self, cliente, cabecalhos, projeto_id):
         execucao_id = cliente.get(f"/api/projetos/{projeto_id}/conferencias",
                                   headers=cabecalhos).json()[0]["id"]
-        for qual in ("a-cobrar", "nao-escrituradas"):
+        for qual in ("a-cobrar", "nao-escrituradas", "conferidas"):
             r = cliente.get(
                 f"/api/conferencias/{execucao_id}/planilhas/{qual}",
                 headers=cabecalhos)

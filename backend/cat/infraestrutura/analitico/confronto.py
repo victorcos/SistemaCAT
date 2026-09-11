@@ -1,8 +1,8 @@
 """O confronto propriamente dito, em DuckDB.
 
-Duas listas saem daqui, e vão para parquet em vez de para o banco: numa base
-desta casa a EFD tem centenas de milhões de documentos, e a pendência pode ser
-milhões de linhas. O que vai para o Postgres é o resumo — números que a tela
+Três listas saem daqui — pendentes, não escrituradas e conferidas —, e vão
+para parquet em vez de para o banco: numa base desta casa a EFD tem centenas
+de milhões de documentos, e qualquer uma delas pode ser milhões de linhas. O que vai para o Postgres é o resumo — números que a tela
 mostra e que ficam registrados na execução.
 
 **Nada sai da lista.** Documento cancelado, denegado, com numeração inutilizada
@@ -45,6 +45,7 @@ SITUACOES_COM_DOCUMENTO = ("00", "01", "06", "07", "08")
 
 ARQUIVO_NAO_ESCRITURADAS = "nao_escrituradas.parquet"
 ARQUIVO_SEM_DOCUMENTO = "sem_documento.parquet"
+ARQUIVO_CONFERIDOS = "conferidos.parquet"
 BANCO_DO_CONFRONTO = "confronto.duckdb"
 
 # quanto de disco não se toca. Encher a unidade de rascunho derruba o
@@ -54,7 +55,7 @@ FOLGA_DE_DISCO = 2 * 1000**3
 
 def confrontar(efd: str, pasta: str, destino: str,
                anterior: str | None = None) -> ResumoDaConferencia:
-    """Compara os dois parquets e grava as duas listas de divergência.
+    """Compara os dois parquets e grava as três listas.
 
     `anterior` é o `sem_documento.parquet` da rodada passada. Com ele, o resumo
     diz o que andou desde então: quantas pendências o cliente resolveu, quantas
@@ -63,6 +64,7 @@ def confrontar(efd: str, pasta: str, destino: str,
     os.makedirs(destino, exist_ok=True)
     nao_escrituradas = os.path.join(destino, ARQUIVO_NAO_ESCRITURADAS)
     sem_documento = os.path.join(destino, ARQUIVO_SEM_DOCUMENTO)
+    conferidos = os.path.join(destino, ARQUIVO_CONFERIDOS)
     esperado = str(SITUACOES_COM_DOCUMENTO)
 
     con = _abrir(destino)
@@ -106,67 +108,7 @@ def confrontar(efd: str, pasta: str, destino: str,
             SELECT e.* FROM efd e ANTI JOIN entregues p ON e.chave = p.chave
         """)
 
-        # Deduplicar SÓ o que se repete — e em COMANDOS SEPARADOS.
-        #
-        # Agrupar as dezesseis colunas do registro sobre dezenas de milhões de
-        # grupos não cabe em memória nem derramando: numa base de 37,9 milhões
-        # de documentos morreu em 3,7 GB. As chaves são quase todas únicas —
-        # o agrupamento fazia trabalho enorme para não juntar quase nada.
-        #
-        # E a forma importa tanto quanto a ideia. Uma primeira versão com os
-        # dois ramos numa UNION ALL e EXISTS correlacionados levou o DuckDB a
-        # materializar `pendentes_cru` inteira (CTE de subplano comum, 26 GB
-        # de rascunho, sem terminar em 88 minutos). Cada ramo num COPY próprio
-        # relê 400 MB de parquet — segundos — em vez de materializar 38
-        # milhões de linhas. Medido: as quatro etapas em 1,5 min, e a
-        # ordenação final em 6,4 min, com 1,9 GB de rascunho.
-        con.execute("""
-            CREATE TABLE repetidos AS
-            SELECT agrupador FROM pendentes_cru
-            GROUP BY agrupador HAVING count(*) > 1
-        """)
-
-        unicos = os.path.join(destino, "_unicos.parquet")
-        repetidos = os.path.join(destino, "_repetidos.parquet")
-
-        # os únicos atravessam sem agregar: uma passada, em fluxo
-        con.execute(f"""
-            COPY (
-                SELECT p.agrupador, p.chave, p.tem_chave, p.modelo, p.situacao,
-                       p.serie, p.numero, p.data, p.valor, p.participante,
-                       p.operacao, p.emitente, p.cnpj, p.competencia,
-                       p.arquivo AS arquivo_efd, 1::BIGINT AS ocorrencias
-                FROM pendentes_cru p
-                ANTI JOIN repetidos r ON r.agrupador = p.agrupador
-            ) TO '{_escapar(unicos)}' (FORMAT PARQUET, COMPRESSION ZSTD)
-        """)
-
-        # só os repetidos — um conjunto pequeno — passam pelo GROUP BY largo
-        con.execute(f"""
-            COPY (
-                SELECT agrupador,
-                       any_value(chave)    AS chave,
-                       bool_and(tem_chave) AS tem_chave,
-                       min(modelo)         AS modelo,
-                       min(situacao)       AS situacao,
-                       any_value(serie)    AS serie,
-                       any_value(numero)   AS numero,
-                       min(data)           AS data,
-                       max(valor)          AS valor,
-                       any_value(participante) AS participante,
-                       any_value(operacao)     AS operacao,
-                       any_value(emitente)     AS emitente,
-                       any_value(cnpj)         AS cnpj,
-                       min(competencia)        AS competencia,
-                       -- de qual arquivo saiu: é por onde se recomeça quando
-                       -- alguém questiona uma linha da cobrança meses depois
-                       any_value(arquivo)      AS arquivo_efd,
-                       count(*)                AS ocorrencias
-                FROM pendentes_cru p
-                SEMI JOIN repetidos r ON r.agrupador = p.agrupador
-                GROUP BY agrupador
-            ) TO '{_escapar(repetidos)}' (FORMAT PARQUET, COMPRESSION ZSTD)
-        """)
+        partes = _uma_linha_por_chave(con, "pendentes_cru", destino, "pendentes")
 
         # junta, classifica e ordena — a partir dos dois parquets prontos, que
         # é uma varredura, não uma materialização
@@ -179,16 +121,39 @@ def confrontar(efd: str, pasta: str, destino: str,
                          WHEN situacao NOT IN {esperado} THEN 'sem_documento_a_pedir'
                          ELSE 'a_cobrar'
                        END AS classificacao
-                FROM read_parquet(['{_escapar(unicos)}', '{_escapar(repetidos)}'])
+                FROM read_parquet({_lista_sql(partes)})
                 ORDER BY classificacao, cnpj, competencia
             ) TO '{_escapar(sem_documento)}' (FORMAT PARQUET, COMPRESSION ZSTD)
         """)
-        for temporario in (unicos, repetidos):
-            try:
-                os.remove(temporario)
-            except OSError:
-                log.warning("não deu para apagar parquet intermediário",
-                            extra={"arquivo": temporario})
+        _apagar(partes)
+
+        # ---- na EFD e com documento: o resultado positivo ----
+        # "Possui nota e está na EFD — onde vejo?" precisa de lista, não só
+        # de número: é o que segue para a apuração. Mesma forma da lista de
+        # pendências (uma linha por chave, ocorrências contadas) mais de onde
+        # veio o documento. Sem ORDER BY de propósito: numa base saudável
+        # este é o lado GRANDE, e ordenar 37 milhões de linhas custou 6,4
+        # min na lista de pendências — lá a classificação justifica, aqui não.
+        con.execute("""
+            CREATE VIEW conferidos_cru AS
+            SELECT e.* FROM efd e SEMI JOIN entregues p ON e.chave = p.chave
+        """)
+        partes = _uma_linha_por_chave(con, "conferidos_cru", destino, "conferidos")
+        # de qual arquivo veio o documento de cada chave. A pasta é o lado
+        # pequeno; agrupar aqui é barato
+        con.execute("""
+            CREATE TABLE documentos AS
+            SELECT chave, min(origem) AS origem, min(arquivo) AS arquivo
+            FROM pasta GROUP BY chave
+        """)
+        con.execute(f"""
+            COPY (
+                SELECT c.*, d.origem, d.arquivo AS arquivo_do_documento
+                FROM read_parquet({_lista_sql(partes)}) c
+                JOIN documentos d ON d.chave = c.chave
+            ) TO '{_escapar(conferidos)}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        """)
+        _apagar(partes)
 
         # ---- na pasta e fora da EFD: sai da análise ----
         con.execute(f"""
@@ -202,7 +167,7 @@ def confrontar(efd: str, pasta: str, destino: str,
             ) TO '{_escapar(nao_escrituradas)}' (FORMAT PARQUET, COMPRESSION ZSTD)
         """)
 
-        resumo = _resumir(con, nao_escrituradas, sem_documento)
+        resumo = _resumir(con, nao_escrituradas, sem_documento, conferidos)
         if anterior and os.path.isfile(anterior):
             _comparar(con, anterior, sem_documento, resumo)
     finally:
@@ -221,6 +186,93 @@ def confrontar(efd: str, pasta: str, destino: str,
                "cobertura": round(resumo.cobertura, 4)},
     )
     return resumo
+
+
+def _uma_linha_por_chave(con, fonte: str, destino: str,
+                         rotulo: str) -> list[str]:
+    """Reduz a view `fonte` a uma linha por agrupador, em dois parquets.
+
+    Deduplicar SÓ o que se repete — e em COMANDOS SEPARADOS.
+
+    Agrupar as dezesseis colunas do registro sobre dezenas de milhões de
+    grupos não cabe em memória nem derramando: numa base de 37,9 milhões de
+    documentos morreu em 3,7 GB. As chaves são quase todas únicas — o
+    agrupamento fazia trabalho enorme para não juntar quase nada. Então os
+    únicos atravessam em fluxo (ANTI JOIN com a tabela pequena dos
+    repetidos) e só os repetidos passam pelo GROUP BY largo.
+
+    E a forma importa tanto quanto a ideia. Uma primeira versão com os dois
+    ramos numa UNION ALL e EXISTS correlacionados levou o DuckDB a
+    materializar a fonte inteira (CTE de subplano comum, 26 GB de rascunho,
+    sem terminar em 88 minutos). Cada ramo num COPY próprio relê 400 MB de
+    parquet — segundos — em vez de materializar 38 milhões de linhas.
+    Medido: as etapas em 1,5 min com 1,9 GB de rascunho.
+
+    Devolve os dois caminhos; quem chama junta, acrescenta o que for seu e
+    apaga com `_apagar`.
+    """
+    con.execute(f"""
+        CREATE TABLE repetidos_{rotulo} AS
+        SELECT agrupador FROM {fonte}
+        GROUP BY agrupador HAVING count(*) > 1
+    """)
+
+    unicos = os.path.join(destino, f"_{rotulo}_unicos.parquet")
+    repetidos = os.path.join(destino, f"_{rotulo}_repetidos.parquet")
+
+    # os únicos atravessam sem agregar: uma passada, em fluxo
+    con.execute(f"""
+        COPY (
+            SELECT p.agrupador, p.chave, p.tem_chave, p.modelo, p.situacao,
+                   p.serie, p.numero, p.data, p.valor, p.participante,
+                   p.operacao, p.emitente, p.cnpj, p.competencia,
+                   p.arquivo AS arquivo_efd, 1::BIGINT AS ocorrencias
+            FROM {fonte} p
+            ANTI JOIN repetidos_{rotulo} r ON r.agrupador = p.agrupador
+        ) TO '{_escapar(unicos)}' (FORMAT PARQUET, COMPRESSION ZSTD)
+    """)
+
+    # só os repetidos — um conjunto pequeno — passam pelo GROUP BY largo
+    con.execute(f"""
+        COPY (
+            SELECT agrupador,
+                   any_value(chave)    AS chave,
+                   bool_and(tem_chave) AS tem_chave,
+                   min(modelo)         AS modelo,
+                   min(situacao)       AS situacao,
+                   any_value(serie)    AS serie,
+                   any_value(numero)   AS numero,
+                   min(data)           AS data,
+                   max(valor)          AS valor,
+                   any_value(participante) AS participante,
+                   any_value(operacao)     AS operacao,
+                   any_value(emitente)     AS emitente,
+                   any_value(cnpj)         AS cnpj,
+                   min(competencia)        AS competencia,
+                   -- de qual arquivo saiu: é por onde se recomeça quando
+                   -- alguém questiona uma linha meses depois
+                   any_value(arquivo)      AS arquivo_efd,
+                   count(*)                AS ocorrencias
+            FROM {fonte} p
+            SEMI JOIN repetidos_{rotulo} r ON r.agrupador = p.agrupador
+            GROUP BY agrupador
+        ) TO '{_escapar(repetidos)}' (FORMAT PARQUET, COMPRESSION ZSTD)
+    """)
+    return [unicos, repetidos]
+
+
+def _lista_sql(caminhos: list[str]) -> str:
+    """Lista de caminhos como literal do read_parquet."""
+    return "[" + ", ".join(f"'{_escapar(c)}'" for c in caminhos) + "]"
+
+
+def _apagar(caminhos: list[str]) -> None:
+    for caminho in caminhos:
+        try:
+            os.remove(caminho)
+        except OSError:
+            log.warning("não deu para apagar parquet intermediário",
+                        extra={"arquivo": caminho})
 
 
 def _abrir(destino: str):
@@ -274,18 +326,15 @@ def _limpar(destino: str) -> None:
                             extra={"arquivo": alvo})
 
 
-def _resumir(con, nao_escrituradas: str,
-             sem_documento: str) -> ResumoDaConferencia:
-    """Os números do confronto, sem nenhuma contagem distinta do lado grande.
+def _resumir(con, nao_escrituradas: str, sem_documento: str,
+             conferidos: str) -> ResumoDaConferencia:
+    """Os números do confronto, lidos dos parquets já escritos.
 
     `count(DISTINCT)` sobre dezenas de milhões de valores constrói uma tabela
     de dispersão que não derrama bem: numa base de 37,9 milhões de documentos
-    ele passou de dez minutos e estourou a memória. Aqui as contagens saem de
-    dois lugares baratos:
-
-    * o parquet de pendências **já escrito** — uma varredura colunar;
-    * o lado da pasta, que é pequeno por natureza (são os documentos que o
-      cliente entregou, não a base fiscal inteira).
+    ele passou de dez minutos e estourou a memória. Aqui as contagens saem
+    das listas **já gravadas** — pendências e conferidos, uma linha por chave
+    cada — numa varredura colunar, sem voltar à base.
 
     E `escriturados` não é contado: as pendências e os conferidos particionam
     o conjunto, então a soma dos dois é o total. Contar de novo seria pagar
@@ -325,20 +374,20 @@ def _resumir(con, nao_escrituradas: str,
         f"SELECT count(*) FROM read_parquet('{_escapar(nao_escrituradas)}')"
     ).fetchone()[0]
 
-    # partindo da pasta, que é o lado pequeno: quantos dos documentos
-    # entregues têm correspondente na EFD
-    conferidos, valor_conferido = con.execute("""
-        SELECT count(DISTINCT e.agrupador), coalesce(sum(e.valor), 0)
-        FROM entregues p JOIN efd e USING (chave)
+    # o lado positivo, do parquet já escrito: uma linha por chave
+    com_documento, valor_conferido = con.execute(f"""
+        SELECT count(*), coalesce(sum(valor), 0)
+        FROM read_parquet('{_escapar(conferidos)}')
     """).fetchone()
 
     origens = [Origem(o) for (o,) in con.execute(
         "SELECT DISTINCT origem FROM pasta WHERE origem IS NOT NULL"
     ).fetchall() if o in {x.value for x in Origem}]
 
-    por_modelo = _fatias(con, "modelo", pendencias, _modelo_rotulo)
+    positivos = _escapar(conferidos)
+    por_modelo = _fatias(con, "modelo", pendencias, positivos, _modelo_rotulo)
     por_operacao = _fatias(
-        con, "operacao", pendencias,
+        con, "operacao", pendencias, positivos,
         lambda o: "Entrada" if o == "entrada" else "Saída")
 
     # como as pendências se dividem: o que se cobra, o que não tem documento a
@@ -364,8 +413,8 @@ def _resumir(con, nao_escrituradas: str,
     ).fetchall() if c]
 
     return ResumoDaConferencia(
-        escriturados=conferidos + faltando,
-        conferidos=conferidos,
+        escriturados=com_documento + faltando,
+        conferidos=com_documento,
         nao_escrituradas=fora,
         sem_documento=faltando,
         sem_documento_cobravel=espera,
@@ -384,20 +433,20 @@ def _resumir(con, nao_escrituradas: str,
     )
 
 
-def _fatias(con, coluna: str, pendencias: str, rotular) -> list[Fatia]:
+def _fatias(con, coluna: str, pendencias: str, positivos: str,
+            rotular) -> list[Fatia]:
     """Recorte somando os dois lados: o que ficou pendente e o que conferiu.
 
-    Somar em vez de contar sobre a base inteira é o que mantém isto barato —
-    um lado é varredura de parquet, o outro é limitado pelo tamanho da pasta
-    do cliente.
+    Somar as duas listas em vez de contar sobre a base inteira é o que mantém
+    isto barato — cada lado é uma varredura de parquet, uma linha por chave.
     """
     pendentes = con.execute(f"""
         SELECT {coluna}, count(*), coalesce(sum(valor), 0)
         FROM read_parquet('{pendencias}') GROUP BY 1
     """).fetchall()
     conferidos = con.execute(f"""
-        SELECT e.{coluna}, count(DISTINCT e.agrupador), coalesce(sum(e.valor), 0)
-        FROM entregues p JOIN efd e USING (chave) GROUP BY 1
+        SELECT {coluna}, count(*), coalesce(sum(valor), 0)
+        FROM read_parquet('{positivos}') GROUP BY 1
     """).fetchall()
 
     juntos: dict[str, tuple[int, Decimal]] = {}

@@ -97,7 +97,7 @@ class Fatia:
 
 @dataclass
 class ResumoDaConferencia:
-    """O que a tela mostra e o que os dois botões exportam.
+    """O que a tela mostra e o que os três botões exportam.
 
     Só números e recortes: as listas em si podem ter milhões de linhas e vivem
     em parquet, não em memória nem no banco.

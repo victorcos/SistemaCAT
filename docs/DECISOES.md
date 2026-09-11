@@ -900,3 +900,33 @@ de marcar em vez de excluir. Custo: uns 20 segundos em 37,9 milhões.
 exemplo), a identidade tem de ser (CNPJ do emitente tirado da chave, posições
 7 a 20; modelo; série; número; e `nrSAT` para o modelo 59). Nunca
 (estabelecimento, modelo, série, número).
+
+---
+
+## 2026-09-11 — A conferência tem três listas, não duas
+
+**A pergunta.** "Onde eu visualizo o que foi escriturado e entregue — o
+resultado positivo?" Não havia onde: o lado positivo era só um número na tela
+(`conferidos`), e a lista em si nunca era gravada.
+
+**Decisão.** O confronto passa a gravar `conferidos.parquet` — está na EFD
+**e** o documento veio — ao lado de `sem_documento.parquet` e
+`nao_escrituradas.parquet`. Mesma forma da lista de pendências (uma linha por
+chave, `ocorrencias` contadas, arquivo da EFD) mais **de onde veio o
+documento**: origem (XML ou relatório do cliente) e o arquivo. Sai pela rota
+`/conferencias/{id}/planilhas/conferidas` como `notas_conferidas.xlsx`, com
+filtro por modelo, e ganhou o terceiro cartão na tela.
+
+**O que mudou por dentro.** A deduplicação (únicos em fluxo, repetidos pelo
+GROUP BY largo, cada ramo num COPY próprio) virou a função
+`_uma_linha_por_chave`, usada pelas duas listas. O resumo agora lê os dois
+lados dos parquets já gravados — sumiu a última consulta que voltava à base
+(`entregues JOIN efd`), inclusive nos recortes por modelo e operação.
+Conferido na execução 3 real: números idênticos aos gravados, 2 segundos.
+
+**Sem ORDER BY na lista positiva, de propósito.** Numa base saudável este é o
+lado grande. Ordenar 37 milhões de linhas custou 6,4 min na lista de
+pendências, onde a classificação justifica; aqui não há classificação.
+
+**Execuções antigas não têm a lista.** O botão responde 410 dizendo isso e
+pedindo para rodar de novo — não se fabrica o parquet por fora do pipeline.

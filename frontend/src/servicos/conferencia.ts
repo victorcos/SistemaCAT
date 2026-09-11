@@ -59,6 +59,9 @@ export interface Execucao {
 
 export const EM_CURSO = ["na_fila", "rodando"];
 
+/** As três listas que a conferência exporta. */
+export type Planilha = "nao-escrituradas" | "a-cobrar" | "conferidas";
+
 export const iniciarConferencia = (projetoId: number) =>
   chamar<Execucao>(`/projetos/${projetoId}/conferencias`, { method: "POST" });
 
@@ -69,7 +72,7 @@ export const detalharConferencia = (execucaoId: number) =>
   chamar<Execucao>(`/conferencias/${execucaoId}`);
 
 /**
- * Baixa uma das duas planilhas.
+ * Baixa uma das três planilhas.
  *
  * Não dá para usar um link simples: a rota exige o token no cabeçalho, e
  * `<a href>` não manda cabeçalho. Então busca-se o conteúdo e monta-se o
@@ -77,7 +80,7 @@ export const detalharConferencia = (execucaoId: number) =>
  */
 export async function baixarPlanilha(
   execucaoId: number,
-  qual: "nao-escrituradas" | "a-cobrar",
+  qual: Planilha,
   modelos: string[] = [],
   classificacoes: string[] = [],
 ): Promise<void> {

@@ -11,6 +11,7 @@ import {
   numero,
   type Execucao,
   type Fatia,
+  type Planilha,
   type ResumoDaConferencia,
 } from "../servicos/conferencia";
 import { tamanho } from "../servicos/lote";
@@ -23,9 +24,9 @@ const INTERVALO_MS = 2000;
  * Conferência de documentos.
  *
  * Cruza o que a EFD escriturou (C100 e C800) com o XML e o relatório do
- * cliente, e entrega as duas listas do trabalho: o que está na pasta e não foi
- * escriturado, que sai da análise, e o que foi escriturado sem documento, que
- * é o que se cobra.
+ * cliente, e entrega as três listas do trabalho: o que casou (segue para a
+ * apuração), o que está na pasta e não foi escriturado (sai da análise) e o
+ * que foi escriturado sem documento (é o que se cobra).
  */
 export default function Conferencia() {
   const { id } = useParams<{ id: string }>();
@@ -90,7 +91,7 @@ export default function Conferencia() {
     }
   }
 
-  async function baixar(qual: "nao-escrituradas" | "a-cobrar") {
+  async function baixar(qual: Planilha) {
     if (!execucao) return;
     setOcupado(true);
     setErro(null);
@@ -230,7 +231,7 @@ function Resultado({
   classes: string[];
   aoAlternarModelo: (codigo: string) => void;
   aoAlternarClasse: (codigo: string) => void;
-  aoBaixar: (qual: "nao-escrituradas" | "a-cobrar") => void;
+  aoBaixar: (qual: Planilha) => void;
   ocupado: boolean;
 }) {
   const cobertura = Math.round(resumo.cobertura * 100);
@@ -289,6 +290,26 @@ function Resultado({
             {a}
           </div>
         ))}
+      </section>
+
+      <section className="cartao">
+        <h2 className="cartao__titulo">Notas conferidas</h2>
+        <p className="cartao__sub">
+          Estão na EFD e o documento veio — XML da pasta ou linha do relatório
+          do cliente. É o resultado positivo: o que segue para a apuração.
+        </p>
+        <p className="numerao">{numero(resumo.conferidos)}</p>
+        <p className="campo__dica">
+          {dinheiro(resumo.valor_conferido)} em documentos conferidos.
+        </p>
+        <button
+          type="button"
+          className="botao botao--secundario"
+          onClick={() => aoBaixar("conferidas")}
+          disabled={ocupado || resumo.conferidos === 0}
+        >
+          Baixar planilha
+        </button>
       </section>
 
       <section className="cartao">

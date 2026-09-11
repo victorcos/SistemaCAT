@@ -18,6 +18,7 @@ from cat.dominio.sped.fiscais import Emitente, Operacao, ler_documento
 from cat.infraestrutura.analitico.confronto import confrontar
 from cat.infraestrutura.analitico.extracao import extrair_efd, extrair_pasta
 from cat.infraestrutura.planilhas.conferencia import (
+    gerar_conferidas,
     gerar_nao_escrituradas,
     gerar_sem_documento,
 )
@@ -222,6 +223,37 @@ class TestConfrontar:
         resumo, _ = confronto
         assert resumo.conferidos == 1
 
+    def test_a_lista_positiva_traz_a_nota_e_de_onde_veio_o_documento(
+        self, confronto
+    ):
+        # "possui nota e está na EFD — onde vejo?" Aqui: uma linha por
+        # chave, com o arquivo do documento que casou
+        resumo, destino = confronto
+        con = duckdb.connect()
+        linhas = con.execute(
+            "SELECT chave, origem, arquivo_do_documento, ocorrencias "
+            f"FROM read_parquet('{destino}/conferidos.parquet')").fetchall()
+        con.close()
+        assert len(linhas) == resumo.conferidos == 1
+        chave, origem, arquivo, ocorrencias = linhas[0]
+        assert chave == CHAVE_C100
+        assert origem == "xml"
+        assert arquivo.endswith("nota.xml")
+        assert ocorrencias == 1
+
+    def test_as_duas_listas_particionam_a_efd(self, confronto):
+        # cada documento escriturado está em exatamente uma das listas
+        resumo, destino = confronto
+        con = duckdb.connect()
+        positivas = con.execute(
+            f"SELECT count(*) FROM read_parquet('{destino}/conferidos.parquet')"
+        ).fetchone()[0]
+        pendentes = con.execute(
+            f"SELECT count(*) FROM read_parquet('{destino}/sem_documento.parquet')"
+        ).fetchone()[0]
+        con.close()
+        assert positivas + pendentes == resumo.escriturados == 4
+
     def test_o_que_esta_na_pasta_e_nao_na_efd(self, confronto):
         resumo, _ = confronto
         assert resumo.nao_escrituradas == 1
@@ -266,6 +298,36 @@ class TestConfrontar:
         assert not any("chave repetida" in a for a in resumo.avisos)
 
 
+class TestNotaEmDuasFiliaisComDocumento:
+    """A mesma chave em dois C100 (emitida por uma filial, recebida por outra)
+    e o XML na pasta: é UMA nota conferida, com duas ocorrências — o mesmo
+    tratamento que a lista de pendências dá."""
+
+    def test_conta_uma_vez_e_mostra_as_ocorrencias(self, efd, tmp_path):
+        import shutil  # noqa: PLC0415
+
+        outra_filial = str(tmp_path / "efd_filial.txt")
+        shutil.copy(efd, outra_filial)
+        caminho_efd = str(tmp_path / "efd.parquet")
+        extrair_efd([efd, outra_filial], caminho_efd)
+
+        xml = tmp_path / "nota.xml"
+        xml.write_text(NFE, encoding="utf-8")
+        caminho_pasta = str(tmp_path / "pasta.parquet")
+        extrair_pasta([str(xml)], [], caminho_pasta)
+
+        destino = str(tmp_path / "saida")
+        resumo = confrontar(caminho_efd, caminho_pasta, destino)
+        assert resumo.conferidos == 1
+        assert resumo.escriturados == 4          # 8 linhas, 4 documentos
+
+        con = duckdb.connect()
+        assert con.execute(
+            f"SELECT ocorrencias FROM read_parquet('{destino}/conferidos.parquet')"
+        ).fetchall() == [(2,)]
+        con.close()
+
+
 class TestPlanilhas:
     def test_sai_inteira_sem_filtro(self, confronto, tmp_path):
         # nada é excluído: cancelada e sem chave vão junto, marcadas
@@ -298,6 +360,18 @@ class TestPlanilhas:
         linhas = gerar_nao_escrituradas(f"{destino}/nao_escrituradas.parquet",
                                         str(tmp_path / "fora.xlsx"))
         assert linhas == 1
+
+    def test_conferidas_diz_de_onde_veio_o_documento(self, confronto, tmp_path):
+        import openpyxl  # noqa: PLC0415
+
+        _, destino = confronto
+        caminho = str(tmp_path / "conferidas.xlsx")
+        assert gerar_conferidas(f"{destino}/conferidos.parquet", caminho) == 1
+        aba = openpyxl.load_workbook(caminho).active
+        colunas = [c.value for c in aba[1]]
+        origem = aba.cell(row=2, column=colunas.index("Origem do documento") + 1)
+        assert origem.value == "XML"
+        assert "Classificação" not in colunas       # quem casou, casou
 
     def test_chave_vai_como_texto(self, confronto, tmp_path):
         # chave de 44 dígitos como número vira notação científica: parece certa
