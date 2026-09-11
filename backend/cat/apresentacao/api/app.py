@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from cat.config import obter_config
+from cat.versao import versao
 from cat.infraestrutura.repositorios.banco import conferir_migracoes
 from cat.log import configurar, contexto, obter_log
 
@@ -52,7 +53,9 @@ async def ciclo_de_vida(app: FastAPI):
 app = FastAPI(
     title="Sistema CAT",
     description="Apuração das obrigações da CAT. BMS Consultoria Tributária.",
-    version="0.3.0",
+    # de uma fonte só: o pyproject.toml. Escrita à mão aqui, parou em 0.3.0
+    # enquanto as etiquetas do git iam a v0.15.2 — e /api/saude mentia.
+    version=versao(),
     lifespan=ciclo_de_vida,
 )
 

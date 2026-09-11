@@ -1,6 +1,8 @@
 [project]
 name = "sistema-cat"
-version = "0.3.0"
+# FONTE ÚNICA da versão. A API lê daqui (cat/versao.py) e a etiqueta do git
+# repete este número: `git tag v<version>`. Bump aqui primeiro, sempre.
+version = "0.15.3"
 description = "Sistema de apuração das obrigações da CAT — BMS Consultoria Tributária"
 requires-python = ">=3.11"
 dependencies = [

@@ -82,3 +82,23 @@ o histórico, não apagar num commit seguinte.
 
 Privado. A documentação contém nome de cliente, volume e valor apurado. Só passa
 a público se houver decisão explícita e limpeza prévia do conteúdo sensível.
+
+## 4. Onde a versão vive
+
+**Em um lugar só: `backend/pyproject.toml`, campo `version`.** A API lê daí
+(`cat/versao.py`) e expõe em `/api/saude`. A etiqueta do git repete o número,
+com o prefixo `v`.
+
+A ordem de um release é sempre a mesma, e a ordem importa:
+
+1. bump do `version` no `pyproject.toml`
+2. commit (com `docs/DECISOES.md` em dia)
+3. `git tag -a v<version>` no mesmo commit
+4. `git push --follow-tags`
+
+**Por quê.** A versão já viveu escrita à mão em dois lugares — `app.py` e
+`pyproject.toml` — e os dois pararam em 0.3.0 enquanto as etiquetas chegavam a
+v0.15.2. O `/api/saude`, que existe para dizer *o que está rodando*, dizia
+outra coisa. Um teste (`tests/unidade/test_versao.py`) falha quando a etiqueta
+mais recente está **à frente** do `pyproject` — que é exatamente como o drift
+aconteceu. O contrário é normal: é o commit de bump, antes de etiquetar.
