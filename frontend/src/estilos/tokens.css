@@ -147,7 +147,7 @@
 
   --raio:      6px;
   --raio-g:    10px;
-  --fonte:     "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --fonte:     "Inter Variable", "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   --fonte-num: "IBM Plex Mono", "Consolas", ui-monospace, monospace;
 }
 

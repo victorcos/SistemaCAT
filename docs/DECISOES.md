@@ -930,3 +930,23 @@ pendências, onde a classificação justifica; aqui não há classificação.
 
 **Execuções antigas não têm a lista.** O botão responde 410 dizendo isso e
 pedindo para rodar de novo — não se fabrica o parquet por fora do pipeline.
+
+---
+
+## 2026-09-11 — As fontes viajam com o app
+
+**O que aconteceu.** O rótulo "ESCRITURADAS NA EFD" da ficha de conferência
+saiu "bugado" na tela de um gestor. Os tokens pediam `"Inter"` com peso 650
+para os rótulos, mas nada carregava a Inter: não havia `@font-face`, `<link>`
+nem pacote. O navegador caía no que estivesse instalado — Segoe UI, que não
+tem peso 650 e vira Bold (700) — e cada máquina renderizava de um jeito.
+
+**Decisão.** As fontes vêm embarcadas no build, pelos pacotes
+`@fontsource-variable/inter` (variável: tem o 650 de verdade) e
+`@fontsource/ibm-plex-mono` (400, 500 e 600). Importadas em `main.tsx` antes
+dos tokens, e `--fonte` passa a apontar para `"Inter Variable"` primeiro. Sem
+CDN de propósito: o sistema roda em rede interna e não pode depender de
+fontes do Google carregarem.
+
+**Verificado** com captura do Chrome sem interface na mesma página, antes e
+depois: antes, Segoe UI Bold; depois, Inter no peso desenhado.
