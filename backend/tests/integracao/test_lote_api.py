@@ -188,7 +188,11 @@ class TestRegistrar:
     def test_pasta_sem_nada_util_e_recusada(
         self, cliente, cabecalhos, projeto_id, tmp_path
     ):
-        escrever(tmp_path, "so_contribuicoes.txt", CONTRIBUICOES)
+        # período diferente do que os outros testes já importaram: com o
+        # mesmo conteúdo, o sistema a barraria como cópia (409) antes de
+        # chegar à recusa por "nada alimenta a CAT" que este teste prova
+        escrever(tmp_path, "so_contribuicoes.txt",
+                 CONTRIBUICOES.replace("01062021|30062021", "01072021|31072021"))
         r = cliente.post(f"/api/projetos/{projeto_id}/lotes", headers=cabecalhos,
                          json={"pasta": str(tmp_path), "observacao": None})
         assert r.status_code == 422

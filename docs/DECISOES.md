@@ -814,3 +814,34 @@ longe.
 **O corte de 5% vem de medição.** Numa base real de 37,9 milhões de
 documentos, 2,2% das chaves se repetiam legitimamente. O mesmo lote importado
 em dobro daria perto de 100%. Entre um e outro há margem de sobra.
+
+---
+
+## 2026-09-11 — Cópia exata não entra duas vezes, e o hash só se calcula de quem tem par
+
+**Decisão.** A importação passa a recusar **cópia exata** — mesmo conteúdo,
+byte a byte — de outro arquivo da mesma pasta ou de um já importado no
+trabalho. A cópia fica de fora com aviso dizendo de quem ela é cópia.
+
+**Por quê.** A deduplicação era só por caminho. O mesmo SPED copiado em duas
+pastas (a Sulamericana tem `EFD Fiscal - EFD ICMS IPI`, `Sped FISCAL
+segregado` e `Prescritos`) entrava duas vezes e dobrava os documentos do
+período. O confronto absorvia em silêncio.
+
+**Como, sem ler 100 GB.** Hash SHA-256 **só de candidatos**: arquivos que
+coincidem em tamanho, tipo, CNPJ, competência e finalidade com outro da pasta
+ou com um já importado. Assinatura igual e conteúdo diferente existe, então a
+assinatura escolhe quem hashar; quem decide é o hash. Numa importação sem
+pares nada é lido inteiro. O hash fica gravado (`arquivo_do_lote.hash_conteudo`)
+para a importação seguinte comparar; arquivo importado antes desta regra não
+tem hash e é lido na hora — está em disco, o caminho é conhecido.
+
+**Duas fronteiras que precisaram ficar explícitas.** (1) Caminho que já está
+no trabalho é "já importado", domínio do roteador — não passa pelo hash, que
+o compararia consigo mesmo. Só caminho novo com conteúdo igual é cópia.
+(2) Uma pasta só de cópias responde 409 "são cópias exatas de arquivos que já
+estão no trabalho", antes da recusa genérica "nada alimenta a CAT" — que
+seria verdadeira e enganosa.
+
+**Entre iguais, sobrevive o de pasta mais rasa.** Não muda o resultado; muda
+o que a pessoa vê como "o original", e a cópia costuma estar em `backup/`.

@@ -14,6 +14,7 @@ cabeçalho. Nenhum arquivo é lido inteiro nesta etapa.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 from datetime import date
@@ -206,6 +207,20 @@ def classificar(caminho: str, tamanho: int | None = None) -> ArquivoDoLote:
     return ArquivoDoLote(caminho=caminho, nome=nome, tamanho=tamanho,
                          tipo=TipoDeArquivo.DESCONHECIDO,
                          motivo="extensão não tratada")
+
+
+def hash_de(caminho: str, bloco: int = 1 << 20) -> str:
+    """SHA-256 do arquivo inteiro, lido em blocos de 1 MB.
+
+    É a única leitura completa que a importação faz, e por isso só é chamada
+    para candidatos a cópia. Um SPED de 14 MB leva bem menos de um segundo em
+    disco local; em rede é o tempo de transferir o arquivo.
+    """
+    resumo = hashlib.sha256()
+    with open(caminho, "rb") as f:
+        for pedaco in iter(lambda: f.read(bloco), b""):
+            resumo.update(pedaco)
+    return resumo.hexdigest()
 
 
 def percorrer_pasta(pasta: str) -> Iterator[tuple[str, int]]:

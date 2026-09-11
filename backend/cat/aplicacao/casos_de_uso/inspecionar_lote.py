@@ -15,12 +15,14 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, replace
 
 from cat.config import obter_config
 from cat.dominio.lote import ArquivoDoLote, ResumoDoLote, TipoDeArquivo
 from cat.infraestrutura.arquivos.classificador import (
     LIMITE_DE_ARQUIVOS,
     classificar,
+    hash_de,
     percorrer_pasta,
 )
 from cat.log import obter_log
@@ -32,6 +34,113 @@ log = obter_log(__name__)
 # cálculo: subir bem acima do número de núcleos é o certo. O teto existe para
 # não afogar o servidor de arquivos, que é compartilhado com o resto da casa.
 TAREFAS_SIMULTANEAS = 64
+
+
+@dataclass(frozen=True)
+class ArquivoExistente:
+    """O que já está no trabalho, com o suficiente para detectar cópia.
+
+    `hash_conteudo` pode vir vazio: arquivos importados antes desta regra não
+    foram hashados. Nesse caso, o arquivo antigo é lido na hora — ele está em
+    disco, o caminho é conhecido — e o hash gravado na próxima importação.
+    """
+
+    caminho: str
+    tamanho: int
+    tipo: str
+    cnpj: str | None
+    competencia: object
+    retificadora: bool
+    hash_conteudo: str | None = None
+
+    @property
+    def assinatura(self) -> tuple:
+        return (self.tamanho, self.tipo, self.cnpj, self.competencia, self.retificadora)
+
+
+def _assinatura(a: ArquivoDoLote) -> tuple:
+    return (a.tamanho, a.tipo.value, a.cnpj, a.competencia, a.retificadora)
+
+
+def _separar_copias(
+    itens: list[ArquivoDoLote], existentes: tuple[ArquivoExistente, ...]
+) -> tuple[list[ArquivoDoLote], list[tuple[ArquivoDoLote, str]]]:
+    """Tira as cópias exatas, hashando só quem tem com quem se parecer.
+
+    Candidato é quem coincide em tamanho, tipo, CNPJ, competência e finalidade
+    com outro arquivo da pasta ou com um já importado. Conteúdo diferente com a
+    mesma assinatura existe (dois relatórios do mesmo tamanho), então a
+    assinatura só escolhe quem hashar; quem decide é o hash.
+    """
+    por_assinatura: dict[tuple, list[ArquivoDoLote]] = {}
+    for a in itens:
+        if a.tamanho > 0:
+            por_assinatura.setdefault(_assinatura(a), []).append(a)
+    antigos: dict[tuple, list[ArquivoExistente]] = {}
+    for e in existentes:
+        antigos.setdefault(e.assinatura, []).append(e)
+
+    candidatos = [
+        a for a in itens
+        if a.tamanho > 0
+        and (len(por_assinatura.get(_assinatura(a), [])) > 1
+             or _assinatura(a) in antigos)
+    ]
+    if not candidatos:
+        return itens, []
+
+    # os antigos sem hash precisam ser lidos também; só os que importam agora
+    a_ler_antigos = [
+        e for assinatura in {_assinatura(a) for a in candidatos}
+        for e in antigos.get(assinatura, []) if not e.hash_conteudo
+    ]
+    with ThreadPoolExecutor(max_workers=TAREFAS_SIMULTANEAS) as executor:
+        hashes = dict(zip(
+            [a.caminho for a in candidatos] + [e.caminho for e in a_ler_antigos],
+            executor.map(_hash_tolerante,
+                         [a.caminho for a in candidatos]
+                         + [e.caminho for e in a_ler_antigos]),
+        ))
+
+    hash_antigo: dict[str, str] = {}
+    for e in existentes:
+        h = e.hash_conteudo or hashes.get(e.caminho)
+        if h:
+            hash_antigo.setdefault(h, e.caminho)
+
+    # Entre cópias idênticas, sobrevive a de pasta mais rasa — a cópia costuma
+    # estar em `backup/`, `old/`, `2021 (2)/`. Entre iguais na profundidade,
+    # a ordem alfabética. Não muda o resultado (são o mesmo byte a byte); muda
+    # o que a pessoa vê como "o original", e isso importa para confiar.
+    sobrevivente: dict[str, str] = {}
+    for a in sorted(itens, key=lambda x: (x.caminho.count(os.sep), x.caminho)):
+        h = hashes.get(a.caminho)
+        if h is not None and h not in hash_antigo:
+            sobrevivente.setdefault(h, a.caminho)
+
+    entram: list[ArquivoDoLote] = []
+    copias: list[tuple[ArquivoDoLote, str]] = []
+    for a in itens:
+        h = hashes.get(a.caminho)
+        if h is None:
+            entram.append(a)
+        elif h in hash_antigo:
+            copias.append((replace(a, hash_conteudo=h),
+                           "já no trabalho: " + hash_antigo[h]))
+        elif sobrevivente[h] == a.caminho:
+            entram.append(replace(a, hash_conteudo=h))
+        else:
+            copias.append((replace(a, hash_conteudo=h), sobrevivente[h]))
+    return entram, copias
+
+
+def _hash_tolerante(caminho: str) -> str | None:
+    try:
+        return hash_de(caminho)
+    except OSError as erro:
+        log.warning("não deu para ler o arquivo para conferir cópia",
+                    extra={"arquivo": os.path.basename(caminho), "motivo": str(erro)})
+        return None
 
 
 class PastaInvalida(ValueError):
@@ -53,8 +162,12 @@ def _conferir_permissao(pasta: str) -> None:
     )
 
 
-def inspecionar_pasta(pasta: str, cnpj_raiz: str) -> ResumoDoLote:
-    """Classifica tudo que há na pasta, separando o que é de outra empresa."""
+def inspecionar_pasta(
+    pasta: str, cnpj_raiz: str,
+    existentes: tuple[ArquivoExistente, ...] = (),
+) -> ResumoDoLote:
+    """Classifica tudo que há na pasta, separando o que é de outra empresa
+    e o que é cópia exata — de outro arquivo da pasta ou de um já importado."""
     caminho = os.path.expandvars(os.path.expanduser((pasta or "").strip()))
     if not caminho:
         raise PastaInvalida("Informe a pasta onde estão os arquivos.")
@@ -78,11 +191,21 @@ def inspecionar_pasta(pasta: str, cnpj_raiz: str) -> ResumoDoLote:
         itens = list(executor.map(
             lambda par: classificar(par[0], par[1]), lista))
 
+    da_empresa: list[ArquivoDoLote] = []
     for item in sorted(itens, key=lambda a: a.caminho):
         if _e_de_outra_empresa(item, cnpj_raiz):
             resumo.de_outra_empresa.append(item)
             continue
-        resumo.arquivos.append(item)
+        da_empresa.append(item)
+    # Caminho que já está no trabalho é "já importado" — o roteador conta e
+    # recusa isso por conta própria. Não passa pelo hash: seria comparar o
+    # arquivo consigo mesmo e chamá-lo de cópia. Só caminho NOVO com conteúdo
+    # igual ao de algo já importado é cópia.
+    caminhos_antigos = {e.caminho for e in existentes}
+    ja_importados = [a for a in da_empresa if a.caminho in caminhos_antigos]
+    novos = [a for a in da_empresa if a.caminho not in caminhos_antigos]
+    entram, resumo.copias = _separar_copias(novos, existentes)
+    resumo.arquivos = sorted(entram + ja_importados, key=lambda a: a.caminho)
     resumo.limite_atingido = len(lista) >= LIMITE_DE_ARQUIVOS
 
     log.info(
@@ -92,6 +215,7 @@ def inspecionar_pasta(pasta: str, cnpj_raiz: str) -> ResumoDoLote:
             "arquivos": resumo.total,
             "uteis": len(resumo.uteis),
             "de_outra_empresa": len(resumo.de_outra_empresa),
+            "copias": len(resumo.copias),
             "bytes": resumo.bytes_totais,
             "por_tipo": {t.value: q for t, q in resumo.por_tipo.items()},
             "nao_baixados": resumo.por_tipo.get(TipoDeArquivo.NAO_BAIXADO, 0),

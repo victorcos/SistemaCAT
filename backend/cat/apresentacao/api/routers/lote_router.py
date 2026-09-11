@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from cat.aplicacao.casos_de_uso.excluir_trabalho import excluir_lote
 from cat.aplicacao.casos_de_uso.inspecionar_lote import (
+    ArquivoExistente,
     PastaInvalida,
     inspecionar_pasta,
 )
@@ -107,6 +108,7 @@ class ResumoDto(BaseModel):
     avisos: list[str]
     amostra: list[ArquivoDto]
     ja_no_trabalho: int = 0
+    copias: int = 0
 
 
 class LoteDto(BaseModel):
@@ -164,6 +166,7 @@ def _resumo_dto(r: ResumoDoLote, ja_no_trabalho: int = 0) -> ResumoDto:
         avisos=r.avisos,
         amostra=[_arquivo_dto(a) for a in amostra[:AMOSTRA_NA_TELA]],
         ja_no_trabalho=ja_no_trabalho,
+        copias=len(r.copias),
     )
 
 
@@ -175,6 +178,19 @@ def _projeto_do_usuario(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Trabalho não encontrado.")
     exigir_empresa(usuario, projeto.empresa_id)
     return projeto
+
+
+def _existentes(projeto_id: int, sessao: Session) -> tuple[ArquivoExistente, ...]:
+    """O que já está no trabalho, para a importação nova detectar cópia."""
+    linhas = sessao.execute(
+        select(ArquivoDoLoteDB.caminho, ArquivoDoLoteDB.tamanho,
+               ArquivoDoLoteDB.tipo, ArquivoDoLoteDB.cnpj,
+               ArquivoDoLoteDB.competencia, ArquivoDoLoteDB.retificadora,
+               ArquivoDoLoteDB.hash_conteudo)
+        .join(LoteDB, LoteDB.id == ArquivoDoLoteDB.lote_id)
+        .where(LoteDB.projeto_id == projeto_id)
+    ).all()
+    return tuple(ArquivoExistente(*linha) for linha in linhas)
 
 
 def _caminhos_ja_no_projeto(projeto_id: int, sessao: Session) -> set[str]:
@@ -200,7 +216,8 @@ def inspecionar(
     with contexto(etapa="inspecionar_lote", usuario_id=usuario.id,
                   projeto_id=projeto_id, pasta=entrada.pasta):
         try:
-            resumo = inspecionar_pasta(entrada.pasta, projeto.empresa.cnpj_raiz)
+            resumo = inspecionar_pasta(entrada.pasta, projeto.empresa.cnpj_raiz,
+                                       existentes=_existentes(projeto_id, sessao))
         except PastaInvalida as erro:
             log.warning("pasta recusada", extra={"motivo": str(erro)})
             raise HTTPException(
@@ -228,12 +245,22 @@ def criar_lote(
     with contexto(etapa="criar_lote", usuario_id=usuario.id,
                   projeto_id=projeto_id, pasta=entrada.pasta):
         try:
-            resumo = inspecionar_pasta(entrada.pasta, projeto.empresa.cnpj_raiz)
+            resumo = inspecionar_pasta(entrada.pasta, projeto.empresa.cnpj_raiz,
+                                       existentes=_existentes(projeto_id, sessao))
         except PastaInvalida as erro:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)
             ) from erro
 
+        # a mensagem certa antes da genérica: uma pasta só de cópias não é uma
+        # pasta "sem nada para a CAT" — é uma pasta que já está no trabalho
+        if not resumo.arquivos and resumo.copias:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"Os {len(resumo.copias)} arquivo(s) desta pasta são cópias "
+                "exatas de arquivos que já estão neste trabalho. Nada novo "
+                "para importar.",
+            )
         if not resumo.serve:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -274,6 +301,7 @@ def criar_lote(
                 tamanho=a.tamanho, tipo=a.tipo.value, cnpj=a.cnpj,
                 competencia=a.competencia, uf=a.uf or None,
                 detalhe=a.detalhe or None, retificadora=a.retificadora,
+                hash_conteudo=a.hash_conteudo,
             )
             for a in novos
         ])

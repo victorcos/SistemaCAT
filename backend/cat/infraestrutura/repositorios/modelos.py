@@ -230,6 +230,9 @@ class ArquivoDoLoteDB(Base):
     retificadora: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false", nullable=False
     )
+    # SHA-256 do conteúdo, só de quem foi candidato a cópia na importação.
+    # Vazio para os demais — e para tudo importado antes desta regra.
+    hash_conteudo: Mapped[str | None] = mapped_column(String(64))
 
 
 class ExecucaoDB(Base):

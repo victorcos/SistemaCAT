@@ -130,6 +130,11 @@ class ArquivoDoLote:
     # SPED retificador. Substitui a original do mesmo estabelecimento e
     # período por inteiro — as duas na mesma pasta é o caso comum.
     retificadora: bool = False
+    # SHA-256 do conteúdo. Só é calculado quando há candidato a cópia —
+    # outro arquivo com o mesmo tamanho, tipo, CNPJ, competência e
+    # finalidade. Ler 100 GB inteiros a cada importação não se justifica
+    # para um problema que tamanho e cabeçalho já filtram quase todo.
+    hash_conteudo: str | None = None
 
     @property
     def alimenta_a_cat(self) -> bool:
@@ -149,6 +154,9 @@ class ResumoDoLote:
     pasta: str = ""
     arquivos: list[ArquivoDoLote] = field(default_factory=list)
     de_outra_empresa: list[ArquivoDoLote] = field(default_factory=list)
+    # cópias exatas: (a cópia, de quem ela é cópia). Ficam fora de
+    # `arquivos` — o mesmo SPED lido duas vezes dobra os documentos.
+    copias: list[tuple[ArquivoDoLote, str]] = field(default_factory=list)
     ignorados: int = 0
     limite_atingido: bool = False
 
@@ -221,6 +229,22 @@ class ResumoDoLote:
                 f"{nao_baixados} arquivo(s) existem só como marca de erro de "
                 "sincronização: o conteúdo nunca desceu para a pasta. Abra-os "
                 "na origem antes de contar com eles."
+            )
+        if self.copias:
+            de_fora = sum(1 for _, de in self.copias if de.startswith("já"))
+            na_pasta = len(self.copias) - de_fora
+            partes = []
+            if na_pasta:
+                partes.append(f"{na_pasta} são cópia exata de outro arquivo "
+                              "desta mesma pasta")
+            if de_fora:
+                partes.append(f"{de_fora} são cópia exata de arquivo que já "
+                              "está no trabalho")
+            avisos.append(
+                f"{len(self.copias)} arquivo(s) ficaram de fora: "
+                + "; ".join(partes)
+                + ". Conteúdo idêntico, byte a byte — só o nome ou a pasta "
+                "mudou. O mesmo SPED lido duas vezes dobraria os documentos."
             )
         substituidas = self.substituidas_por_retificadora
         if substituidas:
