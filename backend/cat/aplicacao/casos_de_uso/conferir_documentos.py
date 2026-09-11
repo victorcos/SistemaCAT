@@ -214,7 +214,13 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     caminho_efd = os.path.join(destino, ARQUIVO_EFD)
     passo_efd = extrair_efd(efd, caminho_efd, avisar=relogio.marcar)
 
+    # A EFD acabou: os totais dela ficam congelados na linha. Sem isto, o
+    # relógio da fase seguinte sobrescrevia `documentos` e `bytes` com os
+    # números da leitura dos XML — e a tela mostrava "1 documentos · 0 B"
+    # para uma base de 37,9 milhões, o que parecia travamento.
     relogio.deslocar(len(efd))
+    relogio.congelar_totais(documentos=passo_efd.documentos,
+                            bytes_lidos=passo_efd.bytes_lidos)
     execucao.passo = "Lendo os documentos do cliente"
     sessao.commit()
 
@@ -222,7 +228,10 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     passo_pasta = extrair_pasta(xmls, relatorios, caminho_pasta,
                                 avisar=relogio.marcar)
 
+    # leitura acabou por inteiro: o contador de arquivos fecha antes de o
+    # confronto começar, em vez de ficar no último tique que o limitador viu
     execucao.passo = "Confrontando"
+    execucao.arquivos_lidos = execucao.arquivos_totais
     execucao.fracao = 0.97
     sessao.commit()
 
@@ -301,9 +310,26 @@ class _Relogio:
         self.total = max(total, 1)
         self.deslocamento = 0
         self.ultimo = 0.0
+        # totais de uma fase já encerrada; a fase seguinte não os rebaixa
+        self.congelados: dict[str, int] | None = None
 
     def deslocar(self, quantos: int) -> None:
         self.deslocamento += quantos
+
+    def congelar_totais(self, documentos: int, bytes_lidos: int) -> None:
+        """Fixa `documentos` e `bytes` da fase que acabou e grava na hora.
+
+        Cada fase de extração conta a própria coisa — a EFD conta C100/C800,
+        a pasta conta chaves de XML. Se a segunda escrevesse por cima da
+        primeira, a tela mostraria "1 documentos · 0 B" numa base de 37,9
+        milhões. Gravar na hora também cobre o último tique que o limitador de
+        dois segundos costuma engolir (era o "885 de 960").
+        """
+        self.congelados = {"documentos": documentos, "bytes_lidos": bytes_lidos}
+        self.execucao.documentos = documentos
+        self.execucao.bytes_lidos = bytes_lidos
+        self.execucao.arquivos_lidos = self.deslocamento
+        self.execucao.fracao = min(0.95, self.deslocamento / self.total)
 
     def marcar(self, progresso: Progresso) -> None:
         agora = time.monotonic()
@@ -312,8 +338,14 @@ class _Relogio:
         self.ultimo = agora
         lidos = self.deslocamento + progresso.arquivos_lidos
         self.execucao.arquivos_lidos = lidos
-        self.execucao.bytes_lidos = progresso.bytes_lidos
-        self.execucao.documentos = progresso.documentos
+        if self.congelados is None:
+            self.execucao.bytes_lidos = progresso.bytes_lidos
+            self.execucao.documentos = progresso.documentos
+        else:
+            # a fase atual conta outra coisa (chaves de XML); os totais que a
+            # tela mostra continuam sendo os da EFD
+            self.execucao.bytes_lidos = self.congelados["bytes_lidos"] + progresso.bytes_lidos
+            self.execucao.documentos = self.congelados["documentos"]
         # 0,95 e não 1: o confronto ainda vem depois da leitura
         self.execucao.fracao = min(0.95, lidos / self.total)
         try:

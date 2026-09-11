@@ -845,3 +845,21 @@ seria verdadeira e enganosa.
 
 **Entre iguais, sobrevive o de pasta mais rasa.** Não muda o resultado; muda
 o que a pessoa vê como "o original", e a cópia costuma estar em `backup/`.
+
+---
+
+## 2026-09-11 — O progresso da conferência não rebaixa o que já contou
+
+**O que aconteceu.** Numa conferência real de 37,9 milhões de documentos, a
+tela mostrou "885 de 960 arquivos · 1 documentos · 0 B" durante o confronto.
+Parecia travada; estava na última fase, trabalhando.
+
+**Causa.** Cada fase de extração conta a própria coisa — a EFD conta C100 e
+C800, a leitura da pasta conta chaves de XML. O relógio de progresso escrevia
+os números da segunda fase por cima dos da primeira, e o limitador de dois
+segundos engoliu o tique final da EFD (por isso 885 e não 960).
+
+**Decisão.** Ao encerrar a EFD, os totais dela ficam **congelados** na
+execução e gravados na hora; a fase seguinte só avança o contador de arquivos.
+Ao entrar no confronto, o contador fecha em `totais/totais`. O teto de 95%
+antes do confronto continua: os últimos 5% são o confronto de verdade.
