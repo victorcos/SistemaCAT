@@ -135,9 +135,12 @@ def _resumir(con, p, conferencia_usada: bool) -> ResumoDaMovimentacao:
 
     docs = p(ARQUIVO_DOCUMENTOS)
     (r.documentos, r.documentos_com_item, r.entradas_sem_item,
-     r.saidas_sem_item, arquivos) = con.execute(f"""
+     r.entradas_proprias_sem_item, r.saidas_sem_item, arquivos) = con.execute(f"""
         SELECT count(*), count(*) FILTER (WHERE itens > 0),
-               count(*) FILTER (WHERE operacao = 'entrada' AND itens = 0),
+               count(*) FILTER (WHERE operacao = 'entrada' AND itens = 0
+                                  AND emitente = 'terceiros'),
+               count(*) FILTER (WHERE operacao = 'entrada' AND itens = 0
+                                  AND emitente = 'propria'),
                count(*) FILTER (WHERE operacao = 'saida' AND itens = 0),
                count(DISTINCT arquivo)
         FROM read_parquet('{docs}')

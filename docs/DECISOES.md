@@ -1037,3 +1037,14 @@ de analíticos contra 38 milhões de documentos.
 **Leiautes conferidos em arquivo real, não no manual:** 0200 (12 campos),
 C170 (37, chave do pai vem da ordem do arquivo), C190 (11), C850 (7, sem ST),
 H005 (3), H010 (10). O C810 segue o manual, porque não apareceu.
+
+**Rodada real, logo depois (Sulamericana, 884 EFD, 44 min).** 37.930.719
+documentos; 8.769.348 movimentos de item, todos de entrada; 92.936.619
+analíticos; 1.017.100 linhas de cadastro (72 estabelecimentos); 784
+inventários com 7.757.063 itens. **36.542.970 saídas sem item** — NFC-e 24,0 M,
+SAT 11,6 M, NF-e 964 mil — R$ 5,80 bi, dos quais **R$ 1,66 bi com CST 60**.
+E 179.333 entradas sem C170, **todas de emissão própria** (devolução de venda,
+produtor rural, retorno): mesma regra da saída própria, não anomalia. O
+resumo passou a separar entrada própria sem item (regra, item vem do XML) de
+entrada de terceiros sem item (aí a EFD exige o C170 e faltar é sinal de
+arquivo incompleto). Parquets: 1,6 GB no total; o analítico sozinho tem 874 MB.

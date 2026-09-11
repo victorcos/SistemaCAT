@@ -230,6 +230,7 @@ class TestResumo:
         assert r.documentos == 3
         assert r.documentos_com_item == 1
         assert r.entradas_sem_item == 0
+        assert r.entradas_proprias_sem_item == 0
         assert r.saidas_sem_item == 2
         assert r.valor_saidas_sem_item == Decimal("336.20")      # 300 + 36,20
         assert r.valor_saidas_sem_item_st == Decimal("286.20")   # 250 + 36,20
@@ -281,6 +282,33 @@ class TestResumo:
 
 
 class TestAvisosDoDominio:
+    def test_entrada_propria_sem_item_e_regra_e_terceiros_e_anomalia(self):
+        # base real: 179.333 entradas sem C170, todas de emissão própria
+        r = ResumoDaMovimentacao(entradas_proprias_sem_item=179_333,
+                                 entradas_sem_item=0, conferencia_usada=True)
+        avisos = "\n".join(r.avisos)
+        assert "179.333 nota(s) de entrada de emissão própria" in avisos
+        assert "O item virá do XML" in avisos
+        assert "de terceiros" not in avisos
+
+        r = ResumoDaMovimentacao(entradas_sem_item=7, conferencia_usada=True)
+        assert any("7 entrada(s) de terceiros não trazem C170" in a for a in r.avisos)
+
+    def test_entrada_propria_sem_c170_conta_separada(self, tmp_path):
+        # uma NF-e de entrada emitida pela própria empresa, sem item, ao lado
+        # de uma entrada de terceiros com item
+        propria = (f"|C100|0|0|C001|55|00|001|44700|{CHAVE_SAIDA}"
+                   "|02052021|02052021|30,00|2|0|0|30,00|9|0|0|0|0|0|0|0|0|0|0|0|0|")
+        efd = escrever(tmp_path, "efd.txt", [CABECALHO, ITEM_A_V2, C100_ENTRADA, C170_1,
+                                             C190_ENTRADA, propria, C190_SAIDA_00])
+        destino = str(tmp_path / "s")
+        extrair_movimentos([efd], destino)
+        r = consolidar(destino, None)
+        assert r.documentos == 2
+        assert r.entradas_proprias_sem_item == 1
+        assert r.entradas_sem_item == 0
+        assert r.saidas_sem_item == 0
+
     def test_sem_inventario(self):
         r = ResumoDaMovimentacao(movimentos=10, inventarios=0, conferencia_usada=True)
         assert any("Nenhum inventário" in a for a in r.avisos)

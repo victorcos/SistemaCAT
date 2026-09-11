@@ -44,7 +44,12 @@ class ResumoDaMovimentacao:
     # ---- documentos: o que tem item e o que não tem ----
     documentos: int = 0
     documentos_com_item: int = 0
+    # entrada de TERCEIROS sem C170: aí a EFD exige o item, e faltar é anomalia
     entradas_sem_item: int = 0
+    # entrada de emissão PRÓPRIA sem C170 (devolução de venda, produtor rural,
+    # retorno): mesma regra da saída própria — a EFD dispensa o item. Numa
+    # base real eram 179.333, todas de emissão própria; não é raro, é regra
+    entradas_proprias_sem_item: int = 0
     saidas_sem_item: int = 0
     valor_saidas_sem_item: Decimal = ZERO           # do analítico
     valor_saidas_sem_item_st: Decimal = ZERO        # idem, só CST x60
@@ -92,11 +97,18 @@ class ResumoDaMovimentacao:
                 "(mercadoria com ST retida). O item dessas saídas virá do XML, "
                 "na próxima etapa."
             )
+        if self.entradas_proprias_sem_item:
+            avisos.append(
+                f"{_numero(self.entradas_proprias_sem_item)} nota(s) de entrada "
+                "de emissão própria (devolução de venda, produtor rural, "
+                "retorno) também vêm sem item na EFD — mesma regra da saída "
+                "própria. O item virá do XML."
+            )
         if self.entradas_sem_item:
             avisos.append(
-                f"{_numero(self.entradas_sem_item)} documento(s) de entrada "
-                "não trazem C170 — é raro, e vale conferir se a EFD veio "
-                "completa."
+                f"{_numero(self.entradas_sem_item)} entrada(s) de terceiros não "
+                "trazem C170 — nesses documentos a EFD exige o item. Vale "
+                "conferir se a EFD veio completa."
             )
         if self.itens_sem_cadastro:
             avisos.append(
