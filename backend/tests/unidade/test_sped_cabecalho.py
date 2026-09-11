@@ -154,3 +154,31 @@ class TestPeriodo:
             "|407048962113|3550308|||A|0|"
         )
         assert not ler_cabecalho(linha).periodo_fechado_no_mes
+
+
+class TestRetificadora:
+    """Original ou retificadora, lido a partir da âncora das datas.
+
+    Importa porque as duas costumam estar na mesma pasta e a retificadora
+    substitui a original por inteiro: ler as duas dobra os documentos do
+    período e mistura valores de antes e depois da retificação.
+    """
+
+    def test_icms_ipi_original(self):
+        assert ler_cabecalho(ICMS_IPI).retificadora is False
+
+    def test_icms_ipi_retificadora(self):
+        # COD_FIN é o campo imediatamente antes de DT_INI: |0000|018|1|01012025|
+        linha = ICMS_IPI.replace("|0000|018|0|", "|0000|018|1|", 1)
+        assert ler_cabecalho(linha).retificadora is True
+
+    def test_contribuicoes_original(self):
+        assert ler_cabecalho(CONTRIBUICOES).retificadora is False
+
+    def test_contribuicoes_retificadora(self):
+        # TIPO_ESCRIT vem três campos antes de DT_INI: |0000|006|1|||01062021|
+        linha = CONTRIBUICOES.replace("|0000|006|0|", "|0000|006|1|", 1)
+        assert ler_cabecalho(linha).retificadora is True
+
+    def test_ecd_nao_tem_finalidade(self):
+        assert ler_cabecalho(ECD).retificadora is False

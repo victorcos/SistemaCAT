@@ -82,6 +82,11 @@ class CabecalhoSped:
     inicio: date
     fim: date
     versao_leiaute: str
+    # Original ou retificadora. Importa porque as duas costumam estar na mesma
+    # pasta, e a retificadora SUBSTITUI a original por inteiro: ler as duas
+    # dobra os documentos do período e, pior, mistura valores de antes e
+    # depois da retificação. A ECD não tem esse campo; fica False.
+    retificadora: bool = False
 
     @property
     def e_matriz(self) -> bool:
@@ -214,6 +219,18 @@ def ler_cabecalho(linha: str) -> CabecalhoSped:
     proximo = em(i_uf + 1) if i_uf >= 0 else ""
     ie = "" if (len(proximo) == 7 and proximo.isdigit()) else proximo
 
+    # A finalidade também se lê a partir da âncora, não por posição fixa. No
+    # ICMS/IPI o COD_FIN é o campo imediatamente ANTES da data de início; nas
+    # Contribuições o TIPO_ESCRIT vem três campos antes (TIPO_ESCRIT,
+    # IND_SIT_ESP, NUM_REC_ANTERIOR, DT_INI). Nos dois, 0 é original e 1 é
+    # retificadora. A ECD não tem finalidade.
+    if tipo is TipoSped.EFD_ICMS_IPI:
+        retificadora = em(d - 1) == "1"
+    elif tipo is TipoSped.EFD_CONTRIBUICOES:
+        retificadora = em(d - 3) == "1"
+    else:
+        retificadora = False
+
     return CabecalhoSped(
         tipo=tipo,
         # CNPJ torto não derruba a leitura: o resto do cabeçalho ainda serve, e
@@ -226,4 +243,5 @@ def ler_cabecalho(linha: str) -> CabecalhoSped:
         inicio=_data(em(d)),
         fim=_data(em(d + 1)),
         versao_leiaute=em(1),
+        retificadora=retificadora,
     )

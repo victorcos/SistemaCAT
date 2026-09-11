@@ -101,12 +101,21 @@ def inspecionar_pasta(pasta: str, cnpj_raiz: str) -> ResumoDoLote:
 
 
 def _e_de_outra_empresa(item: ArquivoDoLote, cnpj_raiz: str) -> bool:
-    """Só decide quando o arquivo diz de quem é.
+    """Só decide quando o arquivo diz de quem é — e por QUALQUER ponta.
 
-    Relatório gerencial não traz CNPJ — quem o produziu foi o ERP da própria
-    empresa, e ele não se identifica. Chutar que é de outra empresa deixaria de
-    fora justamente a fonte de quem não libera XML.
+    Relatório gerencial não traz CNPJ: quem o produziu foi o ERP da própria
+    empresa, e ele não se identifica. Chutar que é de outra empresa deixaria
+    de fora justamente a fonte de quem não libera XML.
+
+    No XML, a empresa pode ser o emitente (nota que ela emitiu) OU o
+    destinatário (nota que ela recebeu do fornecedor). Comparar só o emitente
+    rejeitava toda nota de compra como se fosse de outra empresa — e nota de
+    compra, com ST retido, é o insumo principal da CAT 42. O arquivo só é de
+    outra empresa quando NENHUMA das pontas conhecidas tem a raiz do projeto.
     """
-    if not item.cnpj or not cnpj_raiz:
+    if not cnpj_raiz:
         return False
-    return item.cnpj[:8] != cnpj_raiz
+    pontas = [c for c in (item.cnpj, item.cnpj_destinatario) if c]
+    if not pontas:
+        return False
+    return all(c[:8] != cnpj_raiz for c in pontas)

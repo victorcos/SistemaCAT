@@ -117,11 +117,19 @@ class ArquivoDoLote:
     nome: str
     tamanho: int
     tipo: TipoDeArquivo
+    # de quem é. No SPED é o estabelecimento que gerou o arquivo; no XML é o
+    # EMITENTE — e numa nota que a empresa recebe do fornecedor, o emitente
+    # é o fornecedor. Por isso o XML carrega também o destinatário: a nota é
+    # da empresa se ela estiver em qualquer uma das duas pontas.
     cnpj: str | None = None
+    cnpj_destinatario: str | None = None
     competencia: date | None = None
     uf: str = ""
     detalhe: str = ""      # o que o classificador conseguiu dizer a mais
     motivo: str = ""       # por que não foi reconhecido
+    # SPED retificador. Substitui a original do mesmo estabelecimento e
+    # período por inteiro — as duas na mesma pasta é o caso comum.
+    retificadora: bool = False
 
     @property
     def alimenta_a_cat(self) -> bool:
@@ -178,6 +186,20 @@ class ResumoDoLote:
         return sorted({a.cnpj for a in self.arquivos if a.cnpj})
 
     @property
+    def substituidas_por_retificadora(self) -> list[ArquivoDoLote]:
+        """EFD originais que têm retificadora do mesmo estabelecimento e
+        período nesta mesma pasta. A conferência vai ler só a retificadora."""
+        retificadas = {
+            (a.cnpj, a.competencia) for a in self.arquivos
+            if a.tipo is TipoDeArquivo.SPED_ICMS_IPI and a.retificadora
+        }
+        return [
+            a for a in self.arquivos
+            if a.tipo is TipoDeArquivo.SPED_ICMS_IPI and not a.retificadora
+            and (a.cnpj, a.competencia) in retificadas
+        ]
+
+    @property
     def serve(self) -> bool:
         """O lote só vale a pena se traz algo que a CAT 42 lê."""
         return any(a.alimenta_a_cat for a in self.arquivos)
@@ -199,6 +221,14 @@ class ResumoDoLote:
                 f"{nao_baixados} arquivo(s) existem só como marca de erro de "
                 "sincronização: o conteúdo nunca desceu para a pasta. Abra-os "
                 "na origem antes de contar com eles."
+            )
+        substituidas = self.substituidas_por_retificadora
+        if substituidas:
+            avisos.append(
+                f"{len(substituidas)} EFD original(is) têm retificadora do mesmo "
+                "estabelecimento e período nesta pasta. Entram no lote, mas a "
+                "conferência lê só a retificadora: ela substitui a original "
+                "por inteiro, e ler as duas dobraria os documentos do período."
             )
         compactados = self.por_tipo.get(TipoDeArquivo.COMPACTADO, 0)
         if compactados:

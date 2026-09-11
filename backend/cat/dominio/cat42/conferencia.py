@@ -126,6 +126,10 @@ class ResumoDaConferencia:
     estabelecimentos_da_efd: list[str] = field(default_factory=list)
     emitentes_na_pasta: list[str] = field(default_factory=list)
 
+    # EFD originais que ficaram fora da leitura porque havia retificadora
+    # do mesmo estabelecimento e período no lote
+    efd_originais_substituidas: int = 0
+
     # ---- o que andou desde a rodada anterior ----
     # O trabalho não termina na primeira conferência: o cliente manda o que
     # faltava e ela roda de novo. Sem estes números, a segunda rodada só diz
@@ -165,6 +169,13 @@ class ResumoDaConferencia:
                 f"{_lista(self.estabelecimentos_da_efd)} e os documentos da "
                 f"pasta são de {_lista(self.emitentes_na_pasta)}. São filiais "
                 "diferentes — importe a EFD e os XML do mesmo estabelecimento."
+            )
+        if self.efd_originais_substituidas:
+            avisos.append(
+                f"{_numero(self.efd_originais_substituidas)} EFD original(is) "
+                "ficaram fora da leitura: havia retificadora do mesmo "
+                "estabelecimento e período no lote, e a retificadora substitui "
+                "a original por inteiro."
             )
         if self.sem_chave_na_efd:
             avisos.append(

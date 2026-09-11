@@ -273,7 +273,7 @@ def criar_lote(
                 lote_id=lote.id, caminho=a.caminho, nome=a.nome,
                 tamanho=a.tamanho, tipo=a.tipo.value, cnpj=a.cnpj,
                 competencia=a.competencia, uf=a.uf or None,
-                detalhe=a.detalhe or None,
+                detalhe=a.detalhe or None, retificadora=a.retificadora,
             )
             for a in novos
         ])

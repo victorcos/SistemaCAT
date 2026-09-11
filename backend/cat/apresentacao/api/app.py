@@ -35,8 +35,16 @@ async def ciclo_de_vida(app: FastAPI):
             "extra do segredo de servidor.",
             extra={"acao": "definir CAT_SENHA_PIMENTA"},
         )
+    # A pasta de trabalho vai no log de subida de propósito. Um servidor
+    # antigo sobreviveu a um reinício e continuou servindo com a configuração
+    # velha, e a única pista era uma execução gravando no disco errado. Se o
+    # processo diz onde vai escrever no momento em que sobe, isso se pega
+    # na hora — e não depois de encher um disco.
     log.info("API no ar", extra={"banco": cfg.banco_url.split("://")[0],
-                                 "origens": cfg.lista_origens})
+                                 "origens": cfg.lista_origens,
+                                 "pasta_de_trabalho": cfg.raiz_de_trabalho,
+                                 "memoria_analitica": cfg.memoria_analitica,
+                                 "threads_analiticas": cfg.threads_analiticas})
     yield
     log.info("API encerrada")
 
@@ -90,8 +98,21 @@ async def registrar_requisicao(request: Request, chamar):
 
 
 @app.get("/api/saude", tags=["infra"])
-def saude() -> dict[str, str]:
-    return {"status": "ok", "versao": app.version}
+def saude() -> dict[str, object]:
+    """Vivo, e com QUAL configuração — só o que não é segredo.
+
+    Serve para conferir de fora o que o processo que responde realmente
+    enxerga. Sem isso, um servidor antigo que sobreviveu a um reinício é
+    indistinguível do novo: os dois respondem "ok".
+    """
+    cfg = obter_config()
+    return {
+        "status": "ok",
+        "versao": app.version,
+        "pasta_de_trabalho": cfg.raiz_de_trabalho,
+        "memoria_analitica": cfg.memoria_analitica,
+        "threads_analiticas": cfg.threads_analiticas,
+    }
 
 
 from cat.apresentacao.api.routers import (  # noqa: E402

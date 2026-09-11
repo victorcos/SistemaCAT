@@ -225,6 +225,11 @@ class ArquivoDoLoteDB(Base):
     competencia: Mapped[date | None] = mapped_column(Date)
     uf: Mapped[str | None] = mapped_column(String(2))
     detalhe: Mapped[str | None] = mapped_column(Text)
+    # SPED retificador: a conferência precisa saber, porque a retificadora
+    # substitui a original do mesmo estabelecimento e período
+    retificadora: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
 
 
 class ExecucaoDB(Base):

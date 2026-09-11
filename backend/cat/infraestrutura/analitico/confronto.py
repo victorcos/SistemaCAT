@@ -99,50 +99,96 @@ def confrontar(efd: str, pasta: str, destino: str,
         # isso estourou 5,5 GB de memória e derrubou a execução depois de nove
         # minutos. E é trabalho jogado fora, porque numa base saudável a maior
         # parte dos documentos TEM o XML e sai do caminho aqui.
+        # Pendente = não está entre os entregues. ANTI JOIN explícito, com a
+        # tabela pequena (entregues) do lado da construção da dispersão.
         con.execute("""
             CREATE VIEW pendentes_cru AS
-            SELECT * FROM efd e
-            WHERE NOT EXISTS (
-                SELECT 1 FROM entregues p WHERE p.chave = e.chave
-            )
+            SELECT e.* FROM efd e ANTI JOIN entregues p ON e.chave = p.chave
         """)
 
-        con.execute(f"""
-            CREATE VIEW pendentes AS
-            SELECT agrupador,
-                   any_value(chave)    AS chave,
-                   bool_and(tem_chave) AS tem_chave,
-                   min(modelo)         AS modelo,
-                   min(situacao)       AS situacao,
-                   any_value(serie)    AS serie,
-                   any_value(numero)   AS numero,
-                   min(data)           AS data,
-                   max(valor)          AS valor,
-                   any_value(participante) AS participante,
-                   any_value(operacao)     AS operacao,
-                   any_value(emitente)     AS emitente,
-                   any_value(cnpj)         AS cnpj,
-                   min(competencia)        AS competencia,
-                   -- de qual arquivo saiu: é por onde se recomeça quando
-                   -- alguém questiona uma linha da cobrança meses depois
-                   any_value(arquivo)      AS arquivo_efd,
-                   count(*)                AS ocorrencias,
-                   bool_and(tem_chave) AND min(situacao) IN {esperado}
-                       AS espera_documento,
-                   CASE
-                     WHEN NOT bool_and(tem_chave) THEN 'sem_chave'
-                     WHEN min(situacao) NOT IN {esperado}
-                       THEN 'sem_documento_a_pedir'
-                     ELSE 'a_cobrar'
-                   END AS classificacao
-            FROM pendentes_cru GROUP BY agrupador
+        # Deduplicar SÓ o que se repete — e em COMANDOS SEPARADOS.
+        #
+        # Agrupar as dezesseis colunas do registro sobre dezenas de milhões de
+        # grupos não cabe em memória nem derramando: numa base de 37,9 milhões
+        # de documentos morreu em 3,7 GB. As chaves são quase todas únicas —
+        # o agrupamento fazia trabalho enorme para não juntar quase nada.
+        #
+        # E a forma importa tanto quanto a ideia. Uma primeira versão com os
+        # dois ramos numa UNION ALL e EXISTS correlacionados levou o DuckDB a
+        # materializar `pendentes_cru` inteira (CTE de subplano comum, 26 GB
+        # de rascunho, sem terminar em 88 minutos). Cada ramo num COPY próprio
+        # relê 400 MB de parquet — segundos — em vez de materializar 38
+        # milhões de linhas. Medido: as quatro etapas em 1,5 min, e a
+        # ordenação final em 6,4 min, com 1,9 GB de rascunho.
+        con.execute("""
+            CREATE TABLE repetidos AS
+            SELECT agrupador FROM pendentes_cru
+            GROUP BY agrupador HAVING count(*) > 1
         """)
 
+        unicos = os.path.join(destino, "_unicos.parquet")
+        repetidos = os.path.join(destino, "_repetidos.parquet")
+
+        # os únicos atravessam sem agregar: uma passada, em fluxo
         con.execute(f"""
-            COPY (SELECT * FROM pendentes
-                  ORDER BY classificacao, cnpj, competencia)
-            TO '{_escapar(sem_documento)}' (FORMAT PARQUET, COMPRESSION ZSTD)
+            COPY (
+                SELECT p.agrupador, p.chave, p.tem_chave, p.modelo, p.situacao,
+                       p.serie, p.numero, p.data, p.valor, p.participante,
+                       p.operacao, p.emitente, p.cnpj, p.competencia,
+                       p.arquivo AS arquivo_efd, 1::BIGINT AS ocorrencias
+                FROM pendentes_cru p
+                ANTI JOIN repetidos r ON r.agrupador = p.agrupador
+            ) TO '{_escapar(unicos)}' (FORMAT PARQUET, COMPRESSION ZSTD)
         """)
+
+        # só os repetidos — um conjunto pequeno — passam pelo GROUP BY largo
+        con.execute(f"""
+            COPY (
+                SELECT agrupador,
+                       any_value(chave)    AS chave,
+                       bool_and(tem_chave) AS tem_chave,
+                       min(modelo)         AS modelo,
+                       min(situacao)       AS situacao,
+                       any_value(serie)    AS serie,
+                       any_value(numero)   AS numero,
+                       min(data)           AS data,
+                       max(valor)          AS valor,
+                       any_value(participante) AS participante,
+                       any_value(operacao)     AS operacao,
+                       any_value(emitente)     AS emitente,
+                       any_value(cnpj)         AS cnpj,
+                       min(competencia)        AS competencia,
+                       -- de qual arquivo saiu: é por onde se recomeça quando
+                       -- alguém questiona uma linha da cobrança meses depois
+                       any_value(arquivo)      AS arquivo_efd,
+                       count(*)                AS ocorrencias
+                FROM pendentes_cru p
+                SEMI JOIN repetidos r ON r.agrupador = p.agrupador
+                GROUP BY agrupador
+            ) TO '{_escapar(repetidos)}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        """)
+
+        # junta, classifica e ordena — a partir dos dois parquets prontos, que
+        # é uma varredura, não uma materialização
+        con.execute(f"""
+            COPY (
+                SELECT *,
+                       tem_chave AND situacao IN {esperado} AS espera_documento,
+                       CASE
+                         WHEN NOT tem_chave THEN 'sem_chave'
+                         WHEN situacao NOT IN {esperado} THEN 'sem_documento_a_pedir'
+                         ELSE 'a_cobrar'
+                       END AS classificacao
+                FROM read_parquet(['{_escapar(unicos)}', '{_escapar(repetidos)}'])
+                ORDER BY classificacao, cnpj, competencia
+            ) TO '{_escapar(sem_documento)}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        """)
+        for temporario in (unicos, repetidos):
+            try:
+                os.remove(temporario)
+            except OSError:
+                log.warning("não deu para apagar parquet intermediário",
+                            extra={"arquivo": temporario})
 
         # ---- na pasta e fora da EFD: sai da análise ----
         con.execute(f"""
@@ -230,51 +276,51 @@ def _limpar(destino: str) -> None:
 
 def _resumir(con, nao_escrituradas: str,
              sem_documento: str) -> ResumoDaConferencia:
-    # contagem de documentos distintos numa coluna só, em vez de agrupar as
-    # dezesseis colunas do registro inteiro
-    escriturados, sem_chave = con.execute("""
-        SELECT count(DISTINCT agrupador),
-               count(DISTINCT agrupador) FILTER (WHERE NOT tem_chave)
-        FROM efd
-    """).fetchone()
+    """Os números do confronto, sem nenhuma contagem distinta do lado grande.
+
+    `count(DISTINCT)` sobre dezenas de milhões de valores constrói uma tabela
+    de dispersão que não derrama bem: numa base de 37,9 milhões de documentos
+    ele passou de dez minutos e estourou a memória. Aqui as contagens saem de
+    dois lugares baratos:
+
+    * o parquet de pendências **já escrito** — uma varredura colunar;
+    * o lado da pasta, que é pequeno por natureza (são os documentos que o
+      cliente entregou, não a base fiscal inteira).
+
+    E `escriturados` não é contado: as pendências e os conferidos particionam
+    o conjunto, então a soma dos dois é o total. Contar de novo seria pagar
+    caro por um número que já se tem.
+    """
     na_pasta = con.execute("SELECT count(*) FROM entregues").fetchone()[0]
 
-    # do parquet já escrito, e não da visão: reexecutá-la refaria o
-    # agrupamento inteiro sobre dezenas de milhões de linhas
-    faltando, valor_faltando, espera = con.execute(f"""
+    pendencias = _escapar(sem_documento)
+    faltando, valor_faltando, espera, sem_chave = con.execute(f"""
         SELECT count(*), coalesce(sum(valor), 0),
-               count(*) FILTER (WHERE espera_documento)
-        FROM read_parquet('{_escapar(sem_documento)}')
+               count(*) FILTER (WHERE espera_documento),
+               count(*) FILTER (WHERE NOT tem_chave)
+        FROM read_parquet('{pendencias}')
     """).fetchone()
 
     fora = con.execute(
         f"SELECT count(*) FROM read_parquet('{_escapar(nao_escrituradas)}')"
     ).fetchone()[0]
 
+    # partindo da pasta, que é o lado pequeno: quantos dos documentos
+    # entregues têm correspondente na EFD
     conferidos, valor_conferido = con.execute("""
         SELECT count(DISTINCT e.agrupador), coalesce(sum(e.valor), 0)
-        FROM efd e JOIN entregues p USING (chave)
+        FROM entregues p JOIN efd e USING (chave)
     """).fetchone()
 
     origens = [Origem(o) for (o,) in con.execute(
         "SELECT DISTINCT origem FROM pasta WHERE origem IS NOT NULL"
     ).fetchall() if o in {x.value for x in Origem}]
 
-    por_modelo = [
-        Fatia(rotulo=_modelo_rotulo(m), documentos=q, valor=_dec(v), codigo=m)
-        for m, q, v in con.execute("""
-            SELECT modelo, count(DISTINCT agrupador), coalesce(sum(valor), 0)
-            FROM efd GROUP BY modelo ORDER BY 2 DESC
-        """).fetchall()
-    ]
-    por_operacao = [
-        Fatia(rotulo="Entrada" if o == "entrada" else "Saída",
-              documentos=q, valor=_dec(v), codigo=o)
-        for o, q, v in con.execute("""
-            SELECT operacao, count(DISTINCT agrupador), coalesce(sum(valor), 0)
-            FROM efd GROUP BY operacao ORDER BY 2 DESC
-        """).fetchall()
-    ]
+    por_modelo = _fatias(con, "modelo", pendencias, _modelo_rotulo)
+    por_operacao = _fatias(
+        con, "operacao", pendencias,
+        lambda o: "Entrada" if o == "entrada" else "Saída")
+
     # como as pendências se dividem: o que se cobra, o que não tem documento a
     # pedir e o que precisa de conferência manual por não ter chave
     por_classificacao = [
@@ -282,13 +328,14 @@ def _resumir(con, nao_escrituradas: str,
               codigo=c)
         for c, q, v in con.execute(f"""
             SELECT classificacao, count(*), coalesce(sum(valor), 0)
-            FROM read_parquet('{_escapar(sem_documento)}')
-            GROUP BY classificacao ORDER BY count(*) DESC
+            FROM read_parquet('{pendencias}')
+            GROUP BY classificacao ORDER BY 2 DESC
         """).fetchall()
     ]
 
-    # a chave carrega o CNPJ do emitente nas posições 7 a 20; não é preciso
-    # abrir o XML de novo para saber de quem ele é
+    # o CNPJ do emitente está na própria chave, posições 7 a 20; não é preciso
+    # abrir o XML de novo para saber de quem ele é. Distinto aqui é barato:
+    # são poucas dezenas de estabelecimentos, e a tabela de dispersão é minúscula.
     estabelecimentos = [c for (c,) in con.execute(
         "SELECT DISTINCT cnpj FROM efd "
         "WHERE cnpj IS NOT NULL AND cnpj <> '' ORDER BY 1").fetchall()]
@@ -297,7 +344,7 @@ def _resumir(con, nao_escrituradas: str,
     ).fetchall() if c]
 
     return ResumoDaConferencia(
-        escriturados=escriturados,
+        escriturados=conferidos + faltando,
         conferidos=conferidos,
         nao_escrituradas=fora,
         sem_documento=faltando,
@@ -313,6 +360,32 @@ def _resumir(con, nao_escrituradas: str,
         estabelecimentos_da_efd=estabelecimentos[:20],
         emitentes_na_pasta=emitentes[:20],
     )
+
+
+def _fatias(con, coluna: str, pendencias: str, rotular) -> list[Fatia]:
+    """Recorte somando os dois lados: o que ficou pendente e o que conferiu.
+
+    Somar em vez de contar sobre a base inteira é o que mantém isto barato —
+    um lado é varredura de parquet, o outro é limitado pelo tamanho da pasta
+    do cliente.
+    """
+    pendentes = con.execute(f"""
+        SELECT {coluna}, count(*), coalesce(sum(valor), 0)
+        FROM read_parquet('{pendencias}') GROUP BY 1
+    """).fetchall()
+    conferidos = con.execute(f"""
+        SELECT e.{coluna}, count(DISTINCT e.agrupador), coalesce(sum(e.valor), 0)
+        FROM entregues p JOIN efd e USING (chave) GROUP BY 1
+    """).fetchall()
+
+    juntos: dict[str, tuple[int, Decimal]] = {}
+    for codigo, quantos, valor in list(pendentes) + list(conferidos):
+        q, v = juntos.get(codigo or "", (0, ZERO))
+        juntos[codigo or ""] = (q + quantos, v + _dec(valor))
+    return [
+        Fatia(rotulo=rotular(c), documentos=q, valor=v, codigo=c)
+        for c, (q, v) in sorted(juntos.items(), key=lambda kv: -kv[1][0])
+    ]
 
 
 def _comparar(con, anterior: str, atual: str,

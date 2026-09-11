@@ -728,3 +728,72 @@ lentidão, é o processo morrer levando a API junto.
 
 **Configuração nova:** `CAT_PASTA_DE_TRABALHO` (disco com espaço),
 `CAT_MEMORIA_ANALITICA` (padrão 4GB) e `CAT_THREADS_ANALITICAS` (padrão 4).
+
+---
+
+## 2026-09-11 — O confronto grande: o plano importa mais que o operador
+
+**O que aconteceu.** Base de 37,9 milhões de documentos. Três tentativas
+morreram ou travaram: `Allocation failure` em memória; `failed to pin block`;
+e por fim 88 minutos com 26 GB de rascunho, 13% de CPU e zero linhas escritas.
+
+**Diagnóstico, por eliminação e por `EXPLAIN`.**
+
+1. `count(DISTINCT)` sobre 37,9 milhões passa em **20 s** — não era ele.
+2. O `GROUP BY` de dezesseis colunas sobre ~38 milhões de grupos não cabe, com
+   ou sem `ORDER BY` — e é quase todo desperdício: só **832.782** agrupadores
+   se repetem (2,2%).
+3. Separar únicos de repetidos resolveria — mas a primeira forma (dois ramos
+   numa `UNION ALL` com `EXISTS` correlacionado) fez o DuckDB **materializar
+   o subplano comum** (`CTE __common_subplan_1`, 38 milhões × 16 colunas) e
+   descorrelacionar com `LEFT_DELIM_JOIN`. Foi isso que travou.
+
+**Decisão.** Cada ramo num `COPY` próprio, com `ANTI JOIN`/`SEMI JOIN`
+explícitos contra a tabela pequena de repetidos. Reler 400 MB de parquet custa
+segundos; materializar 38 milhões de linhas custa gigabytes.
+
+**Medido, mesmos 4 GB e 4 threads:** únicos 0,5 min, repetidos 0,1 min, união
+0,3 min, ordenação final 6,4 min — **8 min no total, 1,9 GB de rascunho**. E é
+o pior caso possível: pasta sem nenhum XML, todos os 37,9 milhões viram
+pendência. Numa base real a maior parte sai antes.
+
+**Regra que fica.** Quando uma consulta grande trava, pedir o `EXPLAIN` antes
+de mexer em memória ou threads. Duas armadilhas conhecidas do DuckDB: a mesma
+visão referenciada duas vezes vira CTE materializada; `EXISTS` correlacionado
+vira delim join. As duas se evitam com comandos separados e junções explícitas.
+
+---
+
+## 2026-09-11 — A empresa pode ser emitente OU destinatário do XML
+
+**Decisão.** Um XML é da empresa se a raiz do CNPJ do projeto estiver no
+emitente **ou** no destinatário. Só é "de outra empresa" quando nenhuma das
+pontas conhecidas bate.
+
+**Por quê.** A primeira versão comparava só o emitente. Numa nota que a
+empresa **recebe** do fornecedor — a entrada com ST retido, insumo principal
+da CAT 42 — o emitente é o fornecedor. Todo XML de compra seria jogado fora.
+Não apareceu no primeiro teste real porque os 884 XML eram de emissão própria.
+
+**Consequência.** A amostra lida do XML subiu de 8 para 16 KB: o `<dest>` só
+vem depois do `<emit>` com endereço inteiro, e 8 KB nem sempre alcançava.
+
+---
+
+## 2026-09-11 — A retificadora substitui a original, e o sistema age
+
+**Decisão.** O cabeçalho lê `COD_FIN` (ICMS/IPI) e `TIPO_ESCRIT`
+(Contribuições) a partir da âncora das datas. Quando o lote tem original e
+retificadora do mesmo estabelecimento e período, a conferência **lê só a
+retificadora**. A original continua no lote — registrada, contada, avisada —
+mas fora da leitura.
+
+**Por quê.** É a regra fiscal: a retificadora substitui a original por
+inteiro. Ler as duas dobrava os documentos do período e, pior, o confronto
+fazia `max(valor)` e `min(situacao)` entre as duas versões — misturava a nota
+de antes e a de depois numa linha só. Não é ruído; é número errado. E as duas
+na mesma pasta é o caso comum (pasta `10 - RETIFICAÇÃO SPEDS` do Advertising).
+
+**Limite conhecido.** Mais de uma retificadora para o mesmo período entram
+todas: o registro 0000 não traz a data de recepção, e sem ela não há como
+saber qual é a última. Fica no log.

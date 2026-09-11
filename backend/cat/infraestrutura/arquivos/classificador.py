@@ -33,7 +33,11 @@ from cat.log import obter_log
 log = obter_log(__name__)
 
 CODIFICACOES = ("utf-8-sig", "utf-8", "latin-1")
-BYTES_DE_AMOSTRA = 8192
+# 16 KB e não 8: no XML de NF-e o bloco <dest> só vem depois do <emit> com o
+# endereço inteiro, e 8 KB nem sempre alcançava — a nota ficava sem
+# destinatário e uma compra podia passar por "de outra empresa". Para SPED e
+# relatório o extra não muda nada: a primeira linha cabe de sobra.
+BYTES_DE_AMOSTRA = 16384
 
 EXTENSOES_TEXTO = (".txt", ".sped", ".efd")
 EXTENSOES_XML = (".xml",)
@@ -67,6 +71,12 @@ _RE_STUB = re.compile(
 _RE_NFE = re.compile(r"<(nfeProc|NFe|infNFe)\b", re.IGNORECASE)
 _RE_CNPJ_EMITENTE = re.compile(
     r"<emit>.*?<CNPJ>(\d{14})</CNPJ>", re.IGNORECASE | re.DOTALL)
+# Numa nota que a empresa RECEBE, o emitente é o fornecedor. Sem o
+# destinatário, todo XML de compra — o insumo principal da CAT 42 — seria
+# jogado fora como "de outra empresa". O bloco <dest> pode trazer CPF em
+# vez de CNPJ (venda a consumidor); aí não há o que capturar, e tudo bem.
+_RE_CNPJ_DESTINATARIO = re.compile(
+    r"<dest>.*?<CNPJ>(\d{14})</CNPJ>", re.IGNORECASE | re.DOTALL)
 _RE_EMISSAO = re.compile(r"<(?:dhEmi|dEmi)>(\d{4})-(\d{2})-(\d{2})")
 
 
@@ -101,12 +111,14 @@ def _do_sped(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote | None:
         competencia=c.inicio,
         uf=c.uf,
         detalhe=c.nome,
+        retificadora=c.retificadora,
     )
 
 
 def _do_xml(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote:
     e_nfe = _RE_NFE.search(texto) is not None
     emitente = _RE_CNPJ_EMITENTE.search(texto)
+    destinatario = _RE_CNPJ_DESTINATARIO.search(texto)
     emissao = _RE_EMISSAO.search(texto)
     return ArquivoDoLote(
         caminho=caminho,
@@ -114,6 +126,7 @@ def _do_xml(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote:
         tamanho=tamanho,
         tipo=TipoDeArquivo.XML_NFE if e_nfe else TipoDeArquivo.XML_OUTRO,
         cnpj=emitente.group(1) if emitente else None,
+        cnpj_destinatario=destinatario.group(1) if destinatario else None,
         # a competência de uma nota é o mês da emissão
         competencia=(date(int(emissao.group(1)), int(emissao.group(2)), 1)
                      if emissao else None),

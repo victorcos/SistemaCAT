@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 import shutil
 import time
+from collections import Counter
 from dataclasses import asdict
 from datetime import datetime, timezone
 
@@ -74,6 +75,55 @@ def caminhos_do_projeto(
     ))
 
 
+def caminhos_de_efd_vigentes(
+    projeto_id: int, sessao: Session
+) -> tuple[list[str], list[str]]:
+    """As EFD ICMS/IPI que valem, e as originais que uma retificadora substituiu.
+
+    A retificadora substitui a original do mesmo estabelecimento e período POR
+    INTEIRO — é a regra fiscal, não uma escolha nossa. Ler as duas dobraria os
+    documentos do período e, pior, misturaria valores de antes e depois da
+    retificação numa linha só. Então, onde há retificadora, a original sai da
+    leitura. Sai da leitura, não do lote: continua registrada, e a tela diz
+    quantas ficaram de fora e por quê.
+
+    Se houver mais de uma retificadora para o mesmo período, todas entram: não
+    há como saber qual é a mais recente sem a data de recepção, que o registro
+    0000 não traz. Fica no log para alguém olhar.
+    """
+    linhas = sessao.execute(
+        select(ArquivoDoLoteDB.caminho, ArquivoDoLoteDB.cnpj,
+               ArquivoDoLoteDB.competencia, ArquivoDoLoteDB.retificadora)
+        .join(LoteDB, LoteDB.id == ArquivoDoLoteDB.lote_id)
+        .where(LoteDB.projeto_id == projeto_id,
+               ArquivoDoLoteDB.tipo == TipoDeArquivo.SPED_ICMS_IPI.value)
+        .order_by(ArquivoDoLoteDB.caminho)
+    ).all()
+
+    retificadas = {(cnpj, competencia)
+                   for _, cnpj, competencia, retificadora in linhas if retificadora}
+    vigentes: list[str] = []
+    substituidas: list[str] = []
+    for caminho, cnpj, competencia, retificadora in linhas:
+        if not retificadora and (cnpj, competencia) in retificadas:
+            substituidas.append(caminho)
+        else:
+            vigentes.append(caminho)
+
+    repetidas = [chave for chave, n in Counter(
+        (cnpj, competencia) for _, cnpj, competencia, r in linhas if r
+    ).items() if n > 1]
+    if repetidas:
+        log.warning("mais de uma retificadora para o mesmo período; todas entram",
+                    extra={"projeto_id": projeto_id,
+                           "periodos": [f"{c} {p}" for c, p in repetidas][:10]})
+    if substituidas:
+        log.info("EFD originais substituídas por retificadora",
+                 extra={"projeto_id": projeto_id, "quantas": len(substituidas),
+                        "amostra": [os.path.basename(c) for c in substituidas[:5]]})
+    return vigentes, substituidas
+
+
 def pasta_da_execucao(execucao_id: int) -> str:
     raiz = obter_config().raiz_de_trabalho
     return os.path.join(raiz, f"execucao-{execucao_id}")
@@ -86,7 +136,7 @@ def preparar(projeto_id: int, usuario_id: int, sessao: Session) -> ExecucaoDB:
     dizer 'não há EFD neste trabalho' na hora vale mais do que uma execução que
     nasce e morre em silêncio.
     """
-    efd = caminhos_do_projeto(projeto_id, (TipoDeArquivo.SPED_ICMS_IPI,), sessao)
+    efd, _ = caminhos_de_efd_vigentes(projeto_id, sessao)
     if not efd:
         raise NadaParaConferir(
             "Este trabalho não tem nenhuma EFD ICMS/IPI importada. "
@@ -150,7 +200,7 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     sessao.commit()
 
     projeto_id = execucao.projeto_id
-    efd = caminhos_do_projeto(projeto_id, (TipoDeArquivo.SPED_ICMS_IPI,), sessao)
+    efd, substituidas = caminhos_de_efd_vigentes(projeto_id, sessao)
     xmls = caminhos_do_projeto(projeto_id, (TipoDeArquivo.XML_NFE,), sessao)
     relatorios = caminhos_do_projeto(
         projeto_id, (TipoDeArquivo.GERENCIAL_MOVIMENTO,), sessao)
@@ -178,6 +228,7 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
 
     resumo = confrontar(caminho_efd, caminho_pasta, destino,
                         anterior=_pendencias_anteriores(execucao, sessao))
+    resumo.efd_originais_substituidas = len(substituidas)
 
     execucao.situacao = "concluida"
     execucao.passo = "Concluída"

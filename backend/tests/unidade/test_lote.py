@@ -232,3 +232,65 @@ class TestOrigensPermitidas:
         monkeypatch.setenv("CAT_PASTAS_PERMITIDAS", str(tmp_path))
 
         assert inspecionar_pasta(str(dentro), "50948371").total == 1
+
+
+# NF-e de FORNECEDOR: emitente é outra raiz, destinatário é a empresa do
+# projeto (raiz 50948371). É a nota de compra — o insumo principal da CAT 42.
+NFE_DE_FORNECEDOR = (
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<nfeProc versao="4.00"><NFe><infNFe Id="NFe4125031151784100027855001000044623141195329">'
+    "<ide><dhEmi>2025-03-14T10:22:00-03:00</dhEmi></ide>"
+    "<emit><CNPJ>11517841000278</CNPJ><xNome>FORNECEDOR LTDA</xNome></emit>"
+    "<dest><CNPJ>50948371000178</CNPJ><xNome>IRMAOS BOA</xNome></dest>"
+    "</infNFe></NFe></nfeProc>"
+)
+# nem emitente nem destinatário são da empresa: essa sim é de outra
+NFE_ALHEIA = NFE_DE_FORNECEDOR.replace("50948371000178", "99999999000191")
+# venda a consumidor: <dest> tem CPF, não CNPJ — só o emitente identifica
+NFE_A_CONSUMIDOR = (
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<nfeProc versao="4.00"><NFe><infNFe Id="NFe3525035094837100017865001000000010000000015">'
+    "<ide><dhEmi>2025-03-14T10:22:00-03:00</dhEmi></ide>"
+    "<emit><CNPJ>50948371000178</CNPJ></emit>"
+    "<dest><CPF>00176231110</CPF></dest>"
+    "</infNFe></NFe></nfeProc>"
+)
+
+
+class TestXmlDeFornecedor:
+    """A empresa pode ser o emitente OU o destinatário da nota.
+
+    A primeira versão comparava só o emitente e jogava fora toda nota de
+    compra como "de outra empresa". Não apareceu no primeiro teste real porque
+    os 884 XML eram de emissão própria; num varejista importando nota de
+    fornecedor, apareceria na primeira pasta.
+    """
+
+    def test_classificador_extrai_as_duas_pontas(self, tmp_path):
+        a = classificar(escrever(tmp_path, "compra.xml", NFE_DE_FORNECEDOR, "utf-8"))
+        assert a.cnpj == "11517841000278"              # emitente: o fornecedor
+        assert a.cnpj_destinatario == "50948371000178"  # destinatário: a empresa
+
+    def test_nota_de_compra_entra_no_lote(self, tmp_path):
+        escrever(tmp_path, "compra.xml", NFE_DE_FORNECEDOR, "utf-8")
+        r = inspecionar_pasta(str(tmp_path), "50948371")
+        assert r.total == 1
+        assert not r.de_outra_empresa
+
+    def test_nota_de_emissao_propria_continua_entrando(self, tmp_path):
+        escrever(tmp_path, "venda.xml", NFE, "utf-8")
+        r = inspecionar_pasta(str(tmp_path), "50948371")
+        assert r.total == 1 and not r.de_outra_empresa
+
+    def test_venda_a_consumidor_sem_cnpj_no_destinatario(self, tmp_path):
+        a = classificar(escrever(tmp_path, "cupom.xml", NFE_A_CONSUMIDOR, "utf-8"))
+        assert a.cnpj == "50948371000178"
+        assert a.cnpj_destinatario is None
+        r = inspecionar_pasta(str(tmp_path), "50948371")
+        assert r.total == 1 and not r.de_outra_empresa
+
+    def test_nota_sem_nenhuma_ponta_da_empresa_fica_de_fora(self, tmp_path):
+        escrever(tmp_path, "alheia.xml", NFE_ALHEIA, "utf-8")
+        r = inspecionar_pasta(str(tmp_path), "50948371")
+        assert r.total == 0
+        assert len(r.de_outra_empresa) == 1
