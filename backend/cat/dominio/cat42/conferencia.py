@@ -130,6 +130,11 @@ class ResumoDaConferencia:
     # do mesmo estabelecimento e período no lote
     efd_originais_substituidas: int = 0
 
+    # pendências cuja chave apareceu mais de uma vez na EFD. Uma parcela
+    # pequena é legítima — a mesma nota escriturada em duas filiais. Uma
+    # parcela grande é o mesmo arquivo importado duas vezes.
+    pendencias_repetidas: int = 0
+
     # ---- o que andou desde a rodada anterior ----
     # O trabalho não termina na primeira conferência: o cliente manda o que
     # faltava e ela roda de novo. Sem estes números, a segunda rodada só diz
@@ -191,6 +196,18 @@ class ResumoDaConferencia:
                 "inutilizadas ou sem chave. Continuam na lista, marcadas — de "
                 "cancelada e denegada não se espera documento, mas quem decide "
                 "pedir ou não é quem trabalha, não o sistema."
+            )
+        # 5% é o corte entre "nota em duas filiais" e "arquivo importado duas
+        # vezes". Numa base real de 37,9 milhões, 2,2% das chaves se repetiam
+        # legitimamente; o mesmo lote importado em dobro daria perto de 100%.
+        if (self.sem_documento
+                and self.pendencias_repetidas / self.sem_documento > 0.05):
+            avisos.append(
+                f"{_numero(self.pendencias_repetidas)} das pendências "
+                f"({self.pendencias_repetidas / self.sem_documento:.0%}) têm a "
+                "mesma chave mais de uma vez na EFD. Acima do que filial "
+                "repetida explica: é sinal de arquivo importado em dobro. A "
+                "coluna 'Ocorrências na EFD' da planilha mostra quais."
             )
         if self.nao_escrituradas:
             avisos.append(

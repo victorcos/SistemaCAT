@@ -294,10 +294,11 @@ def _resumir(con, nao_escrituradas: str,
     na_pasta = con.execute("SELECT count(*) FROM entregues").fetchone()[0]
 
     pendencias = _escapar(sem_documento)
-    faltando, valor_faltando, espera, sem_chave = con.execute(f"""
+    faltando, valor_faltando, espera, sem_chave, repetidas = con.execute(f"""
         SELECT count(*), coalesce(sum(valor), 0),
                count(*) FILTER (WHERE espera_documento),
-               count(*) FILTER (WHERE NOT tem_chave)
+               count(*) FILTER (WHERE NOT tem_chave),
+               count(*) FILTER (WHERE ocorrencias > 1)
         FROM read_parquet('{pendencias}')
     """).fetchone()
 
@@ -359,6 +360,7 @@ def _resumir(con, nao_escrituradas: str,
         por_classificacao=por_classificacao,
         estabelecimentos_da_efd=estabelecimentos[:20],
         emitentes_na_pasta=emitentes[:20],
+        pendencias_repetidas=repetidas,
     )
 
 

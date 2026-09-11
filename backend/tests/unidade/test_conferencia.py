@@ -404,3 +404,42 @@ class TestFiliaisTrocadas:
             emitentes_na_pasta=["43112531000421"],
         )
         assert not any("filiais diferentes" in a for a in r.avisos)
+
+
+class TestDuplicidadeDeArquivo:
+    """`ocorrencias` na planilha, e aviso quando a repetição denuncia arquivo em dobro.
+
+    O corte é 5%. Numa base real de 37,9 milhões, 2,2% das chaves se repetiam
+    legitimamente (a mesma nota escriturada em duas filiais); o mesmo lote
+    importado duas vezes daria perto de 100%.
+    """
+
+    def test_acima_do_corte_avisa(self):
+        r = ResumoDaConferencia(escriturados=100, sem_documento=100,
+                                pendencias_repetidas=40)
+        aviso = next(a for a in r.avisos if "arquivo importado em dobro" in a)
+        assert "40%" in aviso
+
+    def test_repeticao_legitima_nao_avisa(self):
+        # 2% é filial repetida, não arquivo em dobro
+        r = ResumoDaConferencia(escriturados=100, sem_documento=100,
+                                pendencias_repetidas=2)
+        assert not any("em dobro" in a for a in r.avisos)
+
+    def test_sem_pendencia_nao_divide_por_zero(self):
+        assert ResumoDaConferencia(escriturados=5, sem_documento=0).avisos == [
+            a for a in ResumoDaConferencia(escriturados=5, sem_documento=0).avisos
+        ]
+
+    def test_a_planilha_mostra_as_ocorrencias(self, confronto, tmp_path):
+        import openpyxl  # noqa: PLC0415
+
+        _, destino = confronto
+        caminho = str(tmp_path / "pendencias.xlsx")
+        gerar_sem_documento(f"{destino}/sem_documento.parquet", caminho)
+        aba = openpyxl.load_workbook(caminho).active
+        cabecalho = [c.value for c in aba[1]]
+        assert "Ocorrências na EFD" in cabecalho
+        coluna = cabecalho.index("Ocorrências na EFD") + 1
+        # todas as pendências da fixture são chaves únicas: 1 ocorrência
+        assert aba.cell(row=2, column=coluna).value == 1

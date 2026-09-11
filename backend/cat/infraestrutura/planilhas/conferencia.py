@@ -53,6 +53,10 @@ COLUNAS_SEM_DOCUMENTO = (
     Coluna("emitente", "Emitente", "texto", 14),
     Coluna("participante", "Cód. participante", "texto", 18),
     Coluna("situacao", "Situação", "texto", 10),
+    # quantas vezes a chave apareceu na EFD. 1 é o normal; 2 pode ser a nota
+    # escriturada em duas filiais (legítimo) ou o mesmo arquivo importado duas
+    # vezes (não). Sem esta coluna, quem baixa não tinha como ver a diferença.
+    Coluna("ocorrencias", "Ocorrências na EFD", "numero", 12),
     # o que fazer com a linha. Vem primeiro na ordenação do parquet, então
     # quem abre a planilha já cai no que há para cobrar
     Coluna("classificacao", "Classificação", "texto", 30),

@@ -797,3 +797,20 @@ na mesma pasta é o caso comum (pasta `10 - RETIFICAÇÃO SPEDS` do Advertising)
 **Limite conhecido.** Mais de uma retificadora para o mesmo período entram
 todas: o registro 0000 não traz a data de recepção, e sem ela não há como
 saber qual é a última. Fica no log.
+
+---
+
+## 2026-09-11 — A planilha mostra quantas vezes a chave apareceu, e o sistema avisa quando é arquivo em dobro
+
+**Decisão.** A planilha de pendências ganha a coluna **Ocorrências na EFD**, e
+a conferência avisa quando mais de **5%** das pendências têm chave repetida.
+
+**Por quê.** O confronto sempre colapsou chaves repetidas numa linha só — e
+isso absorvia, em silêncio, tanto o caso legítimo (a mesma nota escriturada em
+duas filiais) quanto o acidental (o mesmo arquivo importado duas vezes). A
+coluna deixa quem baixa ver a diferença; o aviso deixa quem confere ver de
+longe.
+
+**O corte de 5% vem de medição.** Numa base real de 37,9 milhões de
+documentos, 2,2% das chaves se repetiam legitimamente. O mesmo lote importado
+em dobro daria perto de 100%. Entre um e outro há margem de sobra.
