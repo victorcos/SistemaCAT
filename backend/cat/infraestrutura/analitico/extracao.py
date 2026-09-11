@@ -219,6 +219,19 @@ def _chave_do_xml(caminho: str) -> str:
     return do_nome.group(1) if do_nome else ""
 
 
+_RE_NAO_DIGITO = re.compile(r"\D+")
+
+
+def _chave_do_relatorio(bruto: str | None) -> str | None:
+    """Os 44 dígitos, venham como vierem: "NFe" na frente, espaço, em blocos.
+
+    O que o Excel estragou não tem volta — "4,12105E+43" perdeu os dígitos
+    ao virar número — e devolve None, para ser contado e avisado.
+    """
+    digitos = _RE_NAO_DIGITO.sub("", bruto or "")
+    return digitos if len(digitos) == 44 else None
+
+
 def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
                   avisar: Aviso | None = None) -> Progresso:
     """Escreve um parquet com a chave de cada documento que o cliente entregou.
@@ -228,6 +241,7 @@ def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
     trouxe fica na coluna `origem`, que é o que permite explicar depois de onde
     a informação veio.
     """
+    from cat.dominio.gerencial.campos import Especie
     from cat.infraestrutura.arquivos.gerencial import Leitura
 
     progresso = Progresso(arquivos_totais=len(xmls) + len(relatorios))
@@ -250,11 +264,22 @@ def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
 
     for caminho in relatorios:
         nome = os.path.basename(caminho)
+        sem_chave = 0
         try:
             leitura = Leitura(caminho)
+            # inventário e resumo não têm documento nem chave; passar por
+            # eles em silêncio daria "0 documentos" sem explicação
+            if leitura.especie is not Especie.MOVIMENTO:
+                progresso.recusados.append(
+                    f"{nome}: é {leitura.especie.rotulo.lower()}, não relatório "
+                    "de movimento — não tem chave de documento para conferir")
+                progresso.arquivos_lidos += 1
+                continue
             for _numero, dados in leitura.brutos():
-                chave = (dados.get("chave") or "").strip()
-                if len(chave) == 44 and chave not in vistas:
+                chave = _chave_do_relatorio(dados.get("chave"))
+                if chave is None:
+                    sem_chave += 1
+                elif chave not in vistas:
                     vistas.add(chave)
                     escritor.acrescentar({
                         "chave": chave, "origem": Origem.GERENCIAL.value,
@@ -265,6 +290,14 @@ def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
             progresso.recusados.append(f"{nome}: {erro}")
             log.warning("relatório ilegível no confronto",
                         extra={"arquivo": nome, "motivo": str(erro)})
+        if sem_chave:
+            # a nota dessas linhas vai cair como pendente, e quem for cobrar
+            # precisa saber que o relatório a trazia — só que sem chave
+            progresso.recusados.append(
+                f"{nome}: {sem_chave} linha(s) sem chave de acesso válida, "
+                "ignoradas — costuma ser chave que o Excel converteu em número")
+            log.warning("relatório com linhas sem chave válida",
+                        extra={"arquivo": nome, "linhas": sem_chave})
         progresso.arquivos_lidos += 1
         if avisar is not None:
             avisar(progresso)

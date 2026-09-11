@@ -95,3 +95,18 @@
   text-transform: uppercase;
   color: var(--texto-fraco);
 }
+
+/* ---------- arquivos que a leitura recusou ---------- */
+/* Vinha no JSON e ninguém via: um relatório com toda chave estragada pelo
+   Excel aparecia como "0 documentos" sem explicação. Agora é lista, e cada
+   linha diz o arquivo e o motivo. */
+.recusados {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.recusados li + li {
+  margin-top: 4px;
+}

@@ -290,6 +290,18 @@ function Resultado({
             {a}
           </div>
         ))}
+
+        {resumo.recusados.length > 0 && (
+          <div className="aviso aviso--atencao">
+            <strong>Arquivos com problema na leitura</strong> — o que está
+            aqui não entrou no confronto:
+            <ul className="recusados">
+              {resumo.recusados.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       <section className="cartao">

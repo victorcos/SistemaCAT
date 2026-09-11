@@ -950,3 +950,44 @@ fontes do Google carregarem.
 
 **Verificado** com captura do Chrome sem interface na mesma página, antes e
 depois: antes, Segoe UI Bold; depois, Inter no peso desenhado.
+
+---
+
+## 2026-09-11 — Relatório do cliente no confronto: o que a simulação mostrou
+
+**O pedido.** Validar a opção de subir um relatório gerencial para o
+comparativo, simulando o pior cenário, o médio usual e um perfeito. Entraram
+como testes de ponta a ponta (`test_cenarios_relatorio_api.py`, 200
+documentos por cenário: 120 NF-e e 80 CF-e) e como testes de unidade do
+caminho do relatório (`test_conferencia_por_relatorio.py`).
+
+**O que já funcionava.** Relatório sozinho confirma a nota; uma linha por
+item vira um documento só; nota do relatório que a EFD não tem sai como não
+escriturada; quando XML e relatório trazem a mesma chave, **o XML vence**
+(regra da casa); arquivo ilegível não derruba os outros.
+
+**Três falhas que a simulação achou, e as correções.**
+
+1. **Chave suja era perdida em silêncio.** `NFe` na frente, espaço em volta,
+   chave em blocos: o comparador exigia exatamente 44 caracteres e descartava
+   sem contar. Agora ficam só os dígitos; 44 é chave.
+2. **Chave que o Excel estragou** ("3,52105E+43" — os dígitos foram embora ao
+   virar número) **e linha sem chave** também não eram contadas. Agora cada
+   relatório informa "N linha(s) sem chave de acesso válida, ignoradas" na
+   lista de recusados, com a causa provável. A nota cai como pendente, e quem
+   for cobrar sabe que o relatório a trazia.
+3. **Inventário no lugar do movimento** dava "0 documentos" sem explicação.
+   A extração agora recusa com o motivo. (Pela API ele nem chega: a
+   conferência só pega XML e relatório de movimento do lote — mas o relatório
+   de movimento com a chave destruída chega, e é o caso 2.)
+
+**E uma na tela.** A lista de recusados ia no JSON e ninguém via. Agora
+aparece no cartão do resultado, arquivo por arquivo, com o motivo.
+
+**Os três cenários, como ficaram.** Perfeito: 200/200, sem aviso, sem
+recusado. Médio usual: 175 conferidas (170 pelo relatório, 5 pelo XML), 25
+pendentes das quais 4 canceladas marcadas, 5 não escrituradas, 8 linhas sem
+chave avisadas. Pior (inventário + movimento com chave destruída + relatório
+da outra filial): 0 conferidas, 203 pendentes, 50 não escrituradas, e a tela
+diz as três coisas — "filiais diferentes" com os dois CNPJ, "400 linha(s) sem
+chave" no arquivo certo, e as sem chave e canceladas marcadas.
