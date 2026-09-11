@@ -94,6 +94,9 @@ Objetivo: o produto que o cliente enxerga.
 - [ ] Detecção das anomalias já identificadas, começando pelas baixas sem
       enquadramento
 - [ ] Relatórios em Excel, com quebra acima de 900 mil linhas
+- [x] Histórico de movimentação: itens da EFD (C170), analítico (C190/C850),
+      cadastro (0200) e inventário (bloco H), cada movimento marcado pela
+      conferência — *etapa 3 no ar; item de saída vem do XML, etapa seguinte*
 - [ ] Consulta de movimentação por item
 
 ### Etapa 4 — De-para
@@ -186,3 +189,9 @@ ICMS/IPI, seis versões de leiaute, sem falha.
 
 **2026-09-10** — Tela de trabalhos com cartões por projeto e página de detalhe
 com o roteiro de processamento da CAT em sete etapas.
+
+**2026-09-11** — Conferência de documentos (etapa 2) com três listas —
+pendentes, não escrituradas e conferidas — validada em base real de 37,9
+milhões de documentos e em três cenários simulados com relatório do cliente.
+Etapa 3, histórico de movimentação, no ar: a EFD não tem item de saída
+(NF-e própria sem C170, SAT sem C810), e a etapa diz isso com número.

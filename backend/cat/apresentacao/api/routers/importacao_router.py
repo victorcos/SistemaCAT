@@ -429,18 +429,19 @@ def _etapas_do(
     if tem_base:
         concluidas.add("importar")
 
-    # a conferência conclui com uma rodada terminada; enquanto roda, a etapa
-    # aparece em andamento, que é o que explica a espera ao usuário
-    situacao = sessao.scalar(
-        select(ExecucaoDB.situacao)
-        .where(ExecucaoDB.projeto_id == p.id, ExecucaoDB.etapa == "conferencia")
-        .order_by(ExecucaoDB.id.desc())
-        .limit(1)
-    )
-    if situacao == "concluida":
-        concluidas.add("conferencia")
-    elif situacao in ("na_fila", "rodando"):
-        em_andamento = "conferencia"
+    # cada etapa de processamento conclui com uma rodada terminada; enquanto
+    # roda, aparece em andamento, que é o que explica a espera ao usuário
+    for etapa in ("conferencia", "movimentos"):
+        situacao = sessao.scalar(
+            select(ExecucaoDB.situacao)
+            .where(ExecucaoDB.projeto_id == p.id, ExecucaoDB.etapa == etapa)
+            .order_by(ExecucaoDB.id.desc())
+            .limit(1)
+        )
+        if situacao == "concluida":
+            concluidas.add(etapa)
+        elif situacao in ("na_fila", "rodando") and em_andamento is None:
+            em_andamento = etapa
 
     return etapas_dominio.montar(concluidas, em_andamento)
 

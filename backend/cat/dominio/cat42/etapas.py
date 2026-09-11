@@ -70,9 +70,11 @@ ETAPAS: tuple[DefinicaoEtapa, ...] = (
         chave="movimentos",
         nome="Extrair movimentos",
         descricao=(
-            "Ler os registros C100 e C170 de cada documento, o cadastro de item "
-            "(0200) e o inventário (Bloco H), que dá o saldo de abertura."
+            "Ler os itens de cada documento (C170), o analítico (C190/C850), o "
+            "cadastro de item (0200) e o inventário (Bloco H), que dá o saldo "
+            "de abertura — cada movimento marcado pela conferência."
         ),
+        implementada=True,
     ),
     DefinicaoEtapa(
         chave="st_suportado",

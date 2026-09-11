@@ -89,15 +89,29 @@ export async function baixarPlanilha(
   if (classificacoes.length)
     parametros.set("classificacoes", classificacoes.join(","));
   const filtro = parametros.toString() ? `?${parametros}` : "";
+  await baixarArquivo(
+    `/api/conferencias/${execucaoId}/planilhas/${qual}${filtro}`,
+    `${qual}.xlsx`,
+  );
+}
+
+/**
+ * Busca um arquivo autenticado e dispara o download no navegador.
+ *
+ * Serve a qualquer etapa que exporte planilha: a rota exige o token no
+ * cabeçalho, e `<a href>` não manda cabeçalho.
+ */
+export async function baixarArquivo(
+  endereco: string,
+  nomePadrao: string,
+): Promise<void> {
   const cabecalhos = new Headers();
   const token = lerToken();
   if (token) cabecalhos.set("Authorization", `Bearer ${token}`);
 
   let r: Response;
   try {
-    r = await fetch(`/api/conferencias/${execucaoId}/planilhas/${qual}${filtro}`, {
-      headers: cabecalhos,
-    });
+    r = await fetch(endereco, { headers: cabecalhos });
   } catch {
     throw new ErroApi("Não foi possível baixar a planilha.", 0);
   }
@@ -115,15 +129,15 @@ export async function baixarPlanilha(
   }
 
   const conteudo = await r.blob();
-  const endereco = URL.createObjectURL(conteudo);
+  const url = URL.createObjectURL(conteudo);
   const link = document.createElement("a");
-  link.href = endereco;
-  link.download = nomeDoArquivo(r) ?? `${qual}.xlsx`;
+  link.href = url;
+  link.download = nomeDoArquivo(r) ?? nomePadrao;
   document.body.appendChild(link);
   link.click();
   link.remove();
   // o navegador precisa do endereço enquanto o download começa
-  setTimeout(() => URL.revokeObjectURL(endereco), 10_000);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 function nomeDoArquivo(r: Response): string | null {

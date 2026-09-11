@@ -36,7 +36,7 @@ LINHAS_POR_LEITURA = 50_000
 class Coluna:
     campo: str
     titulo: str
-    tipo: str = "texto"      # texto | numero | data
+    tipo: str = "texto"      # texto | numero | quantidade | numero_inteiro | data
     largura: int = 16
 
 
@@ -104,6 +104,10 @@ _ROTULO_CLASSIFICACAO = {
     "a_cobrar": "A cobrar do cliente",
     "sem_documento_a_pedir": "Cancelada, denegada ou inutilizada",
     "sem_chave": "Sem chave — conferir à mão",
+    # as marcas que o histórico de movimentação carrega
+    "conferido": "Documento conferido",
+    "pendente": "Documento pendente na conferência",
+    "nao_conferido": "Sem conferência",
 }
 
 _TRADUCOES = {
@@ -135,8 +139,12 @@ def gerar(parquet: str, destino: str, colunas: tuple[Coluna, ...],
     })
     texto = livro.add_format({"num_format": "@"})
     dinheiro = livro.add_format({"num_format": "#,##0.00"})
+    # quantidade tem até cinco casas na EFD; mostrar duas esconderia fração
+    quantidade = livro.add_format({"num_format": "#,##0.00###"})
+    inteiro = livro.add_format({"num_format": "0"})
     dia = livro.add_format({"num_format": "dd/mm/yyyy"})
-    formatos = {"texto": texto, "numero": dinheiro, "data": dia}
+    formatos = {"texto": texto, "numero": dinheiro, "quantidade": quantidade,
+                "numero_inteiro": inteiro, "data": dia}
 
     aba = _abrir_aba(livro, titulo_da_aba, 1, colunas, cabecalho)
     escritas = 0
@@ -187,11 +195,15 @@ def _escrever(aba, linha: int, registro: dict, colunas: tuple[Coluna, ...],
         if traducao:
             aba.write_string(linha, i, traducao.get(str(valor), str(valor)),
                              formatos["texto"])
+        elif isinstance(valor, bool):
+            # antes de "numero": bool é int em Python, e "True" numa célula
+            # não diz nada a quem lê em português
+            aba.write_string(linha, i, "Sim" if valor else "Não", formatos["texto"])
         elif coluna.tipo == "data" and isinstance(valor, date):
             aba.write_datetime(linha, i, valor, formatos["data"])
-        elif coluna.tipo == "numero":
+        elif coluna.tipo in ("numero", "quantidade", "numero_inteiro"):
             aba.write_number(linha, i, float(valor if isinstance(valor, Decimal)
-                                             else valor), formatos["numero"])
+                                             else valor), formatos[coluna.tipo])
         else:
             # tudo o mais é identificador: vai como texto para não perder zero
             aba.write_string(linha, i, str(valor), formatos["texto"])

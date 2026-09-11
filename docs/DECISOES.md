@@ -991,3 +991,49 @@ chave avisadas. Pior (inventário + movimento com chave destruída + relatório
 da outra filial): 0 conferidas, 203 pendentes, 50 não escrituradas, e a tela
 diz as três coisas — "filiais diferentes" com os dois CNPJ, "400 linha(s) sem
 chave" no arquivo certo, e as sem chave e canceladas marcadas.
+
+---
+
+## 2026-09-11 — Etapa 3, histórico de movimentação: o que a EFD tem e o que não tem
+
+**O pedido.** "Vamos começar a trabalhar na parte de histórico da movimentação
+do que foi encontrado — a etapa 3."
+
+**O que os SPED reais mostraram antes de qualquer código.** Em duas empresas
+(Sulamericana, 884 EFD; Advertising, 68 EFD), o C170 só existe nas
+**entradas**: 27.448 registros de item e nenhum com CFOP de saída. Para NF-e
+de emissão própria a EFD dispensa o item. E o cupom SAT não traz C810 — em
+171.652 cupons reais de São Paulo, nenhum; o SAT vai para a EFD só com o
+**C850**, o analítico por CST/CFOP. Ou seja: **a EFD não tem item de saída**.
+O item das saídas — inclusive as de CST 60, que são o coração do ressarcimento
+— terá de vir do XML (NF-e e CF-e), na etapa seguinte.
+
+**Decisão.** A etapa 3 extrai o que a EFD tem, marca cada movimento pelo que a
+conferência achou e diz com número o que falta:
+
+* `documentos.parquet` — cada C100/C800 com quantos itens e analíticos trouxe;
+* `movimentos.parquet` — cada C170/C810 com o documento pai, o cadastro
+  (descrição, código de barras, NCM, CEST do 0200 mais recente) e a
+  **classificação da conferência**: conferido, pendente, sem chave. Ordenado
+  por estabelecimento, item e data — a ordem em que a ficha se lê;
+* `analitico.parquet` — cada C190/C850 com `tem_item`, decidido na própria
+  leitura (os analíticos de um documento esperam em memória até ele fechar).
+  É por aqui que se sabe quanto de CST 60 saiu sem detalhe;
+* `itens.parquet` — o 0200 que vale, por estabelecimento e código;
+* `inventario.parquet` — o bloco H, item a item, com a data do H005.
+
+A etapa exige conferência concluída: é a lista de conferidos dela que marca
+os movimentos. "Do que foi encontrado" é isto — o que tem documento sustenta
+o razão; o que não tem entra marcado e perde a marca quando o cliente mandar
+o que falta.
+
+**Duas escolhas de escala, medidas na conferência e repetidas aqui.** A marca
+da conferência é feita pelo lado pequeno: reduz-se a lista de conferidos
+(dezenas de milhões de chaves numa base saudável) às chaves distintas dos
+movimentos (só entradas, poucos milhões) por SEMI JOIN, e só então se marca.
+E o `tem_item` do analítico sai da extração, não de uma junção de 100 milhões
+de analíticos contra 38 milhões de documentos.
+
+**Leiautes conferidos em arquivo real, não no manual:** 0200 (12 campos),
+C170 (37, chave do pai vem da ordem do arquivo), C190 (11), C850 (7, sem ST),
+H005 (3), H010 (10). O C810 segue o manual, porque não apareceu.

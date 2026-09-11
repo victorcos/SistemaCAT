@@ -116,6 +116,15 @@ export default function Projeto({ usuario }: { usuario: Usuario }) {
                       : "Conferir documentos"}
                 </Link>
               )}
+              {e.chave === "movimentos" && e.acessivel && (
+                <Link className="etapa__acao" to={`/projetos/${id}/movimentos`}>
+                  {e.situacao === "concluida"
+                    ? "Ver o histórico e baixar as planilhas"
+                    : e.situacao === "em_andamento"
+                      ? "Acompanhar a extração"
+                      : "Extrair movimentos"}
+                </Link>
+              )}
             </div>
           </li>
         ))}
