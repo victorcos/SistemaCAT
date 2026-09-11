@@ -689,3 +689,42 @@ que é — importaram a EFD de uma filial e os XML de outra.
 
 **Como.** O CNPJ do emitente já está na chave de acesso, posições 7 a 20. Não
 é preciso reabrir XML nenhum para saber de quem ele é.
+
+---
+
+## 2026-09-11 — O confronto filtra antes de agrupar, e derrama em disco
+
+**O que aconteceu.** Uma empresa grande gerou **37.930.719 documentos** de C100
+e C800. O confronto morreu com `Out of Memory Error: Allocation failure`, e a
+API ficou sem responder junto — o processo brigava por RAM com o resto da
+máquina.
+
+**Três causas, em camadas.**
+
+1. **Banco analítico em memória não derrama.** A correção de desempenho do dia
+   anterior trocou `VIEW` por `CREATE TABLE`, e tabela em banco DuckDB em
+   memória, sem `temp_directory`, não tem para onde escrever o que não couber:
+   morre em vez de usar disco. Agora o banco é **em arquivo**, dentro da pasta
+   da execução, com `temp_directory`, `memory_limit` e teto de linhas de
+   execução declarados — e `preserve_insertion_order` desligado, que é o que
+   mais economiza memória em parquet grande.
+
+2. **O plano estava invertido.** Agrupava a base inteira por chave e só depois
+   tirava o que já tinha documento. Numa base saudável a maior parte dos
+   documentos **tem** o XML e deveria sair do caminho antes do agrupamento.
+   Agora filtra primeiro e agrupa só o que sobrou. As contagens gerais passaram
+   a usar `count(DISTINCT agrupador)` numa coluna só, em vez de agregar as
+   dezesseis colunas do registro inteiro.
+
+3. **Disco.** A pasta de trabalho estava no `C:`, com 12,9 GB livres. Um
+   confronto desse tamanho passou de 13 GB só de rascunho. Mudou para
+   `D:\cat-trabalho` via `CAT_PASTA_DE_TRABALHO`, e o limite de rascunho deixa
+   2 GB de folga: encher a unidade derruba mais que a execução.
+
+**Regra que fica.** Filtrar antes de agregar não é micro-otimização quando a
+diferença é entre concluir e não concluir. E todo motor analítico precisa saber
+**onde derramar** e **até onde pode ir** — sem isso, o modo de falha não é
+lentidão, é o processo morrer levando a API junto.
+
+**Configuração nova:** `CAT_PASTA_DE_TRABALHO` (disco com espaço),
+`CAT_MEMORIA_ANALITICA` (padrão 4GB) e `CAT_THREADS_ANALITICAS` (padrão 4).

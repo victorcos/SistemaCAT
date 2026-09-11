@@ -42,6 +42,18 @@ class Config(BaseSettings):
     # extração dessas grava por minutos.
     pasta_de_trabalho: str = "data/trabalho"
 
+    # Teto de memória do motor analítico. Existe para o confronto derramar
+    # em disco em vez de brigar por RAM com a API e com o Postgres, que
+    # rodam na mesma máquina. Baixo demais só deixa mais lento; alto demais
+    # derruba o processo inteiro.
+    memoria_analitica: str = "4GB"
+
+    # Quantas linhas de execução o motor analítico usa. Cada uma mantém os
+    # próprios blocos de agrupamento e de ordenação, então mais linhas é
+    # mais memória de pico — e o gargalo aqui é memória, não processador.
+    # Zero deixa o DuckDB decidir.
+    threads_analiticas: int = 4
+
     @property
     def raiz_de_trabalho(self) -> str:
         """A pasta de trabalho como caminho absoluto.

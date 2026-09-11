@@ -24,9 +24,12 @@ pendência resolvida nem por resolver, é pendência de conferência manual.
 from __future__ import annotations
 
 import os
+import shutil
 from decimal import Decimal
 
 import duckdb
+
+from cat.config import obter_config
 
 from cat.dominio.cat42.conferencia import Fatia, Origem, ResumoDaConferencia
 from cat.log import obter_log
@@ -42,6 +45,11 @@ SITUACOES_COM_DOCUMENTO = ("00", "01", "06", "07", "08")
 
 ARQUIVO_NAO_ESCRITURADAS = "nao_escrituradas.parquet"
 ARQUIVO_SEM_DOCUMENTO = "sem_documento.parquet"
+BANCO_DO_CONFRONTO = "confronto.duckdb"
+
+# quanto de disco não se toca. Encher a unidade de rascunho derruba o
+# sistema operacional junto, não só esta execução.
+FOLGA_DE_DISCO = 2 * 1000**3
 
 
 def confrontar(efd: str, pasta: str, destino: str,
@@ -57,7 +65,7 @@ def confrontar(efd: str, pasta: str, destino: str,
     sem_documento = os.path.join(destino, ARQUIVO_SEM_DOCUMENTO)
     esperado = str(SITUACOES_COM_DOCUMENTO)
 
-    con = duckdb.connect()
+    con = _abrir(destino)
     try:
         # DuckDB não aceita parâmetro preparado em CREATE VIEW; o caminho entra
         # no texto, com as aspas simples dobradas
@@ -84,8 +92,23 @@ def confrontar(efd: str, pasta: str, destino: str,
             FROM efd_bruta
         """)
 
+        # Tira PRIMEIRO o que já tem documento, agrupa só o que sobrou.
+        #
+        # Na ordem inversa — agrupar tudo e depois filtrar — o agrupamento
+        # carrega a base inteira: numa empresa de 37,9 milhões de documentos
+        # isso estourou 5,5 GB de memória e derrubou a execução depois de nove
+        # minutos. E é trabalho jogado fora, porque numa base saudável a maior
+        # parte dos documentos TEM o XML e sai do caminho aqui.
         con.execute("""
-            CREATE TABLE por_documento AS
+            CREATE VIEW pendentes_cru AS
+            SELECT * FROM efd e
+            WHERE NOT EXISTS (
+                SELECT 1 FROM entregues p WHERE p.chave = e.chave
+            )
+        """)
+
+        con.execute(f"""
+            CREATE VIEW pendentes AS
             SELECT agrupador,
                    any_value(chave)    AS chave,
                    bool_and(tem_chave) AS tem_chave,
@@ -103,27 +126,21 @@ def confrontar(efd: str, pasta: str, destino: str,
                    -- de qual arquivo saiu: é por onde se recomeça quando
                    -- alguém questiona uma linha da cobrança meses depois
                    any_value(arquivo)      AS arquivo_efd,
-                   count(*)                AS ocorrencias
-            FROM efd GROUP BY agrupador
-        """)
-
-        con.execute(f"""
-            CREATE TABLE pendentes AS
-            SELECT e.*,
-                   e.tem_chave AND e.situacao IN {esperado} AS espera_documento,
+                   count(*)                AS ocorrencias,
+                   bool_and(tem_chave) AND min(situacao) IN {esperado}
+                       AS espera_documento,
                    CASE
-                     WHEN NOT e.tem_chave THEN 'sem_chave'
-                     WHEN e.situacao NOT IN {esperado} THEN 'sem_documento_a_pedir'
+                     WHEN NOT bool_and(tem_chave) THEN 'sem_chave'
+                     WHEN min(situacao) NOT IN {esperado}
+                       THEN 'sem_documento_a_pedir'
                      ELSE 'a_cobrar'
                    END AS classificacao
-            FROM por_documento e
-            LEFT JOIN entregues p USING (chave)
-            WHERE p.chave IS NULL
+            FROM pendentes_cru GROUP BY agrupador
         """)
 
         con.execute(f"""
             COPY (SELECT * FROM pendentes
-                  ORDER BY classificacao, cnpj, competencia, data, numero)
+                  ORDER BY classificacao, cnpj, competencia)
             TO '{_escapar(sem_documento)}' (FORMAT PARQUET, COMPRESSION ZSTD)
         """)
 
@@ -139,11 +156,12 @@ def confrontar(efd: str, pasta: str, destino: str,
             ) TO '{_escapar(nao_escrituradas)}' (FORMAT PARQUET, COMPRESSION ZSTD)
         """)
 
-        resumo = _resumir(con, nao_escrituradas)
+        resumo = _resumir(con, nao_escrituradas, sem_documento)
         if anterior and os.path.isfile(anterior):
             _comparar(con, anterior, sem_documento, resumo)
     finally:
         con.close()
+        _limpar(destino)
 
     log.info(
         "confronto concluído",
@@ -159,17 +177,74 @@ def confrontar(efd: str, pasta: str, destino: str,
     return resumo
 
 
-def _resumir(con, nao_escrituradas: str) -> ResumoDaConferencia:
+def _abrir(destino: str):
+    """Conexão do confronto: em ARQUIVO, com teto de memória e onde derramar.
+
+    Banco em memória não tem para onde derramar quando a agregação não cabe na
+    RAM — ele simplesmente morre com "Allocation failure". Aconteceu num
+    confronto de 37,9 milhões de documentos: a agregação por chave estourou e a
+    execução inteira caiu, levando junto a responsividade da API.
+
+    As três configurações resolvem coisas diferentes:
+
+    * banco em arquivo e `temp_directory` dão a DuckDB onde escrever o que não
+      couber na memória;
+    * `memory_limit` impede que ele tome a máquina de assalto — a API e o
+      Postgres rodam ao lado;
+    * `preserve_insertion_order` desligado é o que mais economiza memória em
+      leitura e escrita de parquet grande, e aqui a ordem de entrada não
+      significa nada: o que sai é ordenado por ORDER BY explícito.
+    """
+    con = duckdb.connect(os.path.join(destino, BANCO_DO_CONFRONTO))
+    con.execute(f"SET temp_directory = '{_escapar(destino)}'")
+    con.execute(f"SET memory_limit = '{obter_config().memoria_analitica}'")
+    con.execute("SET preserve_insertion_order = false")
+    if obter_config().threads_analiticas:
+        con.execute(f"SET threads = {obter_config().threads_analiticas}")
+    livre = shutil.disk_usage(destino).free
+    # deixa uma folga: encher o disco de rascunho derruba mais coisa do
+    # que esta execução
+    teto = max(livre - FOLGA_DE_DISCO, FOLGA_DE_DISCO)
+    con.execute(f"SET max_temp_directory_size = '{teto // 10**9}GB'")
+    log.info("motor analítico aberto",
+             extra={"destino": destino, "livre_gb": round(livre / 1e9, 1),
+                    "teto_rascunho_gb": teto // 10**9,
+                    "memoria": obter_config().memoria_analitica,
+                    "threads": obter_config().threads_analiticas})
+    return con
+
+
+def _limpar(destino: str) -> None:
+    """O banco do confronto é rascunho: o resultado está nos parquets."""
+    caminho = os.path.join(destino, BANCO_DO_CONFRONTO)
+    for alvo in (caminho, caminho + ".wal", caminho + ".tmp"):
+        if os.path.isdir(alvo):
+            shutil.rmtree(alvo, ignore_errors=True)
+        elif os.path.isfile(alvo):
+            try:
+                os.remove(alvo)
+            except OSError:
+                log.warning("não deu para apagar o rascunho do confronto",
+                            extra={"arquivo": alvo})
+
+
+def _resumir(con, nao_escrituradas: str,
+             sem_documento: str) -> ResumoDaConferencia:
+    # contagem de documentos distintos numa coluna só, em vez de agrupar as
+    # dezesseis colunas do registro inteiro
     escriturados, sem_chave = con.execute("""
-        SELECT count(*), count(*) FILTER (WHERE NOT tem_chave)
-        FROM por_documento
+        SELECT count(DISTINCT agrupador),
+               count(DISTINCT agrupador) FILTER (WHERE NOT tem_chave)
+        FROM efd
     """).fetchone()
     na_pasta = con.execute("SELECT count(*) FROM entregues").fetchone()[0]
 
-    faltando, valor_faltando, espera = con.execute("""
+    # do parquet já escrito, e não da visão: reexecutá-la refaria o
+    # agrupamento inteiro sobre dezenas de milhões de linhas
+    faltando, valor_faltando, espera = con.execute(f"""
         SELECT count(*), coalesce(sum(valor), 0),
                count(*) FILTER (WHERE espera_documento)
-        FROM pendentes
+        FROM read_parquet('{_escapar(sem_documento)}')
     """).fetchone()
 
     fora = con.execute(
@@ -177,9 +252,8 @@ def _resumir(con, nao_escrituradas: str) -> ResumoDaConferencia:
     ).fetchone()[0]
 
     conferidos, valor_conferido = con.execute("""
-        SELECT count(*), coalesce(sum(e.valor), 0)
-        FROM por_documento e
-        JOIN entregues p USING (chave)
+        SELECT count(DISTINCT e.agrupador), coalesce(sum(e.valor), 0)
+        FROM efd e JOIN entregues p USING (chave)
     """).fetchone()
 
     origens = [Origem(o) for (o,) in con.execute(
@@ -189,16 +263,16 @@ def _resumir(con, nao_escrituradas: str) -> ResumoDaConferencia:
     por_modelo = [
         Fatia(rotulo=_modelo_rotulo(m), documentos=q, valor=_dec(v), codigo=m)
         for m, q, v in con.execute("""
-            SELECT modelo, count(*), coalesce(sum(valor), 0)
-            FROM por_documento GROUP BY modelo ORDER BY count(*) DESC
+            SELECT modelo, count(DISTINCT agrupador), coalesce(sum(valor), 0)
+            FROM efd GROUP BY modelo ORDER BY 2 DESC
         """).fetchall()
     ]
     por_operacao = [
         Fatia(rotulo="Entrada" if o == "entrada" else "Saída",
               documentos=q, valor=_dec(v), codigo=o)
         for o, q, v in con.execute("""
-            SELECT operacao, count(*), coalesce(sum(valor), 0)
-            FROM por_documento GROUP BY operacao ORDER BY count(*) DESC
+            SELECT operacao, count(DISTINCT agrupador), coalesce(sum(valor), 0)
+            FROM efd GROUP BY operacao ORDER BY 2 DESC
         """).fetchall()
     ]
     # como as pendências se dividem: o que se cobra, o que não tem documento a
@@ -206,16 +280,17 @@ def _resumir(con, nao_escrituradas: str) -> ResumoDaConferencia:
     por_classificacao = [
         Fatia(rotulo=_CLASSIFICACAO.get(c, c), documentos=q, valor=_dec(v),
               codigo=c)
-        for c, q, v in con.execute("""
+        for c, q, v in con.execute(f"""
             SELECT classificacao, count(*), coalesce(sum(valor), 0)
-            FROM pendentes GROUP BY classificacao ORDER BY count(*) DESC
+            FROM read_parquet('{_escapar(sem_documento)}')
+            GROUP BY classificacao ORDER BY count(*) DESC
         """).fetchall()
     ]
 
     # a chave carrega o CNPJ do emitente nas posições 7 a 20; não é preciso
     # abrir o XML de novo para saber de quem ele é
     estabelecimentos = [c for (c,) in con.execute(
-        "SELECT DISTINCT cnpj FROM por_documento "
+        "SELECT DISTINCT cnpj FROM efd "
         "WHERE cnpj IS NOT NULL AND cnpj <> '' ORDER BY 1").fetchall()]
     emitentes = [c for (c,) in con.execute(
         "SELECT DISTINCT substr(chave, 7, 14) FROM entregues ORDER BY 1"
