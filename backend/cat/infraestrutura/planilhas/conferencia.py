@@ -80,6 +80,12 @@ COLUNAS_SEM_DOCUMENTO = (
     # quantas vezes a chave apareceu na EFD. 1 é o normal; 2 pode ser a nota
     # escriturada em duas filiais (legítimo) ou o mesmo arquivo importado duas
     # vezes (não). Sem esta coluna, quem baixa não tinha como ver a diferença.
+    #
+    # É contagem e sai como "1,00", porque o tipo é "numero" e não
+    # "numero_inteiro". Fica assim de propósito: a planilha já circula desta
+    # forma e trocar o tipo mudaria o arquivo que o pessoal usa. Decidido em
+    # 12/09/2026 — se for para mudar um dia, muda nas duas listas ao mesmo
+    # tempo, aqui e em COLUNAS_CONFERIDAS.
     Coluna("ocorrencias", "Ocorrências na EFD", "numero", 12),
     # o que fazer com a linha. Vem primeiro na ordenação do parquet, então
     # quem abre a planilha já cai no que há para cobrar
@@ -103,6 +109,8 @@ COLUNAS_CONFERIDAS = (
     Coluna("emitente", "Emitente", "texto", 14),
     Coluna("participante", "Cód. participante", "texto", 18),
     Coluna("situacao", "Situação", "texto", 10),
+    # "numero" e não "numero_inteiro" de propósito: ver a nota em
+    # COLUNAS_SEM_DOCUMENTO. As duas listas mudam juntas ou não mudam.
     Coluna("ocorrencias", "Ocorrências na EFD", "numero", 12),
     Coluna("origem", "Origem do documento", "texto", 20),
     Coluna("arquivo_do_documento", "Arquivo do documento", "texto", 44),
