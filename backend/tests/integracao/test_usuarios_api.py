@@ -235,3 +235,94 @@ class TestDesbloqueio:
         r = cliente.post(f"/api/usuarios/{alvo['id']}/desbloquear", headers=gestor)
         assert r.status_code == 200
         assert r.json()["tentativas_falhas"] == 0
+
+
+class TestAcessoAEmpresas:
+    """De onde vem o escopo de visibilidade.
+
+    Antes desta rota a alocação só nascia de quem cadastrava a empresa pelo
+    SPED — e os outros ficavam sem acesso a nada, sem caminho para ganhá-lo.
+    """
+
+    @pytest.fixture(scope="class")
+    def empresa_id(self, cliente):
+        r = cliente.post("/api/empresas", headers=cab(cliente, "diretor"), json={
+            "cnpj_raiz": "12345678", "cnpj_matriz": "12345678000195",
+            "razao_social": "EMPRESA DO ACESSO", "uf": "SP",
+            "inscricao_estadual": "123456789012",
+        })
+        assert r.status_code in (201, 409), r.text
+        lista = cliente.get("/api/empresas", headers=cab(cliente, "diretor")).json()
+        return next(e["id"] for e in lista if e["cnpj_raiz"] == "12345678")
+
+    def test_lista_todas_as_empresas_marcando_as_que_alcanca(self, cliente, empresa_id):
+        r = cliente.get(f"/api/usuarios/{id_de(cliente, 'ana')}/empresas",
+                        headers=cab(cliente, "diretor"))
+        assert r.status_code == 200, r.text
+        alvo = next(e for e in r.json() if e["empresa_id"] == empresa_id)
+        assert alvo["tem_acesso"] is False
+        assert alvo["razao_social"] == "EMPRESA DO ACESSO"
+
+    def test_conceder_e_a_pessoa_passa_a_enxergar(self, cliente, empresa_id):
+        alvo = id_de(cliente, "ana")
+        r = cliente.put(f"/api/usuarios/{alvo}/empresas",
+                        headers=cab(cliente, "diretor"),
+                        json={"empresas": [empresa_id]})
+        assert r.status_code == 200, r.text
+        assert r.json()["concedidas"] == ["EMPRESA DO ACESSO"]
+        assert r.json()["encerradas"] == []
+
+        assert empresa_id in _empresas_de(cliente, "ana")
+
+    def test_encerrar_tira_o_acesso_sem_apagar_a_linha(self, cliente, empresa_id):
+        from sqlalchemy import text  # noqa: PLC0415
+
+        from cat.infraestrutura.repositorios.banco import Sessao  # noqa: PLC0415
+
+        alvo = id_de(cliente, "ana")
+        r = cliente.put(f"/api/usuarios/{alvo}/empresas",
+                        headers=cab(cliente, "diretor"), json={"empresas": []})
+        assert r.status_code == 200, r.text
+        assert r.json()["encerradas"] == ["EMPRESA DO ACESSO"]
+
+        assert empresa_id not in _empresas_de(cliente, "ana")
+
+        # a linha fica, com fim preenchido: quem tinha acesso em março
+        # continua respondível meses depois
+        with Sessao() as s:
+            n = s.execute(text(
+                "SELECT count(*) FROM alocacao WHERE usuario_id=:u "
+                "AND empresa_id=:e AND fim IS NOT NULL"
+            ), {"u": alvo, "e": empresa_id}).scalar()
+        assert n == 1
+
+    def test_ninguem_tira_o_proprio_acesso(self, cliente, empresa_id):
+        meu_id = id_de(cliente, "diretor")
+        # garante que o diretor tem ao menos uma empresa para tentar tirar
+        cliente.put(f"/api/usuarios/{meu_id}/empresas",
+                    headers=cab(cliente, "diretor"), json={"empresas": [empresa_id]})
+        r = cliente.put(f"/api/usuarios/{meu_id}/empresas",
+                        headers=cab(cliente, "diretor"), json={"empresas": []})
+        assert r.status_code == 422
+        assert "próprio acesso" in r.json()["detail"]
+
+    def test_empresa_inexistente_e_recusada(self, cliente):
+        r = cliente.put(f"/api/usuarios/{id_de(cliente, 'ana')}/empresas",
+                        headers=cab(cliente, "diretor"),
+                        json={"empresas": [999999]})
+        assert r.status_code == 422
+        assert "Empresa não encontrada" in r.json()["detail"]
+
+    def test_quem_nao_e_gestor_nao_mexe(self, cliente, empresa_id):
+        # `ana` teve a senha mexida por testes anteriores; o que importa aqui
+        # é o papel, e para isso basta um token de analista qualquer
+        r = cliente.put(f"/api/usuarios/{id_de(cliente, 'ana')}/empresas",
+                        headers={"Authorization": "Bearer invalido"},
+                        json={"empresas": [empresa_id]})
+        assert r.status_code == 401
+
+
+def _empresas_de(cliente, nome: str) -> list[int]:
+    """As empresas que a pessoa alcança, lidas pela listagem do gestor."""
+    lista = cliente.get("/api/usuarios", headers=cab(cliente, "diretor")).json()
+    return next(u["empresas"] for u in lista if u["usuario"] == nome)

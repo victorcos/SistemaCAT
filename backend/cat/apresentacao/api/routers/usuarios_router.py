@@ -34,6 +34,14 @@ from cat.dominio.acesso.usuario import (
     Usuario,
 )
 from cat.infraestrutura.auth.senha import SenhasArgon2
+from cat.aplicacao.casos_de_uso.alocar_em_empresas import (
+    EmpresaInexistente,
+    NaoPodeAlocar,
+    NaoPodeTirarDeSi,
+    UsuarioNaoEncontrado as AlvoDeAlocacaoNaoEncontrado,
+    definir as definir_acesso_a_empresas,
+    listar as listar_empresas_do_usuario,
+)
 from cat.infraestrutura.repositorios.banco import obter_sessao
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from cat.log import contexto, obter_log
@@ -105,6 +113,25 @@ class PedidoDados(BaseModel):
     email: str
 
 
+class PedidoDeAcesso(BaseModel):
+    """As empresas que a pessoa deve alcançar depois desta chamada."""
+
+    empresas: list[int]
+
+
+class AcessoDto(BaseModel):
+    empresa_id: int
+    razao_social: str
+    uf: str | None = None
+    tem_acesso: bool
+    desde: str | None = None
+
+
+class MudancaDeAcessoDto(BaseModel):
+    concedidas: list[str]
+    encerradas: list[str]
+
+
 class PedidoSituacao(BaseModel):
     ativo: bool
 
@@ -140,6 +167,12 @@ def _resumo(u: Usuario) -> UsuarioResumo:
 
 
 def _traduzir(erro: Exception) -> HTTPException:
+    if isinstance(erro, NaoPodeAlocar):
+        return HTTPException(status.HTTP_403_FORBIDDEN, str(erro))
+    if isinstance(erro, AlvoDeAlocacaoNaoEncontrado):
+        return HTTPException(status.HTTP_404_NOT_FOUND, str(erro))
+    if isinstance(erro, (NaoPodeTirarDeSi, EmpresaInexistente)):
+        return HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro))
     """Erro de domínio vira resposta HTTP. A regra fica no domínio; aqui só a
     tradução do código."""
     if isinstance(erro, UsuarioNaoEncontrado):
@@ -242,6 +275,59 @@ def alterar_papel(
             )
         except Exception as erro:
             raise _traduzir(erro) from erro
+
+
+# ---------------------------------------------------------------------------
+# Acesso às empresas
+#
+# É daqui que sai o escopo de visibilidade: `Usuario.empresas` são as
+# alocações vigentes, e toda consulta a dado fiscal passa por elas. Até esta
+# rota existir, a alocação só nascia de quem cadastrava a empresa pelo SPED —
+# e os demais ficavam sem acesso a nada, sem caminho para ganhá-lo.
+# ---------------------------------------------------------------------------
+@router.get("/{alvo_id}/empresas", response_model=list[AcessoDto])
+def listar_acesso(
+    alvo_id: int,
+    gestor: SoGestor,
+    sessao: Annotated[Session, Depends(obter_sessao)],
+) -> list[AcessoDto]:
+    """Todas as empresas, marcando quais esta pessoa alcança hoje."""
+    try:
+        return [
+            AcessoDto(
+                empresa_id=a.empresa_id, razao_social=a.razao_social, uf=a.uf,
+                tem_acesso=a.tem_acesso,
+                desde=a.desde.isoformat() if a.desde else None,
+            )
+            for a in listar_empresas_do_usuario(alvo_id, sessao)
+        ]
+    except Exception as erro:
+        raise _traduzir(erro) from erro
+
+
+@router.put("/{alvo_id}/empresas", response_model=MudancaDeAcessoDto)
+def definir_acesso(
+    alvo_id: int,
+    pedido: PedidoDeAcesso,
+    gestor: SoGestor,
+    sessao: Annotated[Session, Depends(obter_sessao)],
+) -> MudancaDeAcessoDto:
+    """Faz o acesso ser exatamente esta lista de empresas.
+
+    Tirar acesso não apaga a alocação: encerra (`fim`), porque quem tinha
+    acesso a um dado em determinado mês precisa continuar respondível.
+    """
+    with contexto(etapa="alocar_em_empresas", por_usuario_id=gestor.id,
+                  alvo_id=alvo_id):
+        try:
+            mudou = definir_acesso_a_empresas(
+                alvo_id, set(pedido.empresas), gestor, sessao
+            )
+        except Exception as erro:
+            raise _traduzir(erro) from erro
+    return MudancaDeAcessoDto(
+        concedidas=mudou.concedidas, encerradas=mudou.encerradas
+    )
 
 
 @router.patch("/{alvo_id}/dados", response_model=UsuarioResumo)

@@ -47,6 +47,30 @@ export const alterarCargo = (id: number, cargo: Cargo) =>
 export const definirSituacao = (id: number, ativo: boolean) =>
   alterar<UsuarioResumo>(id, "situacao", { ativo });
 
+/** As empresas que a pessoa alcança — e todas as outras, para conceder. */
+export interface AcessoAEmpresa {
+  empresa_id: number;
+  razao_social: string;
+  uf: string | null;
+  tem_acesso: boolean;
+  desde: string | null;
+}
+
+export const lerAcessoAEmpresas = (id: number) =>
+  chamar<AcessoAEmpresa[]>(`/usuarios/${id}/empresas`);
+
+/** Faz o acesso ser exatamente esta lista. Tirar não apaga a alocação:
+ *  encerra, para o histórico continuar respondível. */
+export const definirAcessoAEmpresas = (id: number, empresas: number[]) =>
+  chamar<{ concedidas: string[]; encerradas: string[] }>(
+    `/usuarios/${id}/empresas`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ empresas }),
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+
 export const desbloquear = (id: number) =>
   chamar<UsuarioResumo>(`/usuarios/${id}/desbloquear`, { method: "POST" });
 

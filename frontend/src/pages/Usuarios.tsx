@@ -29,7 +29,9 @@ import {
 } from "@/components/ui/Pagina";
 import {
   IconeChave,
+  IconeConfirma,
   IconeCopiar,
+  IconeEmpresa,
   IconeDesativar,
   IconeDesbloquear,
   IconeEditar,
@@ -50,10 +52,13 @@ import {
   alterarDados,
   alterarPapel,
   criarUsuario,
+  definirAcessoAEmpresas,
   definirSituacao,
   desbloquear,
+  lerAcessoAEmpresas,
   listarUsuarios,
   redefinirSenha,
+  type AcessoAEmpresa,
 } from "@/services/usuarios";
 import type { Cargo, Papel, UsuarioResumo } from "@/types/auth";
 import type { ErroApi } from "@/types/erro";
@@ -133,6 +138,7 @@ export default function Usuarios() {
   const [flash, setFlash] = useState<Flash | null>(null);
   const [criando, setCriando] = useState(false);
   const [editando, setEditando] = useState<UsuarioResumo | null>(null);
+  const [dandoAcesso, setDandoAcesso] = useState<UsuarioResumo | null>(null);
   const [ocupado, setOcupado] = useState<number | null>(null);
 
   const carregar = useCallback(async () => {
@@ -316,6 +322,7 @@ export default function Usuarios() {
                   souEu={u.id === eu.id}
                   ocupado={ocupado === u.id}
                   aoEditar={() => setEditando(u)}
+                  aoDarAcesso={() => setDandoAcesso(u)}
                   aoRedefinir={() => aoRedefinir(u)}
                   aoAlternarSituacao={() => aoAlternarSituacao(u)}
                   aoDesbloquear={() => aoDesbloquear(u)}
@@ -336,6 +343,21 @@ export default function Usuarios() {
             texto: "Entregue a senha provisória à pessoa. A troca é obrigatória no primeiro acesso, e a senha não é exibida de novo.",
             segredo: senha,
           });
+          carregar();
+        }}
+      />
+
+      <ModalDeAcesso
+        usuario={dandoAcesso}
+        souEu={dandoAcesso?.id === eu.id}
+        aoFechar={() => setDandoAcesso(null)}
+        aoSalvo={(mudanca) => {
+          setDandoAcesso(null);
+          const partes = [
+            mudanca.concedidas.length && `${mudanca.concedidas.length} concedida(s)`,
+            mudanca.encerradas.length && `${mudanca.encerradas.length} encerrada(s)`,
+          ].filter(Boolean);
+          if (partes.length) toast.sucesso("Acesso atualizado", partes.join(" · "));
           carregar();
         }}
       />
@@ -443,6 +465,7 @@ function Linha({
   souEu,
   ocupado,
   aoEditar,
+  aoDarAcesso,
   aoRedefinir,
   aoAlternarSituacao,
   aoDesbloquear,
@@ -451,6 +474,7 @@ function Linha({
   souEu: boolean;
   ocupado: boolean;
   aoEditar: () => void;
+  aoDarAcesso: () => void;
   aoRedefinir: () => void;
   aoAlternarSituacao: () => void;
   aoDesbloquear: () => void;
@@ -519,6 +543,19 @@ function Linha({
           tom="destaque"
           disabled={ocupado}
           onClick={aoEditar}
+        />
+        <BotaoIcone
+          icone={IconeEmpresa}
+          rotulo={
+            u.empresas.length === 0
+              ? "Sem acesso a nenhuma empresa — conceder"
+              : `Acesso a ${u.empresas.length} empresa(s)`
+          }
+          // sem empresa a pessoa não enxerga trabalho nenhum: o botão chama
+          // atenção em vez de esperar que alguém descubra
+          tom={u.empresas.length === 0 ? "perigo" : "neutro"}
+          disabled={ocupado}
+          onClick={aoDarAcesso}
         />
         <BotaoIcone
           icone={IconeChave}
@@ -776,6 +813,175 @@ function ModalEditar({
           {(props) => <Combobox {...props} valor={cargo} opcoes={OPCOES_DE_CARGO} aoMudar={setCargo} />}
         </Campo>
       </form>
+    </Modal>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* modal: acesso às empresas                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A que empresas esta pessoa tem acesso.
+ *
+ * É daqui que sai o escopo de visibilidade do sistema: sem alocação, a
+ * pessoa entra e não vê trabalho nenhum. Até esta tela existir, a alocação
+ * só nascia de quem cadastrava a empresa pelo SPED.
+ */
+function ModalDeAcesso({
+  usuario,
+  souEu,
+  aoFechar,
+  aoSalvo,
+}: {
+  usuario: UsuarioResumo | null;
+  souEu: boolean;
+  aoFechar: () => void;
+  aoSalvo: (mudanca: { concedidas: string[]; encerradas: string[] }) => void;
+}) {
+  const [empresas, setEmpresas] = useState<AcessoAEmpresa[] | null>(null);
+  const [escolhidas, setEscolhidas] = useState<number[]>([]);
+  const [busca, setBusca] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    if (!usuario) return;
+    setEmpresas(null);
+    setBusca("");
+    setErro(null);
+    lerAcessoAEmpresas(usuario.id)
+      .then((lista) => {
+        setEmpresas(lista);
+        setEscolhidas(lista.filter((e) => e.tem_acesso).map((e) => e.empresa_id));
+      })
+      .catch((e) => setErro(comoErro(e).message));
+  }, [usuario]);
+
+  const visiveis = (empresas ?? []).filter((e) =>
+    e.razao_social.toLocaleLowerCase("pt-BR").includes(busca.toLocaleLowerCase("pt-BR")),
+  );
+  const originais = new Set(
+    (empresas ?? []).filter((e) => e.tem_acesso).map((e) => e.empresa_id),
+  );
+  const mudou =
+    escolhidas.length !== originais.size ||
+    escolhidas.some((id) => !originais.has(id));
+
+  async function salvar() {
+    if (!usuario) return;
+    setEnviando(true);
+    setErro(null);
+    try {
+      aoSalvo(await definirAcessoAEmpresas(usuario.id, escolhidas));
+    } catch (e) {
+      setErro(comoErro(e).message);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <Modal
+      aberto={usuario !== null}
+      aoFechar={aoFechar}
+      tamanho="md"
+      titulo={`Acesso às empresas de ${usuario?.nome_exibicao ?? ""}`}
+      sub="Sem empresa, a pessoa entra no sistema e não vê trabalho nenhum. Tirar o acesso não apaga o histórico: ele registra até quando ela teve."
+      rodape={
+        <>
+          <p className={cn("m-0 mr-auto text-xs", erro ? "text-erro" : "text-texto-fraco")}>
+            {erro ??
+              (souEu
+                ? "Você não pode tirar o seu próprio acesso — peça a outro gestor."
+                : `${escolhidas.length} de ${empresas?.length ?? 0} empresa(s)`)}
+          </p>
+          <Botao variante="fantasma" onClick={aoFechar} disabled={enviando}>
+            Cancelar
+          </Botao>
+          <Botao
+            onClick={salvar}
+            carregando={enviando}
+            disabled={!mudou}
+            className="shadow-acao"
+          >
+            Salvar acesso
+          </Botao>
+        </>
+      }
+    >
+      {usuario?.papel === "dev" && (
+        <Aviso tom="atencao" className="mb-4">
+          Contas <strong>dev</strong> enxergam todas as empresas por definição do papel —
+          alocação aqui não muda nada para elas.
+        </Aviso>
+      )}
+
+      {empresas === null ? (
+        <Carregando texto="Carregando empresas…" />
+      ) : empresas.length === 0 ? (
+        <Vazio titulo="Nenhuma empresa cadastrada ainda">
+          O cadastro de empresa começa pelo SPED, na tela de Cadastro.
+        </Vazio>
+      ) : (
+        <>
+          {empresas.length > 8 && (
+            <div className="mb-3">
+              <Busca valor={busca} aoMudar={setBusca} placeholder="Buscar empresa" />
+            </div>
+          )}
+          <ul className="m-0 flex max-h-[340px] list-none flex-col gap-1.5 overflow-y-auto p-0">
+            {visiveis.map((e) => {
+              const marcada = escolhidas.includes(e.empresa_id);
+              return (
+                <li key={e.empresa_id}>
+                  <label
+                    className={cn(
+                      "flex cursor-pointer items-center gap-3 rounded-raio-g border px-3.5 py-2.5",
+                      "transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-borda-foco",
+                      marcada
+                        ? "border-laranja-500/45 bg-laranja-500/10"
+                        : "border-borda bg-superficie-vidro hover:border-texto-fraco",
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={marcada}
+                      onChange={() =>
+                        setEscolhidas((atuais) =>
+                          atuais.includes(e.empresa_id)
+                            ? atuais.filter((i) => i !== e.empresa_id)
+                            : [...atuais, e.empresa_id],
+                        )
+                      }
+                      className="sr-only"
+                    />
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border",
+                        marcada
+                          ? "border-marca-laranja bg-marca-laranja text-acao-texto"
+                          : "border-texto-fraco",
+                      )}
+                    >
+                      {marcada && <IconeConfirma size={11} strokeWidth={3} />}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm text-texto">
+                      {e.razao_social}
+                    </span>
+                    {e.uf && (
+                      <span className="shrink-0 rounded border border-borda px-1.5 py-0.5 text-[11px] font-bold text-texto-fraco">
+                        {e.uf}
+                      </span>
+                    )}
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
     </Modal>
   );
 }

@@ -150,3 +150,24 @@ responsavel, responsavel_id, comentarios
 tela mostra gente, e buscar cada nome depois seria uma consulta por cartão.
 São campos diferentes de propósito — quem criou não muda nunca; quem responde
 muda a cada sucessão.
+
+### Acesso às empresas (escopo de visibilidade)
+
+Duas rotas, **só para gestor e dev**, na tela de Usuários:
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `GET` | `/api/usuarios/{id}/empresas` | todas as empresas, com `tem_acesso` e `desde` |
+| `PUT` | `/api/usuarios/{id}/empresas` | `{"empresas": [1, 3]}` — faz o acesso ser exatamente essa lista |
+
+A resposta do `PUT` diz o que mudou: `{"concedidas": [...], "encerradas": [...]}`,
+com os nomes das empresas.
+
+**Tirar acesso não apaga a alocação** — preenche `fim` e `motivo_saida`, como
+o modelo pede desde o começo: é o que permite responder, meses depois, quem
+tinha acesso a um dado em determinado mês. Alocar de novo cria linha nova, e
+o histórico fica com as duas passagens.
+
+**Ninguém tira o próprio acesso** (422): evita alguém se trancar para fora por
+engano. Conta `dev` ignora o escopo por definição do papel — alocação nela não
+muda nada, e a tela avisa.

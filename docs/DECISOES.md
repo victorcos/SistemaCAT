@@ -1320,3 +1320,33 @@ Fica anotado o que isto revelou: **alocar pessoa a empresa não tem tela**. Os
 três gestores reais do sistema não enxergam empresa alguma. Enquanto não
 houver essa tela, a sucessão é o único caminho para dar acesso — o que é
 pouco.
+
+---
+
+## 2026-09-12 — Alocar pessoa a empresa ganhou tela
+
+**O que faltava.** O escopo de visibilidade do sistema sai das alocações:
+`Usuario.empresas` são as vigentes, e toda consulta a dado fiscal passa por
+`exigir_empresa`. Só que a alocação **só nascia de um jeito** — quem cadastra
+a empresa pelo SPED fica alocado nela. Não havia como dar acesso a mais
+ninguém. No banco real isso ficou visível: dos três gestores, um tinha uma
+alocação e dois não tinham nenhuma; entravam no sistema e não viam trabalho
+algum.
+
+**A tela.** Na lista de usuários, um botão por linha abre *Acesso às
+empresas*: todas as empresas com caixa de seleção, marcando as que a pessoa
+alcança. O botão fica **vermelho quando a pessoa não tem empresa nenhuma** —
+sem isso, o problema continuaria invisível até alguém reclamar que não vê
+nada.
+
+**Tirar acesso não apaga a alocação.** Preenche `fim` e `motivo_saida`, como
+o modelo pedia desde o início e ninguém tinha exercitado. Quem tinha acesso a
+um dado em março continua respondível em setembro.
+
+**Ninguém tira o próprio acesso** — mesma família da regra que impede alguém
+de se desativar. Para conta `dev` a tela avisa que o papel já enxerga todas,
+e que alocação ali não muda nada.
+
+Com isto, a sucessão deixa de ser o único caminho para conceder acesso — ela
+continua concedendo, porque passar o trabalho implica passar o acesso, mas
+agora é atalho e não gambiarra.

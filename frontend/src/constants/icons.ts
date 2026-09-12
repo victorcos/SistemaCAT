@@ -29,6 +29,7 @@ export {
   // navegação e controles
   House as IconeInicio,
   Users as IconeUsuarios,
+  Building2 as IconeEmpresa,
   Search as IconeBusca,
   ChevronDown as IconeAbrir,
   ChevronUp as IconeFechar2,
