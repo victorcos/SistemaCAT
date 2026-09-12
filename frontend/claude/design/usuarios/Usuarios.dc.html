@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<![CDATA[<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #070c18; }
+    body { font-family: "Plus Jakarta Sans", "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #f2971d; text-decoration: none; }
+    a:hover { color: #ffb34d; }
+    input, select, button { font-family: inherit; }
+    select option { background: #0f1729; color: #e8edf7; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 99px; }
+    @keyframes dcFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes dcSweep { 0% { transform: translateX(-110%); } 100% { transform: translateX(210%); } }
+    @keyframes dcPulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; background: radial-gradient(900px 500px at 18% -10%, rgba(242,151,29,.10), transparent 60%), radial-gradient(900px 600px at 90% 0%, rgba(37,99,235,.14), transparent 65%), #070c18; color: #e8edf7;">
+
+  <aside style="width: 244px; flex: 0 0 244px; border-right: 1px solid rgba(255,255,255,.07); background: linear-gradient(180deg, rgba(12,19,36,.9), rgba(8,13,25,.9)); display: flex; flex-direction: column; padding: 22px 16px; gap: 28px; position: sticky; top: 0; height: 100vh;">
+    <div style="display: flex; align-items: center; gap: 11px; padding: 0 6px;">
+      <div style="width: 38px; height: 38px; border-radius: 11px; background: linear-gradient(140deg, #f2971d, #d9741a); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 22px rgba(242,151,29,.28);">
+        <div style="width: 18px; height: 18px; display: flex; gap: 3px; transform: skewX(-14deg);">
+          <div style="flex: 1; background: #0b1120; border-radius: 1px;"></div>
+          <div style="flex: 1; background: rgba(11,17,32,.55); border-radius: 1px;"></div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <div style="font-size: 20px; font-weight: 800; letter-spacing: .08em; line-height: 1;">BMS</div>
+        <div style="font-size: 8px; letter-spacing: .22em; color: #7e8fad; font-weight: 600;">CONSULTORIA TRIBUTÁRIA</div>
+      </div>
+    </div>
+
+    <nav style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 10px; letter-spacing: .16em; color: #5f7191; font-weight: 700; padding: 0 10px 8px;">NAVEGAÇÃO</div>
+      <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;">
+        <span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Início
+      </a>
+      <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;">
+        <span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Cadastro
+      </a>
+      <div style="position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 700; color: #fff; background: linear-gradient(90deg, rgba(242,151,29,.16), rgba(242,151,29,.02)); border: 1px solid rgba(242,151,29,.28); overflow: hidden;">
+        <span style="position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: #f2971d;"></span>
+        <span style="width: 6px; height: 6px; border-radius: 99px; background: #f2971d; box-shadow: 0 0 10px #f2971d;"></span>Usuários
+      </div>
+    </nav>
+
+    <div style="margin-top: auto; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.06); background: rgba(255,255,255,.02);">
+      <div style="font-size: 11px; color: #6d7f9d; font-weight: 600;">Sistema CAT</div>
+      <div style="font-size: 11px; color: #4d5d79; margin-top: 3px;">sessão não comercial</div>
+    </div>
+  </aside>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+
+    <header style="display: flex; align-items: center; gap: 14px; padding: 16px 28px; border-bottom: 1px solid rgba(255,255,255,.07); background: rgba(8,13,25,.72); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(140deg, #1e3a8a, #0f1e3f); border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #cfe0ff;">DI</div>
+        <div style="font-size: 14px; font-weight: 700;">Diretor</div>
+      </div>
+      <span style="font-size: 10px; font-weight: 700; letter-spacing: .1em; padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); color: #c6d4ea;">GESTOR</span>
+      <span style="font-size: 13px; color: #7b8dab;">1 empresa</span>
+      <div style="flex: 1;"></div>
+      <button style="padding: 9px 18px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dce6f7; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .18s;" style-hover="background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.4); color: #fecaca;">Sair</button>
+    </header>
+
+    <main style="padding: 28px; display: flex; flex-direction: column; gap: 20px; max-width: 1400px; width: 100%;">
+
+      <section style="position: relative; overflow: hidden; border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: linear-gradient(120deg, rgba(18,27,48,.9), rgba(10,16,31,.9)); padding: 24px 26px;">
+        <div style="position: absolute; inset: 0; pointer-events: none; background: radial-gradient(420px 160px at 8% 0%, rgba(242,151,29,.16), transparent 70%);"></div>
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 1px; overflow: hidden;">
+          <div style="width: 40%; height: 100%; background: linear-gradient(90deg, transparent, #f2971d, transparent); animation: dcSweep 5.5s linear infinite;"></div>
+        </div>
+        <div style="position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px;">
+          <div style="flex: 1; min-width: 280px;">
+            <div style="font-size: 11px; font-weight: 700; letter-spacing: .18em; color: #f2971d;">ADMINISTRAÇÃO</div>
+            <h1 style="margin: 8px 0 8px; font-size: 30px; font-weight: 800; letter-spacing: -.02em;">Usuários</h1>
+            <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #8798b6; max-width: 560px; text-wrap: pretty;">Cadastro e redefinição de senha ficam com gestores. Não há autocadastro nem recuperação por e-mail.</p>
+          </div>
+          <button onClick="{{ openNew }}" style="display: flex; align-items: center; gap: 9px; padding: 13px 22px; border-radius: 12px; border: none; background: linear-gradient(135deg, #f9a72b, #e8801a); color: #121a2c; font-size: 14px; font-weight: 800; cursor: pointer; box-shadow: 0 12px 28px rgba(242,151,29,.3); transition: transform .16s, box-shadow .16s;" style-hover="transform: translateY(-2px); box-shadow: 0 16px 34px rgba(242,151,29,.42);">
+            <span style="font-size: 17px; line-height: 1;">+</span>Novo usuário
+          </button>
+        </div>
+
+        <div style="position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 22px;">
+          <div style="padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.03);">
+            <div style="font-size: 11px; letter-spacing: .12em; color: #7486a5; font-weight: 700;">TOTAL</div>
+            <div style="font-size: 24px; font-weight: 800; margin-top: 4px;">{{ total }}</div>
+          </div>
+          <div style="padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(52,211,153,.18); background: rgba(52,211,153,.06);">
+            <div style="font-size: 11px; letter-spacing: .12em; color: #6ee7b7; font-weight: 700;">ATIVOS</div>
+            <div style="font-size: 24px; font-weight: 800; margin-top: 4px;">{{ ativos }}</div>
+          </div>
+          <div style="padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(240,180,41,.2); background: rgba(240,180,41,.06);">
+            <div style="font-size: 11px; letter-spacing: .12em; color: #fbbf24; font-weight: 700;">SENHA PROVISÓRIA</div>
+            <div style="font-size: 24px; font-weight: 800; margin-top: 4px;">{{ provisorios }}</div>
+          </div>
+          <div style="padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.03);">
+            <div style="font-size: 11px; letter-spacing: .12em; color: #7486a5; font-weight: 700;">INATIVOS</div>
+            <div style="font-size: 24px; font-weight: 800; margin-top: 4px;">{{ inativos }}</div>
+          </div>
+        </div>
+      </section>
+
+      <sc-if value="{{ flash }}">
+        <div style="display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 14px; border: 1px solid rgba(242,151,29,.35); background: linear-gradient(100deg, rgba(242,151,29,.14), rgba(242,151,29,.03)); animation: dcFade .25s ease both;">
+          <div style="width: 34px; height: 34px; border-radius: 10px; background: rgba(242,151,29,.2); display: flex; align-items: center; justify-content: center; font-size: 15px;">🔑</div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 13px; font-weight: 700;">{{ flash.title }}</div>
+            <div style="font-size: 13px; color: #b9c7e0; margin-top: 3px;">{{ flash.body }}</div>
+          </div>
+          <sc-if value="{{ flash.secret }}">
+            <code style="font-family: 'JetBrains Mono', monospace; font-size: 15px; letter-spacing: .06em; padding: 9px 14px; border-radius: 9px; background: rgba(0,0,0,.4); border: 1px dashed rgba(242,151,29,.5); color: #ffd08a;">{{ flash.secret }}</code>
+          </sc-if>
+          <button onClick="{{ dismissFlash }}" style="background: none; border: none; color: #94a5c2; font-size: 18px; cursor: pointer; padding: 4px 8px;" style-hover="color: #fff;">×</button>
+        </div>
+      </sc-if>
+
+      <section style="border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: rgba(13,20,37,.72); overflow: hidden;">
+
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid rgba(255,255,255,.07);">
+          <div style="position: relative; flex: 1; min-width: 220px; max-width: 360px;">
+            <span style="position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: #6b7d9b; font-size: 13px;">⌕</span>
+            <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="Buscar por usuário, nome ou e-mail" style="width: 100%; padding: 11px 14px 11px 32px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); color: #e8edf7; font-size: 13px; outline: none;" style-focus="border-color: rgba(242,151,29,.55); background: rgba(242,151,29,.06);" />
+          </div>
+          <div style="display: flex; gap: 6px; padding: 4px; border-radius: 11px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08);">
+            <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+              <button onClick="{{ t.onClick }}" style="padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: 700; background: {{ t.bg }}; color: {{ t.fg }};">{{ t.label }}</button>
+            </sc-for>
+          </div>
+          <div style="flex: 1;"></div>
+          <div style="font-size: 12px; color: #7486a5; font-weight: 600;">{{ countLabel }}</div>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <div style="min-width: 1080px;">
+            <div style="display: grid; grid-template-columns: 1.5fr 1fr .8fr .9fr 1fr .9fr 1.4fr; gap: 12px; padding: 12px 18px; background: rgba(255,255,255,.025); border-bottom: 1px solid rgba(255,255,255,.06); font-size: 10px; font-weight: 800; letter-spacing: .14em; color: #6f81a0;">
+              <div>NOME</div><div>USUÁRIO</div><div>PAPEL</div><div>CARGO</div><div>SITUAÇÃO</div><div>ÚLTIMO ACESSO</div><div style="text-align: right;">AÇÕES</div>
+            </div>
+
+            <sc-for list="{{ rows }}" as="u" hint-placeholder-count="3">
+              <div style="display: grid; grid-template-columns: 1.5fr 1fr .8fr .9fr 1fr .9fr 1.4fr; gap: 12px; align-items: center; padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,.05); opacity: {{ u.rowOpacity }}; transition: background .16s;" style-hover="background: rgba(255,255,255,.035);">
+                <div style="display: flex; align-items: center; gap: 11px; min-width: 0;">
+                  <div style="width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px; background: {{ u.avatarBg }}; border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #e9f0ff;">{{ u.initials }}</div>
+                  <div style="min-width: 0;">
+                    <div style="font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ u.name }}</div>
+                    <div style="font-size: 12px; color: #7b8dab; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ u.email }}</div>
+                  </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                  <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #c8d6ee; overflow: hidden; text-overflow: ellipsis;">{{ u.username }}</code>
+                  <sc-if value="{{ u.isSelf }}">
+                    <span style="font-size: 9px; font-weight: 800; letter-spacing: .1em; padding: 3px 6px; border-radius: 5px; background: rgba(242,151,29,.16); border: 1px solid rgba(242,151,29,.35); color: #ffbb5c;">VOCÊ</span>
+                  </sc-if>
+                </div>
+
+                <div style="font-size: 13px; font-weight: 600; color: #dbe5f6;">{{ u.role }}</div>
+
+                <div style="font-size: 13px; color: #a9b8d2;">{{ u.position }}</div>
+
+                <div>
+                  <span style="display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: {{ u.statusBg }}; border: 1px solid {{ u.statusBorder }}; color: {{ u.statusFg }};">
+                    <span style="width: 6px; height: 6px; border-radius: 99px; background: {{ u.statusFg }}; animation: dcPulse 2.4s ease-in-out infinite;"></span>{{ u.statusLabel }}
+                  </span>
+                </div>
+
+                <div style="font-size: 13px; color: #93a4c1;">{{ u.lastAccess }}</div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                  <button onClick="{{ u.onEdit }}" title="Editar usuário" aria-label="Editar usuário" style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 9px; background: rgba(242,151,29,.12); border: 1px solid rgba(242,151,29,.34); color: #ffc478; cursor: pointer; transition: all .16s;" style-hover="background: rgba(242,151,29,.22); border-color: rgba(242,151,29,.65); transform: translateY(-1px);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 20h4l11-11a2.5 2.5 0 0 0-3.5-3.5L4.5 16.5 4 20z"></path>
+                      <path d="M13.5 6.5 17.5 10.5"></path>
+                    </svg>
+                  </button>
+                  <button onClick="{{ u.onReset }}" title="Redefinir senha" aria-label="Redefinir senha" style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 9px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #c8d6ee; cursor: pointer; transition: all .16s;" style-hover="background: rgba(242,151,29,.14); border-color: rgba(242,151,29,.45); color: #ffc478; transform: translateY(-1px);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="8.5" cy="8.5" r="4.5"></circle>
+                      <path d="M11.8 11.8 20 20"></path>
+                      <path d="M17 17l-2 2 2 2"></path>
+                    </svg>
+                  </button>
+                  <button onClick="{{ u.onToggle }}" disabled="{{ u.isSelf }}" title="{{ u.toggleLabel }}" aria-label="{{ u.toggleLabel }}" style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 9px; background: transparent; border: 1px solid {{ u.toggleBorder }}; color: {{ u.toggleFg }}; cursor: {{ u.toggleCursor }}; transition: all .16s;" style-hover="background: rgba(255,255,255,.06);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 3v8"></path>
+                      <path d="M6.5 6.5a7.5 7.5 0 1 0 11 0"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </sc-for>
+
+            <sc-if value="{{ empty }}">
+              <div style="padding: 54px 18px; text-align: center; color: #7486a5;">
+                <div style="font-size: 15px; font-weight: 700; color: #b7c5de;">Nenhum usuário encontrado</div>
+                <div style="font-size: 13px; margin-top: 6px;">Ajuste a busca ou o filtro de situação.</div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <sc-if value="{{ showNew }}">
+    <div style="position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-start; justify-content: center; padding: 48px 20px; background: rgba(4,8,16,.66); backdrop-filter: blur(6px); overflow-y: auto;">
+      <div style="width: 100%; max-width: 880px; border-radius: 20px; border: 1px solid rgba(255,255,255,.1); background: linear-gradient(150deg, rgba(19,28,50,.98), rgba(10,16,31,.98)); box-shadow: 0 40px 90px rgba(0,0,0,.6); animation: dcFade .22s ease both;">
+        <div style="padding: 22px 26px; border-bottom: 1px solid rgba(255,255,255,.07); display: flex; align-items: flex-start; gap: 16px;">
+          <div style="flex: 1;">
+            <h2 style="margin: 0; font-size: 20px; font-weight: 800;">Novo usuário</h2>
+            <p style="margin: 7px 0 0; font-size: 13px; color: #8798b6; line-height: 1.5;">A senha é gerada pelo sistema e aparece uma única vez. A troca é obrigatória no primeiro acesso.</p>
+          </div>
+          <button onClick="{{ closeNew }}" style="background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #a9b8d2; width: 32px; height: 32px; border-radius: 9px; font-size: 16px; cursor: pointer;" style-hover="color: #fff; background: rgba(255,255,255,.1);">×</button>
+        </div>
+
+        <div style="padding: 24px 26px; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px;">
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Nome de usuário</label>
+            <input value="{{ form.username }}" onChange="{{ onFormUsername }}" placeholder="ana.silva" style="padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none;" style-focus="border-color: rgba(242,151,29,.55);" />
+            <span style="font-size: 11px; color: #6d7f9d; line-height: 1.45;">Não pode ser alterado depois. Minúsculas, números, ponto, hífen e sublinhado.</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Nome completo</label>
+            <input value="{{ form.name }}" onChange="{{ onFormName }}" placeholder="Ana Silva" style="padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-size: 13px; outline: none;" style-focus="border-color: rgba(242,151,29,.55);" />
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">E-mail</label>
+            <input value="{{ form.email }}" onChange="{{ onFormEmail }}" placeholder="ana.silva@bms.local" style="padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-size: 13px; outline: none;" style-focus="border-color: rgba(242,151,29,.55);" />
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Papel</label>
+            <div data-picker="newRole" style="position: relative;">
+              <button onClick="{{ pNewRole.onToggle }}" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid {{ pNewRole.triggerBorder }}; color: {{ pNewRole.triggerFg }}; font-size: 13px; font-weight: 600; cursor: {{ pNewRole.triggerCursor }}; text-align: left;">
+                <span style="flex: 1;">{{ pNewRole.value }}</span>
+                <span style="font-size: 11px; color: #7f91af;">{{ pNewRole.caret }}</span>
+              </button>
+              <sc-if value="{{ pNewRole.open }}">
+                <div style="position: absolute; z-index: 90; top: calc(100% + 6px); left: 0; right: 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #101a30; box-shadow: 0 22px 48px rgba(0,0,0,.55); overflow: hidden; animation: dcFade .14s ease both;">
+                  <div style="padding: 9px; border-bottom: 1px solid rgba(255,255,255,.07);">
+                    <input ref="{{ pNewRole.focusRef }}" value="{{ pNewRole.query }}" onChange="{{ pNewRole.onQuery }}" placeholder="Buscar…" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #e8edf7; font-size: 12px; outline: none;" style-focus="border-color: rgba(242,151,29,.5);" />
+                  </div>
+                  <div style="max-height: 200px; overflow-y: auto; padding: 6px;">
+                    <sc-for list="{{ pNewRole.options }}" as="o" hint-placeholder-count="3">
+                      <div onClick="{{ o.onSelect }}" style="display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ o.bg }}; color: {{ o.fg }};" style-hover="background: rgba(255,255,255,.06);">
+                        <span style="flex: 1;">{{ o.label }}</span><span style="font-size: 12px;">{{ o.check }}</span>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ pNewRole.empty }}">
+                      <div style="padding: 12px 10px; font-size: 12px; color: #6d7f9d;">Nenhum resultado</div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+            <span style="font-size: 11px; color: #6d7f9d;">{{ roleHint }}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Cargo</label>
+            <div data-picker="newPosition" style="position: relative;">
+              <button onClick="{{ pNewPosition.onToggle }}" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid {{ pNewPosition.triggerBorder }}; color: {{ pNewPosition.triggerFg }}; font-size: 13px; font-weight: 600; cursor: {{ pNewPosition.triggerCursor }}; text-align: left;">
+                <span style="flex: 1;">{{ pNewPosition.value }}</span>
+                <span style="font-size: 11px; color: #7f91af;">{{ pNewPosition.caret }}</span>
+              </button>
+              <sc-if value="{{ pNewPosition.open }}">
+                <div style="position: absolute; z-index: 90; top: calc(100% + 6px); left: 0; right: 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #101a30; box-shadow: 0 22px 48px rgba(0,0,0,.55); overflow: hidden; animation: dcFade .14s ease both;">
+                  <div style="padding: 9px; border-bottom: 1px solid rgba(255,255,255,.07);">
+                    <input ref="{{ pNewPosition.focusRef }}" value="{{ pNewPosition.query }}" onChange="{{ pNewPosition.onQuery }}" placeholder="Buscar…" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #e8edf7; font-size: 12px; outline: none;" style-focus="border-color: rgba(242,151,29,.5);" />
+                  </div>
+                  <div style="max-height: 200px; overflow-y: auto; padding: 6px;">
+                    <sc-for list="{{ pNewPosition.options }}" as="o" hint-placeholder-count="4">
+                      <div onClick="{{ o.onSelect }}" style="display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ o.bg }}; color: {{ o.fg }};" style-hover="background: rgba(255,255,255,.06);">
+                        <span style="flex: 1;">{{ o.label }}</span><span style="font-size: 12px;">{{ o.check }}</span>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ pNewPosition.empty }}">
+                      <div style="padding: 12px 10px; font-size: 12px; color: #6d7f9d;">Nenhum resultado</div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+            <span style="font-size: 11px; color: #6d7f9d;">Posição na empresa. Não define permissão.</span>
+          </div>
+        </div>
+
+        <div style="padding: 18px 26px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,.07);">
+          <div style="flex: 1; min-width: 180px; font-size: 12px; color: {{ errorColor }};">{{ formMessage }}</div>
+          <button onClick="{{ closeNew }}" style="padding: 11px 20px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 13px; font-weight: 700; cursor: pointer;" style-hover="background: rgba(255,255,255,.08);">Cancelar</button>
+          <button onClick="{{ createUser }}" style="padding: 11px 22px; border-radius: 10px; border: none; background: linear-gradient(135deg, #f9a72b, #e8801a); color: #121a2c; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 24px rgba(242,151,29,.28);" style-hover="transform: translateY(-1px);">Criar usuário</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ edit }}">
+    <div style="position: fixed; inset: 0; z-index: 65; display: flex; align-items: flex-start; justify-content: center; padding: 48px 20px; background: rgba(4,8,16,.66); backdrop-filter: blur(6px); overflow-y: auto;">
+      <div style="width: 100%; max-width: 640px; border-radius: 20px; border: 1px solid rgba(255,255,255,.1); background: linear-gradient(150deg, rgba(19,28,50,.98), rgba(10,16,31,.98)); box-shadow: 0 40px 90px rgba(0,0,0,.6); animation: dcFade .22s ease both;">
+        <div style="padding: 22px 26px; border-bottom: 1px solid rgba(255,255,255,.07); display: flex; align-items: flex-start; gap: 16px;">
+          <div style="flex: 1;">
+            <h2 style="margin: 0; font-size: 20px; font-weight: 800;">Editar usuário</h2>
+            <p style="margin: 7px 0 0; font-size: 13px; color: #8798b6;">{{ edit.subtitle }}</p>
+          </div>
+          <button onClick="{{ closeEdit }}" style="background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #a9b8d2; width: 32px; height: 32px; border-radius: 9px; font-size: 16px; cursor: pointer;" style-hover="color: #fff; background: rgba(255,255,255,.1);">×</button>
+        </div>
+
+        <div style="padding: 24px 26px; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px;">
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Nome completo</label>
+            <input value="{{ edit.name }}" onChange="{{ onEditName }}" style="padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-size: 13px; outline: none;" style-focus="border-color: rgba(242,151,29,.55);" />
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">E-mail</label>
+            <input value="{{ edit.email }}" onChange="{{ onEditEmail }}" style="padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-size: 13px; outline: none;" style-focus="border-color: rgba(242,151,29,.55);" />
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Papel</label>
+            <div data-picker="editRole" style="position: relative;">
+              <button onClick="{{ pEditRole.onToggle }}" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid {{ pEditRole.triggerBorder }}; color: {{ pEditRole.triggerFg }}; font-size: 13px; font-weight: 600; cursor: {{ pEditRole.triggerCursor }}; text-align: left;">
+                <span style="flex: 1;">{{ pEditRole.value }}</span>
+                <span style="font-size: 11px; color: #7f91af;">{{ pEditRole.caret }}</span>
+              </button>
+              <sc-if value="{{ pEditRole.open }}">
+                <div style="position: absolute; z-index: 90; top: calc(100% + 6px); left: 0; right: 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #101a30; box-shadow: 0 22px 48px rgba(0,0,0,.55); overflow: hidden; animation: dcFade .14s ease both;">
+                  <div style="padding: 9px; border-bottom: 1px solid rgba(255,255,255,.07);">
+                    <input ref="{{ pEditRole.focusRef }}" value="{{ pEditRole.query }}" onChange="{{ pEditRole.onQuery }}" placeholder="Buscar…" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #e8edf7; font-size: 12px; outline: none;" style-focus="border-color: rgba(242,151,29,.5);" />
+                  </div>
+                  <div style="max-height: 200px; overflow-y: auto; padding: 6px;">
+                    <sc-for list="{{ pEditRole.options }}" as="o" hint-placeholder-count="3">
+                      <div onClick="{{ o.onSelect }}" style="display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ o.bg }}; color: {{ o.fg }};" style-hover="background: rgba(255,255,255,.06);">
+                        <span style="flex: 1;">{{ o.label }}</span><span style="font-size: 12px;">{{ o.check }}</span>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ pEditRole.empty }}">
+                      <div style="padding: 12px 10px; font-size: 12px; color: #6d7f9d;">Nenhum resultado</div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+            <span style="font-size: 11px; color: #6d7f9d;">{{ edit.roleHint }}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Cargo</label>
+            <div data-picker="editPosition" style="position: relative;">
+              <button onClick="{{ pEditPosition.onToggle }}" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid {{ pEditPosition.triggerBorder }}; color: {{ pEditPosition.triggerFg }}; font-size: 13px; font-weight: 600; cursor: {{ pEditPosition.triggerCursor }}; text-align: left;">
+                <span style="flex: 1;">{{ pEditPosition.value }}</span>
+                <span style="font-size: 11px; color: #7f91af;">{{ pEditPosition.caret }}</span>
+              </button>
+              <sc-if value="{{ pEditPosition.open }}">
+                <div style="position: absolute; z-index: 90; top: calc(100% + 6px); left: 0; right: 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #101a30; box-shadow: 0 22px 48px rgba(0,0,0,.55); overflow: hidden; animation: dcFade .14s ease both;">
+                  <div style="padding: 9px; border-bottom: 1px solid rgba(255,255,255,.07);">
+                    <input ref="{{ pEditPosition.focusRef }}" value="{{ pEditPosition.query }}" onChange="{{ pEditPosition.onQuery }}" placeholder="Buscar…" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #e8edf7; font-size: 12px; outline: none;" style-focus="border-color: rgba(242,151,29,.5);" />
+                  </div>
+                  <div style="max-height: 200px; overflow-y: auto; padding: 6px;">
+                    <sc-for list="{{ pEditPosition.options }}" as="o" hint-placeholder-count="4">
+                      <div onClick="{{ o.onSelect }}" style="display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ o.bg }}; color: {{ o.fg }};" style-hover="background: rgba(255,255,255,.06);">
+                        <span style="flex: 1;">{{ o.label }}</span><span style="font-size: 12px;">{{ o.check }}</span>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ pEditPosition.empty }}">
+                      <div style="padding: 12px 10px; font-size: 12px; color: #6d7f9d;">Nenhum resultado</div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+            <span style="font-size: 11px; color: #6d7f9d;">Posição na empresa. Não define permissão.</span>
+          </div>
+        </div>
+
+        <div style="padding: 18px 26px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,.07);">
+          <div style="flex: 1; min-width: 180px; font-size: 12px; color: {{ edit.messageColor }};">{{ edit.message }}</div>
+          <button onClick="{{ closeEdit }}" style="padding: 11px 20px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 13px; font-weight: 700; cursor: pointer;" style-hover="background: rgba(255,255,255,.08);">Cancelar</button>
+          <button onClick="{{ saveEdit }}" style="padding: 11px 22px; border-radius: 10px; border: none; background: linear-gradient(135deg, #f9a72b, #e8801a); color: #121a2c; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 24px rgba(242,151,29,.28);" style-hover="transform: translateY(-1px);">Salvar alterações</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ confirm }}">
+    <div style="position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(4,8,16,.7); backdrop-filter: blur(6px);">
+      <div style="width: 100%; max-width: 440px; border-radius: 18px; border: 1px solid rgba(255,255,255,.1); background: linear-gradient(150deg, rgba(19,28,50,.98), rgba(10,16,31,.98)); box-shadow: 0 30px 70px rgba(0,0,0,.6); padding: 26px; animation: dcFade .18s ease both;">
+        <div style="width: 40px; height: 40px; border-radius: 12px; background: {{ confirm.iconBg }}; display: flex; align-items: center; justify-content: center; font-size: 18px;">{{ confirm.icon }}</div>
+        <h3 style="margin: 16px 0 8px; font-size: 17px; font-weight: 800;">{{ confirm.title }}</h3>
+        <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #8798b6;">{{ confirm.body }}</p>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px;">
+          <button onClick="{{ closeConfirm }}" style="padding: 10px 18px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 13px; font-weight: 700; cursor: pointer;" style-hover="background: rgba(255,255,255,.08);">Cancelar</button>
+          <button onClick="{{ confirm.onConfirm }}" style="padding: 10px 18px; border-radius: 10px; border: 1px solid {{ confirm.ctaBorder }}; background: {{ confirm.ctaBg }}; color: {{ confirm.ctaFg }}; font-size: 13px; font-weight: 800; cursor: pointer;" style-hover="transform: translateY(-1px);">{{ confirm.ctaLabel }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>]]>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  state = {
+    users: [
+      { id: 1, username: "coordenador", name: "Coordenador", email: "coordenador@bms.local", role: "Gestor", position: "Coordenador", status: "provisoria", lastAccess: "nunca entrou", active: true },
+      { id: 2, username: "diretor", name: "Diretor", email: "diretor@bms.local", role: "Gestor", position: "Diretor", status: "ativo", lastAccess: "11/09/2026, 23:21", active: true, self: true },
+      { id: 3, username: "gerente", name: "Gerente", email: "gerente@bms.local", role: "Gestor", position: "Gerente", status: "provisoria", lastAccess: "nunca entrou", active: true }
+    ],
+    query: "",
+    filter: "Todos",
+    showNew: false,
+    form: { username: "", name: "", email: "", role: "Leitura", position: "Analista" },
+    formError: "",
+    flash: null,
+    confirm: null,
+    edit: null,
+    editError: "",
+    openPicker: null,
+    pickerQuery: "",
+    nextId: 4
+  };
+
+  initials(name) {
+    const p = String(name || "").trim().split(/\s+/);
+    return ((p[0] || "").charAt(0) + (p[1] || "").charAt(0)).toUpperCase() || "–";
+  }
+
+  avatarBg(id) {
+    const hues = [222, 262, 32, 190, 300, 150];
+    const h = hues[id % hues.length];
+    return "linear-gradient(140deg, oklch(0.42 0.09 " + h + "), oklch(0.28 0.06 " + h + "))";
+  }
+
+  genPassword() {
+    const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let s = "";
+    for (let i = 0; i < 10; i++) s += a.charAt(Math.floor(Math.random() * a.length));
+    return s.slice(0, 5) + "-" + s.slice(5);
+  }
+
+  setFilter(f) { this.setState({ filter: f }); }
+
+  componentDidMount() {
+    this._away = e => {
+      if (!this.state.openPicker) return;
+      const el = e.target.closest ? e.target.closest("[data-picker]") : null;
+      if (!el || el.getAttribute("data-picker") !== this.state.openPicker) this.setState({ openPicker: null, pickerQuery: "" });
+    };
+    document.addEventListener("mousedown", this._away, true);
+  }
+
+  componentWillUnmount() { document.removeEventListener("mousedown", this._away, true); }
+
+  picker(key, value, options, onSelect, disabled) {
+    const s = this.state;
+    const open = s.openPicker === key && !disabled;
+    const q = s.pickerQuery.trim().toLowerCase();
+    const list = options.filter(o => !q || o.toLowerCase().indexOf(q) >= 0);
+    return {
+      value: value,
+      open: open,
+      query: s.pickerQuery,
+      disabled: !!disabled,
+      caret: open ? "▴" : "▾",
+      triggerBorder: disabled ? "rgba(255,255,255,.06)" : (open ? "rgba(242,151,29,.55)" : "rgba(255,255,255,.11)"),
+      triggerFg: disabled ? "#5a6b88" : "#e8edf7",
+      triggerCursor: disabled ? "not-allowed" : "pointer",
+      empty: list.length === 0,
+      onToggle: () => { if (!disabled) this.setState(st => ({ openPicker: st.openPicker === key ? null : key, pickerQuery: "" })); },
+      onQuery: e => this.setState({ pickerQuery: e.target.value }),
+      focusRef: el => { if (el && open) setTimeout(() => el.focus(), 0); },
+      options: list.map(o => ({
+        label: o,
+        bg: o === value ? "rgba(242,151,29,.14)" : "transparent",
+        fg: o === value ? "#ffc478" : "#cfdbef",
+        check: o === value ? "✓" : "",
+        onSelect: () => { this.setState({ openPicker: null, pickerQuery: "" }); onSelect(o); }
+      }))
+    };
+  }
+
+  openEdit(u) {
+    this.setState({ edit: { id: u.id, username: u.username, name: u.name, email: u.email, role: u.role, position: u.position, isSelf: !!u.self }, editError: "" });
+  }
+
+  editField(key) { return e => this.setState(s => ({ edit: Object.assign({}, s.edit, { [key]: e.target.value }), editError: "" })); }
+
+  saveEdit = () => {
+    const e = this.state.edit;
+    if (!e) return;
+    if (!String(e.name).trim()) return this.setState({ editError: "Informe o nome completo." });
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.email)) return this.setState({ editError: "Informe um e-mail válido." });
+    this.setState(s => ({
+      users: s.users.map(u => u.id === e.id ? Object.assign({}, u, { name: e.name, email: e.email, role: e.role, position: e.position }) : u),
+      edit: null,
+      editError: "",
+      flash: { title: e.name + " atualizado", body: "Papel: " + e.role + " · Cargo: " + e.position }
+    }));
+  };
+
+  resetPassword(u) {
+    this.setState({
+      confirm: {
+        icon: "🔑", iconBg: "rgba(242,151,29,.18)",
+        title: "Gerar nova senha provisória para " + u.name + "?",
+        body: "A senha atual deixa de funcionar na hora, e a nova aparece uma única vez.",
+        ctaLabel: "Gerar senha", ctaBg: "linear-gradient(135deg, #f9a72b, #e8801a)", ctaBorder: "transparent", ctaFg: "#121a2c",
+        onConfirm: () => {
+          const secret = this.genPassword();
+          this.setState(s => ({
+            confirm: null,
+            users: s.users.map(x => x.id === u.id ? Object.assign({}, x, { status: "provisoria", lastAccess: "nunca entrou" }) : x),
+            flash: { title: "Senha provisória de " + u.name, body: "Copie agora — ela não será exibida novamente.", secret: secret }
+          }));
+        }
+      }
+    });
+  }
+
+  toggleActive(u) {
+    const off = u.active;
+    this.setState({
+      confirm: {
+        icon: off ? "⏸" : "▶", iconBg: off ? "rgba(239,68,68,.16)" : "rgba(52,211,153,.16)",
+        title: (off ? "Desativar " : "Reativar ") + u.name + "?",
+        body: off ? "O acesso é bloqueado imediatamente. O histórico do usuário é preservado." : "O usuário volta a acessar o sistema com uma senha provisória.",
+        ctaLabel: off ? "Desativar" : "Reativar",
+        ctaBg: off ? "rgba(239,68,68,.16)" : "rgba(52,211,153,.16)",
+        ctaBorder: off ? "rgba(239,68,68,.45)" : "rgba(52,211,153,.45)",
+        ctaFg: off ? "#fecaca" : "#a7f3d0",
+        onConfirm: () => this.setState(s => ({
+          confirm: null,
+          users: s.users.map(x => x.id === u.id ? Object.assign({}, x, { active: !off, status: off ? "inativo" : "provisoria" }) : x),
+          flash: { title: u.name + (off ? " foi desativado" : " foi reativado"), body: off ? "O login está bloqueado a partir de agora." : "Gere uma senha provisória para liberar o primeiro acesso." }
+        }))
+      }
+    });
+  }
+
+  createUser = () => {
+    const f = this.state.form;
+    if (!/^[a-z0-9._-]{3,}$/.test(f.username)) return this.setState({ formError: "Nome de usuário inválido: mínimo 3 caracteres, minúsculas, números, ponto, hífen ou sublinhado." });
+    if (!f.name.trim()) return this.setState({ formError: "Informe o nome completo." });
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) return this.setState({ formError: "Informe um e-mail válido." });
+    if (this.state.users.some(u => u.username === f.username)) return this.setState({ formError: "Esse nome de usuário já existe." });
+    const secret = this.genPassword();
+    this.setState(s => ({
+      users: s.users.concat([{ id: s.nextId, username: f.username, name: f.name, email: f.email, role: f.role, position: f.position, status: "provisoria", lastAccess: "nunca entrou", active: true }]),
+      nextId: s.nextId + 1,
+      showNew: false,
+      formError: "",
+      form: { username: "", name: "", email: "", role: "Leitura", position: "Analista" },
+      flash: { title: "Usuário " + f.username + " criado", body: "Senha provisória — aparece uma única vez. A troca é obrigatória no primeiro acesso.", secret: secret }
+    }));
+  };
+
+  field(key) { return e => this.setState(s => ({ form: Object.assign({}, s.form, { [key]: e.target.value }), formError: "" })); }
+
+  patch(id, key, value) { this.setState(s => ({ users: s.users.map(u => u.id === id ? Object.assign({}, u, { [key]: value }) : u) })); }
+
+  renderVals() {
+    const s = this.state;
+    const q = s.query.trim().toLowerCase();
+    const statusMap = {
+      ativo: { label: "Ativo", fg: "#6ee7b7", bg: "rgba(52,211,153,.1)", border: "rgba(52,211,153,.3)" },
+      provisoria: { label: "Senha provisória", fg: "#fbbf24", bg: "rgba(240,180,41,.1)", border: "rgba(240,180,41,.32)" },
+      inativo: { label: "Inativo", fg: "#94a3b8", bg: "rgba(148,163,184,.1)", border: "rgba(148,163,184,.28)" }
+    };
+    const filtered = s.users.filter(u => {
+      const hitQ = !q || (u.username + " " + u.name + " " + u.email).toLowerCase().indexOf(q) >= 0;
+      const hitF = s.filter === "Todos" || (s.filter === "Ativos" && u.status === "ativo") || (s.filter === "Provisórios" && u.status === "provisoria") || (s.filter === "Inativos" && !u.active);
+      return hitQ && hitF;
+    });
+    const tabs = ["Todos", "Ativos", "Provisórios", "Inativos"].map(label => ({
+      label,
+      bg: s.filter === label ? "rgba(242,151,29,.16)" : "transparent",
+      fg: s.filter === label ? "#ffbb5c" : "#8798b6",
+      onClick: () => this.setFilter(label)
+    }));
+    const ROLES = ["Gestor", "Operação", "Leitura"];
+    const POSITIONS = ["Diretor", "Gerente", "Coordenador", "Analista", "Estagiário", "Outro"];
+    const roleHints = { Gestor: "Cadastra usuários e redefine senhas.", "Operação": "Edita dados, sem gestão de acesso.", Leitura: "Só consulta." };
+
+    return {
+      total: s.users.length,
+      ativos: s.users.filter(u => u.status === "ativo").length,
+      provisorios: s.users.filter(u => u.status === "provisoria").length,
+      inativos: s.users.filter(u => !u.active).length,
+      query: s.query,
+      onQuery: e => this.setState({ query: e.target.value }),
+      tabs,
+      countLabel: filtered.length + (filtered.length === 1 ? " usuário" : " usuários"),
+      empty: filtered.length === 0,
+      rows: filtered.map(u => {
+        const st = statusMap[u.active ? u.status : "inativo"];
+        return {
+          username: u.username, name: u.name, email: u.email, role: u.role, position: u.position,
+          lastAccess: u.lastAccess, isSelf: !!u.self,
+          initials: this.initials(u.name), avatarBg: this.avatarBg(u.id),
+          rowOpacity: u.active ? 1 : 0.62,
+          statusLabel: st.label, statusFg: st.fg, statusBg: st.bg, statusBorder: st.border,
+          toggleLabel: u.active ? "Desativar" : "Reativar",
+          toggleFg: u.self ? "#475569" : (u.active ? "#f87171" : "#6ee7b7"),
+          toggleBorder: u.self ? "rgba(255,255,255,.07)" : (u.active ? "rgba(248,113,113,.35)" : "rgba(52,211,153,.35)"),
+          toggleCursor: u.self ? "not-allowed" : "pointer",
+          onEdit: () => this.openEdit(u),
+          onReset: () => this.resetPassword(u),
+          onToggle: () => { if (!u.self) this.toggleActive(u); }
+        };
+      }),
+      flash: s.flash,
+      dismissFlash: () => this.setState({ flash: null }),
+      showNew: s.showNew,
+      openNew: () => this.setState({ showNew: true, formError: "" }),
+      closeNew: () => this.setState({ showNew: false, formError: "" }),
+      form: s.form,
+      onFormUsername: this.field("username"),
+      onFormName: this.field("name"),
+      onFormEmail: this.field("email"),
+      onFormRole: this.field("role"),
+      onFormPosition: this.field("position"),
+      roleHint: roleHints[s.form.role] || "",
+      formMessage: s.formError || "A senha provisória é exibida após a criação.",
+      errorColor: s.formError ? "#fca5a5" : "#6d7f9d",
+      createUser: this.createUser,
+      edit: s.edit ? Object.assign({}, s.edit, {
+        subtitle: "Nome de usuário " + s.edit.username + " não pode ser alterado.",
+        roleHint: s.edit.isSelf ? "Você não pode alterar seu próprio papel." : (roleHints[s.edit.role] || ""),
+        message: s.editError || "Alterações de papel valem no próximo acesso do usuário.",
+        messageColor: s.editError ? "#fca5a5" : "#6d7f9d"
+      }) : null,
+      onEditName: this.editField("name"),
+      onEditEmail: this.editField("email"),
+      onEditRole: this.editField("role"),
+      onEditPosition: this.editField("position"),
+      pNewRole: this.picker("newRole", s.form.role, ROLES, v => this.setState(st => ({ form: Object.assign({}, st.form, { role: v }), formError: "" }))),
+      pNewPosition: this.picker("newPosition", s.form.position, POSITIONS, v => this.setState(st => ({ form: Object.assign({}, st.form, { position: v }), formError: "" }))),
+      pEditRole: this.picker("editRole", s.edit ? s.edit.role : "", ROLES, v => this.setState(st => ({ edit: Object.assign({}, st.edit, { role: v }) })), s.edit ? s.edit.isSelf : false),
+      pEditPosition: this.picker("editPosition", s.edit ? s.edit.position : "", POSITIONS, v => this.setState(st => ({ edit: Object.assign({}, st.edit, { position: v }) }))),
+      saveEdit: this.saveEdit,
+      closeEdit: () => this.setState({ edit: null, editError: "" }),
+      confirm: s.confirm,
+      closeConfirm: () => this.setState({ confirm: null })
+    };
+  }
+}
+</script>
+</body>
+</html>

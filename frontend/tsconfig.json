@@ -13,7 +13,17 @@
     "isolatedModules": true,
     "noEmit": true,
     "resolveJsonModule": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+
+    // o .tsbuildinfo sai da raiz para nao ser versionado por acidente: com
+    // 'tsc -b', estado de build alheio faz o compilador pular arquivo e o
+    // erro so aparece na maquina de quem nao tem o arquivo
+    "tsBuildInfoFile": "node_modules/.tmp/tsconfig.tsbuildinfo",
+
+    // caminho absoluto '@/' para que mover pasta nao obrigue a reescrever
+    // import relativo em dezenas de arquivos
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] }
   },
   "include": ["src"]
 }

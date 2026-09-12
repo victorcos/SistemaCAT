@@ -1,0 +1,172 @@
+/* ==========================================================================
+   Ponte entre tokens.css e o Tailwind.
+
+   tokens.css continua sendo a UNICA fonte de cor do sistema — e a regra do
+   docs/IDENTIDADE.md. Este arquivo nao redefine paleta nenhuma: so ensina o
+   Tailwind a gerar utilitarias que APONTAM para as variaveis de la.
+
+   O ganho pratico: 'bg-superficie' vira background-color: var(--superficie),
+   e --superficie ja troca sozinha nos blocos de tema claro/escuro de
+   tokens.css. Ou seja, quase nenhuma tela precisa escrever 'escuro:'.
+
+   Preflight fica DE FORA de proposito enquanto houver CSS legado — ver o
+   bloco de imports logo abaixo.
+   ========================================================================== */
+
+/* A ordem das camadas decide quem vence. O legado (pages/*.css e
+   legacy-kit.css) e CSS sem camada, e CSS sem camada vence QUALQUER camada —
+   por isso um utilitario Tailwind nao sobrepoe .botao ou .cartao hoje.
+   Regra de convivencia: componente migrado abandona a classe legada; nunca
+   misturar as duas no mesmo elemento. */
+@layer theme, base, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* O preflight (tailwindcss/preflight.css) NAO entra agora: ele zera margem de
+   h1-h6/p/dl/dd e o background de <button>, o que quebraria as 7 paginas que
+   ainda rodam no CSS legado (o <dl> de Inicio e todo .botao, por exemplo).
+   Ligar so quando nao houver mais nada em pages/*.css. Ate la, a unica
+   regra do preflight que as utilitarias realmente exigem esta em tokens.css:
+   o box-sizing: border-box global. */
+
+/* ---------- tema escuro por atributo ----------
+   tokens.css ja responde a [data-tema="escuro"] e a prefers-color-scheme.
+   Esta variante e para o punhado de casos em que a cor nao cabe num papel
+   semantico e precisa ser dita explicitamente. */
+/* keyframes e utilitarias de animacao do redesenho */
+@import "./animations.css";
+
+@custom-variant escuro (&:where([data-tema="escuro"], [data-tema="escuro"] *));
+
+@theme inline {
+  /* ---------- marca ---------- */
+  --color-marca-azul: var(--marca-azul);
+  --color-marca-laranja: var(--marca-laranja);
+  --color-marca-dourado: var(--marca-dourado);
+  --color-marca-branco: var(--marca-branco);
+
+  /* ---------- escalas derivadas ---------- */
+  --color-azul-900: var(--azul-900);
+  --color-azul-800: var(--azul-800);
+  --color-azul-700: var(--azul-700);
+  --color-azul-600: var(--azul-600);
+  --color-azul-500: var(--azul-500);
+  --color-azul-400: var(--azul-400);
+  --color-azul-300: var(--azul-300);
+  --color-azul-200: var(--azul-200);
+  --color-azul-100: var(--azul-100);
+  --color-azul-050: var(--azul-050);
+
+  --color-laranja-900: var(--laranja-900);
+  --color-laranja-800: var(--laranja-800);
+  --color-laranja-700: var(--laranja-700);
+  --color-laranja-600: var(--laranja-600);
+  --color-laranja-500: var(--laranja-500);
+  --color-laranja-400: var(--laranja-400);
+  --color-laranja-300: var(--laranja-300);
+  --color-laranja-200: var(--laranja-200);
+  --color-laranja-100: var(--laranja-100);
+  --color-laranja-050: var(--laranja-050);
+
+  --color-dourado-800: var(--dourado-800);
+  --color-dourado-700: var(--dourado-700);
+  --color-dourado-600: var(--dourado-600);
+  --color-dourado-500: var(--dourado-500);
+  --color-dourado-400: var(--dourado-400);
+  --color-dourado-300: var(--dourado-300);
+  --color-dourado-200: var(--dourado-200);
+  --color-dourado-100: var(--dourado-100);
+
+  --color-cinza-900: var(--cinza-900);
+  --color-cinza-800: var(--cinza-800);
+  --color-cinza-700: var(--cinza-700);
+  --color-cinza-600: var(--cinza-600);
+  --color-cinza-500: var(--cinza-500);
+  --color-cinza-400: var(--cinza-400);
+  --color-cinza-300: var(--cinza-300);
+  --color-cinza-200: var(--cinza-200);
+  --color-cinza-100: var(--cinza-100);
+  --color-cinza-050: var(--cinza-050);
+
+  /* ---------- semanticas ----------
+     Atencao NAO usa o laranja da marca — se o alerta tiver a cor do botao
+     principal, o usuario deixa de distinguir marca de aviso. */
+  --color-sucesso: var(--sucesso);
+  --color-sucesso-fundo: var(--sucesso-fundo);
+  --color-atencao: var(--atencao);
+  --color-atencao-fundo: var(--atencao-fundo);
+  --color-erro: var(--erro);
+  --color-erro-fundo: var(--erro-fundo);
+  --color-info: var(--info);
+  --color-info-fundo: var(--info-fundo);
+
+  /* ---------- dominio fiscal ---------- */
+  --color-fiscal-ressarcimento: var(--fiscal-ressarcimento);
+  --color-fiscal-complemento: var(--fiscal-complemento);
+  --color-fiscal-verificar: var(--fiscal-verificar);
+  --color-fiscal-sem-valor: var(--fiscal-sem-valor);
+  --color-fiscal-estoque: var(--fiscal-estoque);
+
+  /* ---------- papeis semanticos ----------
+     Sao estes que trocam sozinhos entre claro e escuro. Prefira sempre um
+     papel a uma cor da escala: 'bg-superficie', nao 'bg-azul-800'. */
+  --color-fundo: var(--fundo);
+  --color-superficie: var(--superficie);
+  --color-superficie-alt: var(--superficie-alt);
+  --color-superficie-elevada: var(--superficie-elevada);
+
+  --color-texto: var(--texto);
+  --color-texto-suave: var(--texto-suave);
+  --color-texto-fraco: var(--texto-fraco);
+  --color-texto-invertido: var(--texto-invertido);
+
+  --color-borda: var(--borda);
+  --color-borda-forte: var(--borda-forte);
+  --color-borda-foco: var(--borda-foco);
+  --color-borda-sutil: var(--borda-sutil);
+
+  --color-moldura-fundo: var(--moldura-fundo);
+  --color-moldura-texto: var(--moldura-texto);
+  --color-moldura-texto-suave: var(--moldura-texto-suave);
+  --color-moldura-ativo: var(--moldura-ativo);
+  --color-moldura-borda: var(--moldura-borda);
+
+  --color-acao-fundo: var(--acao-fundo);
+  --color-acao-texto: var(--acao-texto);
+  --color-acao-hover: var(--acao-hover);
+  --color-acao-ativo: var(--acao-ativo);
+  --color-acao-inativo-fundo: var(--acao-inativo-fundo);
+  --color-acao-inativo-texto: var(--acao-inativo-texto);
+
+  --color-acao2-texto: var(--acao2-texto);
+  --color-acao2-borda: var(--acao2-borda);
+  --color-acao2-hover: var(--acao2-hover);
+
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+
+  --color-tabela-cabecalho-fundo: var(--tabela-cabecalho-fundo);
+  --color-tabela-cabecalho-texto: var(--tabela-cabecalho-texto);
+  --color-tabela-linha: var(--tabela-linha);
+  --color-tabela-linha-alt: var(--tabela-linha-alt);
+  --color-tabela-linha-hover: var(--tabela-linha-hover);
+  --color-tabela-linha-marcada: var(--tabela-linha-marcada);
+  --color-tabela-borda: var(--tabela-borda);
+
+  --color-destaque: var(--destaque);
+  --color-superficie-vidro: var(--superficie-vidro);
+
+  /* ---------- forma ---------- */
+  --radius-raio: var(--raio);       /* 6px  — botao, input */
+  --radius-raio-g: var(--raio-g);   /* 10px — cartao pequeno */
+  --radius-cartao: var(--raio-cartao); /* 18px — cartao grande do redesenho */
+
+  --shadow-cat: var(--sombra);
+  --shadow-cat-alta: var(--sombra-elevada);
+  --shadow-acao: var(--brilho-acao);
+
+  /* ---------- tipografia ---------- */
+  --font-sans: var(--fonte);
+  --font-mono: var(--fonte-num);
+}

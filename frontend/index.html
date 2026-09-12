@@ -3,8 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#081C41" />
+    <meta name="theme-color" content="#021D44" />
     <title>Sistema CAT — BMS Consultoria Tributária</title>
+    <script>
+      // Aplica o tema antes da primeira pintura. Sem isto a tela pisca clara
+      // por um quadro antes do React montar o ThemeProvider, e o flash branco
+      // no tema escuro incomoda mais que qualquer outro detalhe.
+      (function () {
+        try {
+          var t = localStorage.getItem("cat.tema") || "escuro";
+          if (t === "sistema") {
+            t = matchMedia("(prefers-color-scheme: dark)").matches
+              ? "escuro"
+              : "claro";
+          }
+          document.documentElement.dataset.tema = t;
+        } catch (e) {
+          document.documentElement.dataset.tema = "escuro";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="raiz"></div>

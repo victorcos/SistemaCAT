@@ -1,0 +1,108 @@
+/* Conferência de documentos. Só variáveis de tokens.css. */
+
+
+
+/* a barra de dentro do cartão precisa de ar; a dos cartões de trabalho é fina
+   de propósito, mas aqui ela é o que informa o andamento */
+.barra--larga {
+  height: 8px;
+  margin-top: 16px;
+}
+
+
+
+/* o número que responde a pergunta do cartão, em tamanho de manchete: quem
+   abre esta tela quer saber quantas notas, não ler parágrafo */
+.numerao {
+  margin: 16px 0 14px;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--texto);
+  font-variant-numeric: tabular-nums;
+}
+
+/* o cartão de cobrança é o que gera trabalho para o cliente: ganha a faixa
+   laranja da marca para se distinguir do que é só informativo */
+.cartao--cobranca {
+  border-left: 4px solid var(--marca-laranja);
+}
+
+.cartao--cobranca .numerao {
+  color: var(--laranja-700);
+}
+
+/* ---------- filtro por modelo ---------- */
+.modelos {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 16px;
+}
+
+.modelo {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  font-size: 13px;
+  color: var(--texto);
+  background: var(--superficie-alt);
+  border: 1px solid var(--borda);
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.modelo:hover {
+  border-color: var(--borda-forte);
+}
+
+.modelo:has(input:checked) {
+  color: var(--azul-700);
+  background: var(--azul-100);
+  border-color: var(--azul-300);
+  font-weight: 600;
+}
+
+.modelo input {
+  margin: 0;
+  accent-color: var(--marca-azul);
+}
+
+/* ---------- o que andou entre rodadas ---------- */
+/* a segunda conferência precisa responder "andou?", não só "quanto falta" */
+.andou {
+  margin-top: 16px;
+  padding: 12px 15px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--texto);
+  background: var(--sucesso-fundo);
+  border-left: 3px solid var(--sucesso);
+  border-radius: var(--raio);
+}
+
+.filtro__titulo {
+  margin: 18px 0 2px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--texto-fraco);
+}
+
+/* ---------- arquivos que a leitura recusou ---------- */
+/* Vinha no JSON e ninguém via: um relatório com toda chave estragada pelo
+   Excel aparecia como "0 documentos" sem explicação. Agora é lista, e cada
+   linha diz o arquivo e o motivo. */
+.recusados {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.recusados li + li {
+  margin-top: 4px;
+}

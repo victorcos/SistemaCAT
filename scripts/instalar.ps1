@@ -88,8 +88,17 @@ Ok "git, node e Python ($python) encontrados"
 
 $docker = (-not $SemDocker) -and (Tem docker)
 if ($docker) {
-    try { docker info *> $null; Ok "Docker em execução" }
-    catch { $docker = $false; Aviso "Docker instalado mas não está rodando: vou usar SQLite" }
+    # Nao usar try/catch com `docker info *> $null`: no PowerShell 5.1 redirecionar
+    # o stderr de um executavel nativo vira NativeCommandError e, com
+    # $ErrorActionPreference = "Stop", cai no catch ate quando o docker responde.
+    # Perguntar a versao do servidor: so o daemon no ar sabe responder.
+    $versaoDocker = (docker info --format "{{.ServerVersion}}" 2>$null | Select-Object -Last 1)
+    if ($versaoDocker -and $versaoDocker -notmatch "error|cannot find") {
+        Ok "Docker em execução (servidor $versaoDocker)"
+    } else {
+        $docker = $false
+        Aviso "Docker instalado mas não está rodando: vou usar SQLite"
+    }
 } else {
     Aviso "Sem Docker: o banco será SQLite (serve para desenvolver; Postgres é o de produção)"
 }

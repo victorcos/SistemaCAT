@@ -1,0 +1,66 @@
+/* ==========================================================================
+   Os efeitos do redesenho (estilo Aceternity), em CSS puro.
+
+   Aceternity UI nao e pacote npm — e registry de copy-paste, e os snippets
+   dependem de framer-motion. Os quatro efeitos que a spec de fato usa sao
+   varredura de brilho, fade de entrada, pulso de bolinha e glow radial:
+   nenhum deles precisa de JS. Trazer framer-motion (~34 kB gz) para animar
+   opacidade e um gradiente nao se paga. Reavaliar so se aparecer transicao
+   de layout compartilhado ou arrastar.
+
+   Registrados no @theme para virarem utilitaria: animate-brilho,
+   animate-entrada, animate-pulso.
+   ========================================================================== */
+
+@theme {
+  --animate-brilho: brilho 5.5s linear infinite;
+  --animate-entrada: entrada 0.22s ease-out both;
+  --animate-pulso: pulso 2.4s ease-in-out infinite;
+}
+
+/* faixa de luz que atravessa o topo de um cartao */
+@keyframes brilho {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(210%);
+  }
+}
+
+/* entrada de modal, banner e linha de tabela */
+@keyframes entrada {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* bolinha de estado em curso: respira, nao pisca */
+@keyframes pulso {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Quem pediu menos movimento ao sistema operacional recebe menos movimento.
+   A spec pede isto explicitamente e o prototipo nao cobria. Vale para toda
+   animacao e transicao, inclusive as do CSS legado. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
