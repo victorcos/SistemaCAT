@@ -51,6 +51,7 @@ Node 20+ (o script instala o que faltar via `winget` com
 `-InstalarPreRequisitos`); Docker Desktop é opcional — sem ele o banco é SQLite.
 
 ```
+gh auth login                           # o repositório é privado: entrar no GitHub uma vez
 gh repo clone victorcos/SistemaCAT      # ou: git clone https://github.com/victorcos/SistemaCAT.git
 cd SistemaCAT
 .\scripts\instalar.ps1                  # venv, .env com segredos novos, banco, migrações, gestores, front
@@ -60,7 +61,8 @@ cd SistemaCAT
 O `instalar.ps1` é idempotente e imprime as senhas provisórias dos três
 gestores uma vez só — anote. Cada máquina tem o próprio `.env` (JWT e
 pimenta não viajam) e o próprio banco: usuários, empresas e trabalhos não
-vêm junto do repositório, e o dado fiscal do cliente continua onde está.
+vêm junto do repositório, e o dado fiscal do cliente continua onde está —
+de fora do escritório, as pastas em `Z:` só existem pela VPN.
 
 ## Como rodar
 

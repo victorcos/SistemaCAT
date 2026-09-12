@@ -48,3 +48,6 @@ logs/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# gerado pelo pip install -e; nunca versionar
+*.egg-info/
