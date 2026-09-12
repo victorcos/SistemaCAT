@@ -864,6 +864,8 @@ function ModalDeAcesso({
   const originais = new Set(
     (empresas ?? []).filter((e) => e.tem_acesso).map((e) => e.empresa_id),
   );
+  const todasMarcadas =
+    visiveis.length > 0 && visiveis.every((e) => escolhidas.includes(e.empresa_id));
   const mudou =
     escolhidas.length !== originais.size ||
     escolhidas.some((id) => !originais.has(id));
@@ -925,11 +927,35 @@ function ModalDeAcesso({
         </Vazio>
       ) : (
         <>
-          {empresas.length > 8 && (
-            <div className="mb-3">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {empresas.length > 8 && (
               <Busca valor={busca} aoMudar={setBusca} placeholder="Buscar empresa" />
-            </div>
-          )}
+            )}
+            {/* um controle só para os dois gestos: com busca ativa, vale
+                para o que está à vista, que é o que a pessoa está olhando */}
+            <Botao
+              tamanho="sm"
+              variante="secundario"
+              className="ml-auto"
+              disabled={visiveis.length === 0 || (todasMarcadas && souEu)}
+              title={
+                todasMarcadas && souEu
+                  ? "Você não pode tirar o seu próprio acesso"
+                  : undefined
+              }
+              onClick={() =>
+                setEscolhidas((atuais) => {
+                  const ids = visiveis.map((e) => e.empresa_id);
+                  return todasMarcadas
+                    ? atuais.filter((i) => !ids.includes(i))
+                    : [...new Set([...atuais, ...ids])];
+                })
+              }
+            >
+              {todasMarcadas ? "Desmarcar todas" : "Marcar todas"}
+              {busca && ` (${visiveis.length})`}
+            </Botao>
+          </div>
           <ul className="m-0 flex max-h-[340px] list-none flex-col gap-1.5 overflow-y-auto p-0">
             {visiveis.map((e) => {
               const marcada = escolhidas.includes(e.empresa_id);
