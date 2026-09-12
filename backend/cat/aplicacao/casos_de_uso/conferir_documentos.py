@@ -26,8 +26,13 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from cat.aplicacao.casos_de_uso.historico_do_projeto import (
+    exigir_que_ande,
+    registrar_de_etapa,
+)
 from cat.config import obter_config
 from cat.dominio.cat42.conferencia import ResumoDaConferencia
+from cat.dominio.projeto.historico import TipoDeEvento
 from cat.dominio.lote import TipoDeArquivo
 from cat.infraestrutura.analitico.confronto import (
     ARQUIVO_SEM_DOCUMENTO,
@@ -43,6 +48,7 @@ from cat.infraestrutura.repositorios.modelos import (
     ArquivoDoLoteDB,
     ExecucaoDB,
     LoteDB,
+    ProjetoDB,
 )
 from cat.log import contexto, obter_log
 
@@ -136,6 +142,10 @@ def preparar(projeto_id: int, usuario_id: int, sessao: Session) -> ExecucaoDB:
     dizer 'não há EFD neste trabalho' na hora vale mais do que uma execução que
     nasce e morre em silêncio.
     """
+    projeto = sessao.get(ProjetoDB, projeto_id)
+    if projeto is not None:
+        exigir_que_ande(projeto, "conferir documentos")
+
     efd, _ = caminhos_de_efd_vigentes(projeto_id, sessao)
     if not efd:
         raise NadaParaConferir(
@@ -164,6 +174,14 @@ def preparar(projeto_id: int, usuario_id: int, sessao: Session) -> ExecucaoDB:
     sessao.add(execucao)
     sessao.commit()
     sessao.refresh(execucao)
+    registrar_de_etapa(
+        sessao, projeto_id, TipoDeEvento.ETAPA_INICIADA, ETAPA,
+        f"Conferência de documentos · {len(efd)} EFD e "
+        f"{len(documentos)} documento(s) do cliente",
+        dados={"execucao_id": execucao.id,
+               "arquivos": execucao.arquivos_totais},
+        autor_id=usuario_id,
+    )
     return execucao
 
 
@@ -190,6 +208,12 @@ def executar(execucao_id: int) -> None:
                 execucao.passo = "Falhou"
                 execucao.terminada_em = datetime.now(timezone.utc)
                 sessao.commit()
+                registrar_de_etapa(
+                    sessao, execucao.projeto_id, TipoDeEvento.ETAPA_FALHOU, ETAPA,
+                    f"Conferência falhou · {type(erro).__name__}",
+                    dados={"execucao_id": execucao.id, "erro": str(erro)[:500]},
+                    autor_id=execucao.criada_por,
+                )
 
 
 def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
@@ -249,6 +273,19 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     execucao.terminada_em = datetime.now(timezone.utc)
     sessao.commit()
 
+    registrar_de_etapa(
+        sessao, execucao.projeto_id, TipoDeEvento.ETAPA_CONCLUIDA, ETAPA,
+        f"Conferência concluída · {resumo.conferidos:,} com documento, "
+        f"{resumo.sem_documento:,} a cobrar, "
+        f"{resumo.nao_escrituradas:,} não escrituradas".replace(",", "."),
+        dados={"execucao_id": execucao.id,
+               "escriturados": resumo.escriturados,
+               "conferidos": resumo.conferidos,
+               "sem_documento": resumo.sem_documento,
+               "nao_escrituradas": resumo.nao_escrituradas,
+               "segundos": round(time.time() - inicio, 1)},
+        autor_id=execucao.criada_por,
+    )
     log.info("conferência concluída",
              extra={"segundos": round(time.time() - inicio, 1),
                     "documentos": passo_efd.documentos,

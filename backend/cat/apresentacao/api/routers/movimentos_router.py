@@ -37,6 +37,7 @@ from cat.apresentacao.api.routers.conferencia_router import (
     _precisa_gerar,
     _projeto,
 )
+from cat.aplicacao.casos_de_uso.historico_do_projeto import TrabalhoParado
 from cat.apresentacao.api.seguranca import UsuarioAtual
 from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_ANALITICO,
@@ -97,7 +98,7 @@ def iniciar(
     with contexto(etapa=ETAPA, usuario_id=usuario.id, projeto_id=projeto_id):
         try:
             execucao = preparar(projeto_id, usuario.id, sessao)
-        except NadaParaExtrair as erro:
+        except (TrabalhoParado, NadaParaExtrair) as erro:
             log.warning("extração de movimentos recusada", extra={"motivo": str(erro)})
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)

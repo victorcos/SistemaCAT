@@ -119,8 +119,8 @@ def saude() -> dict[str, object]:
 
 
 from cat.apresentacao.api.routers import (  # noqa: E402
-    auth_router, conferencia_router, importacao_router, lote_router,
-    movimentos_router, usuarios_router,
+    auth_router, conferencia_router, historico_router, importacao_router,
+    lote_router, movimentos_router, usuarios_router,
 )
 
 app.include_router(auth_router.router)
@@ -129,3 +129,4 @@ app.include_router(importacao_router.router)
 app.include_router(lote_router.router)
 app.include_router(conferencia_router.router)
 app.include_router(movimentos_router.router)
+app.include_router(historico_router.router)

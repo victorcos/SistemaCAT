@@ -31,7 +31,12 @@ from cat.aplicacao.casos_de_uso.excluir_trabalho import (
 )
 from cat.apresentacao.api.seguranca import UsuarioAtual, exigir_capacidade
 from cat.dominio.acesso.usuario import Usuario
+from cat.aplicacao.casos_de_uso.historico_do_projeto import (
+    contar_comentarios,
+    registrar,
+)
 from cat.dominio.cat42 import etapas as etapas_dominio
+from cat.dominio.projeto.historico import StatusDoProjeto, TipoDeEvento
 from cat.dominio.comum.cnpj import Cnpj, CnpjInvalido
 from cat.config import obter_config
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
@@ -145,9 +150,17 @@ class ProjetoDto(BaseModel):
     competencia_ini: date
     competencia_fim: date
     status: str
+    status_rotulo: str = ""
     pre_cadastro: bool = False
     etapas_feitas: int = 0
     etapas_totais: int = 0
+    # quem criou e quem responde hoje. Nomes, não identificadores: a tela
+    # mostra gente, e buscar cada nome depois seria uma consulta por cartão.
+    criado_por: str | None = None
+    criado_por_id: int | None = None
+    responsavel: str | None = None
+    responsavel_id: int | None = None
+    comentarios: int = 0
 
 
 class EtapaDto(BaseModel):
@@ -395,11 +408,21 @@ def criar_projeto(
         competencia_fim=pedido.competencia_fim,
         observacao=pedido.observacao,
         criado_por=usuario.id,
+        # quem cria responde, até passar adiante
+        responsavel_id=usuario.id,
     )
     sessao.add(p)
     sessao.commit()
     sessao.refresh(p)
 
+    registrar(
+        sessao, p.id, TipoDeEvento.CRIADO,
+        texto=f"{FRENTES.get(p.frente, p.frente)} · {p.nome}",
+        dados={"frente": p.frente, "nome": p.nome,
+               "competencia_ini": p.competencia_ini.isoformat(),
+               "competencia_fim": p.competencia_fim.isoformat()},
+        por=usuario,
+    )
     log.info(
         "projeto criado",
         extra={"projeto_id": p.id, "empresa_id": p.empresa_id,
@@ -464,10 +487,23 @@ def _projeto_dto(p: ProjetoDB, sessao: Session) -> ProjetoDto:
         competencia_ini=p.competencia_ini,
         competencia_fim=p.competencia_fim,
         status=p.status,
+        status_rotulo=_rotulo_do_status(p.status),
         pre_cadastro=e.pre_cadastro if e else False,
         etapas_feitas=feitas,
         etapas_totais=totais,
+        criado_por=p.autor.nome_exibicao if p.autor else None,
+        criado_por_id=p.criado_por,
+        responsavel=p.responsavel.nome_exibicao if p.responsavel else None,
+        responsavel_id=p.responsavel_id,
+        comentarios=contar_comentarios(p.id, sessao),
     )
+
+
+def _rotulo_do_status(valor: str) -> str:
+    try:
+        return StatusDoProjeto(valor).rotulo
+    except ValueError:
+        return valor
 
 
 @router.get("/projetos/{projeto_id}", response_model=ProjetoDetalheDto)

@@ -33,6 +33,7 @@ from cat.aplicacao.casos_de_uso.conferir_documentos import (
     executar,
     preparar,
 )
+from cat.aplicacao.casos_de_uso.historico_do_projeto import TrabalhoParado
 from cat.apresentacao.api.seguranca import (
     UsuarioAtual,
     exigir_capacidade,
@@ -153,7 +154,7 @@ def iniciar(
     with contexto(etapa=ETAPA, usuario_id=usuario.id, projeto_id=projeto_id):
         try:
             execucao = preparar(projeto_id, usuario.id, sessao)
-        except NadaParaConferir as erro:
+        except (TrabalhoParado, NadaParaConferir) as erro:
             log.warning("conferência recusada", extra={"motivo": str(erro)})
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)

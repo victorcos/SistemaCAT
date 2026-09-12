@@ -32,7 +32,12 @@ from cat.aplicacao.casos_de_uso.conferir_documentos import (
     caminhos_de_efd_vigentes,
     pasta_da_execucao,
 )
+from cat.aplicacao.casos_de_uso.historico_do_projeto import (
+    exigir_que_ande,
+    registrar_de_etapa,
+)
 from cat.dominio.cat42.movimentacao import ResumoDaMovimentacao
+from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.confronto import ARQUIVO_CONFERIDOS
 from cat.infraestrutura.analitico.movimentacao import consolidar
 from cat.infraestrutura.analitico.movimentos import (
@@ -40,7 +45,7 @@ from cat.infraestrutura.analitico.movimentos import (
     extrair_movimentos,
 )
 from cat.infraestrutura.repositorios.banco import Sessao
-from cat.infraestrutura.repositorios.modelos import ExecucaoDB
+from cat.infraestrutura.repositorios.modelos import ExecucaoDB, ProjetoDB
 from cat.log import contexto, obter_log
 
 log = obter_log(__name__)
@@ -65,6 +70,10 @@ def conferencia_concluida(projeto_id: int, sessao: Session) -> ExecucaoDB | None
 
 
 def preparar(projeto_id: int, usuario_id: int, sessao: Session) -> ExecucaoDB:
+    projeto = sessao.get(ProjetoDB, projeto_id)
+    if projeto is not None:
+        exigir_que_ande(projeto, "extrair movimentos")
+
     efd, _ = caminhos_de_efd_vigentes(projeto_id, sessao)
     if not efd:
         raise NadaParaExtrair(
@@ -88,6 +97,12 @@ def preparar(projeto_id: int, usuario_id: int, sessao: Session) -> ExecucaoDB:
     sessao.add(execucao)
     sessao.commit()
     sessao.refresh(execucao)
+    registrar_de_etapa(
+        sessao, projeto_id, TipoDeEvento.ETAPA_INICIADA, ETAPA,
+        f"Extração de movimentos · {len(efd)} EFD",
+        dados={"execucao_id": execucao.id, "arquivos": len(efd)},
+        autor_id=usuario_id,
+    )
     return execucao
 
 
@@ -113,6 +128,12 @@ def executar(execucao_id: int) -> None:
                 execucao.passo = "Falhou"
                 execucao.terminada_em = datetime.now(timezone.utc)
                 sessao.commit()
+                registrar_de_etapa(
+                    sessao, execucao.projeto_id, TipoDeEvento.ETAPA_FALHOU, ETAPA,
+                    f"Extração de movimentos falhou · {type(erro).__name__}",
+                    dados={"execucao_id": execucao.id, "erro": str(erro)[:500]},
+                    autor_id=execucao.criada_por,
+                )
 
 
 def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
@@ -147,6 +168,17 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     execucao.terminada_em = datetime.now(timezone.utc)
     sessao.commit()
 
+    registrar_de_etapa(
+        sessao, execucao.projeto_id, TipoDeEvento.ETAPA_CONCLUIDA, ETAPA,
+        f"Movimentos extraídos · {resumo.movimentos:,} linhas de item, "
+        f"{resumo.saidas_sem_item:,} saídas sem item na EFD".replace(",", "."),
+        dados={"execucao_id": execucao.id,
+               "documentos": resumo.documentos,
+               "movimentos": resumo.movimentos,
+               "saidas_sem_item": resumo.saidas_sem_item,
+               "segundos": round(time.time() - inicio, 1)},
+        autor_id=execucao.criada_por,
+    )
     log.info("movimentos extraídos e consolidados",
              extra={"segundos": round(time.time() - inicio, 1),
                     "documentos": progresso.documentos,

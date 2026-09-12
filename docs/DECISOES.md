@@ -1212,3 +1212,53 @@ por um piscar de Suspense a cada navegação não se paga. A nota em
 `routers/index.tsx` registra quando reavaliar.
 
 **Backend:** nada mudou nesta entrega. 489 testes seguem passando.
+
+---
+
+## 2026-09-12 — O trabalho passa a ter memória: histórico, status e sucessão
+
+**O pedido.** Um histórico por trabalho onde se veja tudo que foi feito, com
+chat de comentários e atividades, o nome de quem fez cada coisa, status que
+aparece no cartão, o nome de quem criou o projeto visível para o gestor, e
+sucessão — o gestor passa o trabalho para outra pessoa.
+
+**Por que não cabia num campo.** Um trabalho da CAT dura meses e passa por
+várias mãos. "De qual base saiu este número" a execução já respondia; "por
+que ficou parado em março", "quem recebeu isto quando o fulano saiu de
+férias" não tinha onde. Entrou uma linha do tempo com duas naturezas de
+entrada **misturadas de propósito**: o que o sistema fez (lote importado,
+conferência concluída, status alterado) e o que a pessoa escreveu. Separá-las
+mentiria sobre a ordem dos fatos — o comentário "o cliente vai mandar o que
+falta" só faz sentido logo abaixo da conferência que achou 92 mil pendências.
+
+**Evento não se apaga nem se edita.** É registro, não anotação: histórico que
+se reescreve não responde pergunta de auditoria. Comentário errado se corrige
+com outro comentário.
+
+**Quatro status, e eles valem.** Em andamento, pausado, cancelado, concluído.
+Pausar e cancelar **exigem motivo** — sem ele, a pergunta de três meses depois
+não tem resposta. E trabalho pausado ou cancelado **não roda etapa**: sem
+isso, "pausado" seria só uma cor no cartão enquanto uma extração de 44 minutos
+continuaria disparando num trabalho que a equipe decidiu parar. Concluído
+roda, porque refazer uma conferência depois da entrega é exatamente o que se
+faz quando o cliente questiona um número.
+
+**Criador e responsável são campos diferentes.** Quem criou não muda nunca;
+quem responde muda a cada sucessão. Os projetos que já existiam herdaram o
+criador como responsável — é a verdade mais próxima disponível, e melhor que
+deixá-los sem dono.
+
+**Sucessão é de gestor**, e só para conta **ativa** com papel que escreve.
+Passar um trabalho para conta desativada é exatamente como ele fica sem dono
+sem ninguém perceber.
+
+**Registrar evento nunca derruba a operação que o gerou.** Se gravar a linha
+do histórico falhar, o lote continua importado e a conferência continua
+concluída; o que se perde é a anotação, e isso vai para o log. O contrário
+seria uma extração de 44 minutos desfeita porque uma frase não coube no banco.
+
+**Paginação por cursor, não por offset.** Com evento entrando enquanto se lê,
+offset repete linha e pula linha.
+
+O contrato das seis rotas está em `docs/CONTRATOS.md` §6 — o front desta
+funcionalidade será desenhado à parte.

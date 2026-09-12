@@ -161,8 +161,48 @@ class ProjetoDB(Base):
         DateTime(timezone=True), default=agora, nullable=False
     )
     criado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    # Quem responde pelo trabalho hoje — nem sempre quem o criou. Férias,
+    # desligamento e troca de carteira acontecem no meio de uma apuração que
+    # dura meses, e a sucessão fica registrada no histórico.
+    responsavel_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
 
     empresa: Mapped[EmpresaDB] = relationship(lazy="joined")
+    autor: Mapped["UsuarioDB | None"] = relationship(
+        lazy="joined", foreign_keys=[criado_por]
+    )
+    responsavel: Mapped["UsuarioDB | None"] = relationship(
+        lazy="joined", foreign_keys=[responsavel_id]
+    )
+
+
+class EventoDoProjetoDB(Base):
+    """Uma linha da história do trabalho. Nunca se altera nem se apaga.
+
+    Mistura o que o sistema fez com o que a pessoa escreveu, na ordem em que
+    aconteceu — ver `cat.dominio.projeto.historico`.
+
+    O autor é opcional porque o usuário pode ser apagado um dia e o fato,
+    não: "lote importado em 10/09" continua verdadeiro mesmo sem a conta de
+    quem o importou. `autor_nome` guarda o nome de exibição do momento pela
+    mesma razão — quem lê o histórico daqui a um ano quer o nome que a pessoa
+    tinha quando fez, não o de agora.
+    """
+
+    __tablename__ = "evento_do_projeto"
+    __table_args__ = (Index("ix_evento_projeto", "projeto_id", "criado_em"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    projeto_id: Mapped[int] = mapped_column(
+        ForeignKey("projeto.id", ondelete="CASCADE"), nullable=False
+    )
+    tipo: Mapped[str] = mapped_column(String(30), nullable=False)
+    texto: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    dados: Mapped[dict | None] = mapped_column(JSON)
+    autor_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    autor_nome: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, nullable=False
+    )
 
 
 class LoteDB(Base):

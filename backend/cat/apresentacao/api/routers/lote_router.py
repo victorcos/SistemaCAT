@@ -40,6 +40,8 @@ from cat.aplicacao.casos_de_uso.inspecionar_lote import (
 from cat.apresentacao.api.seguranca import UsuarioAtual, exigir_capacidade, exigir_empresa
 from cat.dominio.acesso.usuario import Usuario
 from cat.dominio.lote import ArquivoDoLote, ResumoDoLote, TipoDeArquivo
+from cat.aplicacao.casos_de_uso.historico_do_projeto import registrar
+from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.repositorios.banco import obter_sessao
 from cat.infraestrutura.repositorios.modelos import (
     ArquivoDoLoteDB,
@@ -308,6 +310,15 @@ def criar_lote(
         sessao.commit()
         sessao.refresh(lote)
 
+        registrar(
+            sessao, projeto_id, TipoDeEvento.LOTE_IMPORTADO,
+            texto=f"{len(novos):,} arquivo(s) de {lote.pasta}".replace(",", "."),
+            dados={"lote_id": lote.id, "pasta": lote.pasta,
+                   "arquivos": lote.total_arquivos,
+                   "uteis": lote.arquivos_uteis, "bytes": lote.bytes_totais,
+                   "repetidos_ignorados": len(resumo.arquivos) - len(novos)},
+            por=usuario,
+        )
         log.info(
             "lote registrado",
             extra={"lote_id": lote.id, "arquivos": lote.total_arquivos,
@@ -413,5 +424,13 @@ def remover_lote(
     with contexto(etapa="remover_lote", usuario_id=usuario.id,
                   projeto_id=projeto_id, lote_id=lote_id):
         apagado = excluir_lote(lote_id, usuario, sessao)
+        registrar(
+            sessao, projeto_id, TipoDeEvento.LOTE_REMOVIDO,
+            texto=apagado.pasta,
+            dados={"lote_id": lote_id, "pasta": apagado.pasta,
+                   "arquivos": apagado.arquivos,
+                   "conferencias_invalidadas": apagado.conferencias_invalidadas},
+            por=usuario,
+        )
     return LoteApagadoDto(pasta=apagado.pasta, arquivos=apagado.arquivos,
                           conferencias_invalidadas=apagado.conferencias_invalidadas)
