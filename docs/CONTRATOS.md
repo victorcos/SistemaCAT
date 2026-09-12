@@ -170,6 +170,11 @@ para agradar o Excel: a chave de acesso vai com os 44 dígitos que tem. Aberto
 com dois cliques no Excel, isso vira notação científica e não volta. Para
 Excel, xlsx.
 
+O download é do navegador para o arquivo que a pessoa escolher, sem passar
+pela memória, e pode ser cancelado no meio. Cancelar descarta o arquivo
+parcial: meia planilha no disco é pior que nenhuma. A geração no servidor,
+essa, segue até o fim e fica em cache.
+
 ### Acesso às empresas (escopo de visibilidade)
 
 Duas rotas, **só para gestor e dev**, na tela de Usuários:

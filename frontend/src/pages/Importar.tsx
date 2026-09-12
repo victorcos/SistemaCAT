@@ -16,6 +16,7 @@ import { IconeConfirma, IconeEnviar, IconeTentarDeNovo } from "@/constants/icons
 import { ROTAS } from "@/constants/routes";
 import { cn } from "@/lib/cn";
 import { compara, mascarar, paraIso, paraTexto, valida } from "@/lib/competencia";
+import { useAcao } from "@/hooks/useAcao";
 import { comoErro } from "@/lib/errors";
 import { numero } from "@/lib/format";
 import {
@@ -52,6 +53,10 @@ export default function Importar() {
   const [criado, setCriado] = useState<Projeto | null>(null);
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  // o envio do SPED é o carregamento longo desta tela, e cancelar desfaz
+  // mesmo: a análise não grava nada. Já criar a empresa é POST que o
+  // servidor conclui — ali não há Cancelar, porque não haveria o que desfazer
+  const envio = useAcao();
 
   function reiniciar() {
     setPasso("envio");
@@ -62,22 +67,16 @@ export default function Importar() {
   }
 
   async function enviar(arquivo: File) {
-    setOcupado(true);
     setErro(null);
-    try {
-      const r = await analisarRemessa(arquivo);
-      setRemessa(r);
-      // remessa de empresa já cadastrada pula direto para o projeto
-      if (r.ja_cadastrada && r.empresa_id) {
-        setEmpresaId(r.empresa_id);
-        setPasso("projeto");
-      } else {
-        setPasso("conferencia");
-      }
-    } catch (e) {
-      setErro(comoErro(e));
-    } finally {
-      setOcupado(false);
+    const r = await envio.executar((sinal) => analisarRemessa(arquivo, sinal));
+    if (!r) return;          // erro já mostrado, ou a pessoa cancelou
+    setRemessa(r);
+    // remessa de empresa já cadastrada pula direto para o projeto
+    if (r.ja_cadastrada && r.empresa_id) {
+      setEmpresaId(r.empresa_id);
+      setPasso("projeto");
+    } else {
+      setPasso("conferencia");
     }
   }
 
@@ -120,8 +119,17 @@ export default function Importar() {
       </CabecalhoDePagina>
 
       {erro && <Aviso titulo={erro.message} codigo={erro.requisicaoId} />}
+      {envio.erro && (
+        <Aviso titulo={envio.erro.message} codigo={envio.erro.requisicaoId} />
+      )}
 
-      {passo === "envio" && <ZonaDeEnvio aoEnviar={enviar} ocupado={ocupado} />}
+      {passo === "envio" && (
+        <ZonaDeEnvio
+          aoEnviar={enviar}
+          ocupado={ocupado || envio.carregando}
+          aoCancelar={envio.podeCancelar ? envio.cancelar : undefined}
+        />
+      )}
 
       {passo === "conferencia" && remessa && (
         <ConferirEmpresa remessa={remessa} ocupado={ocupado} aoConfirmar={confirmarEmpresa} />
@@ -232,9 +240,12 @@ function Stepper({ atual }: { atual: Passo }) {
 function ZonaDeEnvio({
   aoEnviar,
   ocupado,
+  aoCancelar,
 }: {
   aoEnviar: (a: File) => void;
   ocupado: boolean;
+  /** só chega depois de uns instantes: ver useAcao */
+  aoCancelar?: () => void;
 }) {
   const [sobre, setSobre] = useState(false);
   const entrada = useRef<HTMLInputElement>(null);
@@ -272,7 +283,16 @@ function ZonaDeEnvio({
         }}
       />
       {ocupado ? (
-        <p className="m-0 text-[15px] font-semibold text-texto-suave">Lendo os cabeçalhos…</p>
+        <div className="flex flex-col items-center gap-3">
+          <p className="m-0 text-[15px] font-semibold text-texto-suave">
+            Lendo os cabeçalhos…
+          </p>
+          {aoCancelar && (
+            <Botao variante="secundario" tamanho="sm" onClick={aoCancelar}>
+              Cancelar envio
+            </Botao>
+          )}
+        </div>
       ) : (
         <>
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-laranja-500/12 text-laranja-700 escuro:text-laranja-300">

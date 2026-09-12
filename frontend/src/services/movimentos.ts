@@ -50,6 +50,14 @@ export interface ExecucaoDeMovimentos extends Omit<Execucao, "resumo"> {
 /** As quatro listas que a etapa exporta. */
 export type PlanilhaDeMovimentos = "movimentos" | "itens" | "inventario" | "analitico";
 
+/** O nome que a janela de salvar sugere. */
+const NOME_SUGERIDO: Record<PlanilhaDeMovimentos, string> = {
+  movimentos: "movimentos",
+  itens: "cadastro_de_itens",
+  inventario: "inventario",
+  analitico: "analitico_por_documento",
+};
+
 export const iniciarMovimentos = (projetoId: number) =>
   chamar<ExecucaoDeMovimentos>(`/projetos/${projetoId}/movimentos`, {
     method: "POST",
@@ -67,6 +75,7 @@ export function baixarPlanilhaDeMovimentos(
   modelos: string[] = [],
   classificacoes: string[] = [],
   formato: Formato = "xlsx",
+  sinal?: AbortSignal,
 ): Promise<void> {
   const parametros = new URLSearchParams();
   if (modelos.length) parametros.set("modelos", modelos.join(","));
@@ -76,6 +85,7 @@ export function baixarPlanilhaDeMovimentos(
   const filtro = parametros.toString() ? `?${parametros}` : "";
   return baixarArquivo(
     `/api/movimentos/${execucaoId}/planilhas/${qual}${filtro}`,
-    `${qual}.${formato}`,
+    `${NOME_SUGERIDO[qual]}.${formato}`,
+    sinal,
   );
 }

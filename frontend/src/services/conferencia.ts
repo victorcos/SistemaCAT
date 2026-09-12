@@ -1,5 +1,13 @@
-import { chamar, lerToken } from "./api";
+import {
+  baixarPelaPastaPadrao,
+  descartar,
+  DownloadCancelado,
+  escolherOndeSalvar,
+  foiAbortado,
+  gravarNoArquivo,
+} from "@/lib/download";
 import { ErroApi } from "@/types/erro";
+import { chamar, lerToken } from "./api";
 
 /**
  * Conferência de documentos: EFD contra XML e relatório do cliente.
@@ -65,6 +73,14 @@ export const EM_CURSO = ["na_fila", "rodando"];
 /** As três listas que a conferência exporta. */
 export type Planilha = "nao-escrituradas" | "a-cobrar" | "conferidas";
 
+/** O nome que a janela de salvar sugere. Antes era a chave da rota
+ *  ("a-cobrar.xlsx"), que não diz nada na pasta de quem baixou. */
+const NOME_SUGERIDO: Record<Planilha, string> = {
+  "nao-escrituradas": "notas_nao_escrituradas",
+  "a-cobrar": "notas_a_cobrar",
+  conferidas: "notas_conferidas",
+};
+
 export const iniciarConferencia = (projetoId: number) =>
   chamar<Execucao>(`/projetos/${projetoId}/conferencias`, { method: "POST" });
 
@@ -97,6 +113,7 @@ export async function baixarPlanilha(
   modelos: string[] = [],
   classificacoes: string[] = [],
   formato: Formato = "xlsx",
+  sinal?: AbortSignal,
 ): Promise<void> {
   const parametros = new URLSearchParams();
   if (modelos.length) parametros.set("modelos", modelos.join(","));
@@ -106,28 +123,45 @@ export async function baixarPlanilha(
   const filtro = parametros.toString() ? `?${parametros}` : "";
   await baixarArquivo(
     `/api/conferencias/${execucaoId}/planilhas/${qual}${filtro}`,
-    `${qual}.${formato}`,
+    `${NOME_SUGERIDO[qual]}.${formato}`,
+    sinal,
   );
 }
 
 /**
- * Busca um arquivo autenticado e dispara o download no navegador.
+ * Busca um arquivo autenticado e salva onde a pessoa escolher.
  *
  * Serve a qualquer etapa que exporte planilha: a rota exige o token no
  * cabeçalho, e `<a href>` não manda cabeçalho.
+ *
+ * **O seletor de pasta vem antes da busca.** O navegador só abre "salvar
+ * como" enquanto a ativação do gesto do clique vale, e ela não sobrevive a
+ * uma ida à rede. Perguntar depois de buscar faz o seletor ser recusado —
+ * além de obrigar a segurar o arquivo em algum lugar enquanto se pergunta.
+ *
+ * Com o seletor, a resposta é canalizada da rede direto para o arquivo: a
+ * memória usada não depende do tamanho do download, e um CSV de vários GB
+ * passa a caber. Sem ele, cai no caminho antigo, que carrega tudo em memória
+ * e entrega à pasta de downloads do navegador.
  */
 export async function baixarArquivo(
   endereco: string,
   nomePadrao: string,
+  sinal?: AbortSignal,
 ): Promise<void> {
+  const destino = await escolherOndeSalvar(nomePadrao);
+
   const cabecalhos = new Headers();
   const token = lerToken();
   if (token) cabecalhos.set("Authorization", `Bearer ${token}`);
 
   let r: Response;
   try {
-    r = await fetch(endereco, { headers: cabecalhos });
-  } catch {
+    r = await fetch(endereco, { headers: cabecalhos, signal: sinal });
+  } catch (e) {
+    if (destino) await descartar(destino);
+    // cancelar no meio da busca não é falha de rede
+    if (foiAbortado(e)) throw new DownloadCancelado();
     throw new ErroApi("Não foi possível baixar a planilha.", 0);
   }
 
@@ -140,19 +174,24 @@ export async function baixarArquivo(
     } catch {
       /* resposta sem JSON */
     }
+    // o seletor já criou o arquivo ao confirmar o nome; sem isto ficaria um
+    // arquivo de 0 byte com cara de planilha, que alguém tentaria abrir
+    if (destino) await descartar(destino);
     throw new ErroApi(detalhe, r.status, requisicaoId);
   }
 
-  const conteudo = await r.blob();
-  const url = URL.createObjectURL(conteudo);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = nomeDoArquivo(r) ?? nomePadrao;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  // o navegador precisa do endereço enquanto o download começa
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  if (destino) {
+    try {
+      await gravarNoArquivo(destino, r, sinal);
+    } catch (e) {
+      // cancelou no meio da gravação: o arquivo pela metade não serve a
+      // ninguém, e deixá-lo no disco é o mesmo que entregar dado truncado
+      if (e instanceof DownloadCancelado) await descartar(destino);
+      throw e;
+    }
+    return;
+  }
+  baixarPelaPastaPadrao(await r.blob(), nomeDoArquivo(r) ?? nomePadrao);
 }
 
 function nomeDoArquivo(r: Response): string | null {

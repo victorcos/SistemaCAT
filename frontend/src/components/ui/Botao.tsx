@@ -32,6 +32,14 @@ interface Base {
   variante?: VarianteDeBotao;
   tamanho?: keyof typeof TAMANHOS;
   carregando?: boolean;
+  /**
+   * Interrompe a ação em curso.
+   *
+   * Quando existe, o botão vira "Cancelar" enquanto carrega, em vez de só
+   * girar desabilitado. Só se passa isto quando cancelar desfaz de verdade o
+   * que estava acontecendo — ver `useAcao`.
+   */
+  aoCancelar?: () => void;
   icone?: Icone;
   /** ocupa toda a largura disponível */
   largo?: boolean;
@@ -68,6 +76,7 @@ export function Botao({
   variante,
   tamanho = "md",
   carregando,
+  aoCancelar,
   icone: Ico,
   largo,
   className,
@@ -76,6 +85,24 @@ export function Botao({
   ...resto
 }: PropsDeBotao) {
   const tam = tamanho === "sm" ? 14 : 16;
+
+  // carregando COM saída: o próprio botão vira o cancelamento. Ocupa o mesmo
+  // lugar de propósito — é onde a pessoa já está olhando e com o mouse
+  if (carregando && aoCancelar) {
+    return (
+      <button
+        {...resto}
+        type="button"
+        onClick={aoCancelar}
+        aria-busy
+        className={classes({ variante, tamanho, largo, className })}
+      >
+        <IconeCarregando size={tam} className="animate-spin" aria-hidden />
+        Cancelar
+      </button>
+    );
+  }
+
   return (
     <button
       {...resto}

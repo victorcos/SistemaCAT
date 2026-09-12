@@ -5,6 +5,53 @@
 
 ---
 
+## 2026-09-12 — Baixar escolhendo a pasta, e cancelar o que carrega
+
+**Decisão.** Três coisas, que vieram juntas porque uma depende da outra.
+
+**1. A pessoa escolhe onde salvar.** O download abre o "salvar como" do
+navegador (`showSaveFilePicker`) em vez de despejar na pasta de downloads.
+Pedido de quem tem pouco espaço em disco: encher a pasta padrão sem escolha e
+depois ter de mover o arquivo.
+
+**2. O arquivo não passa mais pela memória.** O jeito antigo fazia
+`await r.blob()` — o download inteiro em memória antes de um byte chegar ao
+disco. A lista analítica de uma base real tem 37,9 milhões de documentos, um
+CSV de vários GB: a aba morre antes de salvar. Com o seletor dá para canalizar
+a resposta direto para o arquivo, e a memória deixa de depender do tamanho.
+
+Isto **não é um bônus do item 1, é o motivo de ele funcionar**. Sem o
+destino em disco não há para onde canalizar, e sem canalizar o item 1 seria
+só cosmético num arquivo que nunca caberia.
+
+**3. Cancelar virou padrão.** `useAcao`, em `hooks/`, é o padrão da casa para
+qualquer ação que carrega: estado do botão, erro e cancelamento num lugar só.
+O botão que está carregando vira "Cancelar" — mesmo lugar, onde a pessoa já
+está olhando.
+
+**Duas regras que o padrão carrega.**
+
+*O Cancelar só aparece depois de 400 ms.* Ação que acaba em 200 ms faria o
+botão piscar, e botão que pisca ninguém acerta — só faz a tela tremer.
+
+*Cancelar é de verdade ou não existe.* Onde abortar desfaz o trabalho, há
+Cancelar: os sete downloads e o envio do SPED, que é análise e não grava nada.
+Onde o servidor já concluiu — criar empresa, criar usuário, comentar — **não
+há Cancelar**, porque um botão que diz ter cancelado a criação de um usuário
+que foi criado é pior do que não ter botão.
+
+**O que o cancelamento não alcança.** A planilha é gerada no servidor antes do
+primeiro byte sair. Cancelar solta o navegador na hora, mas a geração segue até
+o fim do outro lado. Não é trabalho perdido: o arquivo fica em cache na pasta
+da execução e o próximo pedido responde na hora. Parar a geração no servidor é
+outra coisa, e precisaria de cancelamento de execução, que não existe.
+
+**Onde o seletor não existe** — Firefox, Safari, página fora de contexto
+seguro — cai no caminho antigo, com a pasta padrão do navegador e o arquivo
+em memória. Continua funcionando; só não escolhe pasta.
+
+---
+
 ## 2026-09-12 — CSV ao lado do xlsx, nas sete listas
 
 **Decisão.** O gerador de planilha passou a receber `formato`, e cada lista

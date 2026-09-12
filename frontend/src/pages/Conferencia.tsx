@@ -19,6 +19,7 @@ import {
 import { IconeTentarDeNovo } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
 import { aceitaProcessamento } from "@/constants/status";
+import { useAcao } from "@/hooks/useAcao";
 import { comoErro } from "@/lib/errors";
 import { dinheiro, numero } from "@/lib/format";
 import {
@@ -54,6 +55,12 @@ export default function Conferencia() {
   const [execucao, setExecucao] = useState<Execucao | null>(null);
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  // o download tem vida própria: carrega, erra e é cancelável por conta
+  const download = useAcao();
+  const [baixando, setBaixando] = useState<{
+    qual: Planilha;
+    formato: Formato;
+  } | null>(null);
   const [modelos, setModelos] = useState<string[]>([]);
   const [classes, setClasses] = useState<string[]>([]);
   const relogio = useRef<number | null>(null);
@@ -107,21 +114,19 @@ export default function Conferencia() {
 
   async function baixar(qual: Planilha, formato: Formato) {
     if (!execucao) return;
-    setOcupado(true);
     setErro(null);
-    try {
-      await baixarPlanilha(
+    setBaixando({ qual, formato });
+    await download.executar((sinal) =>
+      baixarPlanilha(
         execucao.id,
         qual,
         qual === "a-cobrar" ? modelos : [],
         qual === "a-cobrar" ? classes : [],
         formato,
-      );
-    } catch (e) {
-      setErro(comoErro(e));
-    } finally {
-      setOcupado(false);
-    }
+        sinal,
+      ),
+    );
+    setBaixando(null);
   }
 
   const rodando = execucao !== null && EM_CURSO.includes(execucao.situacao);
@@ -163,6 +168,9 @@ export default function Conferencia() {
       <TrabalhoParado status={projeto?.projeto.status} projetoId={projetoId} />
 
       {erro && <Aviso titulo={erro.message} codigo={erro.requisicaoId} />}
+      {download.erro && (
+        <Aviso titulo={download.erro.message} codigo={download.erro.requisicaoId} />
+      )}
 
       {!execucao && (
         <Vazio titulo="Nenhuma conferência ainda">
@@ -188,7 +196,9 @@ export default function Conferencia() {
           aoAlternarModelo={(codigo) => setModelos(alternar(codigo))}
           aoAlternarClasse={(codigo) => setClasses(alternar(codigo))}
           aoBaixar={baixar}
-          ocupado={ocupado}
+          ocupado={ocupado || download.carregando}
+          baixando={baixando}
+          aoCancelar={download.podeCancelar ? download.cancelar : undefined}
           projetoId={projetoId}
         />
       )}
@@ -211,6 +221,8 @@ function Resultado({
   aoAlternarClasse,
   aoBaixar,
   ocupado,
+  baixando,
+  aoCancelar,
   projetoId,
 }: {
   resumo: ResumoDaConferencia;
@@ -221,6 +233,8 @@ function Resultado({
   aoAlternarClasse: (codigo: string) => void;
   aoBaixar: (qual: Planilha, formato: Formato) => void;
   ocupado: boolean;
+  baixando: { qual: Planilha; formato: Formato } | null;
+  aoCancelar?: () => void;
   projetoId: number;
 }) {
   const cobertura = Math.round(resumo.cobertura * 100);
@@ -303,6 +317,8 @@ function Resultado({
           <BaixarPlanilha
             aoBaixar={(formato) => aoBaixar("conferidas", formato)}
             desabilitado={ocupado || resumo.conferidos === 0}
+            baixando={baixando?.qual === "conferidas" ? baixando.formato : null}
+            aoCancelar={aoCancelar}
           />
         }
       >
@@ -318,6 +334,8 @@ function Resultado({
           <BaixarPlanilha
             aoBaixar={(formato) => aoBaixar("nao-escrituradas", formato)}
             desabilitado={ocupado || resumo.nao_escrituradas === 0}
+            baixando={baixando?.qual === "nao-escrituradas" ? baixando.formato : null}
+            aoCancelar={aoCancelar}
           />
         }
       >
@@ -356,6 +374,8 @@ function Resultado({
             destaque
             aoBaixar={(formato) => aoBaixar("a-cobrar", formato)}
             desabilitado={ocupado || resumo.sem_documento === 0}
+            baixando={baixando?.qual === "a-cobrar" ? baixando.formato : null}
+            aoCancelar={aoCancelar}
             rotulo={filtrada ? "Baixar planilha filtrada" : "Baixar planilha"}
           />
         </div>

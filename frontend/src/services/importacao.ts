@@ -80,8 +80,15 @@ export interface ProjetoDetalhe {
  *
  * Não usa `chamar` porque este é o único ponto com multipart: definir
  * Content-Type à mão quebraria o limite que o navegador gera sozinho.
+ *
+ * Aceita `sinal` porque é envio longo — SPED de uma empresa grande passa de
+ * um GB — e cancelar aqui desfaz mesmo: a análise não grava nada, então
+ * abortar não deixa meia empresa cadastrada.
  */
-export async function analisarRemessa(arquivo: File): Promise<Remessa> {
+export async function analisarRemessa(
+  arquivo: File,
+  sinal?: AbortSignal,
+): Promise<Remessa> {
   const corpo = new FormData();
   corpo.append("arquivo", arquivo);
 
@@ -95,8 +102,10 @@ export async function analisarRemessa(arquivo: File): Promise<Remessa> {
       method: "POST",
       body: corpo,
       headers: cabecalhos,
+      signal: sinal,
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
     throw new ErroApi("Não foi possível enviar o arquivo.", 0);
   }
 

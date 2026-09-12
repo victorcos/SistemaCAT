@@ -19,6 +19,7 @@ import {
 import { IconeTentarDeNovo } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
 import { aceitaProcessamento } from "@/constants/status";
+import { useAcao } from "@/hooks/useAcao";
 import { comoErro } from "@/lib/errors";
 import { dinheiro, numero } from "@/lib/format";
 import { EM_CURSO, type Fatia, type Formato } from "@/services/conferencia";
@@ -53,6 +54,12 @@ export default function Movimentos() {
   const [execucao, setExecucao] = useState<ExecucaoDeMovimentos | null>(null);
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  // o download tem vida própria: carrega, erra e é cancelável por conta
+  const download = useAcao();
+  const [baixando, setBaixando] = useState<{
+    qual: PlanilhaDeMovimentos;
+    formato: Formato;
+  } | null>(null);
   const [classes, setClasses] = useState<string[]>([]);
   const relogio = useRef<number | null>(null);
 
@@ -104,21 +111,19 @@ export default function Movimentos() {
 
   async function baixar(qual: PlanilhaDeMovimentos, formato: Formato) {
     if (!execucao) return;
-    setOcupado(true);
     setErro(null);
-    try {
-      await baixarPlanilhaDeMovimentos(
+    setBaixando({ qual, formato });
+    await download.executar((sinal) =>
+      baixarPlanilhaDeMovimentos(
         execucao.id,
         qual,
         [],
         qual === "movimentos" ? classes : [],
         formato,
-      );
-    } catch (e) {
-      setErro(comoErro(e));
-    } finally {
-      setOcupado(false);
-    }
+        sinal,
+      ),
+    );
+    setBaixando(null);
   }
 
   const rodando = execucao !== null && EM_CURSO.includes(execucao.situacao);
@@ -160,6 +165,9 @@ export default function Movimentos() {
       <TrabalhoParado status={projeto?.projeto.status} projetoId={projetoId} />
 
       {erro && <Aviso titulo={erro.message} codigo={erro.requisicaoId} />}
+      {download.erro && (
+        <Aviso titulo={download.erro.message} codigo={download.erro.requisicaoId} />
+      )}
 
       {!execucao && (
         <Vazio titulo="Nenhuma extração ainda">
@@ -188,7 +196,9 @@ export default function Movimentos() {
             )
           }
           aoBaixar={baixar}
-          ocupado={ocupado}
+          ocupado={ocupado || download.carregando}
+          baixando={baixando}
+          aoCancelar={download.podeCancelar ? download.cancelar : undefined}
         />
       )}
     </div>
@@ -204,6 +214,8 @@ function Resultado({
   aoAlternarClasse,
   aoBaixar,
   ocupado,
+  baixando,
+  aoCancelar,
 }: {
   resumo: ResumoDaMovimentacao;
   execucao: ExecucaoDeMovimentos | null;
@@ -211,6 +223,8 @@ function Resultado({
   aoAlternarClasse: (codigo: string) => void;
   aoBaixar: (qual: PlanilhaDeMovimentos, formato: Formato) => void;
   ocupado: boolean;
+  baixando: { qual: PlanilhaDeMovimentos; formato: Formato } | null;
+  aoCancelar?: () => void;
 }) {
   const cobertura = Math.round(resumo.cobertura_de_item * 100);
 
@@ -306,6 +320,8 @@ function Resultado({
             destaque
             aoBaixar={(formato) => aoBaixar("movimentos", formato)}
             desabilitado={ocupado || resumo.movimentos === 0}
+            baixando={baixando?.qual === "movimentos" ? baixando.formato : null}
+            aoCancelar={aoCancelar}
             rotulo={classes.length ? "Baixar planilha filtrada" : "Baixar planilha"}
           />
         </div>
@@ -329,6 +345,8 @@ function Resultado({
             <BaixarPlanilha
               aoBaixar={(formato) => aoBaixar("itens", formato)}
               desabilitado={ocupado || resumo.itens_cadastrados === 0}
+              baixando={baixando?.qual === "itens" ? baixando.formato : null}
+              aoCancelar={aoCancelar}
             />
           </div>
         </Secao>
@@ -348,6 +366,8 @@ function Resultado({
             <BaixarPlanilha
               aoBaixar={(formato) => aoBaixar("inventario", formato)}
               desabilitado={ocupado || resumo.itens_em_estoque === 0}
+              baixando={baixando?.qual === "inventario" ? baixando.formato : null}
+              aoCancelar={aoCancelar}
             />
           </div>
         </Secao>
@@ -360,6 +380,8 @@ function Resultado({
           <BaixarPlanilha
             aoBaixar={(formato) => aoBaixar("analitico", formato)}
             desabilitado={ocupado || resumo.analiticos === 0}
+            baixando={baixando?.qual === "analitico" ? baixando.formato : null}
+            aoCancelar={aoCancelar}
           />
         }
       >

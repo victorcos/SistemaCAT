@@ -20,13 +20,23 @@ export function BaixarPlanilha({
   desabilitado,
   rotulo = "Baixar planilha",
   destaque,
+  baixando = null,
+  aoCancelar,
 }: {
   aoBaixar: (formato: Formato) => void;
   desabilitado: boolean;
   rotulo?: string;
   /** o botão principal desta tela, com sombra de ação */
   destaque?: boolean;
+  /** qual formato desta lista está baixando agora, se algum */
+  baixando?: Formato | null;
+  /** só chega depois de uns instantes: botão que pisca ninguém acerta */
+  aoCancelar?: () => void;
 }) {
+  // o botão que está baixando vira Cancelar; o outro fica fora do caminho
+  const saida = (formato: Formato) =>
+    baixando === formato ? aoCancelar : undefined;
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Botao
@@ -34,6 +44,8 @@ export function BaixarPlanilha({
         icone={IconeBaixar}
         onClick={() => aoBaixar("xlsx")}
         disabled={desabilitado}
+        carregando={baixando === "xlsx"}
+        aoCancelar={saida("xlsx")}
         className={destaque ? "shadow-acao" : undefined}
       >
         {rotulo}
@@ -43,6 +55,8 @@ export function BaixarPlanilha({
         tamanho="sm"
         onClick={() => aoBaixar("csv")}
         disabled={desabilitado}
+        carregando={baixando === "csv"}
+        aoCancelar={saida("csv")}
         // a chave de acesso tem 44 dígitos, e o Excel a converte em notação
         // científica ao abrir um CSV com dois cliques. Quem precisa do Excel
         // usa o botão ao lado, que é imune — este é para carregar em outra
