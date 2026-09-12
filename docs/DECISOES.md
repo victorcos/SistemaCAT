@@ -1083,3 +1083,46 @@ quebrou o script. Os scripts vão com BOM UTF-8.
 empresas, trabalhos) e o próprio `.env`. O dado fiscal do cliente fica onde
 está — de casa só se alcança pela VPN, e o sistema do escritório continua no
 ar para quem chegar até ele pela rede interna.
+
+---
+
+## 2026-09-12 — Front reorganizado: Tailwind, providers e roteador em árvore
+
+**O que entrou** (trabalho feito de casa, na branch `feat/frontend-tailwind`,
+integrado no main como v0.19.0). O front deixa de ser um `App.tsx` com
+estado de sessão e rotas soltas e passa a ter:
+
+* **Tailwind v4** pelo plugin do Vite, ligado aos tokens da marca por
+  `styles/tema.css` — os tokens continuam sendo a fonte da cor; o Tailwind é
+  a ponte. As primitivas antigas (`.botao`, `.campo`, `.aviso`, `.tabela`,
+  `.cartao`) ficam em `styles/legacy-kit.css` até cada tela migrar;
+* **providers**: sessão (`AuthProvider`), tema claro/escuro, toasts e
+  confirmação, cada um com o seu hook;
+* **roteador em árvore** (`routers/index.tsx`): rota pública, rota protegida,
+  exigência de papel, página 404, e os caminhos num lugar só
+  (`constants/routes.ts`) — mudar um caminho deixa de ser caça a template
+  string;
+* componentes de UI (`Botao`, `Campo`, `Aviso`, `Modal`, `Etiqueta`,
+  `Carregando`, `LogoBMS`), leiaute com barra e menu lateral, tela de login
+  redesenhada — que, de quebra, resolve o logotipo marinho invisível no tema
+  escuro;
+* **pastas em inglês** (`pages`, `services`, `components`, `styles`, `types`,
+  `hooks`, `layout`, `lib`, `constants`) com nomes de arquivo e de símbolo
+  em português. É a convenção daqui para a frente no front; o backend segue
+  em português.
+
+Sem *lazy loading* por enquanto: enquanto uma página depender do CSS de
+outra, dividir o bundle deixa tela sem botão. Entra no fechamento, com o
+preflight.
+
+**Dois ajustes na integração.** (1) A branch trazia `backend/.env.bak-instalador`
+— cópia do `.env` da máquina de casa, com segredos. Saiu do repositório e o
+`.gitignore` da raiz passa a barrar qualquer `.env*` que não seja o exemplo.
+Os segredos eram os daquela máquina; para zerar o risco, basta gerar outros
+lá. (2) `alembic` entra nas dependências: o instalador e o README rodam
+`alembic upgrade head`, e numa máquina limpa ele não estava.
+
+**Achado do instalador em casa.** No PowerShell 5.1, `docker info *> $null`
+dentro de `try/catch` cai no `catch` mesmo com o Docker no ar (redirecionar o
+stderr de executável nativo vira `NativeCommandError`). O script pergunta a
+versão do servidor e decide por ela.

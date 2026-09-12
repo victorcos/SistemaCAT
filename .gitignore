@@ -51,3 +51,8 @@ desktop.ini
 
 # gerado pelo pip install -e; nunca versionar
 *.egg-info/
+
+# nenhum .env, nem copia de .env, entra no repositorio
+.env
+.env.*
+!.env.example
