@@ -169,5 +169,13 @@ tinha acesso a um dado em determinado mês. Alocar de novo cria linha nova, e
 o histórico fica com as duas passagens.
 
 **Ninguém tira o próprio acesso** (422): evita alguém se trancar para fora por
-engano. Conta `dev` ignora o escopo por definição do papel — alocação nela não
-muda nada, e a tela avisa.
+engano.
+
+**Gestor e dev ignoram o escopo por definição do papel** — alocação neles não
+muda nada, e a tela avisa. O gestor responde pela carteira inteira da casa; o
+dev precisa reproduzir problema em qualquer cliente. A diferença entre os dois
+está no log: o acesso do dev sem alocação é registrado como exceção, o do
+gestor não, porque é o escopo normal do papel.
+
+Essas rotas continuam existindo para **quem executa** — analista, revisor e
+leitura —, que é quem de fato tem recorte de carteira.

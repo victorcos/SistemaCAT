@@ -1,5 +1,6 @@
 import { Botao } from "@/components/ui/Botao";
 import { EtiquetaDePapel } from "@/components/ui/Etiqueta";
+import { enxergaTodasAsEmpresas } from "@/constants/roles";
 import { IconeClaro, IconeEscuro, IconeSair } from "@/constants/icons";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
@@ -13,8 +14,11 @@ export function BarraTopo({ usuario }: { usuario: Usuario }) {
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
         <strong className="truncate text-sm">{usuario.nome_exibicao}</strong>
         <EtiquetaDePapel papel={usuario.papel} />
-        {/* dev enxerga toda empresa; mostrar "0 empresas" confundiria */}
-        {usuario.papel !== "dev" && (
+        {/* quem enxerga toda empresa não tem contagem que faça sentido:
+            mostrar "0 empresas" a um gestor era dizer o contrário da verdade */}
+        {enxergaTodasAsEmpresas(usuario.papel) ? (
+          <span className="text-[13px] text-texto-fraco">todas as empresas</span>
+        ) : (
           <span className="text-[13px] text-texto-fraco">
             {usuario.empresas.length === 1
               ? "1 empresa"

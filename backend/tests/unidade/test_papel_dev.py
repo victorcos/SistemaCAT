@@ -24,9 +24,11 @@ class TestPoderes:
     def test_dev_escreve(self):
         assert Papel.DEV.pode_escrever
 
-    def test_so_dev_ignora_o_escopo_de_empresa(self):
+    def test_quem_ignora_o_escopo_de_empresa(self):
+        """Dev por manutenção, gestor porque responde pela carteira inteira."""
         assert Papel.DEV.ignora_escopo_de_empresa
-        for p in (Papel.GESTOR, Papel.ANALISTA, Papel.REVISOR, Papel.LEITURA):
+        assert Papel.GESTOR.ignora_escopo_de_empresa
+        for p in (Papel.ANALISTA, Papel.REVISOR, Papel.LEITURA):
             assert not p.ignora_escopo_de_empresa
 
 
@@ -34,9 +36,14 @@ class TestEscopo:
     def test_dev_enxerga_empresa_sem_alocacao(self):
         assert usuario(Papel.DEV).enxerga_empresa(99)
 
-    def test_gestor_sem_alocacao_nao_enxerga(self):
-        """A diferença entre dev e gestor mora aqui."""
-        assert not usuario(Papel.GESTOR).enxerga_empresa(99)
+    def test_gestor_sem_alocacao_enxerga(self):
+        """Gestor responde pela carteira toda — não se aloca gestor."""
+        assert usuario(Papel.GESTOR).enxerga_empresa(99)
+
+    def test_quem_executa_sem_alocacao_nao_enxerga(self):
+        """O escopo por empresa continua valendo para quem executa."""
+        for p in (Papel.ANALISTA, Papel.REVISOR, Papel.LEITURA):
+            assert not usuario(p).enxerga_empresa(99)
 
     def test_dev_com_alocacao_nao_marca_excecao(self):
         d = usuario(Papel.DEV, empresas=(7,))
@@ -50,6 +57,8 @@ class TestEscopo:
         assert d.acessa_por_excecao(99)
 
     def test_quem_nao_e_dev_nunca_marca_excecao(self):
+        """Inclusive o gestor: ver toda a carteira é o escopo do papel, não um
+        desvio dele. Marcar como exceção encheria o log e apagaria o sinal."""
         for p in (Papel.GESTOR, Papel.ANALISTA, Papel.REVISOR, Papel.LEITURA):
             assert not usuario(p, empresas=(7,)).acessa_por_excecao(99)
 

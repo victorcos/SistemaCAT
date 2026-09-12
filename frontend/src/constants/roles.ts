@@ -9,7 +9,9 @@ export const PAPEIS: Record<Papel, { rotulo: string; ajuda: string }> = {
   },
   gestor: {
     rotulo: "Gestor",
-    ajuda: "Administra usuários e alocações.",
+    ajuda:
+      "Responde pela carteira inteira: enxerga toda empresa e administra " +
+      "usuários e alocações.",
   },
   analista: {
     rotulo: "Analista",
@@ -59,6 +61,21 @@ export const ORDEM_CARGOS: Cargo[] = [
 /** Papéis que administram usuários. Espelha Papel.administra_usuarios no
  *  domínio — a tela usa isto só para esconder o que a API já recusaria. */
 export const ADMINISTRA_USUARIOS: Papel[] = ["dev", "gestor"];
+
+/** Papéis que enxergam toda empresa, alocados ou não. Espelha
+ *  Papel.ignora_escopo_de_empresa no domínio.
+ *
+ *  Gestor está aqui porque responde pela carteira inteira da casa — exigir
+ *  que alguém o alocasse em cada empresa nova era trabalho que ninguém fazia,
+ *  e o gestor entrava num sistema vazio. Dev, porque manutenção precisa
+ *  reproduzir problema em qualquer cliente.
+ *
+ *  Para estes dois, a tela de alocação não muda nada, e "0 empresas" não é
+ *  aviso de nada — é por isso que três telas consultam esta lista. */
+export const IGNORA_ESCOPO_DE_EMPRESA: Papel[] = ["dev", "gestor"];
+
+export const enxergaTodasAsEmpresas = (papel: Papel) =>
+  IGNORA_ESCOPO_DE_EMPRESA.includes(papel);
 
 /** Papéis que apagam um trabalho inteiro. Espelha Papel.pode_excluir_trabalho
  *  no domínio. Analista e revisor escrevem, apuram e entregam — mas não

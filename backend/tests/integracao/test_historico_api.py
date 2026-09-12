@@ -45,6 +45,19 @@ def cliente():
                nome_exibicao="Analista de Outra Carteira",
                senha_hash=senhas.gerar(SENHA), papel=Papel.ANALISTA,
                cargo=Cargo.ANALISTA)
+    # gestor de verdade (o "hist_gestor" acima é dev) e SEM alocação nenhuma:
+    # é com ele que se prova que o papel basta para enxergar a carteira
+    repo.criar(usuario="hist_gestor_real", email="hist.gestorreal@bms.local",
+               nome_exibicao="Gerente sem Alocação",
+               senha_hash=senhas.gerar(SENHA), papel=Papel.GESTOR,
+               cargo=Cargo.GERENTE)
+    # o par do gestor acima: mesma ausência de alocação, papel que executa.
+    # Separado de "hist_sem_acesso" porque aquele recebe o trabalho no teste
+    # de sucessão e sai de lá alocado
+    repo.criar(usuario="hist_fora_da_carteira", email="hist.fora@bms.local",
+               nome_exibicao="Analista de Fora",
+               senha_hash=senhas.gerar(SENHA), papel=Papel.ANALISTA,
+               cargo=Cargo.ANALISTA)
     repo.criar(usuario="hist_inativo", email="hist.inativo@bms.local",
                nome_exibicao="Fulano Desligado",
                senha_hash=senhas.gerar(SENHA), papel=Papel.ANALISTA,
@@ -333,3 +346,20 @@ class TestEscopo:
 
     def test_sem_token_nao_le(self, cliente, projeto):
         assert cliente.get(f"/api/projetos/{projeto['id']}/historico").status_code == 401
+
+    def test_gestor_le_sem_alocacao(self, cliente, projeto):
+        """Gestor responde pela carteira inteira: ninguém o aloca em empresa.
+
+        Antes disso, dois dos três gestores da casa entravam num sistema vazio
+        porque esperavam que alguém os alocasse — trabalho que nunca foi feito.
+        """
+        r = cliente.get(f"/api/projetos/{projeto['id']}/historico",
+                        headers=cab(cliente, "hist_gestor_real"))
+        assert r.status_code == 200, r.text
+        assert r.json()["eventos"]
+
+    def test_quem_executa_sem_alocacao_nao_le(self, cliente, projeto):
+        """O escopo por empresa não caiu — ele só não vale para quem coordena."""
+        r = cliente.get(f"/api/projetos/{projeto['id']}/historico",
+                        headers=cab(cliente, "hist_fora_da_carteira"))
+        assert r.status_code == 403, r.text

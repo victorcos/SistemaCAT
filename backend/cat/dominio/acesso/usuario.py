@@ -105,14 +105,24 @@ class Papel(str, Enum):
 
     @property
     def ignora_escopo_de_empresa(self) -> bool:
-        """Só o dev enxerga empresa sem alocação.
+        """Quem enxerga empresa sem alocação: gestor e dev.
 
-        Existe porque manutenção precisa reproduzir problema em qualquer
-        cliente, e alocar o dev em cada empresa nova na mão seria esquecido na
-        primeira semana. O preço é que todo acesso assim fica registrado como
-        exceção, para nunca virar rotina invisível.
+        **Gestor** porque é quem responde pela carteira inteira da casa —
+        diretor, gerente e coordenador. Exigir que alguém os aloque em cada
+        empresa nova era trabalho que ninguém faria: no banco real, dois dos
+        três gestores não enxergavam empresa alguma e entravam num sistema
+        vazio. E é incoerente com o que o papel já pode fazer — administrar
+        usuários, apagar trabalho, passar trabalho adiante.
+
+        **Dev** porque manutenção precisa reproduzir problema em qualquer
+        cliente.
+
+        A diferença entre os dois está em `acessa_por_excecao`: para o dev,
+        cada acesso sem alocação é exceção e vai para o log; para o gestor, é
+        o escopo normal do papel, e registrar a cada requisição só encheria o
+        log de ruído.
         """
-        return self is Papel.DEV
+        return self in (Papel.DEV, Papel.GESTOR)
 
     @property
     def conta_como_gestor(self) -> bool:
@@ -336,15 +346,16 @@ class Usuario:
         return empresa_id in self.empresas
 
     def acessa_por_excecao(self, empresa_id: int) -> bool:
-        """Verdadeiro quando o acesso só passou por ser dev.
+        """Verdadeiro quando o acesso só passou por ser **dev**.
 
         Serve para o log distinguir acesso normal de acesso por exceção. Sem
         isso, o bypass do dev some no meio do tráfego comum.
+
+        Gestor sem alocação não entra aqui: ver toda a carteira é o escopo
+        do papel, não um desvio dele. Marcar isso como exceção encheria o log
+        a cada requisição e apagaria o sinal do que é mesmo excepcional.
         """
-        return (
-            self.papel.ignora_escopo_de_empresa
-            and empresa_id not in self.empresas
-        )
+        return self.papel is Papel.DEV and empresa_id not in self.empresas
 
     @property
     def tentativas_restantes(self) -> int:

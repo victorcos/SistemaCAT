@@ -40,7 +40,13 @@ import {
   IconeNovo,
   IconeReativar,
 } from "@/constants/icons";
-import { CARGOS, ORDEM_CARGOS, ORDEM_PAPEIS, PAPEIS } from "@/constants/roles";
+import {
+  CARGOS,
+  enxergaTodasAsEmpresas,
+  ORDEM_CARGOS,
+  ORDEM_PAPEIS,
+  PAPEIS,
+} from "@/constants/roles";
 import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useToast } from "@/hooks/useToast";
@@ -547,13 +553,20 @@ function Linha({
         <BotaoIcone
           icone={IconeEmpresa}
           rotulo={
-            u.empresas.length === 0
-              ? "Sem acesso a nenhuma empresa — conceder"
-              : `Acesso a ${u.empresas.length} empresa(s)`
+            enxergaTodasAsEmpresas(u.papel)
+              ? "Enxerga todas as empresas pelo papel"
+              : u.empresas.length === 0
+                ? "Sem acesso a nenhuma empresa — conceder"
+                : `Acesso a ${u.empresas.length} empresa(s)`
           }
           // sem empresa a pessoa não enxerga trabalho nenhum: o botão chama
-          // atenção em vez de esperar que alguém descubra
-          tom={u.empresas.length === 0 ? "perigo" : "neutro"}
+          // atenção em vez de esperar que alguém descubra. Para gestor e dev
+          // a contagem não quer dizer nada — o papel já os deixa ver tudo
+          tom={
+            !enxergaTodasAsEmpresas(u.papel) && u.empresas.length === 0
+              ? "perigo"
+              : "neutro"
+          }
           disabled={ocupado}
           onClick={aoDarAcesso}
         />
@@ -912,10 +925,11 @@ function ModalDeAcesso({
         </>
       }
     >
-      {usuario?.papel === "dev" && (
+      {usuario && enxergaTodasAsEmpresas(usuario.papel) && (
         <Aviso tom="atencao" className="mb-4">
-          Contas <strong>dev</strong> enxergam todas as empresas por definição do papel —
-          alocação aqui não muda nada para elas.
+          Contas <strong>{PAPEIS[usuario.papel].rotulo.toLowerCase()}</strong> enxergam
+          todas as empresas por definição do papel — alocação aqui não muda nada
+          para elas.
         </Aviso>
       )}
 

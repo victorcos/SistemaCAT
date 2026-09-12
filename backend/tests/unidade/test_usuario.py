@@ -86,11 +86,12 @@ class TestEscopo:
     def test_sem_alocacao_nao_enxerga_nada(self):
         assert not novo().enxerga_empresa(10)
 
-    def test_gestor_sem_alocacao_tambem_nao_enxerga(self):
-        """Papel diz o QUE pode fazer; alocação diz SOBRE QUEM."""
+    def test_gestor_sem_alocacao_enxerga_tudo(self):
+        """Para quem executa, alocação diz SOBRE QUEM se trabalha. Gestor não
+        tem esse recorte: responde pela carteira inteira da casa."""
         gestor = novo(papel=Papel.GESTOR, empresas=())
         assert gestor.papel.administra_usuarios
-        assert not gestor.enxerga_empresa(10)
+        assert gestor.enxerga_empresa(10)
 
 
 class TestPapel:

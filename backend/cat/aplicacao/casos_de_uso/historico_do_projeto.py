@@ -408,9 +408,12 @@ class Sucessor:
 
 
 def _alcanca(u: UsuarioDB, empresa_id: int, sessao: Session) -> bool:
-    """Se este usuário enxerga esta empresa. Dev enxerga todas — é a conta de
-    manutenção, e o bypass já é registrado no log a cada acesso."""
-    if u.papel == Papel.DEV.value:
+    """Se este usuário enxerga esta empresa.
+
+    Gestor e dev enxergam todas pelo papel (`ignora_escopo_de_empresa`), e
+    para eles não há alocação a criar.
+    """
+    if Papel(u.papel).ignora_escopo_de_empresa:
         return True
     return sessao.scalar(
         select(func.count())

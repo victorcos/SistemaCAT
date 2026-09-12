@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app  # noqa: E402
 from cat.config import obter_config  # noqa: E402
-from cat.dominio.acesso.usuario import Cargo, Papel  # noqa: E402
+from cat.dominio.acesso.usuario import MINIMO_DE_GESTORES, Cargo, Papel  # noqa: E402
 from cat.infraestrutura.auth.senha import SenhasArgon2  # noqa: E402
 from cat.infraestrutura.repositorios.modelos import Base  # noqa: E402
 from cat.infraestrutura.repositorios.usuario_repositorio import (  # noqa: E402
@@ -143,15 +143,46 @@ class TestDados:
         assert r.status_code == 403
 
 
+TRIO = ("diretor", "gerente", "coordenador")
+
+
+@pytest.fixture
+def so_o_trio(cliente):
+    """Deixa ativos apenas os três gestores deste módulo.
+
+    A salvaguarda conta o banco inteiro e a bateria compartilha um banco. Sem
+    isto, um gestor semeado por outro módulo empurra a contagem para quatro e
+    a recusa que se quer provar não acontece — o teste quebra sem que a regra
+    tenha mudado. Foi o que aconteceu quando o módulo de histórico ganhou um
+    gestor próprio.
+    """
+    c = cab(cliente, "diretor")
+    extras = [
+        u for u in cliente.get("/api/usuarios", headers=c).json()
+        if u["papel"] == "gestor" and u["ativo"] and u["usuario"] not in TRIO
+    ]
+    # rebaixar é permitido enquanto sobrarem os três — é por isso que dá para
+    # limpar o excedente sem esbarrar na própria salvaguarda
+    for u in extras:
+        r = cliente.patch(f"/api/usuarios/{u['id']}/papel", headers=c,
+                          json={"papel": "analista"})
+        assert r.status_code == 200, r.text
+    assert len(TRIO) == MINIMO_DE_GESTORES
+    yield
+    for u in extras:
+        cliente.patch(f"/api/usuarios/{u['id']}/papel", headers=c,
+                      json={"papel": "gestor"})
+
+
 class TestMinimoDeGestores:
-    def test_nao_rebaixa_deixando_menos_de_tres(self, cliente):
+    def test_nao_rebaixa_deixando_menos_de_tres(self, cliente, so_o_trio):
         r = cliente.patch(f"/api/usuarios/{id_de(cliente, 'gerente')}/papel",
                           headers=cab(cliente, "diretor"),
                           json={"papel": "analista"})
         assert r.status_code == 409
         assert "3 gestores" in r.json()["detail"]
 
-    def test_nao_desativa_deixando_menos_de_tres(self, cliente):
+    def test_nao_desativa_deixando_menos_de_tres(self, cliente, so_o_trio):
         r = cliente.patch(f"/api/usuarios/{id_de(cliente, 'gerente')}/situacao",
                           headers=cab(cliente, "diretor"),
                           json={"ativo": False})

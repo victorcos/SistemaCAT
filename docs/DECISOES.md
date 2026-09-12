@@ -5,6 +5,45 @@
 
 ---
 
+## 2026-09-12 — Gestor enxerga toda a carteira, sem alocação
+
+**Decisão.** `Papel.ignora_escopo_de_empresa` passa a valer para **gestor** além
+de dev. O escopo por empresa continua valendo para analista, revisor e leitura.
+
+**Por quê.** Três razões, e a primeira é a que dói.
+
+No banco de verdade, **dois dos três gestores não enxergavam empresa alguma**.
+Entravam no sistema e viam uma lista vazia, porque a alocação só nascia de um
+jeito: quem cadastra a empresa pelo SPED fica alocado nela. Exigir que alguém
+alocasse cada gestor em cada empresa nova era trabalho que ninguém ia fazer — e
+não fez.
+
+Segundo, a regra era incoerente com o que o papel já podia. Gestor administra
+usuários, apaga um trabalho inteiro e passa trabalho de uma pessoa para outra.
+Negar-lhe a leitura de uma empresa não protegia nada: bastava se alocar.
+
+Terceiro, gestor aqui é diretor, gerente e coordenador. Quem coordena responde
+pela carteira inteira; "sobre quem eu trabalho" é um recorte de quem executa.
+
+**Consequência.** `acessa_por_excecao` ficou só do dev. Marcar o gestor como
+exceção encheria o log a cada requisição e afogaria o sinal do que é mesmo
+excepcional — que é justamente o bypass de manutenção.
+
+A tela de alocação continua, para quem executa. Para gestor e dev ela mostra um
+aviso de que não muda nada, e o botão vermelho de "sem acesso a empresa nenhuma"
+não aparece mais para eles: a contagem zero não quer dizer nada nesses papéis.
+O front espelha a regra num lugar só, `IGNORA_ESCOPO_DE_EMPRESA` em
+`constants/roles.ts`, porque três telas precisavam dela.
+
+**De quebra.** Os dois testes da salvaguarda do mínimo de gestores quebraram com
+essa mudança, e não deviam: eles contavam o banco inteiro, que a bateria de
+integração compartilha, e passavam só porque nenhum outro módulo semeava gestor.
+O módulo de histórico passou a semear um, a contagem virou quatro, rebaixar
+passou a ser permitido. Agora o teste constrói a própria premissa — deixa
+exatamente o mínimo ativo, prova a recusa, e devolve os outros.
+
+---
+
 ## 2026-09-09 — Python com DuckDB como base, não outra linguagem
 
 **Decisão.** Python para leitura e varredura, DuckDB para agregação, xlsxwriter
