@@ -98,7 +98,7 @@ export const CampoSenha = forwardRef<
         aria-pressed={visivel}
         disabled={resto.disabled}
         className={
-          "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1.5 " +
+          "absolute right-1.5 top-1/2 -translate-y-1/2 cursor-pointer rounded border-0 bg-transparent p-1.5 " +
           "text-acao2-texto hover:not-disabled:bg-acao2-hover " +
           "disabled:text-texto-fraco disabled:cursor-not-allowed"
         }

@@ -14,6 +14,7 @@
  */
 export {
   // ações de linha
+  Plus as IconeNovo,
   Pencil as IconeEditar,
   KeyRound as IconeChave,
   Power as IconeEnergia,

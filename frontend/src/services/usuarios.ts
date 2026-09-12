@@ -34,6 +34,10 @@ const alterar = <T>(id: number, campo: string, corpo: unknown) =>
     headers: { "Content-Type": "application/json" },
   });
 
+/** Nome de exibição e e-mail. O nome de usuário é imutável. */
+export const alterarDados = (id: number, dados: { nome_exibicao: string; email: string }) =>
+  alterar<UsuarioResumo>(id, "dados", dados);
+
 export const alterarPapel = (id: number, papel: Papel) =>
   alterar<UsuarioResumo>(id, "papel", { papel });
 

@@ -11,10 +11,11 @@ const VARIANTES: Record<VarianteDeBotao, string> = {
   principal:
     "bg-acao-fundo text-acao-texto hover:bg-acao-hover active:bg-acao-ativo " +
     "disabled:bg-acao-inativo-fundo disabled:text-acao-inativo-texto",
+  // bg-transparent nos dois: sem preflight, <button> vem com fundo cinza
   secundario:
-    "border border-acao2-borda text-acao2-texto hover:bg-acao2-hover " +
+    "border border-acao2-borda bg-transparent text-acao2-texto hover:bg-acao2-hover " +
     "disabled:text-texto-fraco",
-  fantasma: "text-acao2-texto hover:bg-acao2-hover disabled:text-texto-fraco",
+  fantasma: "bg-transparent text-acao2-texto hover:bg-acao2-hover disabled:text-texto-fraco",
   // Vermelho solido, nunca laranja da marca: a cor da marca e a de seguir em
   // frente, e apagar nao e seguir em frente.
   perigo:
@@ -42,7 +43,7 @@ type PropsDeBotao = Base & ButtonHTMLAttributes<HTMLButtonElement>;
 type PropsDeLink = Base & { para: string };
 
 const base =
-  "inline-flex items-center justify-center rounded-raio font-[650] " +
+  "inline-flex items-center justify-center whitespace-nowrap rounded-raio font-[650] " +
   "border border-transparent cursor-pointer transition-colors duration-150 " +
   "disabled:cursor-not-allowed " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-borda-foco";

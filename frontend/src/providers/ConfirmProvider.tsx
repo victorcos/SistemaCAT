@@ -1,6 +1,10 @@
 import { createContext, useCallback, useRef, useState, type ReactNode } from "react";
 import { Botao, type VarianteDeBotao } from "@/components/ui/Botao";
 import { Modal } from "@/components/ui/Modal";
+import type { Icone } from "@/constants/icons";
+import { cn } from "@/lib/cn";
+
+export type TomDeConfirmacao = "destaque" | "perigo" | "sucesso";
 
 export interface PedidoDeConfirmacao {
   titulo: ReactNode;
@@ -8,7 +12,16 @@ export interface PedidoDeConfirmacao {
   rotuloConfirmar?: string;
   rotuloCancelar?: string;
   variante?: VarianteDeBotao;
+  /** ícone de 40×40 acima do texto, com fundo no tom da ação */
+  icone?: Icone;
+  tom?: TomDeConfirmacao;
 }
+
+const FUNDO_DO_ICONE: Record<TomDeConfirmacao, string> = {
+  destaque: "bg-laranja-500/18 text-laranja-700 escuro:text-laranja-300",
+  perigo: "bg-erro-fundo text-erro",
+  sucesso: "bg-sucesso-fundo text-sucesso",
+};
 
 interface Contexto {
   confirmar: (pedido: PedidoDeConfirmacao) => Promise<boolean>;
@@ -67,6 +80,16 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           </>
         }
       >
+        {pedido?.icone && (
+          <div
+            className={cn(
+              "mb-4 flex h-10 w-10 items-center justify-center rounded-raio-g",
+              FUNDO_DO_ICONE[pedido.tom ?? "destaque"],
+            )}
+          >
+            <pedido.icone size={18} strokeWidth={2} aria-hidden />
+          </div>
+        )}
         <p className="m-0 text-[13px] leading-relaxed text-texto-suave">
           {pedido?.texto}
         </p>

@@ -62,7 +62,10 @@ export function Modal({
         if (e.target === ref.current) aoFechar();
       }}
       className={cn(
-        "m-auto w-[calc(100%-2.5rem)] bg-transparent p-0 text-texto",
+        // border-0: o <dialog> vem com borda do navegador (sem preflight).
+        // overflow-visible: o padrão do modal é rolar por dentro, e o painel
+        // do combobox estourava a caixa e a fazia rolar — cortando a lista.
+        "m-auto w-[calc(100%-2.5rem)] overflow-visible border-0 bg-transparent p-0 text-texto",
         "backdrop:bg-[rgb(4_8_16/66%)] backdrop:backdrop-blur-[6px]",
         TAMANHOS[tamanho],
       )}
@@ -79,7 +82,7 @@ export function Modal({
               onClick={aoFechar}
               title="Fechar"
               aria-label="Fechar"
-              className="-mr-1.5 h-8 w-8 shrink-0 rounded-raio text-texto-suave hover:bg-acao2-hover"
+              className="-mr-1.5 h-8 w-8 shrink-0 cursor-pointer rounded-raio border-0 bg-transparent text-texto-suave hover:bg-acao2-hover"
             >
               <IconeFechar size={17} strokeWidth={2} className="mx-auto" aria-hidden />
             </button>

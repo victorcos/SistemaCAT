@@ -157,6 +157,26 @@ class GerirUsuariosUseCase:
                  extra={"usuario_id": usuario.id})
 
     # ---------- papel e situação ----------
+    def alterar_dados(self, *, alvo_id: int, nome_exibicao: str, email: str,
+                      por: Usuario) -> Usuario:
+        """Nome de exibição e e-mail. O nome de usuário não muda nunca: é a
+        identidade nos logs e nas alocações."""
+        alvo = self._buscar(alvo_id)
+        email = validar_email(email)
+        nome_exibicao = nome_exibicao.strip()
+        if not nome_exibicao:
+            raise ValueError("O nome de exibição não pode ficar vazio.")
+        dono = self._repo.buscar_por_email(email)
+        if dono is not None and dono.id != alvo.id:
+            raise UsuarioJaExiste("e-mail")
+
+        self._repo.definir_dados(alvo.id, nome_exibicao, email)
+        log.info("dados alterados",
+                 extra={"usuario_id": alvo.id, "usuario": alvo.usuario,
+                        "email_anterior": alvo.email, "email_novo": email,
+                        "por_usuario_id": por.id})
+        return self._buscar(alvo_id)
+
     def alterar_cargo(self, *, alvo_id: int, cargo: Cargo, por: Usuario) -> Usuario:
         alvo = self._buscar(alvo_id)
         self._repo.definir_cargo(alvo.id, cargo)

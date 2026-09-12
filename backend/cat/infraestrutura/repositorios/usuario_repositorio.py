@@ -161,6 +161,14 @@ class UsuarioRepositorioSql:
         linha.papel = papel.value
         self._s.commit()
 
+    def definir_dados(self, usuario_id: int, nome_exibicao: str, email: str) -> None:
+        linha = self._alterar(usuario_id, "definir dados")
+        if linha is None:
+            return
+        linha.nome_exibicao = nome_exibicao
+        linha.email = email
+        self._s.commit()
+
     def definir_cargo(self, usuario_id: int, cargo: Cargo) -> None:
         linha = self._alterar(usuario_id, "definir cargo")
         if linha is None:

@@ -100,6 +100,11 @@ class PedidoCargo(BaseModel):
     cargo: Cargo
 
 
+class PedidoDados(BaseModel):
+    nome_exibicao: str = Field(min_length=2)
+    email: str
+
+
 class PedidoSituacao(BaseModel):
     ativo: bool
 
@@ -233,6 +238,27 @@ def alterar_papel(
             return _resumo(
                 _caso(sessao).alterar_papel(
                     alvo_id=alvo_id, papel=pedido.papel, por=gestor
+                )
+            )
+        except Exception as erro:
+            raise _traduzir(erro) from erro
+
+
+@router.patch("/{alvo_id}/dados", response_model=UsuarioResumo)
+def alterar_dados(
+    alvo_id: int,
+    pedido: PedidoDados,
+    gestor: SoGestor,
+    sessao: Annotated[Session, Depends(obter_sessao)],
+) -> UsuarioResumo:
+    """Nome de exibição e e-mail. Papel, cargo e situação têm rota própria
+    porque têm regra própria (mínimo de gestores, não alterar a si mesmo)."""
+    with contexto(etapa="alterar_dados", por_usuario_id=gestor.id):
+        try:
+            return _resumo(
+                _caso(sessao).alterar_dados(
+                    alvo_id=alvo_id, nome_exibicao=pedido.nome_exibicao,
+                    email=pedido.email, por=gestor,
                 )
             )
         except Exception as erro:

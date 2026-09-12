@@ -78,7 +78,7 @@ export function Aviso({
           onClick={aoFechar}
           title="Dispensar"
           aria-label="Dispensar"
-          className="-mr-1 -mt-1 h-7 w-7 shrink-0 rounded opacity-70 hover:opacity-100"
+          className="-mr-1 -mt-1 h-7 w-7 shrink-0 cursor-pointer rounded border-0 bg-transparent text-current opacity-70 hover:opacity-100"
         >
           <IconeFechar size={15} strokeWidth={2} className="mx-auto" aria-hidden />
         </button>

@@ -105,6 +105,44 @@ class TestCadastro:
         assert r.status_code == 409
 
 
+class TestDados:
+    """Nome e e-mail mudam pela rota de dados; o nome de usuário, nunca."""
+
+    def test_gestor_altera_nome_e_email(self, cliente):
+        r = cliente.patch(f"/api/usuarios/{id_de(cliente, 'ana')}/dados",
+                          headers=cab(cliente, "diretor"),
+                          json={"nome_exibicao": "Ana Paula", "email": "ana.paula@bms.local"})
+        assert r.status_code == 200, r.text
+        assert r.json()["nome_exibicao"] == "Ana Paula"
+        assert r.json()["email"] == "ana.paula@bms.local"
+        assert r.json()["usuario"] == "ana"           # imutável
+
+    def test_email_de_outro_usuario_e_recusado(self, cliente):
+        r = cliente.patch(f"/api/usuarios/{id_de(cliente, 'ana')}/dados",
+                          headers=cab(cliente, "diretor"),
+                          json={"nome_exibicao": "Ana", "email": "gerente@bms.local"})
+        assert r.status_code == 409
+        assert "e-mail" in r.json()["detail"]
+
+    def test_o_proprio_email_nao_conta_como_duplicado(self, cliente):
+        r = cliente.patch(f"/api/usuarios/{id_de(cliente, 'ana')}/dados",
+                          headers=cab(cliente, "diretor"),
+                          json={"nome_exibicao": "Ana Paula S.", "email": "ana.paula@bms.local"})
+        assert r.status_code == 200, r.text
+
+    def test_email_invalido_da_422(self, cliente):
+        r = cliente.patch(f"/api/usuarios/{id_de(cliente, 'ana')}/dados",
+                          headers=cab(cliente, "diretor"),
+                          json={"nome_exibicao": "Ana", "email": "sem-arroba"})
+        assert r.status_code == 422
+
+    def test_quem_nao_e_gestor_nao_altera(self, cliente):
+        r = cliente.patch(f"/api/usuarios/{id_de(cliente, 'gerente')}/dados",
+                          headers=cab(cliente, "ana"),
+                          json={"nome_exibicao": "X Y", "email": "x@bms.local"})
+        assert r.status_code == 403
+
+
 class TestMinimoDeGestores:
     def test_nao_rebaixa_deixando_menos_de_tres(self, cliente):
         r = cliente.patch(f"/api/usuarios/{id_de(cliente, 'gerente')}/papel",

@@ -1126,3 +1126,40 @@ lá. (2) `alembic` entra nas dependências: o instalador e o README rodam
 dentro de `try/catch` cai no `catch` mesmo com o Docker no ar (redirecionar o
 stderr de executável nativo vira `NativeCommandError`). O script pergunta a
 versão do servidor e decide por ela.
+
+---
+
+## 2026-09-12 — Tela de Usuários reconstruída a partir do handoff
+
+**O que chegou.** Um pacote de design (`spec-screen-usuarios.md` +
+protótipo HTML) com a tela de Usuários redesenhada: métricas, busca, filtros
+por situação, tabela com avatar e ações em ícone, modais de criação, edição e
+confirmação, combobox com busca no lugar de todo `<select>`, e banner de
+senha provisória com botão Copiar. A spec é referência visual — a
+implementação usa os componentes do sistema, não o HTML do protótipo.
+
+**O que a spec pedia e o sistema não tinha.** Editar **nome e e-mail** de um
+usuário: existiam rotas para papel, cargo e situação, e nenhuma para os
+dados. Entrou `PATCH /usuarios/{id}/dados`, com a mesma validação da criação
+(e-mail válido, nome não vazio) e a checagem que faltava — e-mail já usado
+por outro usuário responde 409, o próprio e-mail não conta como duplicado. O
+nome de usuário continua imutável: é a identidade nos logs e nas alocações.
+
+**Dois componentes novos, porque servem a mais telas.** `Combobox` (busca,
+teclado ↑↓ Enter Esc Home End, papéis ARIA, abre para cima quando não há
+espaço abaixo — tudo o que a spec listava como "a implementar na versão
+real") e `BotaoIcone` (34×34, exige rótulo, porque ícone sozinho não tem nome
+para leitor de tela).
+
+**A confirmação ganhou ícone e tom** (`useConfirm` com `icone` e `tom`), que
+é o que diferencia "gerar senha" de "desativar" num diálogo de duas linhas.
+
+**Achado da conferência visual.** Sem o preflight do Tailwind — desligado de
+propósito enquanto houver CSS legado —, `<button>` e `<dialog>` chegam com
+borda e fundo do navegador. Aparecia como caixa cinza em volta de cada botão
+do kit. Corrigido nos próprios componentes (`bg-transparent`, `border-0`),
+não na tela. E o `<dialog>` precisou de `overflow-visible`: o padrão cortava
+o painel do combobox dentro do modal.
+
+**Saiu de cena:** `pages/Usuarios.css` (220 linhas) e o componente
+`SenhaProvisoria`, que o banner de flash substitui.
