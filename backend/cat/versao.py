@@ -11,9 +11,12 @@ está à frente do arquivo — que é exatamente como o drift aconteceu.
 
 Ordem de leitura:
 
-1. metadados do pacote instalado (`importlib.metadata`), se alguém um dia o
-   instalar com pip;
-2. o `pyproject.toml` ao lado do pacote, que é como o sistema roda hoje;
+1. o `pyproject.toml` ao lado do pacote. Vem PRIMEIRO porque é a fonte: numa
+   instalação editável (`pip install -e`), os metadados do pacote congelam a
+   versão do dia da instalação e não acompanham o `git pull` — o `/api/saude`
+   voltaria a mentir, agora para o outro lado;
+2. metadados do pacote instalado (`importlib.metadata`), quando não há
+   `pyproject.toml` ao lado (pacote empacotado de verdade);
 3. `0.0.0+desconhecida`, com aviso no log. Versão nunca derruba a API.
 """
 
@@ -37,19 +40,20 @@ _PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
 
 @lru_cache
 def versao() -> str:
+    if _PYPROJECT.is_file():
+        try:
+            with _PYPROJECT.open("rb") as f:
+                lida = tomllib.load(f)["project"]["version"]
+            if isinstance(lida, str) and lida.strip():
+                return lida.strip()
+        except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError) as erro:
+            log.warning("não deu para ler a versão do pyproject.toml",
+                        extra={"arquivo": str(_PYPROJECT), "motivo": str(erro)})
+
     try:
         return metadata.version(NOME_DO_PACOTE)
     except metadata.PackageNotFoundError:
         pass
-
-    try:
-        with _PYPROJECT.open("rb") as f:
-            lida = tomllib.load(f)["project"]["version"]
-        if isinstance(lida, str) and lida.strip():
-            return lida.strip()
-    except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError) as erro:
-        log.warning("não deu para ler a versão do pyproject.toml",
-                    extra={"arquivo": str(_PYPROJECT), "motivo": str(erro)})
     return DESCONHECIDA
 
 

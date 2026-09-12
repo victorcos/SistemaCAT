@@ -1048,3 +1048,38 @@ produtor rural, retorno): mesma regra da saída própria, não anomalia. O
 resumo passou a separar entrada própria sem item (regra, item vem do XML) de
 entrada de terceiros sem item (aí a EFD exige o C170 e faltar é sinal de
 arquivo incompleto). Parquets: 1,6 GB no total; o analítico sozinho tem 874 MB.
+
+---
+
+## 2026-09-11 — Instalação numa máquina nova, a um comando
+
+**O pedido.** Trabalhar de casa, noutra máquina. A sessão de desenvolvimento
+roda na máquina do escritório e não alcança a de casa; o que se pode fazer é
+tornar a instalação trivial e reprodutível.
+
+**Decisão.** `scripts\instalar.ps1` faz tudo de uma vez — pré-requisitos
+(com `-InstalarPreRequisitos` instala via winget), venv, `.env` com JWT e
+pimenta **novos** (segredo de servidor não viaja entre máquinas), Postgres em
+Docker ou SQLite na falta dele, migrações, gestores iniciais, `npm install` —
+e `scripts\subir.ps1` sobe API e tela. Idempotente: rodar de novo não apaga
+`.env`, banco nem senha. Receita no README.
+
+**O ensaio achou dois defeitos que valiam para qualquer máquina limpa.**
+
+1. `pip install -e ".[dev]"` **nunca funcionou**: o setuptools achava `cat`,
+   `tests`, `migracoes` e `workers` na raiz do backend e recusava. O ambiente
+   do escritório tinha sido montado à mão, por isso ninguém viu. Corrigido
+   com `[tool.setuptools.packages.find] include = ["cat*"]`.
+2. Com o pacote instalado em modo editável, `versao()` lia primeiro os
+   metadados do pacote — que congelam a versão do dia da instalação e não
+   acompanham o `git pull`. O `/api/saude` voltaria a mentir. Agora o
+   `pyproject.toml` vem primeiro; os metadados são o recurso de quando não há
+   `pyproject` ao lado.
+
+E o PowerShell 5.1 lê `.ps1` sem BOM como ANSI: um travessão virou aspa e
+quebrou o script. Os scripts vão com BOM UTF-8.
+
+**O que não vem junto.** Cada máquina tem o próprio banco (usuários,
+empresas, trabalhos) e o próprio `.env`. O dado fiscal do cliente fica onde
+está — de casa só se alcança pela VPN, e o sistema do escritório continua no
+ar para quem chegar até ele pela rede interna.

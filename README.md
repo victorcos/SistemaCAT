@@ -44,6 +44,24 @@ scripts/
 - Toda implementação nova sobe versionada. Ver VERSIONAMENTO.md.
 - Dado fiscal de cliente **nunca** entra no repositório.
 
+## Instalar numa máquina nova (Windows)
+
+Três comandos, do zero ao primeiro login. Precisa de Git, Python 3.11+ e
+Node 20+ (o script instala o que faltar via `winget` com
+`-InstalarPreRequisitos`); Docker Desktop é opcional — sem ele o banco é SQLite.
+
+```
+gh repo clone victorcos/SistemaCAT      # ou: git clone https://github.com/victorcos/SistemaCAT.git
+cd SistemaCAT
+.\scripts\instalar.ps1                  # venv, .env com segredos novos, banco, migrações, gestores, front
+.\scripts\subir.ps1                     # API na 8010, tela na 5173, abre o navegador
+```
+
+O `instalar.ps1` é idempotente e imprime as senhas provisórias dos três
+gestores uma vez só — anote. Cada máquina tem o próprio `.env` (JWT e
+pimenta não viajam) e o próprio banco: usuários, empresas e trabalhos não
+vêm junto do repositório, e o dado fiscal do cliente continua onde está.
+
 ## Como rodar
 
 Banco, opcional em desenvolvimento (sem ele usa SQLite):
