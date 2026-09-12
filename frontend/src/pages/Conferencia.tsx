@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { TrabalhoParado } from "@/components/shared/TrabalhoParado";
 import { Andamento } from "@/components/ui/Andamento";
 import { Aviso } from "@/components/ui/Aviso";
 import { Botao, BotaoLink } from "@/components/ui/Botao";
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/Pagina";
 import { IconeBaixar, IconeTentarDeNovo } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
+import { aceitaProcessamento } from "@/constants/status";
 import { comoErro } from "@/lib/errors";
 import { dinheiro, numero } from "@/lib/format";
 import {
@@ -121,6 +123,7 @@ export default function Conferencia() {
 
   const rodando = execucao !== null && EM_CURSO.includes(execucao.situacao);
   const resumo = execucao?.situacao === "concluida" ? execucao.resumo : null;
+  const anda = !projeto || aceitaProcessamento(projeto.projeto.status);
 
   return (
     <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
@@ -146,12 +149,15 @@ export default function Conferencia() {
             icone={IconeTentarDeNovo}
             onClick={comecar}
             carregando={ocupado || rodando}
+            disabled={!anda}
             className="shadow-acao"
           >
             {rodando ? "Conferindo…" : execucao ? "Conferir de novo" : "Conferir"}
           </Botao>
         }
       />
+
+      <TrabalhoParado status={projeto?.projeto.status} projetoId={projetoId} />
 
       {erro && <Aviso titulo={erro.message} codigo={erro.requisicaoId} />}
 

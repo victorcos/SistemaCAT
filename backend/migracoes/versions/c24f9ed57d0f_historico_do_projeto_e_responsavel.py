@@ -47,17 +47,27 @@ def upgrade() -> None:
         "ix_evento_projeto", "evento_do_projeto", ["projeto_id", "criado_em"]
     )
 
-    op.add_column("projeto", sa.Column("responsavel_id", sa.Integer(), nullable=True))
-    op.create_foreign_key(
-        "fk_projeto_responsavel", "projeto", "usuario", ["responsavel_id"], ["id"]
-    )
+    # batch_alter_table e nao add_column + create_foreign_key: SQLite nao tem
+    # ALTER de constraint, e o batch copia-e-move resolve. No Postgres vira o
+    # ALTER normal, com o mesmo resultado.
+    #
+    # Nota: a cadeia de migracoes ainda NAO roda inteira em SQLite — a de
+    # 62fe3d195ce5 usa create_foreign_key direto e quebra la. E anterior a
+    # esta e nao se conserta aqui; fica registrado para quando o caminho sem
+    # Docker do instalar.ps1 for exercitado de verdade.
+    with op.batch_alter_table("projeto") as lote:
+        lote.add_column(sa.Column("responsavel_id", sa.Integer(), nullable=True))
+        lote.create_foreign_key(
+            "fk_projeto_responsavel", "usuario", ["responsavel_id"], ["id"]
+        )
     op.execute(
         "UPDATE projeto SET responsavel_id = criado_por WHERE responsavel_id IS NULL"
     )
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_projeto_responsavel", "projeto", type_="foreignkey")
-    op.drop_column("projeto", "responsavel_id")
+    with op.batch_alter_table("projeto") as lote:
+        lote.drop_constraint("fk_projeto_responsavel", type_="foreignkey")
+        lote.drop_column("responsavel_id")
     op.drop_index("ix_evento_projeto", table_name="evento_do_projeto")
     op.drop_table("evento_do_projeto")

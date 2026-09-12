@@ -41,6 +41,10 @@ def cliente():
                nome_exibicao="Analista do Histórico",
                senha_hash=senhas.gerar(SENHA), papel=Papel.ANALISTA,
                cargo=Cargo.ANALISTA)
+    repo.criar(usuario="hist_sem_acesso", email="hist.semacesso@bms.local",
+               nome_exibicao="Analista de Outra Carteira",
+               senha_hash=senhas.gerar(SENHA), papel=Papel.ANALISTA,
+               cargo=Cargo.ANALISTA)
     repo.criar(usuario="hist_inativo", email="hist.inativo@bms.local",
                nome_exibicao="Fulano Desligado",
                senha_hash=senhas.gerar(SENHA), papel=Papel.ANALISTA,
@@ -74,8 +78,9 @@ def projeto(cliente):
     # o analista precisa de alocação para enxergar a empresa; sem ela, a
     # recusa viria do escopo e não da regra que se quer provar
     with Sessao() as s:
-        s.add(AlocacaoDB(usuario_id=id_de(cliente, "hist_analista"),
-                         empresa_id=empresa_id, papel_projeto="executor"))
+        for quem in ("hist_analista", "hist_inativo"):
+            s.add(AlocacaoDB(usuario_id=id_de(cliente, quem),
+                             empresa_id=empresa_id, papel_projeto="executor"))
         s.commit()
 
     r = cliente.post("/api/projetos", headers=c, json={
@@ -248,6 +253,20 @@ class TestSucessao:
                                 "motivo": ""})
         assert r.status_code == 422
         assert "já responde" in r.json()["detail"]
+
+    def test_passar_para_quem_nao_alcanca_a_empresa_e_recusado(self, cliente, projeto):
+        """Apareceu na conferência visual: a lista oferecia gente sem acesso à
+        empresa, e o trabalho passado ficava inacessível para quem o recebeu."""
+        alvo = id_de(cliente, "hist_sem_acesso")
+        r = cliente.patch(f"/api/projetos/{projeto['id']}/responsavel",
+                          headers=cab(cliente, "hist_gestor"),
+                          json={"responsavel_id": alvo, "motivo": ""})
+        assert r.status_code == 422
+        assert "não tem acesso a esta empresa" in r.json()["detail"]
+
+        sucessores = cliente.get(f"/api/projetos/{projeto['id']}/sucessores",
+                                 headers=cab(cliente, "hist_gestor")).json()
+        assert "hist_sem_acesso" not in [p["usuario"] for p in sucessores]
 
     def test_passar_para_conta_desativada_e_recusado(self, cliente, projeto):
         alvo = id_de(cliente, "hist_inativo")

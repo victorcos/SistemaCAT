@@ -1262,3 +1262,36 @@ offset repete linha e pula linha.
 
 O contrato das seis rotas está em `docs/CONTRATOS.md` §6 — o front desta
 funcionalidade será desenhado à parte.
+
+---
+
+## 2026-09-12 — A tela do histórico, e o trabalho parado que se recusa a andar
+
+**O que entrou.** A tela do histórico, do handoff `README-Historico.md`: linha
+do tempo com ícone por tipo, filtros (Tudo · Comentários · Situação ·
+Arquivos · Etapas), seletor de situação com confirmação e justificativa,
+painel de sucessão para gestores, resumo e o campo de comentário com
+`Ctrl + Enter`. Mais o que ela trouxe nas outras telas: botão **Histórico do
+projeto** e o fato **Criado por** no detalhe, e os quatro status nos cartões
+do Início, com filtro e a métrica de pausados/cancelados.
+
+**O pedido explícito, que contraria a spec — e vence.** O handoff dizia que
+em trabalho pausado "as etapas seguem acessíveis, card marcado". O pedido foi
+o contrário: pausado **desabilita as etapas e avisa**. É o comportamento
+certo, e já era o do servidor desde a v0.21.0 — o que faltava era a tela
+dizer isso antes do clique, em vez de deixar a pessoa descobrir no 422.
+Agora o aviso aparece no detalhe e nas três telas de etapa, com um caminho de
+saída ("Abrir o histórico"), e os botões de ação ficam desabilitados.
+
+**O defeito que só a conferência visual achou.** A lista de sucessores
+oferecia qualquer pessoa ativa com papel de escrita — inclusive quem **não
+tem alocação na empresa**. Passar o trabalho para essa pessoa entregava um
+trabalho que ela não consegue abrir: 403 na primeira tela. Agora a lista
+filtra por acesso à empresa e a rota recusa com a explicação. Mesmo raciocínio
+da conta desativada, que já estava coberto.
+
+**Nota sobre migrações em SQLite.** A migração do histórico usa
+`batch_alter_table`, que é o que o SQLite exige. Mas a cadeia inteira ainda
+não roda lá: a migração `62fe3d195ce5` (bem anterior) usa `create_foreign_key`
+direto e quebra. Fica registrado — o caminho sem Docker do `instalar.ps1`
+depende disso e ainda não foi exercitado de verdade.

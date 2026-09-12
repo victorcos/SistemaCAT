@@ -4,6 +4,7 @@ import { Aviso } from "@/components/ui/Aviso";
 import { Botao } from "@/components/ui/Botao";
 import { BotaoIcone } from "@/components/ui/BotaoIcone";
 import { Campo, Entrada } from "@/components/ui/Campo";
+import { TrabalhoParado } from "@/components/shared/TrabalhoParado";
 import {
   CabecalhoDePagina,
   Metrica,
@@ -15,6 +16,7 @@ import {
 import { Celula, Linha, Tabela } from "@/components/ui/Tabela";
 import { IconeApagar, IconeFechar, IconePasta } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
+import { aceitaProcessamento } from "@/constants/status";
 import { useConfirm } from "@/hooks/useConfirm";
 import { cn } from "@/lib/cn";
 import { comoErro } from "@/lib/errors";
@@ -124,6 +126,10 @@ export default function Lote() {
   }
 
   const p = detalhe?.projeto;
+  // importar arquivo num trabalho cancelado é registrar base que ninguém vai
+  // usar; num pausado, é fazer o trabalho andar pelas costas da decisão de
+  // pará-lo. A API recusa as etapas; aqui a tela recusa antes.
+  const anda = !p || aceitaProcessamento(p.status);
 
   return (
     <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
@@ -144,6 +150,8 @@ export default function Lote() {
           )
         }
       />
+
+      <TrabalhoParado status={p?.status} projetoId={projetoId} />
 
       {erro && <Aviso titulo={erro.message} codigo={erro.requisicaoId} />}
 
@@ -184,6 +192,7 @@ export default function Lote() {
               type="submit"
               icone={IconePasta}
               carregando={ocupado && !resumo}
+              disabled={!anda}
               className="shadow-acao"
             >
               Conferir pasta

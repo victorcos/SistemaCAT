@@ -12,8 +12,14 @@ import {
   Secao,
   Voltar,
 } from "@/components/ui/Pagina";
-import { IconeApagar, IconeConfirma } from "@/constants/icons";
+import { IconeApagar, IconeConfirma, IconeHistorico } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
+import {
+  TOM_DO_STATUS,
+  aceitaProcessamento,
+  avisoDeTrabalhoParado,
+  type Status,
+} from "@/constants/status";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/cn";
 import { periodo } from "@/lib/competencia";
@@ -73,7 +79,7 @@ const TOM_DA_SITUACAO: Record<string, TomDeEtiqueta> = {
 /* ------------------------------------------------------------------ */
 
 export default function Projeto() {
-  const { podeExcluirTrabalho } = useAuth();
+  const { podeExcluirTrabalho, administraUsuarios } = useAuth();
   const { id } = useParams<{ id: string }>();
   const [d, setD] = useState<ProjetoDetalhe | null>(null);
   const [erro, setErro] = useState<ErroApi | null>(null);
@@ -100,6 +106,10 @@ export default function Projeto() {
   const p = d.projeto;
   const disponiveis = d.etapas.filter((e) => e.implementada);
   const feitas = disponiveis.filter((e) => e.situacao === "concluida").length;
+  const status = p.status as Status;
+  // trabalho parado não roda etapa — a API recusa, e a tela diz antes
+  const anda = aceitaProcessamento(status);
+  const parado = avisoDeTrabalhoParado(status);
 
   return (
     <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
@@ -119,7 +129,21 @@ export default function Projeto() {
           </span>
         }
         acao={
-          <dl className="m-0 grid gap-2 text-right">
+          <div className="flex flex-col items-end gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Etiqueta tom={TOM_DO_STATUS[status] ?? "neutro"} pulso={status === "em_andamento"}>
+                {p.status_rotulo || status}
+              </Etiqueta>
+              <BotaoLink
+                para={ROTAS.historico(p.id)}
+                tamanho="sm"
+                variante="secundario"
+                icone={IconeHistorico}
+              >
+                Histórico do projeto
+              </BotaoLink>
+            </div>
+            <dl className="m-0 grid gap-2 text-right">
             <div>
               <dt className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-texto-fraco">
                 Projeto
@@ -134,7 +158,16 @@ export default function Projeto() {
                 {periodo(p.competencia_ini, p.competencia_fim)}
               </dd>
             </div>
-          </dl>
+            {administraUsuarios && p.criado_por && (
+              <div>
+                <dt className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-texto-fraco">
+                  Criado por
+                </dt>
+                <dd className="m-0 text-sm text-texto-suave">{p.criado_por}</dd>
+              </div>
+            )}
+            </dl>
+          </div>
         }
       >
         <div className="flex flex-wrap items-center gap-3">
@@ -145,13 +178,34 @@ export default function Projeto() {
         </div>
       </CabecalhoDePagina>
 
+      {parado && (
+        <Aviso
+          tom={status === "cancelado" ? "erro" : "atencao"}
+          titulo={parado.titulo}
+          acao={
+            <BotaoLink para={ROTAS.historico(p.id)} tamanho="sm" variante="secundario">
+              Abrir o histórico
+            </BotaoLink>
+          }
+        >
+          {parado.texto}
+        </Aviso>
+      )}
+
       <Secao
         titulo="Etapas do processamento"
         sub="A ordem é de dependência real: sem os movimentos não há razão, e sem o razão não há apuração."
       >
         <ol className="m-0 mt-4 flex list-none flex-col gap-2.5 p-0">
           {d.etapas.map((e, i) => (
-            <LinhaDeEtapa key={e.chave} e={e} numero={i + 1} projetoId={Number(id)} />
+            <LinhaDeEtapa
+              key={e.chave}
+              e={e}
+              numero={i + 1}
+              projetoId={Number(id)}
+              bloqueada={!anda}
+              motivo={parado?.titulo ?? ""}
+            />
           ))}
         </ol>
       </Secao>
@@ -194,10 +248,15 @@ function LinhaDeEtapa({
   e,
   numero: n,
   projetoId,
+  bloqueada,
+  motivo,
 }: {
   e: Etapa;
   numero: number;
   projetoId: number;
+  /** o trabalho está pausado ou cancelado: a etapa não roda */
+  bloqueada: boolean;
+  motivo: string;
 }) {
   const concluida = e.situacao === "concluida";
   const atual = e.acessivel && !concluida;
@@ -239,13 +298,21 @@ function LinhaDeEtapa({
         </p>
         {rotulo && e.acessivel && (
           <div className="mt-3">
-            <BotaoLink
-              para={destino.rota(projetoId)}
-              tamanho="sm"
-              variante={atual ? "principal" : "secundario"}
-            >
-              {rotulo}
-            </BotaoLink>
+            {bloqueada ? (
+              // botão morto, e não link escondido: some o caminho, fica o
+              // motivo — quem chega aqui precisa saber por que não dá
+              <Botao tamanho="sm" variante="secundario" disabled title={motivo}>
+                {rotulo}
+              </Botao>
+            ) : (
+              <BotaoLink
+                para={destino.rota(projetoId)}
+                tamanho="sm"
+                variante={atual ? "principal" : "secundario"}
+              >
+                {rotulo}
+              </BotaoLink>
+            )}
           </div>
         )}
       </div>

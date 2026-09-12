@@ -30,6 +30,7 @@ from cat.dominio.projeto.historico import (
     validar_comentario,
 )
 from cat.infraestrutura.repositorios.modelos import (
+    AlocacaoDB,
     EventoDoProjetoDB,
     ProjetoDB,
     UsuarioDB,
@@ -282,6 +283,12 @@ def suceder(
             f"{novo.nome_exibicao} está com o acesso desativado. Reative antes "
             "de passar o trabalho, ou escolha outra pessoa."
         )
+    if not _alcanca(novo, p.empresa_id, sessao):
+        raise SucessorInvalido(
+            f"{novo.nome_exibicao} não tem acesso a esta empresa. Aloque a "
+            "pessoa na empresa antes de passar o trabalho — senão ela recebe "
+            "um trabalho que não consegue abrir."
+        )
     if p.responsavel_id == novo.id:
         raise SucessorInvalido(f"{novo.nome_exibicao} já responde por este trabalho.")
 
@@ -341,17 +348,38 @@ def _status_de(p: ProjetoDB) -> StatusDoProjeto:
         return StatusDoProjeto.EM_ANDAMENTO
 
 
-def sucessores_possiveis(sessao: Session) -> list[UsuarioDB]:
-    """Quem pode receber um trabalho: conta ativa, e que não seja só leitura.
+def sucessores_possiveis(projeto_id: int, sessao: Session) -> list[UsuarioDB]:
+    """Quem pode receber ESTE trabalho.
 
-    Passar um trabalho para quem não pode escrever nele deixaria o trabalho
-    parado por falta de permissão, e a causa não apareceria em lugar nenhum.
+    Três condições, e cada uma existe porque violá-la deixa o trabalho com um
+    dono que não consegue trabalhar nele:
+
+    * **conta ativa** — responsável desativado é trabalho sem dono;
+    * **papel que escreve** — quem só lê não roda etapa nem comenta;
+    * **acesso à empresa** — alocação nela, ou o papel dev, que enxerga
+      todas. Sem isso o novo responsável abre o trabalho e leva 403.
+
+    A terceira só apareceu na conferência visual: a lista oferecia gente que
+    não alcançava a empresa, e o trabalho passado ficava inacessível para
+    quem o recebeu.
     """
-    papeis = [p.value for p in Papel if p.pode_escrever]
-    return list(
-        sessao.scalars(
-            select(UsuarioDB)
-            .where(UsuarioDB.ativo.is_(True), UsuarioDB.papel.in_(papeis))
-            .order_by(UsuarioDB.nome_exibicao)
-        )
+    p = _projeto(projeto_id, sessao)
+    papeis = [x.value for x in Papel if x.pode_escrever]
+    candidatos = sessao.scalars(
+        select(UsuarioDB)
+        .where(UsuarioDB.ativo.is_(True), UsuarioDB.papel.in_(papeis))
+        .order_by(UsuarioDB.nome_exibicao)
     )
+    return [u for u in candidatos if _alcanca(u, p.empresa_id, sessao)]
+
+
+def _alcanca(u: UsuarioDB, empresa_id: int, sessao: Session) -> bool:
+    """Se este usuário enxerga esta empresa. Dev enxerga todas — é a conta de
+    manutenção, e o bypass já é registrado no log a cada acesso."""
+    if u.papel == Papel.DEV.value:
+        return True
+    return sessao.scalar(
+        select(func.count())
+        .select_from(AlocacaoDB)
+        .where(AlocacaoDB.usuario_id == u.id, AlocacaoDB.empresa_id == empresa_id)
+    ) > 0

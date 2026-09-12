@@ -48,9 +48,16 @@ export interface Projeto {
   competencia_ini: string;
   competencia_fim: string;
   status: string;
+  status_rotulo: string;
   pre_cadastro: boolean;
   etapas_feitas: number;
   etapas_totais: number;
+  /** quem criou não muda nunca; quem responde muda a cada sucessão */
+  criado_por: string | null;
+  criado_por_id: number | null;
+  responsavel: string | null;
+  responsavel_id: number | null;
+  comentarios: number;
 }
 
 export interface Etapa {

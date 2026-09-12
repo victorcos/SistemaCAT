@@ -18,6 +18,7 @@ import {
 import { FRENTES, type Frente } from "@/constants/fronts";
 import { IconeNovo } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
+import { BARRA_DO_STATUS, TOM_DO_STATUS, type Status } from "@/constants/status";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/cn";
 import { compara, mascarar, paraIso, periodo, valida } from "@/lib/competencia";
@@ -33,34 +34,23 @@ import type { ErroApi } from "@/types/erro";
 
 /* ------------------------------------------------------------------ */
 
-type Filtro = "todos" | "em_andamento" | "concluidos" | "pre_cadastro";
+/** Os filtros da listagem. Os quatro status, mais o pré-cadastro, que não é
+ *  situação do trabalho e sim da empresa — por isso vem por último. */
+type Filtro = Status | "todos" | "pre_cadastro";
 
 const FILTROS: { chave: Filtro; rotulo: string }[] = [
   { chave: "todos", rotulo: "Todos" },
   { chave: "em_andamento", rotulo: "Em andamento" },
-  { chave: "concluidos", rotulo: "Concluídos" },
+  { chave: "pausado", rotulo: "Pausados" },
+  { chave: "cancelado", rotulo: "Cancelados" },
+  { chave: "concluido", rotulo: "Concluídos" },
   { chave: "pre_cadastro", rotulo: "Pré-cadastro" },
 ];
 
-const STATUS: Record<string, { rotulo: string; tom: "info" | "sucesso" | "atencao" | "neutro" }> = {
-  em_andamento: { rotulo: "Em andamento", tom: "info" },
-  concluido: { rotulo: "Concluído", tom: "sucesso" },
-  pausado: { rotulo: "Pausado", tom: "atencao" },
-};
-
-const statusDe = (p: Projeto) => STATUS[p.status] ?? { rotulo: p.status, tom: "neutro" as const };
-
 function passaNoFiltro(p: Projeto, f: Filtro): boolean {
-  switch (f) {
-    case "em_andamento":
-      return p.status === "em_andamento";
-    case "concluidos":
-      return p.status === "concluido";
-    case "pre_cadastro":
-      return p.pre_cadastro;
-    default:
-      return true;
-  }
+  if (f === "todos") return true;
+  if (f === "pre_cadastro") return p.pre_cadastro;
+  return p.status === f;
 }
 
 function passaNaBusca(p: Projeto, termo: string): boolean {
@@ -94,11 +84,14 @@ export default function Inicio() {
 
   const metricas = useMemo(() => {
     const lista = projetos ?? [];
+    const quantos = (s: Status) => lista.filter((p) => p.status === s).length;
     return {
       total: lista.length,
-      andamento: lista.filter((p) => p.status === "em_andamento").length,
-      concluidos: lista.filter((p) => p.status === "concluido").length,
-      pendentes: lista.reduce((s, p) => s + Math.max(0, p.etapas_totais - p.etapas_feitas), 0),
+      andamento: quantos("em_andamento"),
+      concluidos: quantos("concluido"),
+      parados: quantos("pausado") + quantos("cancelado"),
+      pausados: quantos("pausado"),
+      cancelados: quantos("cancelado"),
     };
   }, [projetos]);
 
@@ -132,7 +125,16 @@ export default function Inicio() {
           <Metrica rotulo="Trabalhos" valor={metricas.total} />
           <Metrica rotulo="Em andamento" valor={metricas.andamento} tom="info" />
           <Metrica rotulo="Concluídos" valor={metricas.concluidos} tom="sucesso" />
-          <Metrica rotulo="Etapas pendentes" valor={metricas.pendentes} tom="atencao" />
+          <Metrica
+            rotulo="Pausados / cancelados"
+            valor={metricas.parados}
+            nota={
+              metricas.parados > 0
+                ? `${metricas.pausados} pausado(s), ${metricas.cancelados} cancelado(s)`
+                : undefined
+            }
+            tom="atencao"
+          />
         </Metricas>
       </CabecalhoDePagina>
 
@@ -216,9 +218,19 @@ export default function Inicio() {
 
 /* ------------------------------------------------------------------ */
 
+/** A faixa à esquerda do cartão, na cor da situação. É o que se lê de longe,
+ *  antes de qualquer número. */
+const FAIXA: Record<Status, string> = {
+  em_andamento: "border-l-info",
+  pausado: "border-l-atencao",
+  cancelado: "border-l-erro",
+  concluido: "border-l-sucesso",
+};
+
 function CartaoDeTrabalho({ p }: { p: Projeto }) {
-  const status = statusDe(p);
-  const concluido = p.etapas_totais > 0 && p.etapas_feitas >= p.etapas_totais;
+  const status = p.status as Status;
+  const tom = TOM_DO_STATUS[status] ?? "neutro";
+  const cancelado = status === "cancelado";
 
   return (
     <Link
@@ -226,13 +238,16 @@ function CartaoDeTrabalho({ p }: { p: Projeto }) {
       className={cn(
         "group flex flex-col gap-3 rounded-cartao border border-borda bg-superficie p-5 no-underline",
         "border-l-[3px] transition-all duration-150",
-        concluido ? "border-l-sucesso" : "border-l-info",
+        FAIXA[status] ?? "border-l-borda-forte",
+        // cancelado entra mais fraco: continua acessível, mas não disputa
+        // atenção com o que está andando
+        cancelado && "opacity-70",
         "hover:-translate-y-0.5 hover:border-laranja-500/40 hover:border-l-marca-laranja hover:shadow-cat-alta",
       )}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <Etiqueta tom={status.tom} pulso={p.status === "em_andamento"}>
-          {status.rotulo}
+        <Etiqueta tom={tom} pulso={status === "em_andamento"}>
+          {p.status_rotulo || status}
         </Etiqueta>
         {p.pre_cadastro && (
           <Etiqueta tom="destaque" title="Dados vieram do arquivo e ainda não foram conferidos">
@@ -284,9 +299,20 @@ function CartaoDeTrabalho({ p }: { p: Projeto }) {
       <Barra
         de={p.etapas_feitas}
         para={p.etapas_totais}
-        tom={concluido ? "sucesso" : "destaque"}
+        tom={BARRA_DO_STATUS[status] ?? "destaque"}
         className="h-1.5"
       />
+
+      {(p.responsavel || p.comentarios > 0) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-borda pt-3 text-xs text-texto-fraco">
+          {p.responsavel && <span>Responsável: {p.responsavel}</span>}
+          {p.comentarios > 0 && (
+            <span className="ml-auto">
+              {p.comentarios === 1 ? "1 comentário" : `${p.comentarios} comentários`}
+            </span>
+          )}
+        </div>
+      )}
     </Link>
   );
 }

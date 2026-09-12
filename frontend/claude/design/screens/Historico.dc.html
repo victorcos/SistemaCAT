@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<![CDATA[<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #070c18; }
+    body { font-family: "Plus Jakarta Sans", "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #f2971d; text-decoration: none; }
+    a:hover { color: #ffb34d; }
+    input, button, textarea { font-family: inherit; }
+    input::placeholder, textarea::placeholder { color: #55688a; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 99px; }
+    @keyframes dcFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes dcSweep { 0% { transform: translateX(-110%); } 100% { transform: translateX(210%); } }
+    @keyframes dcPulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; background: radial-gradient(900px 500px at 18% -10%, rgba(242,151,29,.10), transparent 60%), radial-gradient(900px 600px at 90% 0%, rgba(37,99,235,.14), transparent 65%), #070c18; color: #e8edf7;">
+
+  <aside style="width: 244px; flex: 0 0 244px; border-right: 1px solid rgba(255,255,255,.07); background: linear-gradient(180deg, rgba(12,19,36,.9), rgba(8,13,25,.9)); display: flex; flex-direction: column; padding: 22px 16px; gap: 28px; position: sticky; top: 0; height: 100vh;">
+    <div style="padding: 2px 6px;">
+      <img src="assets/bms-logo.png" alt="BMS Consultoria Tributária" style="width: 172px; height: auto; display: block;" />
+    </div>
+    <nav style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 10px; letter-spacing: .16em; color: #5f7191; font-weight: 700; padding: 0 10px 8px;">NAVEGAÇÃO</div>
+      <a href="Inicio.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;"><span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Início</a>
+      <a href="Cadastro.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;"><span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Cadastro</a>
+      <a href="Usuarios.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;"><span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Usuários</a>
+    </nav>
+    <div style="margin-top: auto; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.06); background: rgba(255,255,255,.02);">
+      <div style="font-size: 11px; color: #6d7f9d; font-weight: 600;">Sistema CAT</div>
+      <div style="font-size: 11px; color: #4d5d79; margin-top: 3px;">sessão não comercial</div>
+    </div>
+  </aside>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+    <header style="display: flex; align-items: center; gap: 14px; padding: 16px 28px; border-bottom: 1px solid rgba(255,255,255,.07); background: rgba(8,13,25,.72); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(140deg, #1e3a8a, #0f1e3f); border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #cfe0ff;">VP</div>
+        <div style="font-size: 14px; font-weight: 700;">Victor Pedroso</div>
+      </div>
+      <span style="font-size: 10px; font-weight: 700; letter-spacing: .1em; padding: 4px 8px; border-radius: 6px; background: rgba(242,151,29,.14); border: 1px solid rgba(242,151,29,.32); color: #ffbb5c;">ADMIN</span>
+      <div style="flex: 1;"></div>
+      <button style="padding: 9px 18px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dce6f7; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .18s;" style-hover="background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.4); color: #fecaca;">Sair</button>
+    </header>
+
+    <main style="padding: 24px 28px 40px; display: flex; flex-direction: column; gap: 20px; max-width: 1320px; width: 100%;">
+      <a href="Trabalho.dc.html" style="display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; width: fit-content;">← Voltar ao trabalho</a>
+
+      <section style="position: relative; overflow: hidden; border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: linear-gradient(120deg, rgba(18,27,48,.9), rgba(10,16,31,.9)); padding: 24px 26px;">
+        <div style="position: absolute; inset: 0; pointer-events: none; background: radial-gradient(420px 160px at 8% 0%, rgba(242,151,29,.16), transparent 70%);"></div>
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 1px; overflow: hidden;">
+          <div style="width: 40%; height: 100%; background: linear-gradient(90deg, transparent, #f2971d, transparent); animation: dcSweep 5.5s linear infinite;"></div>
+        </div>
+
+        <div style="position: relative; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+          <div style="flex: 1; min-width: 300px;">
+            <div style="font-size: 11px; font-weight: 700; letter-spacing: .18em; color: #f2971d;">HISTÓRICO DO PROJETO</div>
+            <h1 style="margin: 8px 0 10px; font-size: 27px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; text-wrap: pretty;">Ressarcimento ST 2022</h1>
+            <div style="font-size: 14px; color: #a9b8d2; font-weight: 600;">ADVERTISING OPERATIONS AS.PL. PROPAG LTD</div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+              <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #93a4c1;">43.112.531/0001-89</code>
+              <span style="font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 3px 7px; border-radius: 6px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); color: #c6d4ea;">SP</span>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; min-width: 250px;">
+            <div style="font-size: 10px; letter-spacing: .13em; font-weight: 800; color: #6f81a0;">SITUAÇÃO DO PROJETO</div>
+            <div data-picker="status" style="position: relative;">
+              <button onClick="{{ pStatus.onToggle }}" style="width: 100%; display: flex; align-items: center; gap: 11px; padding: 12px 14px; border-radius: 11px; background: {{ pStatus.bg }}; border: 1px solid {{ pStatus.border }}; color: {{ pStatus.fg }}; font-size: 14px; font-weight: 700; cursor: pointer; text-align: left; transition: all .18s;" style-hover="filter: brightness(1.12);">
+                <span style="width: 8px; height: 8px; border-radius: 99px; background: {{ pStatus.fg }}; animation: dcPulse 2.4s ease-in-out infinite;"></span>
+                <span style="flex: 1;">{{ pStatus.value }}</span>
+                <span style="font-size: 11px; opacity: .8;">{{ pStatus.caret }}</span>
+              </button>
+              <sc-if value="{{ pStatus.open }}">
+                <div style="position: absolute; z-index: 50; top: calc(100% + 6px); left: 0; right: 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #101a30; box-shadow: 0 22px 48px rgba(0,0,0,.55); overflow: hidden; animation: dcFade .14s ease both;">
+                  <div style="padding: 9px; border-bottom: 1px solid rgba(255,255,255,.07);">
+                    <input ref="{{ pStatus.focusRef }}" value="{{ pStatus.query }}" onChange="{{ pStatus.onQuery }}" placeholder="Buscar situação…" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #e8edf7; font-size: 12px; outline: none;" style-focus="border-color: rgba(242,151,29,.5);" />
+                  </div>
+                  <div style="padding: 6px;">
+                    <sc-for list="{{ pStatus.options }}" as="o" hint-placeholder-count="4">
+                      <div onClick="{{ o.onSelect }}" style="display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ o.bg }}; color: {{ o.fg }};" style-hover="background: rgba(255,255,255,.06);">
+                        <span style="width: 7px; height: 7px; border-radius: 99px; background: {{ o.dot }};"></span>
+                        <span style="flex: 1;">{{ o.label }}</span><span style="font-size: 12px;">{{ o.check }}</span>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ pStatus.empty }}">
+                      <div style="padding: 12px 10px; font-size: 12px; color: #6d7f9d;">Nenhum resultado</div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+            <div style="font-size: 12px; color: #7b8dab; line-height: 1.5;">{{ statusHint }}</div>
+          </div>
+        </div>
+
+        <div style="position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 22px;">
+          <sc-for list="{{ facts }}" as="f" hint-placeholder-count="4">
+            <div style="padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.03);">
+              <div style="font-size: 10px; letter-spacing: .13em; font-weight: 800; color: #6f81a0;">{{ f.label }}</div>
+              <div style="display: flex; align-items: center; gap: 9px; margin-top: 7px;">
+                <sc-if value="{{ f.initials }}">
+                  <span style="width: 26px; height: 26px; flex: 0 0 26px; border-radius: 8px; background: {{ f.avatarBg }}; border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #e9f0ff;">{{ f.initials }}</span>
+                </sc-if>
+                <div style="min-width: 0;">
+                  <div style="font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ f.value }}</div>
+                  <sc-if value="{{ f.sub }}">
+                    <div style="font-size: 11px; color: #7b8dab; margin-top: 2px;">{{ f.sub }}</div>
+                  </sc-if>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 18px; align-items: start;">
+
+        <section style="border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: rgba(13,20,37,.72); display: flex; flex-direction: column; overflow: hidden;">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px 22px; border-bottom: 1px solid rgba(255,255,255,.07);">
+            <div style="flex: 1; min-width: 0;">
+              <h2 style="margin: 0; font-size: 18px; font-weight: 800;">Atividades e comentários</h2>
+              <p style="margin: 5px 0 0; font-size: 12px; color: #7b8dab;">{{ feedCount }}</p>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; border-radius: 11px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); max-width: 100%;">
+              <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+                <button onClick="{{ t.onClick }}" style="padding: 8px 13px; border-radius: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: 700; background: {{ t.bg }}; color: {{ t.fg }};">{{ t.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0; padding: 8px 22px 18px; max-height: 620px; overflow-y: auto;">
+            <sc-for list="{{ feed }}" as="e" hint-placeholder-count="6">
+              <div style="display: flex; gap: 14px; padding: 16px 0 16px; border-bottom: 1px solid rgba(255,255,255,.05);">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 0 0 34px;">
+                  <div style="width: 34px; height: 34px; border-radius: 10px; background: {{ e.iconBg }}; border: 1px solid {{ e.iconBorder }}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: {{ e.iconFg }};">{{ e.icon }}</div>
+                  <div style="flex: 1; width: 1px; background: rgba(255,255,255,.07); min-height: 6px;"></div>
+                </div>
+
+                <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px;">
+                  <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 9px;">
+                    <span style="font-size: 14px; font-weight: 700;">{{ e.author }}</span>
+                    <span style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #a9b8d2;">{{ e.role }}</span>
+                    <span style="font-size: 12px; color: #7b8dab;">{{ e.kindLabel }}</span>
+                    <span style="flex: 1;"></span>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6d7f9d;">{{ e.when }}</span>
+                  </div>
+
+                  <div style="font-size: 13px; line-height: 1.6; color: {{ e.bodyFg }}; text-wrap: pretty;">{{ e.body }}</div>
+
+                  <sc-if value="{{ e.hasChange }}">
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 9px; font-size: 12px; font-weight: 700;">
+                      <span style="padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); color: #93a4c1;">{{ e.from }}</span>
+                      <span style="color: #6d7f9d;">→</span>
+                      <span style="padding: 4px 10px; border-radius: 999px; background: {{ e.toBg }}; border: 1px solid {{ e.toBorder }}; color: {{ e.toFg }};">{{ e.to }}</span>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ e.hasFiles }}">
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                      <sc-for list="{{ e.files }}" as="f" hint-placeholder-count="2">
+                        <span style="font-size: 11px; font-weight: 700; padding: 5px 11px; border-radius: 999px; background: rgba(59,130,246,.12); border: 1px solid rgba(96,165,250,.3); color: #93c5fd;">{{ f.label }}</span>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+
+            <sc-if value="{{ feedEmpty }}">
+              <div style="padding: 46px 10px; text-align: center;">
+                <div style="font-size: 14px; font-weight: 700; color: #b7c5de;">Nada por aqui</div>
+                <div style="font-size: 12px; color: #7486a5; margin-top: 5px;">Troque o filtro para ver outros registros.</div>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="padding: 18px 22px; border-top: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.02); display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; gap: 12px;">
+              <div style="width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px; background: linear-gradient(140deg, #1e3a8a, #0f1e3f); border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #cfe0ff;">VP</div>
+              <textarea value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onDraftKey }}" rows="2" placeholder="Escreva um comentário para a equipe do projeto…" style="flex: 1; padding: 12px 14px; border-radius: 11px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-size: 13px; line-height: 1.5; outline: none; resize: vertical;" style-focus="border-color: rgba(242,151,29,.55); background: rgba(242,151,29,.05);"></textarea>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+              <span style="flex: 1; min-width: 160px; font-size: 11px; color: #6d7f9d;">Ctrl + Enter envia. Comentários ficam no histórico com seu nome.</span>
+              <button onClick="{{ send }}" disabled="{{ sendDisabled }}" style="padding: 11px 20px; border-radius: 10px; border: none; background: {{ sendBg }}; color: {{ sendFg }}; font-size: 13px; font-weight: 800; cursor: {{ sendCursor }}; box-shadow: {{ sendShadow }}; transition: all .18s;" style-hover="transform: translateY(-1px);">Comentar</button>
+            </div>
+          </div>
+        </section>
+
+        <div style="display: flex; flex-direction: column; gap: 18px;">
+
+          <section style="border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: rgba(13,20,37,.72); padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 800;">Resumo</h2>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+                <div style="display: flex; align-items: baseline; gap: 10px;">
+                  <span style="flex: 1; font-size: 13px; color: #93a4c1;">{{ s.label }}</span>
+                  <span style="font-size: 15px; font-weight: 800; color: {{ s.color }};">{{ s.value }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+
+          <section style="position: relative; overflow: hidden; border-radius: 18px; border: 1px solid rgba(242,151,29,.24); background: linear-gradient(140deg, rgba(46,31,10,.4), rgba(13,20,37,.8)); padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
+            <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #f2971d;"></span>
+            <div>
+              <h2 style="margin: 0; font-size: 16px; font-weight: 800;">Sucessão do projeto</h2>
+              <p style="margin: 7px 0 0; font-size: 12px; line-height: 1.55; color: #c3ab86; text-wrap: pretty;">Somente administradores. O responsável passa a responder pelo projeto; o histórico e o nome de quem criou permanecem.</p>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 7px;">
+              <div style="font-size: 10px; letter-spacing: .13em; font-weight: 800; color: #6f81a0;">RESPONSÁVEL ATUAL</div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="width: 30px; height: 30px; border-radius: 9px; background: {{ ownerAvatarBg }}; border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #e9f0ff;">{{ ownerInitials }}</span>
+                <div>
+                  <div style="font-size: 14px; font-weight: 700;">{{ owner }}</div>
+                  <div style="font-size: 11px; color: #7b8dab;">{{ ownerRole }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 7px;">
+              <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Passar para</label>
+              <div data-picker="sucessor" style="position: relative;">
+                <button onClick="{{ pSucessor.onToggle }}" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid {{ pSucessor.triggerBorder }}; color: #e8edf7; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left;">
+                  <span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ pSucessor.value }}</span>
+                  <span style="font-size: 11px; color: #7f91af;">{{ pSucessor.caret }}</span>
+                </button>
+                <sc-if value="{{ pSucessor.open }}">
+                  <div style="position: absolute; z-index: 50; top: calc(100% + 6px); left: 0; right: 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #101a30; box-shadow: 0 22px 48px rgba(0,0,0,.55); overflow: hidden; animation: dcFade .14s ease both;">
+                    <div style="padding: 9px; border-bottom: 1px solid rgba(255,255,255,.07);">
+                      <input ref="{{ pSucessor.focusRef }}" value="{{ pSucessor.query }}" onChange="{{ pSucessor.onQuery }}" placeholder="Buscar usuário…" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #e8edf7; font-size: 12px; outline: none;" style-focus="border-color: rgba(242,151,29,.5);" />
+                    </div>
+                    <div style="max-height: 200px; overflow-y: auto; padding: 6px;">
+                      <sc-for list="{{ pSucessor.options }}" as="o" hint-placeholder-count="4">
+                        <div onClick="{{ o.onSelect }}" style="display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ o.bg }}; color: {{ o.fg }};" style-hover="background: rgba(255,255,255,.06);">
+                          <span style="flex: 1;">{{ o.label }}</span><span style="font-size: 12px;">{{ o.check }}</span>
+                        </div>
+                      </sc-for>
+                      <sc-if value="{{ pSucessor.empty }}">
+                        <div style="padding: 12px 10px; font-size: 12px; color: #6d7f9d;">Nenhum resultado</div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+
+            <button onClick="{{ askTransfer }}" disabled="{{ transferDisabled }}" style="padding: 12px 18px; border-radius: 11px; border: none; background: {{ transferBg }}; color: {{ transferFg }}; font-size: 13px; font-weight: 800; cursor: {{ transferCursor }}; box-shadow: {{ transferShadow }}; transition: all .18s;" style-hover="transform: translateY(-1px);">Transferir projeto</button>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <sc-if value="{{ confirm }}">
+    <div style="position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(4,8,16,.7); backdrop-filter: blur(6px);">
+      <div style="width: 100%; max-width: 460px; border-radius: 18px; border: 1px solid rgba(255,255,255,.1); background: linear-gradient(150deg, rgba(19,28,50,.98), rgba(10,16,31,.98)); box-shadow: 0 30px 70px rgba(0,0,0,.6); padding: 26px; animation: dcFade .18s ease both;">
+        <div style="width: 40px; height: 40px; border-radius: 12px; background: {{ confirm.iconBg }}; display: flex; align-items: center; justify-content: center; font-size: 17px;">{{ confirm.icon }}</div>
+        <h3 style="margin: 16px 0 8px; font-size: 17px; font-weight: 800; text-wrap: pretty;">{{ confirm.title }}</h3>
+        <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #8798b6; text-wrap: pretty;">{{ confirm.body }}</p>
+        <div style="display: flex; flex-direction: column; gap: 7px; margin-top: 18px;">
+          <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Justificativa (entra no histórico)</label>
+          <textarea value="{{ reason }}" onChange="{{ onReason }}" rows="2" placeholder="{{ confirm.placeholder }}" style="padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-size: 13px; line-height: 1.5; outline: none; resize: vertical;" style-focus="border-color: rgba(242,151,29,.55);"></textarea>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+          <button onClick="{{ closeConfirm }}" style="padding: 10px 18px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 13px; font-weight: 700; cursor: pointer;" style-hover="background: rgba(255,255,255,.08);">Cancelar</button>
+          <button onClick="{{ confirm.onConfirm }}" style="padding: 10px 18px; border-radius: 10px; border: 1px solid {{ confirm.ctaBorder }}; background: {{ confirm.ctaBg }}; color: {{ confirm.ctaFg }}; font-size: 13px; font-weight: 800; cursor: pointer;" style-hover="transform: translateY(-1px);">{{ confirm.ctaLabel }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>]]>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  state = {
+    status: "Em andamento",
+    owner: "Victor Pedroso",
+    ownerRole: "Administrador · Diretor",
+    sucessor: "Selecione o novo responsável",
+    draft: "",
+    reason: "",
+    filter: "Tudo",
+    confirm: null,
+    openPicker: null,
+    pickerQuery: "",
+    feed: [
+      { id: 9, kind: "status", author: "Victor Pedroso", role: "ADMIN", when: "11/09 19:12", body: "Projeto retomado após liberação dos arquivos que faltavam.", from: "Pausado", to: "Em andamento" },
+      { id: 8, kind: "arquivo", author: "Ana Ribeiro", role: "OPERAÇÃO", when: "11/09 18:40", body: "Importou um lote na base de dados do projeto.", files: ["XML DE NF-E · 10.811", "86.1 MB"] },
+      { id: 7, kind: "comentario", author: "Ana Ribeiro", role: "OPERAÇÃO", when: "11/09 16:02", body: "Cliente enviou os XML de 07/2023 a 06/2024. Faltam ainda as competências de 2022 — já pedi por e-mail." },
+      { id: 6, kind: "etapa", author: "Sistema", role: "AUTOMÁTICO", when: "11/09 15:41", body: "Etapa Conferir documentos concluída: 11.693 com documento, 92.786 sem documento, 0 não escrituradas." },
+      { id: 5, kind: "status", author: "Carla Menezes", role: "GESTOR", when: "10/09 17:25", body: "Aguardando o cliente enviar os XML pendentes.", from: "Em andamento", to: "Pausado" },
+      { id: 4, kind: "comentario", author: "Carla Menezes", role: "GESTOR", when: "10/09 14:10", body: "Conferência apontou 868 documentos sem chave de acesso. Vamos tratar à mão nas competências mais antigas." },
+      { id: 3, kind: "arquivo", author: "Victor Pedroso", role: "ADMIN", when: "10/09 11:32", body: "Importou dois lotes de SPED na base de dados.", files: ["EFD ICMS/IPI · 43", "COMPACTADO · 1"] },
+      { id: 2, kind: "etapa", author: "Sistema", role: "AUTOMÁTICO", when: "09/09 09:58", body: "Etapa Importar base de dados concluída: 4 lotes registrados, 11.767 arquivos." },
+      { id: 1, kind: "criacao", author: "Victor Pedroso", role: "ADMIN", when: "08/09 08:15", body: "Criou o projeto Ressarcimento ST 2022 na frente CAT 42, competências 01/2022 a 09/2026." }
+    ]
+  };
+
+  USERS = ["Ana Ribeiro — Operação", "Carla Menezes — Gestor", "Diego Alves — Operação", "Marina Souza — Gestor", "Rafael Lima — Leitura"];
+
+  statusMeta = {
+    "Em andamento": { fg: "#93c5fd", bg: "rgba(59,130,246,.12)", border: "rgba(96,165,250,.34)", dot: "#93c5fd", hint: "O projeto aparece como ativo no card e nas listagens." },
+    "Pausado": { fg: "#fbbf24", bg: "rgba(240,180,41,.12)", border: "rgba(240,180,41,.34)", dot: "#fbbf24", hint: "As etapas continuam acessíveis, mas o card fica marcado como pausado." },
+    "Cancelado": { fg: "#f87171", bg: "rgba(239,68,68,.12)", border: "rgba(239,68,68,.36)", dot: "#f87171", hint: "O projeto sai do fluxo de trabalho e fica só para consulta." },
+    "Concluído": { fg: "#6ee7b7", bg: "rgba(52,211,153,.1)", border: "rgba(52,211,153,.32)", dot: "#6ee7b7", hint: "Apuração encerrada e arquivo entregue." }
+  };
+
+  kindMeta = {
+    status: { icon: "⇄", iconBg: "rgba(242,151,29,.14)", iconBorder: "rgba(242,151,29,.34)", iconFg: "#ffc478", label: "alterou a situação" },
+    comentario: { icon: "💬", iconBg: "rgba(255,255,255,.05)", iconBorder: "rgba(255,255,255,.12)", iconFg: "#cfdbef", label: "comentou" },
+    arquivo: { icon: "↥", iconBg: "rgba(59,130,246,.14)", iconBorder: "rgba(96,165,250,.3)", iconFg: "#93c5fd", label: "importou arquivos" },
+    etapa: { icon: "✓", iconBg: "rgba(52,211,153,.14)", iconBorder: "rgba(52,211,153,.34)", iconFg: "#6ee7b7", label: "concluiu uma etapa" },
+    sucessao: { icon: "⇉", iconBg: "rgba(242,151,29,.14)", iconBorder: "rgba(242,151,29,.34)", iconFg: "#ffc478", label: "transferiu o projeto" },
+    criacao: { icon: "★", iconBg: "rgba(255,255,255,.06)", iconBorder: "rgba(255,255,255,.14)", iconFg: "#e8edf7", label: "criou o projeto" }
+  };
+
+  componentDidMount() {
+    this._away = e => {
+      if (!this.state.openPicker) return;
+      const el = e.target.closest ? e.target.closest("[data-picker]") : null;
+      if (!el || el.getAttribute("data-picker") !== this.state.openPicker) this.setState({ openPicker: null, pickerQuery: "" });
+    };
+    document.addEventListener("mousedown", this._away, true);
+  }
+
+  componentWillUnmount() { document.removeEventListener("mousedown", this._away, true); }
+
+  picker(key, value, options, onSelect) {
+    const s = this.state;
+    const open = s.openPicker === key;
+    const q = s.pickerQuery.trim().toLowerCase();
+    const list = options.filter(o => !q || o.toLowerCase().indexOf(q) >= 0);
+    return {
+      value: value, open: open, query: s.pickerQuery,
+      caret: open ? "▴" : "▾",
+      triggerBorder: open ? "rgba(242,151,29,.55)" : "rgba(255,255,255,.11)",
+      empty: list.length === 0,
+      onToggle: () => this.setState(st => ({ openPicker: st.openPicker === key ? null : key, pickerQuery: "" })),
+      onQuery: e => this.setState({ pickerQuery: e.target.value }),
+      focusRef: el => { if (el && open) setTimeout(() => el.focus(), 0); },
+      options: list.map(o => ({
+        label: o,
+        bg: o === value ? "rgba(242,151,29,.14)" : "transparent",
+        fg: o === value ? "#ffc478" : "#cfdbef",
+        check: o === value ? "✓" : "",
+        dot: (this.statusMeta[o] || {}).dot || "transparent",
+        onSelect: () => { this.setState({ openPicker: null, pickerQuery: "" }); onSelect(o); }
+      }))
+    };
+  }
+
+  initials(name) {
+    const p = String(name || "").split("—")[0].trim().split(/\s+/);
+    return ((p[0] || "").charAt(0) + (p[1] || "").charAt(0)).toUpperCase();
+  }
+
+  avatarBg(name) {
+    const hues = [222, 262, 32, 190, 300, 150];
+    let n = 0;
+    for (let i = 0; i < String(name).length; i++) n += String(name).charCodeAt(i);
+    const h = hues[n % hues.length];
+    return "linear-gradient(140deg, oklch(0.42 0.09 " + h + "), oklch(0.28 0.06 " + h + "))";
+  }
+
+  stamp() {
+    const d = new Date();
+    const p = n => String(n).padStart(2, "0");
+    return p(d.getDate()) + "/" + p(d.getMonth() + 1) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+
+  push(entry) {
+    this.setState(s => ({ feed: [Object.assign({ id: Date.now(), author: "Victor Pedroso", role: "ADMIN", when: this.stamp() }, entry)].concat(s.feed) }));
+  }
+
+  send = () => {
+    const t = this.state.draft.trim();
+    if (!t) return;
+    this.push({ kind: "comentario", body: t });
+    this.setState({ draft: "" });
+  };
+
+  askStatus(next) {
+    if (next === this.state.status) return;
+    const m = this.statusMeta[next];
+    this.setState({
+      reason: "",
+      confirm: {
+        icon: "⇄", iconBg: "rgba(242,151,29,.18)",
+        title: "Mudar a situação para " + next + "?",
+        body: "A mudança entra no histórico com seu nome e aparece no card do projeto.",
+        placeholder: "Ex.: aguardando arquivos do cliente",
+        ctaLabel: "Alterar situação", ctaBg: "linear-gradient(135deg, #f9a72b, #e8801a)", ctaBorder: "transparent", ctaFg: "#121a2c",
+        onConfirm: () => {
+          const from = this.state.status;
+          const why = this.state.reason.trim();
+          this.setState({ status: next, confirm: null, reason: "" });
+          this.push({ kind: "status", body: why || "Situação alterada sem justificativa.", from: from, to: next });
+        }
+      }
+    });
+  }
+
+  askTransfer = () => {
+    const to = this.state.sucessor;
+    if (to.indexOf("Selecione") === 0) return;
+    this.setState({
+      reason: "",
+      confirm: {
+        icon: "⇉", iconBg: "rgba(242,151,29,.18)",
+        title: "Transferir o projeto para " + to.split("—")[0].trim() + "?",
+        body: "O novo responsável passa a responder pelo projeto. O nome de quem criou e todo o histórico permanecem.",
+        placeholder: "Ex.: realocação de carteira",
+        ctaLabel: "Transferir", ctaBg: "linear-gradient(135deg, #f9a72b, #e8801a)", ctaBorder: "transparent", ctaFg: "#121a2c",
+        onConfirm: () => {
+          const from = this.state.owner;
+          const name = to.split("—")[0].trim();
+          const role = (to.split("—")[1] || "").trim();
+          const why = this.state.reason.trim();
+          this.setState({ owner: name, ownerRole: role ? role + " · responsável" : "Responsável", sucessor: "Selecione o novo responsável", confirm: null, reason: "" });
+          this.push({ kind: "sucessao", body: why || "Sucessão registrada sem justificativa.", from: from, to: name });
+        }
+      }
+    });
+  };
+
+  renderVals() {
+    const s = this.state;
+    const sm = this.statusMeta[s.status];
+    const filters = { "Tudo": null, "Comentários": "comentario", "Situação": "status", "Arquivos": "arquivo" };
+    const wanted = filters[s.filter];
+    const feed = s.feed.filter(e => !wanted || e.kind === wanted);
+    const canSend = !!s.draft.trim();
+    const canTransfer = s.sucessor.indexOf("Selecione") !== 0;
+
+    return {
+      pStatus: Object.assign(this.picker("status", s.status, Object.keys(this.statusMeta), v => this.askStatus(v)), { bg: sm.bg, border: sm.border, fg: sm.fg }),
+      statusHint: sm.hint,
+
+      facts: [
+        { label: "CRIADO POR", value: "Victor Pedroso", sub: "08/09/2026 · 08:15", initials: "VP", avatarBg: this.avatarBg("Victor Pedroso") },
+        { label: "RESPONSÁVEL ATUAL", value: s.owner, sub: s.ownerRole, initials: this.initials(s.owner), avatarBg: this.avatarBg(s.owner) },
+        { label: "FRENTE", value: "CAT 42", sub: "ressarcimento de ICMS-ST", initials: "", avatarBg: "" },
+        { label: "COMPETÊNCIAS", value: "01/2022 a 09/2026", sub: "2 de 8 etapas concluídas", initials: "", avatarBg: "" }
+      ],
+
+      tabs: Object.keys(filters).map(label => ({
+        label: label,
+        bg: s.filter === label ? "rgba(242,151,29,.16)" : "transparent",
+        fg: s.filter === label ? "#ffbb5c" : "#8798b6",
+        onClick: () => this.setState({ filter: label })
+      })),
+      feedCount: feed.length + (feed.length === 1 ? " registro" : " registros") + " · mais recente primeiro",
+      feedEmpty: feed.length === 0,
+      feed: feed.map(e => {
+        const k = this.kindMeta[e.kind] || this.kindMeta.comentario;
+        const toMeta = this.statusMeta[e.to];
+        return {
+          author: e.author, role: e.role, when: e.when, body: e.body,
+          icon: k.icon, iconBg: k.iconBg, iconBorder: k.iconBorder, iconFg: k.iconFg, kindLabel: k.label,
+          bodyFg: e.kind === "comentario" ? "#dbe5f6" : "#9fb3c9",
+          hasChange: !!e.from, from: e.from || "", to: e.to || "",
+          toBg: toMeta ? toMeta.bg : "rgba(242,151,29,.12)",
+          toBorder: toMeta ? toMeta.border : "rgba(242,151,29,.34)",
+          toFg: toMeta ? toMeta.fg : "#ffc478",
+          hasFiles: !!(e.files && e.files.length),
+          files: (e.files || []).map(f => ({ label: f }))
+        };
+      }),
+
+      stats: [
+        { label: "Comentários", value: String(s.feed.filter(e => e.kind === "comentario").length), color: "#e8edf7" },
+        { label: "Mudanças de situação", value: String(s.feed.filter(e => e.kind === "status").length), color: "#ffc478" },
+        { label: "Importações", value: String(s.feed.filter(e => e.kind === "arquivo").length), color: "#93c5fd" },
+        { label: "Etapas concluídas", value: "2 de 8", color: "#6ee7b7" }
+      ],
+
+      draft: s.draft,
+      onDraft: e => this.setState({ draft: e.target.value }),
+      onDraftKey: e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) this.send(); },
+      send: this.send,
+      sendDisabled: !canSend,
+      sendBg: canSend ? "linear-gradient(135deg, #f9a72b, #e8801a)" : "rgba(30,58,138,.42)",
+      sendFg: canSend ? "#121a2c" : "#7f93bb",
+      sendCursor: canSend ? "pointer" : "not-allowed",
+      sendShadow: canSend ? "0 10px 24px rgba(242,151,29,.28)" : "none",
+
+      owner: s.owner, ownerRole: s.ownerRole,
+      ownerInitials: this.initials(s.owner), ownerAvatarBg: this.avatarBg(s.owner),
+      pSucessor: this.picker("sucessor", s.sucessor, this.USERS, v => this.setState({ sucessor: v })),
+      askTransfer: this.askTransfer,
+      transferDisabled: !canTransfer,
+      transferBg: canTransfer ? "linear-gradient(135deg, #f9a72b, #e8801a)" : "rgba(30,58,138,.42)",
+      transferFg: canTransfer ? "#121a2c" : "#7f93bb",
+      transferCursor: canTransfer ? "pointer" : "not-allowed",
+      transferShadow: canTransfer ? "0 10px 24px rgba(242,151,29,.28)" : "none",
+
+      confirm: s.confirm,
+      reason: s.reason,
+      onReason: e => this.setState({ reason: e.target.value }),
+      closeConfirm: () => this.setState({ confirm: null, reason: "" })
+    };
+  }
+}
+</script>
+</body>
+</html>

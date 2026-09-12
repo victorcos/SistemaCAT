@@ -253,7 +253,7 @@ def listar_sucessores(
             id=u.id, nome_exibicao=u.nome_exibicao, usuario=u.usuario,
             papel=u.papel, cargo=u.cargo,
         )
-        for u in sucessores_possiveis(sessao)
+        for u in sucessores_possiveis(projeto_id, sessao)
     ]
 
 

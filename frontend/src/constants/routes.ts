@@ -16,6 +16,7 @@ export const ROTAS = {
   arquivos: (id: number | string) => `/projetos/${id}/arquivos`,
   conferencia: (id: number | string) => `/projetos/${id}/conferencia`,
   movimentos: (id: number | string) => `/projetos/${id}/movimentos`,
+  historico: (id: number | string) => `/projetos/${id}/historico`,
 } as const;
 
 /** Rotas que existem para entrar no sistema. Nunca servem como destino de

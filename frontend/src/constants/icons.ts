@@ -37,6 +37,14 @@ export {
   Check as IconeConfirma,
   LogOut as IconeSair,
 
+  // histórico
+  Star as IconeEstrela,
+  MessageSquare as IconeComentario,
+  ArrowRightLeft as IconeTrocar,
+  Repeat as IconeSucessao,
+  FileText as IconeArquivo,
+  History as IconeHistorico,
+
   // estado e feedback
   LoaderCircle as IconeCarregando,
   CircleAlert as IconeErro,

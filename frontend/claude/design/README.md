@@ -23,10 +23,13 @@ Os protótipos usam estilos inline por restrição da ferramenta; na implementa�
 | `Etapa Importar.dc.html` | Etapa 1 — Importar base de dados | `/trabalhos/:id/importar` |
 | `Etapa Conferir.dc.html` | Etapa 2 — Conferir documentos | `/trabalhos/:id/conferir` |
 | `Etapa Extrair.dc.html` | Etapa 3 — Extrair movimentos | `/trabalhos/:id/extrair` |
+| `Historico.dc.html` | Histórico do projeto (feed, situação, sucessão) | `/trabalhos/:id/historico` |
 | `Usuarios.dc.html` | Administração de usuários | `/usuarios` |
 
+O histórico tem documento próprio: **`README-Historico.md`** (inclui as alterações que ele trouxe em Trabalhos e no detalhe do trabalho).
+
 ### Fluxo
-Login → Trabalhos → (card) Detalhe do trabalho → etapa clicada. "Cadastrar trabalho" abre o wizard de Cadastro, que termina em "Ver o trabalho". Usuários é acessível pela sidebar (somente gestores).
+Login → Trabalhos → (card) Detalhe do trabalho → etapa clicada, ou → Histórico do projeto. "Cadastrar trabalho" abre o wizard de Cadastro, que termina em "Ver o trabalho". Usuários é acessível pela sidebar (somente gestores).
 
 ---
 
