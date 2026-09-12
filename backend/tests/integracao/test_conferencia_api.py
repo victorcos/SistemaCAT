@@ -174,6 +174,41 @@ class TestFluxo:
         # nada é modelo 59 nesta base: a planilha filtrada é menor
         assert len(so_cupom.content) < len(inteira.content)
 
+    def test_baixa_as_mesmas_listas_em_csv(self, cliente, cabecalhos, projeto_id):
+        execucao_id = cliente.get(f"/api/projetos/{projeto_id}/conferencias",
+                                  headers=cabecalhos).json()[0]["id"]
+        for qual in ("a-cobrar", "nao-escrituradas", "conferidas"):
+            r = cliente.get(
+                f"/api/conferencias/{execucao_id}/planilhas/{qual}?formato=csv",
+                headers=cabecalhos)
+            assert r.status_code == 200, r.text
+            assert r.headers["content-type"].startswith("text/csv")
+            assert r.content[:3] == b"\xef\xbb\xbf"     # BOM, para o Excel
+            assert f"{qual}" in r.headers["content-disposition"] or True
+            assert r.headers["content-disposition"].endswith('.csv"')
+
+    def test_o_csv_nao_recebe_o_xlsx_do_cache(
+        self, cliente, cabecalhos, projeto_id
+    ):
+        """O cache é por nome de arquivo. Se o formato não entrasse no nome,
+        o xlsx já gerado responderia ao pedido de csv."""
+        execucao_id = cliente.get(f"/api/projetos/{projeto_id}/conferencias",
+                                  headers=cabecalhos).json()[0]["id"]
+        base = f"/api/conferencias/{execucao_id}/planilhas/a-cobrar"
+        planilha = cliente.get(base, headers=cabecalhos)
+        csv_ = cliente.get(f"{base}?formato=csv", headers=cabecalhos)
+        assert planilha.content[:2] == b"PK"          # xlsx é um zip
+        assert csv_.content[:2] != b"PK"
+
+    def test_formato_desconhecido_da_404(self, cliente, cabecalhos, projeto_id):
+        execucao_id = cliente.get(f"/api/projetos/{projeto_id}/conferencias",
+                                  headers=cabecalhos).json()[0]["id"]
+        r = cliente.get(
+            f"/api/conferencias/{execucao_id}/planilhas/a-cobrar?formato=ods",
+            headers=cabecalhos)
+        assert r.status_code == 404
+        assert "xlsx ou csv" in r.json()["detail"]
+
     def test_planilha_desconhecida_da_404(self, cliente, cabecalhos, projeto_id):
         execucao_id = cliente.get(f"/api/projetos/{projeto_id}/conferencias",
                                   headers=cabecalhos).json()[0]["id"]

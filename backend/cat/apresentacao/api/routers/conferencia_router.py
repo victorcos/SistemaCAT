@@ -46,6 +46,7 @@ from cat.infraestrutura.analitico.confronto import (
     ARQUIVO_SEM_DOCUMENTO,
 )
 from cat.infraestrutura.planilhas.conferencia import (
+    FORMATOS,
     gerar_conferidas,
     gerar_nao_escrituradas,
     gerar_sem_documento,
@@ -63,6 +64,15 @@ PodeEscrever = Annotated[
 ]
 
 SITUACOES_EM_CURSO = ("na_fila", "rodando")
+
+
+# o que o navegador recebe. CSV vai com charset declarado: sem isso o Excel
+# ignora o BOM em algumas versões e o acento se perde no caminho
+TIPOS = {
+    "xlsx": ("application/vnd.openxmlformats-officedocument"
+             ".spreadsheetml.sheet"),
+    "csv": "text/csv; charset=utf-8",
+}
 
 # nome do arquivo que o usuário recebe, e do que fica em cache na execução
 PLANILHAS = {
@@ -206,9 +216,15 @@ def baixar_planilha(
     sessao: Annotated[Session, Depends(obter_sessao)],
     modelos: str | None = None,
     classificacoes: str | None = None,
+    formato: str = "xlsx",
 ) -> FileResponse:
     if qual not in PLANILHAS:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Planilha desconhecida.")
+    if formato not in FORMATOS:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"Formato desconhecido: {formato}. Vale xlsx ou csv.",
+        )
 
     execucao = _execucao(execucao_id, usuario, sessao)
     if execucao.situacao != "concluida":
@@ -239,20 +255,22 @@ def baixar_planilha(
     # ficaria em cache e o filtro seguinte devolveria a planilha errada
     partes = sorted(escolhidos or ()) + sorted(classes or ())
     sufixo = "-" + "_".join(partes) if partes else ""
-    raiz, extensao = os.path.splitext(nome)
-    destino = os.path.join(pasta, f"{raiz}{sufixo}{extensao}")
+    raiz, _ = os.path.splitext(nome)
+    # o formato entra no nome do cache: sem isso o xlsx já gerado responderia
+    # ao pedido de csv, porque os dois só se diferenciavam pelo filtro
+    destino = os.path.join(pasta, f"{raiz}{sufixo}.{formato}")
     if _precisa_gerar(destino, origem):
         with contexto(etapa=ETAPA, execucao_id=execucao_id, planilha=qual):
-            linhas = gerador(origem, destino, escolhidos, classes)
+            linhas = gerador(origem, destino, escolhidos, classes,
+                             formato=formato)
             log.info("planilha da conferência gerada",
-                     extra={"planilha": qual, "linhas": linhas,
+                     extra={"planilha": qual, "linhas": linhas, "formato": formato,
                             "modelos": sorted(escolhidos) if escolhidos else "todos",
                             "classificacoes": sorted(classes) if classes else "todas"})
 
     return FileResponse(
         destino,
-        media_type=("application/vnd.openxmlformats-officedocument"
-                    ".spreadsheetml.sheet"),
+        media_type=TIPOS[formato],
         filename=os.path.basename(destino),
     )
 

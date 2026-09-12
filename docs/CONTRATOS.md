@@ -151,6 +151,25 @@ tela mostra gente, e buscar cada nome depois seria uma consulta por cartão.
 São campos diferentes de propósito — quem criou não muda nunca; quem responde
 muda a cada sucessão.
 
+### Formato das listas (xlsx ou csv)
+
+As sete listas do sistema — três da conferência, quatro da movimentação — saem
+nos dois formatos pela mesma rota, com `?formato=`:
+
+| Valor | Content-Type | Para quê |
+|---|---|---|
+| `xlsx` (padrão) | `application/vnd.openxmlformats-…` | abrir e ler |
+| `csv` | `text/csv; charset=utf-8` | carregar em outra ferramenta, ou lista grande demais para o Excel |
+
+Formato desconhecido dá **404**. O nome do arquivo em cache carrega o formato,
+senão o xlsx já gerado responderia ao pedido de csv.
+
+O CSV sai com `;`, vírgula decimal, data `dd/mm/aaaa` e **BOM** — é o que o
+Excel em português lê sem configurar nada. O que ele não faz é alterar valor
+para agradar o Excel: a chave de acesso vai com os 44 dígitos que tem. Aberto
+com dois cliques no Excel, isso vira notação científica e não volta. Para
+Excel, xlsx.
+
 ### Acesso às empresas (escopo de visibilidade)
 
 Duas rotas, **só para gestor e dev**, na tela de Usuários:

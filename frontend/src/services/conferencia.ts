@@ -75,6 +75,16 @@ export const detalharConferencia = (execucaoId: number) =>
   chamar<Execucao>(`/conferencias/${execucaoId}`);
 
 /**
+/**
+ * Em que formato a lista sai.
+ *
+ * `xlsx` é para abrir e ler. `csv` é para carregar em outra ferramenta, e
+ * para quando a lista passa do que o Excel aguenta — CSV não tem limite de
+ * linha nem quebra em aba.
+ */
+export type Formato = "xlsx" | "csv";
+
+/**
  * Baixa uma das três planilhas.
  *
  * Não dá para usar um link simples: a rota exige o token no cabeçalho, e
@@ -86,15 +96,17 @@ export async function baixarPlanilha(
   qual: Planilha,
   modelos: string[] = [],
   classificacoes: string[] = [],
+  formato: Formato = "xlsx",
 ): Promise<void> {
   const parametros = new URLSearchParams();
   if (modelos.length) parametros.set("modelos", modelos.join(","));
   if (classificacoes.length)
     parametros.set("classificacoes", classificacoes.join(","));
+  if (formato !== "xlsx") parametros.set("formato", formato);
   const filtro = parametros.toString() ? `?${parametros}` : "";
   await baixarArquivo(
     `/api/conferencias/${execucaoId}/planilhas/${qual}${filtro}`,
-    `${qual}.xlsx`,
+    `${qual}.${formato}`,
   );
 }
 

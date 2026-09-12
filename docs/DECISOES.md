@@ -5,6 +5,40 @@
 
 ---
 
+## 2026-09-12 — CSV ao lado do xlsx, nas sete listas
+
+**Decisão.** O gerador de planilha passou a receber `formato`, e cada lista
+ganhou um botão CSV ao lado do botão de planilha.
+
+**Por quê.** Duas coisas que o xlsx não faz.
+
+Ele tem teto: o Excel para pouco acima de um milhão de linhas por aba, e o
+gerador já quebrava em abas de 900 mil para não estourar em silêncio. A lista
+analítica de uma base real desta casa tem 37,9 milhões de documentos, o que
+daria 43 abas — um arquivo que ninguém abre. CSV não tem limite nem aba.
+
+E ele é formato de leitura, não de carga. Quem vai levar a lista para o DuckDB,
+o Power BI ou o sistema do cliente precisa de CSV, e estava exportando à mão.
+
+**Onde mora.** No mesmo `gerar` que as sete listas já usavam, e não num módulo
+à parte. O filtro por modelo e por classificação é o que decide o que entra na
+cobrança: dois caminhos de filtro dariam, um dia, dois totais para a mesma
+lista. Aqui o filtro é um só e o formato é o último passo.
+
+**O que o CSV não faz.** Não altera valor para agradar o Excel. A chave de
+acesso sai com os 44 dígitos que tem. Abrir esse CSV com dois cliques no Excel
+transforma a chave em notação científica e não há volta — é exatamente o
+defeito que passamos esta manhã diagnosticando no relatório de um cliente.
+Fingir tipo resolveria o Excel e quebraria DuckDB, Power BI e banco, que são
+justamente para quem o CSV existe. Quem precisa do Excel tem o xlsx ao lado,
+que é imune; o botão diz isso ao passar o mouse.
+
+**Consequência.** `?formato=` nas duas rotas de download, com 404 para valor
+desconhecido, e o formato entrando no nome do arquivo em cache — sem isso o
+xlsx já gerado responderia ao pedido de csv.
+
+---
+
 ## 2026-09-12 — Linha sem chave: três motivos, e só um é problema de leitura
 
 **Decisão.** O aviso de "linha sem chave de acesso válida" foi partido em três,

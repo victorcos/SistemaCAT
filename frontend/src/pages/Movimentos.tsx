@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { TrabalhoParado } from "@/components/shared/TrabalhoParado";
 import { Andamento } from "@/components/ui/Andamento";
 import { Aviso } from "@/components/ui/Aviso";
+import { BaixarPlanilha } from "@/components/shared/BaixarPlanilha";
 import { Botao } from "@/components/ui/Botao";
 import { GrupoDeChips, Pilula } from "@/components/ui/Filtros";
 import {
@@ -15,12 +16,12 @@ import {
   Vazio,
   Voltar,
 } from "@/components/ui/Pagina";
-import { IconeBaixar, IconeTentarDeNovo } from "@/constants/icons";
+import { IconeTentarDeNovo } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
 import { aceitaProcessamento } from "@/constants/status";
 import { comoErro } from "@/lib/errors";
 import { dinheiro, numero } from "@/lib/format";
-import { EM_CURSO, type Fatia } from "@/services/conferencia";
+import { EM_CURSO, type Fatia, type Formato } from "@/services/conferencia";
 import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
 import {
   baixarPlanilhaDeMovimentos,
@@ -101,7 +102,7 @@ export default function Movimentos() {
     }
   }
 
-  async function baixar(qual: PlanilhaDeMovimentos) {
+  async function baixar(qual: PlanilhaDeMovimentos, formato: Formato) {
     if (!execucao) return;
     setOcupado(true);
     setErro(null);
@@ -111,6 +112,7 @@ export default function Movimentos() {
         qual,
         [],
         qual === "movimentos" ? classes : [],
+        formato,
       );
     } catch (e) {
       setErro(comoErro(e));
@@ -207,7 +209,7 @@ function Resultado({
   execucao: ExecucaoDeMovimentos | null;
   classes: string[];
   aoAlternarClasse: (codigo: string) => void;
-  aoBaixar: (qual: PlanilhaDeMovimentos) => void;
+  aoBaixar: (qual: PlanilhaDeMovimentos, formato: Formato) => void;
   ocupado: boolean;
 }) {
   const cobertura = Math.round(resumo.cobertura_de_item * 100);
@@ -300,14 +302,12 @@ function Resultado({
         />
 
         <div className="mt-6">
-          <Botao
-            icone={IconeBaixar}
-            onClick={() => aoBaixar("movimentos")}
-            disabled={ocupado || resumo.movimentos === 0}
-            className="shadow-acao"
-          >
-            {classes.length ? "Baixar planilha filtrada" : "Baixar planilha"}
-          </Botao>
+          <BaixarPlanilha
+            destaque
+            aoBaixar={(formato) => aoBaixar("movimentos", formato)}
+            desabilitado={ocupado || resumo.movimentos === 0}
+            rotulo={classes.length ? "Baixar planilha filtrada" : "Baixar planilha"}
+          />
         </div>
       </Secao>
 
@@ -326,14 +326,10 @@ function Resultado({
         >
           <Numerao>{numero(resumo.itens_cadastrados)}</Numerao>
           <div className="mt-5">
-            <Botao
-              variante="secundario"
-              icone={IconeBaixar}
-              onClick={() => aoBaixar("itens")}
-              disabled={ocupado || resumo.itens_cadastrados === 0}
-            >
-              Baixar planilha
-            </Botao>
+            <BaixarPlanilha
+              aoBaixar={(formato) => aoBaixar("itens", formato)}
+              desabilitado={ocupado || resumo.itens_cadastrados === 0}
+            />
           </div>
         </Secao>
 
@@ -349,14 +345,10 @@ function Resultado({
         >
           <Numerao>{numero(resumo.itens_em_estoque)}</Numerao>
           <div className="mt-5">
-            <Botao
-              variante="secundario"
-              icone={IconeBaixar}
-              onClick={() => aoBaixar("inventario")}
-              disabled={ocupado || resumo.itens_em_estoque === 0}
-            >
-              Baixar planilha
-            </Botao>
+            <BaixarPlanilha
+              aoBaixar={(formato) => aoBaixar("inventario", formato)}
+              desabilitado={ocupado || resumo.itens_em_estoque === 0}
+            />
           </div>
         </Secao>
       </div>
@@ -365,14 +357,10 @@ function Resultado({
         titulo="Analítico por documento"
         sub="C190 e C850: o total por CST e CFOP de cada documento, com a marca de quem tem item na EFD e quem não tem. É por aqui que se vê o que o XML terá de detalhar."
         acao={
-          <Botao
-            variante="secundario"
-            icone={IconeBaixar}
-            onClick={() => aoBaixar("analitico")}
-            disabled={ocupado || resumo.analiticos === 0}
-          >
-            Baixar planilha
-          </Botao>
+          <BaixarPlanilha
+            aoBaixar={(formato) => aoBaixar("analitico", formato)}
+            desabilitado={ocupado || resumo.analiticos === 0}
+          />
         }
       >
         <Numerao

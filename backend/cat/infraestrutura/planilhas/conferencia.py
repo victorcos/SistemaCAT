@@ -12,11 +12,26 @@ que já custou retrabalho:
   científica, que é pior: parece certa e não é;
 * **valor e data vão tipados**, senão não se soma nem se monta dinâmica, e o
   cliente que recebe a cobrança não consegue conferir o total.
+
+**CSV é a outra saída, e serve a outra coisa.** O xlsx é para abrir e ler; o
+CSV é para carregar em outro lugar — DuckDB, Power BI, banco, o sistema do
+cliente — e para quando a lista passa do que o Excel aguenta, já que CSV não
+tem limite de linha nem precisa quebrar em aba.
+
+O CSV sai com `;` e vírgula decimal, que é o que o Excel em português espera,
+e com BOM, senão o acento vira lixo. O que ele **não** faz é fingir tipo para
+agradar o Excel: a chave de acesso vai como os 44 dígitos que ela é. Abrir o
+CSV com dois cliques no Excel transforma isso em notação científica — é
+exatamente o defeito que este projeto passou uma manhã diagnosticando num
+relatório de cliente. Quem precisa abrir no Excel baixa o xlsx, que é imune;
+quem precisa carregar em ferramenta baixa o CSV, que é correto.
 """
 
 from __future__ import annotations
 
+import csv
 import os
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -30,6 +45,15 @@ log = obter_log(__name__)
 
 LIMITE_POR_ABA = 900_000
 LINHAS_POR_LEITURA = 50_000
+
+FORMATOS = ("xlsx", "csv")
+
+# ; e vírgula decimal: é o que o Excel em português entende sem perguntar nada.
+# Com vírgula de separador, todo valor com centavo quebraria a coluna.
+SEPARADOR_CSV = ";"
+
+# casas decimais por tipo, para o CSV não inventar precisão nem esconder fração
+CASAS = {"numero": 2, "quantidade": 5, "numero_inteiro": 0}
 
 
 @dataclass(frozen=True)
@@ -121,14 +145,95 @@ _TRADUCOES = {
 
 def gerar(parquet: str, destino: str, colunas: tuple[Coluna, ...],
           titulo_da_aba: str, modelos: frozenset[str] | None = None,
-          classificacoes: frozenset[str] | None = None) -> int:
-    """Escreve o xlsx a partir do parquet. Devolve quantas linhas gravou.
+          classificacoes: frozenset[str] | None = None,
+          formato: str = "xlsx") -> int:
+    """Escreve a planilha a partir do parquet. Devolve quantas linhas gravou.
 
     `modelos` restringe por modelo de documento, e não é detalhe: numa base
     real desta casa, 307.319 dos 321.337 documentos eram NFC-e. Cobrar do
     cliente o XML de cada cupom de consumidor não é trabalho que alguém vá
     fazer, e a planilha inteira perderia serventia por causa do volume.
+
+    `formato` escolhe entre xlsx e csv. O filtro e a tradução de rótulo são os
+    mesmos nos dois: é o motivo de as duas saídas morarem aqui, e não em
+    módulos separados que fatalmente divergiriam.
     """
+    if formato not in FORMATOS:
+        raise ValueError(f"formato desconhecido: {formato}")
+    if formato == "csv":
+        return _gerar_csv(parquet, destino, colunas, modelos, classificacoes)
+    return _gerar_xlsx(parquet, destino, colunas, titulo_da_aba,
+                       modelos, classificacoes)
+
+
+def _filtradas(parquet: str, modelos: frozenset[str] | None,
+               classificacoes: frozenset[str] | None) -> Iterator[dict]:
+    """As linhas do parquet que passam no filtro, em lotes, sem segurar tudo.
+
+    Fica separado porque é a parte que precisa ser idêntica nas duas saídas:
+    xlsx e csv filtrando diferente dariam dois totais para a mesma cobrança.
+    """
+    for lote in pq.ParquetFile(parquet).iter_batches(LINHAS_POR_LEITURA):
+        for r in lote.to_pylist():
+            if modelos is not None and r.get("modelo") not in modelos:
+                continue
+            if (classificacoes is not None
+                    and r.get("classificacao") not in classificacoes):
+                continue
+            yield r
+
+
+def _texto_para_csv(valor, coluna: Coluna) -> str:
+    """O valor como ele deve aparecer no CSV.
+
+    Número sai com vírgula decimal e sem separador de milhar: com milhar, o
+    Excel em português lê "1.234" como mil duzentos e trinta e quatro em uns
+    lugares e como 1,234 em outros. Sem milhar não há ambiguidade.
+    """
+    traducao = _TRADUCOES.get(coluna.campo)
+    if traducao:
+        return traducao.get(str(valor), str(valor))
+    if isinstance(valor, bool):
+        return "Sim" if valor else "Não"
+    if coluna.tipo == "data" and isinstance(valor, date):
+        return valor.strftime("%d/%m/%Y")
+    if coluna.tipo in CASAS:
+        numero = float(valor if not isinstance(valor, Decimal) else valor)
+        return f"{numero:.{CASAS[coluna.tipo]}f}".replace(".", ",")
+    return str(valor)
+
+
+def _gerar_csv(parquet: str, destino: str, colunas: tuple[Coluna, ...],
+               modelos: frozenset[str] | None = None,
+               classificacoes: frozenset[str] | None = None) -> int:
+    """Uma linha por registro, sem limite e sem aba.
+
+    `utf-8-sig` grava o BOM: sem ele o Excel lê o arquivo como ANSI e todo
+    acento vira lixo. `newline=""` é exigência do módulo csv no Windows —
+    sem isso sai uma linha em branco entre cada duas.
+    """
+    escritas = 0
+    with open(destino, "w", encoding="utf-8-sig", newline="") as f:
+        escritor = csv.writer(f, delimiter=SEPARADOR_CSV,
+                              quoting=csv.QUOTE_MINIMAL)
+        escritor.writerow([c.titulo for c in colunas])
+        for r in _filtradas(parquet, modelos, classificacoes):
+            linha = []
+            for coluna in colunas:
+                valor = r.get(coluna.campo)
+                linha.append("" if valor is None or valor == ""
+                             else _texto_para_csv(valor, coluna))
+            escritor.writerow(linha)
+            escritas += 1
+
+    log.info("csv gerado",
+             extra={"arquivo": os.path.basename(destino), "linhas": escritas})
+    return escritas
+
+
+def _gerar_xlsx(parquet: str, destino: str, colunas: tuple[Coluna, ...],
+                titulo_da_aba: str, modelos: frozenset[str] | None = None,
+                classificacoes: frozenset[str] | None = None) -> int:
     livro = xlsxwriter.Workbook(destino, {
         "constant_memory": True,        # não segura a planilha em memória
         "default_date_format": "dd/mm/yyyy",
@@ -151,21 +256,14 @@ def gerar(parquet: str, destino: str, colunas: tuple[Coluna, ...],
     na_aba = 0
     abas = 1
 
-    for lote in pq.ParquetFile(parquet).iter_batches(LINHAS_POR_LEITURA):
-        registros = lote.to_pylist()
-        for r in registros:
-            if modelos is not None and r.get("modelo") not in modelos:
-                continue
-            if (classificacoes is not None
-                    and r.get("classificacao") not in classificacoes):
-                continue
-            if na_aba >= LIMITE_POR_ABA:
-                abas += 1
-                aba = _abrir_aba(livro, titulo_da_aba, abas, colunas, cabecalho)
-                na_aba = 0
-            _escrever(aba, na_aba + 1, r, colunas, formatos)
-            na_aba += 1
-            escritas += 1
+    for r in _filtradas(parquet, modelos, classificacoes):
+        if na_aba >= LIMITE_POR_ABA:
+            abas += 1
+            aba = _abrir_aba(livro, titulo_da_aba, abas, colunas, cabecalho)
+            na_aba = 0
+        _escrever(aba, na_aba + 1, r, colunas, formatos)
+        na_aba += 1
+        escritas += 1
 
     livro.close()
     log.info("planilha gerada",
@@ -211,7 +309,8 @@ def _escrever(aba, linha: int, registro: dict, colunas: tuple[Coluna, ...],
 
 def gerar_sem_documento(parquet: str, destino: str,
                         modelos: frozenset[str] | None = None,
-                        classificacoes: frozenset[str] | None = None) -> int:
+                        classificacoes: frozenset[str] | None = None,
+                        formato: str = "xlsx") -> int:
     """A planilha de pendências.
 
     Sem filtro, sai inteira — cancelada, denegada e sem chave incluídas,
@@ -220,25 +319,28 @@ def gerar_sem_documento(parquet: str, destino: str,
     mandar o que faltava, ninguém voltaria a olhá-las.
     """
     return gerar(parquet, destino, COLUNAS_SEM_DOCUMENTO, "Pendências",
-                 modelos=modelos, classificacoes=classificacoes)
+                 modelos=modelos, classificacoes=classificacoes,
+                 formato=formato)
 
 
 def gerar_conferidas(parquet: str, destino: str,
                      modelos: frozenset[str] | None = None,
-                     classificacoes: frozenset[str] | None = None) -> int:
+                     classificacoes: frozenset[str] | None = None,
+                     formato: str = "xlsx") -> int:
     """A lista positiva: está na EFD e o documento veio.
 
     É o que segue para a apuração. Não tem classificação; o filtro por modelo
     vale pelo mesmo motivo da cobrança — cupom domina o volume.
     """
     return gerar(parquet, destino, COLUNAS_CONFERIDAS, "Conferidas",
-                 modelos=modelos)
+                 modelos=modelos, formato=formato)
 
 
 def gerar_nao_escrituradas(parquet: str, destino: str,
                            modelos: frozenset[str] | None = None,
-                           classificacoes: frozenset[str] | None = None) -> int:
+                           classificacoes: frozenset[str] | None = None,
+                           formato: str = "xlsx") -> int:
     # o parquet das não escrituradas não tem modelo: a chave veio da pasta,
     # e o que se sabe dela é a origem
     return gerar(parquet, destino, COLUNAS_NAO_ESCRITURADAS,
-                 "Não escrituradas")
+                 "Não escrituradas", formato=formato)

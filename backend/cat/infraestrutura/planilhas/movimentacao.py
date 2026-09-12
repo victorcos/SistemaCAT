@@ -106,26 +106,32 @@ COLUNAS_ANALITICO = (
 
 def gerar_movimentos(parquet: str, destino: str,
                      modelos: frozenset[str] | None = None,
-                     classificacoes: frozenset[str] | None = None) -> int:
+                     classificacoes: frozenset[str] | None = None,
+                     formato: str = "xlsx") -> int:
     return gerar(parquet, destino, COLUNAS_MOVIMENTOS, "Movimentos",
-                 modelos=modelos, classificacoes=classificacoes)
+                 modelos=modelos, classificacoes=classificacoes,
+                 formato=formato)
 
 
 def gerar_itens(parquet: str, destino: str,
                 modelos: frozenset[str] | None = None,
-                classificacoes: frozenset[str] | None = None) -> int:
+                classificacoes: frozenset[str] | None = None,
+                formato: str = "xlsx") -> int:
     # o cadastro não tem modelo nem classificação: os filtros não se aplicam
-    return gerar(parquet, destino, COLUNAS_ITENS, "Itens")
+    return gerar(parquet, destino, COLUNAS_ITENS, "Itens", formato=formato)
 
 
 def gerar_inventario(parquet: str, destino: str,
                      modelos: frozenset[str] | None = None,
-                     classificacoes: frozenset[str] | None = None) -> int:
-    return gerar(parquet, destino, COLUNAS_INVENTARIO, "Inventário")
+                     classificacoes: frozenset[str] | None = None,
+                     formato: str = "xlsx") -> int:
+    return gerar(parquet, destino, COLUNAS_INVENTARIO, "Inventário",
+                 formato=formato)
 
 
 def gerar_analitico(parquet: str, destino: str,
                     modelos: frozenset[str] | None = None,
-                    classificacoes: frozenset[str] | None = None) -> int:
+                    classificacoes: frozenset[str] | None = None,
+                    formato: str = "xlsx") -> int:
     return gerar(parquet, destino, COLUNAS_ANALITICO, "Analítico",
-                 modelos=modelos)
+                 modelos=modelos, formato=formato)

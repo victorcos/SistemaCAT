@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { BaixarPlanilha } from "@/components/shared/BaixarPlanilha";
 import { TrabalhoParado } from "@/components/shared/TrabalhoParado";
 import { Andamento } from "@/components/ui/Andamento";
 import { Aviso } from "@/components/ui/Aviso";
@@ -15,13 +16,14 @@ import {
   Vazio,
   Voltar,
 } from "@/components/ui/Pagina";
-import { IconeBaixar, IconeTentarDeNovo } from "@/constants/icons";
+import { IconeTentarDeNovo } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
 import { aceitaProcessamento } from "@/constants/status";
 import { comoErro } from "@/lib/errors";
 import { dinheiro, numero } from "@/lib/format";
 import {
   baixarPlanilha,
+  type Formato,
   detalharConferencia,
   EM_CURSO,
   iniciarConferencia,
@@ -103,7 +105,7 @@ export default function Conferencia() {
     }
   }
 
-  async function baixar(qual: Planilha) {
+  async function baixar(qual: Planilha, formato: Formato) {
     if (!execucao) return;
     setOcupado(true);
     setErro(null);
@@ -113,6 +115,7 @@ export default function Conferencia() {
         qual,
         qual === "a-cobrar" ? modelos : [],
         qual === "a-cobrar" ? classes : [],
+        formato,
       );
     } catch (e) {
       setErro(comoErro(e));
@@ -216,7 +219,7 @@ function Resultado({
   classes: string[];
   aoAlternarModelo: (codigo: string) => void;
   aoAlternarClasse: (codigo: string) => void;
-  aoBaixar: (qual: Planilha) => void;
+  aoBaixar: (qual: Planilha, formato: Formato) => void;
   ocupado: boolean;
   projetoId: number;
 }) {
@@ -297,14 +300,10 @@ function Resultado({
         titulo="Notas conferidas"
         sub="Estão na EFD e o documento veio — XML da pasta ou linha do relatório do cliente. É o resultado positivo: o que segue para a apuração."
         acao={
-          <Botao
-            variante="secundario"
-            icone={IconeBaixar}
-            onClick={() => aoBaixar("conferidas")}
-            disabled={ocupado || resumo.conferidos === 0}
-          >
-            Baixar planilha
-          </Botao>
+          <BaixarPlanilha
+            aoBaixar={(formato) => aoBaixar("conferidas", formato)}
+            desabilitado={ocupado || resumo.conferidos === 0}
+          />
         }
       >
         <Numerao nota={`${dinheiro(resumo.valor_conferido)} em documentos conferidos.`}>
@@ -316,14 +315,10 @@ function Resultado({
         titulo="Notas não escrituradas"
         sub="Estão na pasta do cliente e não estão na EFD. Ficam fora da análise: ressarcimento se pede sobre o que foi declarado ao fisco."
         acao={
-          <Botao
-            variante="secundario"
-            icone={IconeBaixar}
-            onClick={() => aoBaixar("nao-escrituradas")}
-            disabled={ocupado || resumo.nao_escrituradas === 0}
-          >
-            Baixar planilha
-          </Botao>
+          <BaixarPlanilha
+            aoBaixar={(formato) => aoBaixar("nao-escrituradas", formato)}
+            desabilitado={ocupado || resumo.nao_escrituradas === 0}
+          />
         }
       >
         <Numerao>{numero(resumo.nao_escrituradas)}</Numerao>
@@ -357,14 +352,12 @@ function Resultado({
         />
 
         <div className="mt-6">
-          <Botao
-            icone={IconeBaixar}
-            onClick={() => aoBaixar("a-cobrar")}
-            disabled={ocupado || resumo.sem_documento === 0}
-            className="shadow-acao"
-          >
-            {filtrada ? "Baixar planilha filtrada" : "Baixar planilha"}
-          </Botao>
+          <BaixarPlanilha
+            destaque
+            aoBaixar={(formato) => aoBaixar("a-cobrar", formato)}
+            desabilitado={ocupado || resumo.sem_documento === 0}
+            rotulo={filtrada ? "Baixar planilha filtrada" : "Baixar planilha"}
+          />
         </div>
       </Secao>
 

@@ -177,6 +177,20 @@ class TestFluxo:
             assert r.status_code == 200, (qual, r.text)
             assert r.content[:2] == b"PK"
 
+    def test_baixa_as_quatro_em_csv(self, cliente, cabecalhos, execucao):
+        """As quatro listas da movimentação também saem em csv.
+
+        A do analítico é a que mais pede: numa base real desta casa deu 37,9
+        milhões de documentos, e o xlsx precisaria quebrar em 43 abas."""
+        for qual in ("movimentos", "itens", "inventario", "analitico"):
+            r = cliente.get(
+                f"/api/movimentos/{execucao['id']}/planilhas/{qual}?formato=csv",
+                headers=cabecalhos)
+            assert r.status_code == 200, (qual, r.text)
+            assert r.headers["content-type"].startswith("text/csv")
+            assert r.content[:3] == b"\xef\xbb\xbf"
+            assert r.headers["content-disposition"].endswith('.csv"')
+
     def test_filtro_por_classificacao_muda_o_arquivo(self, cliente, cabecalhos, execucao):
         inteira = cliente.get(f"/api/movimentos/{execucao['id']}/planilhas/movimentos",
                               headers=cabecalhos)

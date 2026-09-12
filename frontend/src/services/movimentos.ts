@@ -1,5 +1,5 @@
 import { chamar } from "./api";
-import { baixarArquivo, type Execucao, type Fatia } from "./conferencia";
+import { baixarArquivo, type Execucao, type Fatia, type Formato } from "./conferencia";
 
 /**
  * Histórico de movimentação: os itens da EFD, marcados pela conferência.
@@ -66,14 +66,16 @@ export function baixarPlanilhaDeMovimentos(
   qual: PlanilhaDeMovimentos,
   modelos: string[] = [],
   classificacoes: string[] = [],
+  formato: Formato = "xlsx",
 ): Promise<void> {
   const parametros = new URLSearchParams();
   if (modelos.length) parametros.set("modelos", modelos.join(","));
   if (classificacoes.length)
     parametros.set("classificacoes", classificacoes.join(","));
+  if (formato !== "xlsx") parametros.set("formato", formato);
   const filtro = parametros.toString() ? `?${parametros}` : "";
   return baixarArquivo(
     `/api/movimentos/${execucaoId}/planilhas/${qual}${filtro}`,
-    `${qual}.xlsx`,
+    `${qual}.${formato}`,
   );
 }
