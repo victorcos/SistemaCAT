@@ -7,6 +7,11 @@ import { LogoBMS } from "@/components/ui/LogoBMS";
  * Metade marinho com o logotipo, metade formulário. Em tela estreita o lado
  * da marca some e o logotipo entra acima do formulário — em celular, metade
  * da tela ocupada por identidade tira espaço do que importa.
+ *
+ * O painel da marca tem os dois efeitos que a spec pede, ambos em CSS e
+ * ambos `aria-hidden`: um halo laranja que deriva devagar e uma grade de
+ * 56px esmaecida nas bordas por máscara radial. Quem pediu menos movimento
+ * ao sistema operacional não vê a deriva (styles/animations.css).
  */
 export function LeiauteAcesso({
   titulo,
@@ -21,24 +26,43 @@ export function LeiauteAcesso({
 }) {
   return (
     <div className="grid min-h-screen grid-cols-1 md:grid-cols-2">
-      {/* a linha dourada na borda vem da propria marca */}
       <aside
         aria-hidden
-        className="hidden flex-col items-center justify-center gap-6 border-r-[3px] border-marca-dourado bg-marca-azul p-12 md:flex"
+        className="relative hidden flex-col items-center justify-center gap-6 overflow-hidden border-r border-laranja-500/30 bg-marca-azul p-12 md:flex"
       >
-        <LogoBMS sobre="escuro" alt="" className="w-[min(340px,70%)]" />
-        <p className="m-0 max-w-[30ch] text-center text-[15px] leading-relaxed text-moldura-texto-suave">
-          Sistema de apuração das obrigações da CAT
-        </p>
+        {/* grade de 56px, apagando nas bordas */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-100"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgb(255 255 255 / 3.5%) 1px, transparent 1px), linear-gradient(to bottom, rgb(255 255 255 / 3.5%) 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+            maskImage: "radial-gradient(ellipse 70% 60% at 50% 45%, black, transparent)",
+          }}
+        />
+        {/* halo laranja: a única coisa que se move nesta tela */}
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 animate-deriva rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle, color-mix(in srgb, var(--marca-laranja) 14%, transparent), transparent 65%)",
+          }}
+        />
+
+        <div className="relative flex flex-col items-center gap-5">
+          <LogoBMS sobre="escuro" alt="" className="w-[min(340px,70%)]" />
+          <span className="h-0.5 w-16 rounded-full bg-[linear-gradient(90deg,transparent,var(--marca-laranja),transparent)]" />
+          <p className="m-0 max-w-[30ch] text-center text-[17px] leading-relaxed text-moldura-texto-suave">
+            Sistema de apuração das obrigações da CAT
+          </p>
+        </div>
       </aside>
 
       <main className="flex flex-col items-center justify-center gap-8 bg-fundo px-6 py-12">
-        <div className="flex w-full max-w-[380px] flex-col gap-4">
+        <div className="flex w-full max-w-[412px] flex-col gap-4">
           <LogoBMS sobre="claro" className="mx-auto mb-2 w-[190px] md:hidden" />
-          <h1 className="m-0 text-[26px] font-[650] tracking-[-0.01em]">
-            {titulo}
-          </h1>
-          {sub && <p className="m-0 -mt-2 text-sm text-texto-suave">{sub}</p>}
+          <h1 className="m-0 text-[30px] font-extrabold tracking-[-0.02em]">{titulo}</h1>
+          {sub && <p className="m-0 -mt-2 text-sm leading-relaxed text-texto-suave">{sub}</p>}
           {children}
         </div>
         {rodape}

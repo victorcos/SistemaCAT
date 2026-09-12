@@ -40,13 +40,17 @@ function Raiz() {
 }
 
 /**
- * Lazy loading ainda NÃO.
+ * Sobre dividir o pacote (`lazy:`).
  *
- * As primitivas compartilhadas ainda vivem em styles/legacy-kit.css e o CSS
- * das páginas ainda é importado por cada uma delas. Enquanto uma página
- * depender do CSS de outra, dividir o bundle deixa telas sem botão e sem
- * tabela. Ligar `lazy:` nas quatro pesadas (Importar, Lote, Conferencia,
- * Movimentos) na fase de fechamento, junto com a reativação do preflight.
+ * O impedimento que havia aqui — páginas dependendo do CSS umas das outras —
+ * acabou em 12/09/2026, quando a última tela migrou e styles/legacy-kit.css
+ * saiu do projeto. Hoje cada página é autossuficiente e a divisão é segura.
+ *
+ * Segue sem dividir porque ainda não se paga: o pacote inteiro tem 110 kB
+ * comprimido, e o sistema roda em rede interna. Dividir aqui trocaria uma
+ * carga única e rápida por um piscar de Suspense a cada navegação. Vale
+ * reavaliar quando alguma tela trouxer biblioteca pesada — tabela
+ * virtualizada ou gráfico, por exemplo.
  */
 export const roteador = createBrowserRouter([
   {

@@ -16,6 +16,7 @@
   --animate-brilho: brilho 5.5s linear infinite;
   --animate-entrada: entrada 0.22s ease-out both;
   --animate-pulso: pulso 2.4s ease-in-out infinite;
+  --animate-deriva: deriva 16s ease-in-out infinite alternate;
 }
 
 /* faixa de luz que atravessa o topo de um cartao */
@@ -37,6 +38,16 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* halo do painel de marca do login: deriva devagar, nunca chama atencao */
+@keyframes deriva {
+  from {
+    transform: translate(-50%, -50%);
+  }
+  to {
+    transform: translate(calc(-50% + 24px), calc(-50% - 18px));
   }
 }
 

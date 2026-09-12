@@ -14,9 +14,20 @@ import { Campo, Entrada } from "@/components/ui/Campo";
 import { Carregando } from "@/components/ui/Carregando";
 import { Combobox, type OpcaoDeCombobox } from "@/components/ui/Combobox";
 import { Etiqueta, type TomDeEtiqueta } from "@/components/ui/Etiqueta";
+import {
+  Busca,
+  Contador,
+  Segmentado,
+  Toolbar,
+} from "@/components/ui/Filtros";
 import { Modal } from "@/components/ui/Modal";
 import {
-  IconeBusca,
+  CabecalhoDePagina,
+  Metrica,
+  Metricas,
+  Vazio,
+} from "@/components/ui/Pagina";
+import {
   IconeChave,
   IconeCopiar,
   IconeDesativar,
@@ -33,7 +44,7 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { useToast } from "@/hooks/useToast";
 import { cn } from "@/lib/cn";
 import { comoErro } from "@/lib/errors";
-import { dataHora, numero } from "@/lib/format";
+import { dataHora } from "@/lib/format";
 import {
   alterarCargo,
   alterarDados,
@@ -225,7 +236,23 @@ export default function Usuarios() {
 
   return (
     <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
-      <Cabecalho metricas={metricas} aoCriar={() => setCriando(true)} />
+      <CabecalhoDePagina
+        eyebrow="Administração"
+        titulo="Usuários"
+        sub="Cadastro e redefinição de senha ficam com gestores. Não há autocadastro nem recuperação por e-mail."
+        acao={
+          <Botao icone={IconeNovo} onClick={() => setCriando(true)} className="shadow-acao">
+            Novo usuário
+          </Botao>
+        }
+      >
+        <Metricas>
+          <Metrica rotulo="Total" valor={metricas.total} />
+          <Metrica rotulo="Ativos" valor={metricas.ativos} tom="sucesso" />
+          <Metrica rotulo="Senha provisória" valor={metricas.provisorios} tom="atencao" />
+          <Metrica rotulo="Inativos" valor={metricas.inativos} />
+        </Metricas>
+      </CabecalhoDePagina>
 
       {erro && (
         <Aviso
@@ -242,23 +269,27 @@ export default function Usuarios() {
       {flash && <FlashBanner flash={flash} aoFechar={() => setFlash(null)} />}
 
       <section className="overflow-hidden rounded-cartao border border-borda bg-superficie shadow-cat">
-        <Toolbar
-          busca={busca}
-          aoBuscar={setBusca}
-          filtro={filtro}
-          aoFiltrar={setFiltro}
-          quantos={visiveis.length}
-        />
+        <Toolbar>
+          <Busca
+            valor={busca}
+            aoMudar={setBusca}
+            placeholder="Buscar por usuário, nome ou e-mail"
+          />
+          <Segmentado
+            rotulo="Filtrar por situação"
+            opcoes={FILTROS}
+            valor={filtro}
+            aoMudar={setFiltro}
+          />
+          <Contador quantos={visiveis.length} singular="usuário" plural="usuários" />
+        </Toolbar>
 
         {!usuarios ? (
           <Carregando texto="Carregando usuários…" />
         ) : visiveis.length === 0 ? (
-          <div className="px-4 py-14 text-center">
-            <p className="m-0 text-[15px] font-bold text-texto-suave">Nenhum usuário encontrado</p>
-            <p className="m-0 mt-1 text-[13px] text-texto-fraco">
-              Ajuste a busca ou o filtro de situação.
-            </p>
-          </div>
+          <Vazio titulo="Nenhum usuário encontrado">
+            Ajuste a busca ou o filtro de situação.
+          </Vazio>
         ) : (
           <div className="overflow-x-auto">
             <div role="table" aria-label="Usuários" className="min-w-[1080px]">
@@ -327,80 +358,6 @@ export default function Usuarios() {
 }
 
 /* ------------------------------------------------------------------ */
-/* cabeçalho com métricas                                              */
-/* ------------------------------------------------------------------ */
-
-function Cabecalho({
-  metricas,
-  aoCriar,
-}: {
-  metricas: { total: number; ativos: number; provisorios: number; inativos: number };
-  aoCriar: () => void;
-}) {
-  return (
-    <section className="relative overflow-hidden rounded-cartao border border-borda bg-superficie p-6 shadow-cat">
-      {/* brilho radial e a faixa de luz do topo: os dois efeitos do redesenho */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(420px_160px_at_8%_0%,color-mix(in_srgb,var(--marca-laranja)_16%,transparent),transparent_70%)]"
-      />
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px overflow-hidden">
-        <div className="h-full w-2/5 animate-brilho bg-[linear-gradient(90deg,transparent,var(--marca-laranja),transparent)]" />
-      </div>
-
-      <div className="relative flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="m-0 text-[11px] font-bold uppercase tracking-[0.18em] text-laranja-700 escuro:text-laranja-400">
-            Administração
-          </p>
-          <h1 className="m-0 mt-1 text-3xl font-extrabold tracking-[-0.02em] text-texto">Usuários</h1>
-          <p className="m-0 mt-2 max-w-[560px] text-sm leading-[1.55] text-texto-suave [text-wrap:pretty]">
-            Cadastro e redefinição de senha ficam com gestores. Não há autocadastro nem
-            recuperação por e-mail.
-          </p>
-        </div>
-        <Botao icone={IconeNovo} onClick={aoCriar} className="shadow-acao hover:-translate-y-0.5 transition-transform">
-          Novo usuário
-        </Botao>
-      </div>
-
-      <dl className="relative m-0 mt-5 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
-        <Metrica rotulo="Total" valor={metricas.total} />
-        <Metrica rotulo="Ativos" valor={metricas.ativos} tom="sucesso" />
-        <Metrica rotulo="Senha provisória" valor={metricas.provisorios} tom="atencao" />
-        <Metrica rotulo="Inativos" valor={metricas.inativos} />
-      </dl>
-    </section>
-  );
-}
-
-function Metrica({
-  rotulo,
-  valor,
-  tom,
-}: {
-  rotulo: string;
-  valor: number;
-  tom?: "sucesso" | "atencao";
-}) {
-  const classes = {
-    sucesso: "border-sucesso/20 bg-sucesso-fundo [&_dt]:text-sucesso",
-    atencao: "border-atencao/20 bg-atencao-fundo [&_dt]:text-atencao",
-  };
-  return (
-    <div
-      className={cn(
-        "rounded-raio-g border border-borda bg-superficie-vidro px-4 py-3.5",
-        tom && classes[tom],
-      )}
-    >
-      <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-texto-fraco">{rotulo}</dt>
-      <dd className="m-0 mt-1 text-2xl font-extrabold tabular-nums text-texto">{numero(valor)}</dd>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /* flash                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -455,81 +412,6 @@ function FlashBanner({ flash, aoFechar }: { flash: Flash; aoFechar: () => void }
       >
         <IconeFechar size={15} strokeWidth={2} className="mx-auto" aria-hidden />
       </button>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* barra de busca e filtros                                            */
-/* ------------------------------------------------------------------ */
-
-function Toolbar({
-  busca,
-  aoBuscar,
-  filtro,
-  aoFiltrar,
-  quantos,
-}: {
-  busca: string;
-  aoBuscar: (v: string) => void;
-  filtro: Filtro;
-  aoFiltrar: (f: Filtro) => void;
-  quantos: number;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-borda px-4 py-4">
-      <div className="relative min-w-[220px] max-w-[360px] flex-1">
-        <IconeBusca
-          size={13}
-          strokeWidth={2}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-texto-fraco"
-          aria-hidden
-        />
-        <input
-          type="search"
-          value={busca}
-          onChange={(e) => aoBuscar(e.target.value)}
-          placeholder="Buscar por usuário, nome ou e-mail"
-          aria-label="Buscar por usuário, nome ou e-mail"
-          className={cn(
-            "w-full rounded-raio-g border border-borda-forte bg-superficie-vidro py-2.5 pl-8 pr-3.5",
-            "text-[13px] text-texto placeholder:text-texto-fraco transition-colors",
-            "focus:outline-none focus:border-laranja-500/55 focus:bg-laranja-500/6",
-          )}
-        />
-      </div>
-
-      <div
-        role="radiogroup"
-        aria-label="Filtrar por situação"
-        className="flex rounded-[11px] border border-borda bg-superficie-vidro p-1"
-      >
-        {FILTROS.map((f) => {
-          const ativo = f.chave === filtro;
-          return (
-            <button
-              key={f.chave}
-              type="button"
-              role="radio"
-              aria-checked={ativo}
-              onClick={() => aoFiltrar(f.chave)}
-              className={cn(
-                // sem preflight, o <button> vem com borda e fundo do navegador
-                "cursor-pointer rounded-raio border-0 bg-transparent px-3.5 py-2 text-xs font-bold transition-colors",
-                ativo
-                  ? "bg-laranja-500/16 text-laranja-800 escuro:text-laranja-300"
-                  : "text-texto-suave hover:text-texto",
-              )}
-            >
-              {f.rotulo}
-            </button>
-          );
-        })}
-      </div>
-
-      <span className="ml-auto text-xs font-semibold text-texto-fraco">
-        {quantos === 1 ? "1 usuário" : `${numero(quantos)} usuários`}
-      </span>
     </div>
   );
 }

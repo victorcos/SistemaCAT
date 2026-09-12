@@ -1163,3 +1163,52 @@ o painel do combobox dentro do modal.
 
 **Saiu de cena:** `pages/Usuarios.css` (220 linhas) e o componente
 `SenhaProvisoria`, que o banner de flash substitui.
+
+---
+
+## 2026-09-12 — O front inteiro no desenho novo, e o CSS legado acabou
+
+**O que chegou.** Um segundo pacote de design, agora com as sete telas
+(`frontend/claude/design/`): Login, Trabalhos, Cadastro, Detalhe do trabalho,
+as três etapas e Usuários. Mesma regra do primeiro: a spec é referência
+visual; a implementação usa os componentes do sistema.
+
+**O que foi feito.** Todas as telas migraram. Com elas nasceram as peças que
+estavam copiadas tela a tela e agora existem uma vez só:
+
+* `Pagina.tsx` — cabeçalho de página (com o brilho e a faixa de luz),
+  métricas, seção, número grande, barra de progresso, estado vazio, voltar;
+* `Filtros.tsx` — toolbar, busca, segmentado, contador, chips de filtro;
+* `Tabela.tsx` — tabela de dados com rolagem própria;
+* `Andamento.tsx` — o progresso de execução longa, compartilhado pelas duas
+  etapas que rodam em segundo plano;
+* `ForcaDaSenha.tsx` — medidor de força e lista de requisitos;
+* `lib/competencia.ts` — competência é mês: `MM/AAAA` na tela, ISO na API.
+  Estava escrita de três jeitos, e o wizard usava `type="date"` com um dia
+  que ninguém escolheu e que reaparecia na tela depois.
+
+**Duas decisões de produto no caminho.**
+
+1. **Novo trabalho para empresa já cadastrada** virou modal no Início, como a
+   spec pede. Empresa nova continua entrando pelo wizard de cadastro: é o
+   SPED que traz CNPJ, razão social, IE e UF, e digitar isso à mão é como o
+   cadastro erra.
+2. **As rotas não mudaram.** A spec sugere `/trabalhos/:id`; ficou
+   `/projetos/:id`, que é o que já está no ar e em links salvos. Trocar rota
+   sem ganho é churn.
+
+**O fim do CSS legado.** Com a última tela migrada, nenhuma classe de
+`styles/legacy-kit.css` era mais usada — o arquivo saiu, e com ele o
+impedimento que estava escrito em `styles/tema.css` desde a branch de casa:
+**o preflight do Tailwind entrou**. Some com isso a correção manual que cada
+componente carregava (`bg-transparent` em botão, `border-0` em dialog,
+sublinhado de link) — que, aliás, foi o que apareceu na conferência visual:
+todo botão que navega vinha sublinhado em azul, e o `<dialog>` com borda
+preta.
+
+**Dividir o pacote continua fora**, agora por outro motivo: cabe inteiro em
+110 kB comprimidos, e o sistema roda em rede interna. Trocar uma carga única
+por um piscar de Suspense a cada navegação não se paga. A nota em
+`routers/index.tsx` registra quando reavaliar.
+
+**Backend:** nada mudou nesta entrega. 489 testes seguem passando.

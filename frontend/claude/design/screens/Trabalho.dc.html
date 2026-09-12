@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<![CDATA[<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #070c18; }
+    body { font-family: "Plus Jakarta Sans", "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #f2971d; text-decoration: none; }
+    a:hover { color: #ffb34d; }
+    button { font-family: inherit; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 99px; }
+    @keyframes dcFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes dcSweep { 0% { transform: translateX(-110%); } 100% { transform: translateX(210%); } }
+    @keyframes dcPulse { 0%,100% { opacity: .45; } 50% { opacity: 1; } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; background: radial-gradient(900px 500px at 18% -10%, rgba(242,151,29,.10), transparent 60%), radial-gradient(900px 600px at 90% 0%, rgba(37,99,235,.14), transparent 65%), #070c18; color: #e8edf7;">
+
+  <aside style="width: 244px; flex: 0 0 244px; border-right: 1px solid rgba(255,255,255,.07); background: linear-gradient(180deg, rgba(12,19,36,.9), rgba(8,13,25,.9)); display: flex; flex-direction: column; padding: 22px 16px; gap: 28px; position: sticky; top: 0; height: 100vh;">
+    <div style="padding: 2px 6px;">
+      <img src="assets/bms-logo.png" alt="BMS Consultoria Tributária" style="width: 172px; height: auto; display: block;" />
+    </div>
+    <nav style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 10px; letter-spacing: .16em; color: #5f7191; font-weight: 700; padding: 0 10px 8px;">NAVEGAÇÃO</div>
+      <div style="position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 700; color: #fff; background: linear-gradient(90deg, rgba(242,151,29,.16), rgba(242,151,29,.02)); border: 1px solid rgba(242,151,29,.28); overflow: hidden;">
+        <span style="position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: #f2971d;"></span>
+        <span style="width: 6px; height: 6px; border-radius: 99px; background: #f2971d; box-shadow: 0 0 10px #f2971d;"></span>Início
+      </div>
+      <a href="Cadastro.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;">
+        <span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Cadastro
+      </a>
+      <a href="Usuarios.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;">
+        <span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Usuários
+      </a>
+    </nav>
+    <div style="margin-top: auto; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.06); background: rgba(255,255,255,.02);">
+      <div style="font-size: 11px; color: #6d7f9d; font-weight: 600;">Sistema CAT</div>
+      <div style="font-size: 11px; color: #4d5d79; margin-top: 3px;">sessão não comercial</div>
+    </div>
+  </aside>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+
+    <header style="display: flex; align-items: center; gap: 14px; padding: 16px 28px; border-bottom: 1px solid rgba(255,255,255,.07); background: rgba(8,13,25,.72); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(140deg, #1e3a8a, #0f1e3f); border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #cfe0ff;">VP</div>
+        <div style="font-size: 14px; font-weight: 700;">Victor Pedroso</div>
+      </div>
+      <span style="font-size: 10px; font-weight: 700; letter-spacing: .1em; padding: 4px 8px; border-radius: 6px; background: rgba(242,151,29,.14); border: 1px solid rgba(242,151,29,.32); color: #ffbb5c;">DEV</span>
+      <div style="flex: 1;"></div>
+      <button style="padding: 9px 18px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dce6f7; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .18s;" style-hover="background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.4); color: #fecaca;">Sair</button>
+    </header>
+
+    <main style="padding: 24px 28px 40px; display: flex; flex-direction: column; gap: 20px; max-width: 1240px; width: 100%;">
+
+      <a href="Inicio.dc.html" style="display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; width: fit-content;">← Trabalhos</a>
+
+      <section style="position: relative; overflow: hidden; border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: linear-gradient(120deg, rgba(18,27,48,.9), rgba(10,16,31,.9)); padding: 24px 26px;">
+        <div style="position: absolute; inset: 0; pointer-events: none; background: radial-gradient(420px 160px at 8% 0%, rgba(242,151,29,.16), transparent 70%);"></div>
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 1px; overflow: hidden;">
+          <div style="width: 40%; height: 100%; background: linear-gradient(90deg, transparent, #f2971d, transparent); animation: dcSweep 5.5s linear infinite;"></div>
+        </div>
+
+        <div style="position: relative; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+          <div style="flex: 1; min-width: 300px;">
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+              <span style="display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: rgba(59,130,246,.1); border: 1px solid rgba(96,165,250,.3); color: #93c5fd;">
+                <span style="width: 6px; height: 6px; border-radius: 99px; background: #93c5fd; animation: dcPulse 2.4s ease-in-out infinite;"></span>Em andamento
+              </span>
+              <span style="font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: rgba(240,180,41,.1); border: 1px solid rgba(240,180,41,.28); color: #fbbf24;">Pré-cadastro</span>
+            </div>
+            <h1 style="margin: 0; font-size: 27px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; text-wrap: pretty;">ADVERTISING OPERATIONS AS.PL. PROPAG LTD</h1>
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+              <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #93a4c1;">43.112.531/0001-89</code>
+              <span style="font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 3px 7px; border-radius: 6px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); color: #c6d4ea;">SP</span>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 18px; min-width: 300px;">
+            <sc-for list="{{ meta }}" as="m" hint-placeholder-count="3">
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <div style="font-size: 10px; letter-spacing: .13em; font-weight: 800; color: #6f81a0;">{{ m.label }}</div>
+                <div style="font-size: 14px; font-weight: 600; font-family: {{ m.font }}; color: #dbe5f6; text-wrap: pretty;">{{ m.value }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="position: relative; margin-top: 22px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #8798b6; margin-bottom: 8px;">
+            <span>{{ progressLabel }}</span><span>{{ progressPct }}</span>
+          </div>
+          <div style="height: 6px; border-radius: 99px; background: rgba(255,255,255,.07); overflow: hidden;">
+            <div style="height: 100%; width: {{ progressPct }}; border-radius: 99px; background: linear-gradient(90deg, #34d399, #6ee7b7); transition: width .4s;"></div>
+          </div>
+        </div>
+      </section>
+
+      <div>
+        <h2 style="margin: 0; font-size: 19px; font-weight: 800;">Etapas do processamento</h2>
+        <p style="margin: 7px 0 0; font-size: 13px; line-height: 1.55; color: #8798b6; max-width: 640px; text-wrap: pretty;">A ordem é de dependência real: sem os movimentos não há razão, e sem o razão não há apuração.</p>
+      </div>
+
+      <section style="display: flex; flex-direction: column; gap: 12px;">
+        <sc-for list="{{ steps }}" as="s" hint-placeholder-count="8">
+          <div style="position: relative; overflow: hidden; display: flex; gap: 16px; padding: 20px 22px 20px 24px; border-radius: 14px; border: 1px solid {{ s.border }}; background: {{ s.bg }}; opacity: {{ s.opacity }}; transition: all .18s;" style-hover="border-color: rgba(242,151,29,.32);">
+            <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{ s.accent }};"></span>
+
+            <div style="width: 30px; height: 30px; flex: 0 0 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; background: {{ s.dotBg }}; border: 1px solid {{ s.dotBorder }}; color: {{ s.dotFg }};">{{ s.mark }}</div>
+
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
+                <div style="font-size: 16px; font-weight: 800; color: {{ s.titleFg }};">{{ s.title }}</div>
+                <span style="font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: {{ s.badgeBg }}; border: 1px solid {{ s.badgeBorder }}; color: {{ s.badgeFg }};">{{ s.badge }}</span>
+              </div>
+              <p style="margin: 0; font-size: 13px; line-height: 1.6; color: {{ s.bodyFg }}; max-width: 780px; text-wrap: pretty;">{{ s.body }}</p>
+              <sc-if value="{{ s.hasAction }}">
+                <button onClick="{{ s.onAction }}" style="width: fit-content; margin-top: 2px; padding: 10px 16px; border-radius: 10px; border: 1px solid {{ s.actionBorder }}; background: {{ s.actionBg }}; color: {{ s.actionFg }}; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .16s;" style-hover="transform: translateY(-1px);">{{ s.action }}</button>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+      </section>
+
+      <section style="position: relative; overflow: hidden; display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding: 22px 24px; border-radius: 16px; border: 1px solid rgba(239,68,68,.28); background: linear-gradient(110deg, rgba(80,20,24,.32), rgba(13,20,37,.7)); margin-top: 8px;">
+        <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #ef4444;"></span>
+        <div style="flex: 1; min-width: 260px;">
+          <div style="font-size: 16px; font-weight: 800; color: #fecaca;">Excluir este trabalho</div>
+          <p style="margin: 7px 0 0; font-size: 13px; line-height: 1.6; color: #d0a5a5; max-width: 640px; text-wrap: pretty;">Some o projeto, os lotes importados e as conferências já feitas. Não há como desfazer.</p>
+        </div>
+        <button onClick="{{ askDelete }}" style="padding: 12px 22px; border-radius: 11px; border: 1px solid rgba(239,68,68,.5); background: rgba(239,68,68,.16); color: #fecaca; font-size: 13px; font-weight: 800; cursor: pointer; transition: all .16s;" style-hover="background: rgba(239,68,68,.26); transform: translateY(-1px);">Excluir trabalho</button>
+      </section>
+    </main>
+  </div>
+
+  <sc-if value="{{ confirm }}">
+    <div style="position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(4,8,16,.7); backdrop-filter: blur(6px);">
+      <div style="width: 100%; max-width: 440px; border-radius: 18px; border: 1px solid rgba(255,255,255,.1); background: linear-gradient(150deg, rgba(19,28,50,.98), rgba(10,16,31,.98)); box-shadow: 0 30px 70px rgba(0,0,0,.6); padding: 26px; animation: dcFade .18s ease both;">
+        <div style="width: 40px; height: 40px; border-radius: 12px; background: rgba(239,68,68,.16); display: flex; align-items: center; justify-content: center;">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M5 7h14"></path><path d="M9 7V5h6v2"></path><path d="M7 7l1 12h8l1-12"></path></svg>
+        </div>
+        <h3 style="margin: 16px 0 8px; font-size: 17px; font-weight: 800;">Excluir o trabalho Ressarcimento ST 2022?</h3>
+        <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #8798b6;">O projeto, os lotes importados e as conferências são removidos. Esta ação não pode ser desfeita.</p>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px;">
+          <button onClick="{{ closeConfirm }}" style="padding: 10px 18px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 13px; font-weight: 700; cursor: pointer;" style-hover="background: rgba(255,255,255,.08);">Cancelar</button>
+          <button onClick="{{ closeConfirm }}" style="padding: 10px 18px; border-radius: 10px; border: 1px solid rgba(239,68,68,.45); background: rgba(239,68,68,.16); color: #fecaca; font-size: 13px; font-weight: 800; cursor: pointer;" style-hover="transform: translateY(-1px);">Excluir trabalho</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>]]>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  state = { confirm: false };
+
+  steps = [
+    { title: "Importar base de dados", href: "Etapa Importar.dc.html", state: "done", body: "Apontar a pasta com a base do trabalho: EFD ICMS/IPI, XML das notas e relatórios do ERP. O sistema identifica cada arquivo e separa o que é de outra empresa. Pode voltar quantas vezes a empresa mandar arquivo — o cadastro é que acontece uma vez só.", action: "Importar mais arquivos" },
+    { title: "Conferir documentos", href: "Etapa Conferir.dc.html", state: "done", body: "Cruzar o que a EFD escriturou (C100 e C800) com o XML e o relatório do cliente. Sai daqui o que está na pasta e não foi escriturado — que fica fora da análise — e o que foi escriturado sem documento, que é o que se cobra do cliente.", action: "Ver o resultado e baixar as planilhas" },
+    { title: "Extrair movimentos", href: "Etapa Extrair.dc.html", state: "current", body: "Ler os itens de cada documento (C170), o analítico (C190/C850), o cadastro de item (0200) e o inventário (H010). É o insumo de tudo que vem depois.", action: "Executar extração" },
+    { title: "Apurar o ICMS suportado", state: "locked", body: "Determinar o imposto suportado de cada entrada. Quando o SPED e o XML divergem, vale o XML — é o documento fiscal." },
+    { title: "Montar o razão dos itens", state: "locked", body: "A Ficha 3: uma ficha por mercadoria, custo médio ponderado móvel, entradas e devoluções antes das saídas no mesmo dia." },
+    { title: "Apurar ressarcimento e complemento", state: "locked", body: "Confrontar o imposto suportado com o ICMS efetivo, por enquadramento legal, e conferir o saldo final contra o inventário." },
+    { title: "Gerar o arquivo digital", state: "locked", body: "Montar os registros 0000 a 1200 no leiaute da CAT 42 e passar pela pré-validação antes do envio à SEFAZ." },
+    { title: "Relatórios e entrega", state: "locked", body: "Planilhas de conferência por filial e competência, e o dossiê que acompanha o pedido." }
+  ];
+
+  renderVals() {
+    const done = this.steps.filter(s => s.state === "done").length;
+    const pct = Math.round((done / this.steps.length) * 100) + "%";
+    const styles = {
+      done: { accent: "#34d399", border: "rgba(52,211,153,.22)", bg: "rgba(6,38,32,.4)", dotBg: "rgba(52,211,153,.16)", dotBorder: "rgba(52,211,153,.45)", dotFg: "#6ee7b7", badge: "Concluída", badgeBg: "rgba(52,211,153,.1)", badgeBorder: "rgba(52,211,153,.3)", badgeFg: "#6ee7b7", titleFg: "#e8edf7", bodyFg: "#9fb3c9", opacity: 1, actionBg: "rgba(255,255,255,.04)", actionBorder: "rgba(242,151,29,.35)", actionFg: "#ffc478" },
+      current: { accent: "#f2971d", border: "rgba(242,151,29,.35)", bg: "linear-gradient(110deg, rgba(48,32,12,.5), rgba(13,20,37,.72))", dotBg: "#f2971d", dotBorder: "transparent", dotFg: "#121a2c", badge: "Pendente", badgeBg: "rgba(240,180,41,.12)", badgeBorder: "rgba(240,180,41,.34)", badgeFg: "#fbbf24", titleFg: "#fff", bodyFg: "#b9c7e0", opacity: 1, actionBg: "linear-gradient(135deg, #f9a72b, #e8801a)", actionBorder: "transparent", actionFg: "#121a2c" },
+      locked: { accent: "rgba(255,255,255,.08)", border: "rgba(255,255,255,.07)", bg: "rgba(13,20,37,.5)", dotBg: "rgba(255,255,255,.05)", dotBorder: "rgba(255,255,255,.1)", dotFg: "#6d7f9d", badge: "Ainda não disponível", badgeBg: "rgba(148,163,184,.08)", badgeBorder: "rgba(148,163,184,.2)", badgeFg: "#94a3b8", titleFg: "#93a4c1", bodyFg: "#6d7f9d", opacity: .72 }
+    };
+
+    return {
+      meta: [
+        { label: "FRENTE", value: "CAT 42 — ressarcimento de ICMS-ST", font: "inherit" },
+        { label: "PROJETO", value: "Ressarcimento ST 2022", font: "inherit" },
+        { label: "COMPETÊNCIAS", value: "01/2022 a 09/2026", font: "'JetBrains Mono', monospace" }
+      ],
+      progressLabel: done + " de " + this.steps.length + " etapas concluídas",
+      progressPct: pct,
+      steps: this.steps.map((s, i) => {
+        const st = styles[s.state];
+        return Object.assign({}, st, {
+          title: s.title, body: s.body,
+          mark: s.state === "done" ? "✓" : String(i + 1),
+          hasAction: !!s.action, action: s.action || "",
+          onAction: () => { if (s.href) window.location.href = s.href; }
+        });
+      }),
+      confirm: this.state.confirm,
+      askDelete: () => this.setState({ confirm: true }),
+      closeConfirm: () => this.setState({ confirm: false })
+    };
+  }
+}
+</script>
+</body>
+</html>

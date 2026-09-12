@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<![CDATA[<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #070c18; }
+    body { font-family: "Plus Jakarta Sans", "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #f2971d; text-decoration: none; }
+    a:hover { color: #ffb34d; }
+    input, button { font-family: inherit; }
+    input::placeholder { color: #55688a; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 99px; }
+    @keyframes dcFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes dcSweep { 0% { transform: translateX(-110%); } 100% { transform: translateX(210%); } }
+    @keyframes dcPulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; background: radial-gradient(900px 500px at 18% -10%, rgba(242,151,29,.10), transparent 60%), radial-gradient(900px 600px at 90% 0%, rgba(37,99,235,.14), transparent 65%), #070c18; color: #e8edf7;">
+
+  <aside style="width: 244px; flex: 0 0 244px; border-right: 1px solid rgba(255,255,255,.07); background: linear-gradient(180deg, rgba(12,19,36,.9), rgba(8,13,25,.9)); display: flex; flex-direction: column; padding: 22px 16px; gap: 28px; position: sticky; top: 0; height: 100vh;">
+    <div style="padding: 2px 6px;">
+      <img src="assets/bms-logo.png" alt="BMS Consultoria Tributária" style="width: 172px; height: auto; display: block;" />
+    </div>
+
+    <nav style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 10px; letter-spacing: .16em; color: #5f7191; font-weight: 700; padding: 0 10px 8px;">NAVEGAÇÃO</div>
+      <div style="position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 700; color: #fff; background: linear-gradient(90deg, rgba(242,151,29,.16), rgba(242,151,29,.02)); border: 1px solid rgba(242,151,29,.28); overflow: hidden;">
+        <span style="position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: #f2971d;"></span>
+        <span style="width: 6px; height: 6px; border-radius: 99px; background: #f2971d; box-shadow: 0 0 10px #f2971d;"></span>Início
+      </div>
+      <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;">
+        <span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Cadastro
+      </a>
+      <a href="Usuarios.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;">
+        <span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Usuários
+      </a>
+    </nav>
+
+    <div style="margin-top: auto; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.06); background: rgba(255,255,255,.02);">
+      <div style="font-size: 11px; color: #6d7f9d; font-weight: 600;">Sistema CAT</div>
+      <div style="font-size: 11px; color: #4d5d79; margin-top: 3px;">sessão não comercial</div>
+    </div>
+  </aside>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+
+    <header style="display: flex; align-items: center; gap: 14px; padding: 16px 28px; border-bottom: 1px solid rgba(255,255,255,.07); background: rgba(8,13,25,.72); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(140deg, #1e3a8a, #0f1e3f); border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #cfe0ff;">VP</div>
+        <div style="font-size: 14px; font-weight: 700;">Victor Pedroso</div>
+      </div>
+      <span style="font-size: 10px; font-weight: 700; letter-spacing: .1em; padding: 4px 8px; border-radius: 6px; background: rgba(242,151,29,.14); border: 1px solid rgba(242,151,29,.32); color: #ffbb5c;">DEV</span>
+      <span style="font-size: 13px; color: #7b8dab;">1 empresa</span>
+      <div style="flex: 1;"></div>
+      <button style="padding: 9px 18px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dce6f7; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .18s;" style-hover="background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.4); color: #fecaca;">Sair</button>
+    </header>
+
+    <main style="padding: 28px; display: flex; flex-direction: column; gap: 20px; max-width: 1400px; width: 100%;">
+
+      <section style="position: relative; overflow: hidden; border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: linear-gradient(120deg, rgba(18,27,48,.9), rgba(10,16,31,.9)); padding: 24px 26px;">
+        <div style="position: absolute; inset: 0; pointer-events: none; background: radial-gradient(420px 160px at 8% 0%, rgba(242,151,29,.16), transparent 70%);"></div>
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 1px; overflow: hidden;">
+          <div style="width: 40%; height: 100%; background: linear-gradient(90deg, transparent, #f2971d, transparent); animation: dcSweep 5.5s linear infinite;"></div>
+        </div>
+        <div style="position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px;">
+          <div style="flex: 1; min-width: 280px;">
+            <div style="font-size: 11px; font-weight: 700; letter-spacing: .18em; color: #f2971d;">SISTEMA CAT</div>
+            <h1 style="margin: 8px 0 8px; font-size: 30px; font-weight: 800; letter-spacing: -.02em;">Trabalhos</h1>
+            <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #8798b6; max-width: 560px; text-wrap: pretty;">Olá, Victor. Cada cartão é um projeto de apuração. Abra um trabalho para ver as etapas de processamento.</p>
+          </div>
+          <button onClick="{{ openNew }}" style="display: flex; align-items: center; gap: 9px; padding: 13px 22px; border-radius: 12px; border: none; background: linear-gradient(135deg, #f9a72b, #e8801a); color: #121a2c; font-size: 14px; font-weight: 800; cursor: pointer; box-shadow: 0 12px 28px rgba(242,151,29,.3); transition: transform .16s, box-shadow .16s;" style-hover="transform: translateY(-2px); box-shadow: 0 16px 34px rgba(242,151,29,.42);">
+            <span style="font-size: 17px; line-height: 1;">+</span>Cadastrar trabalho
+          </button>
+        </div>
+
+        <div style="position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 22px;">
+          <div style="padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.03);">
+            <div style="font-size: 11px; letter-spacing: .12em; color: #7486a5; font-weight: 700;">TRABALHOS</div>
+            <div style="font-size: 24px; font-weight: 800; margin-top: 4px;">{{ total }}</div>
+          </div>
+          <div style="padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(96,165,250,.2); background: rgba(59,130,246,.07);">
+            <div style="font-size: 11px; letter-spacing: .12em; color: #93c5fd; font-weight: 700;">EM ANDAMENTO</div>
+            <div style="font-size: 24px; font-weight: 800; margin-top: 4px;">{{ andamento }}</div>
+          </div>
+          <div style="padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(52,211,153,.18); background: rgba(52,211,153,.06);">
+            <div style="font-size: 11px; letter-spacing: .12em; color: #6ee7b7; font-weight: 700;">CONCLUÍDOS</div>
+            <div style="font-size: 24px; font-weight: 800; margin-top: 4px;">{{ concluidos }}</div>
+          </div>
+          <div style="padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(240,180,41,.2); background: rgba(240,180,41,.06);">
+            <div style="font-size: 11px; letter-spacing: .12em; color: #fbbf24; font-weight: 700;">ETAPAS PENDENTES</div>
+            <div style="font-size: 24px; font-weight: 800; margin-top: 4px;">{{ pendentes }}</div>
+          </div>
+        </div>
+      </section>
+
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+        <div style="position: relative; flex: 1; min-width: 220px; max-width: 380px;">
+          <span style="position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: #6b7d9b; font-size: 13px;">⌕</span>
+          <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="Buscar por empresa, CNPJ ou título" style="width: 100%; padding: 11px 14px 11px 32px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); color: #e8edf7; font-size: 13px; outline: none;" style-focus="border-color: rgba(242,151,29,.55); background: rgba(242,151,29,.06);" />
+        </div>
+
+        <div style="display: flex; gap: 6px; padding: 4px; border-radius: 11px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08);">
+          <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+            <button onClick="{{ t.onClick }}" style="padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: 700; background: {{ t.bg }}; color: {{ t.fg }};">{{ t.label }}</button>
+          </sc-for>
+        </div>
+
+        <div data-picker="uf" style="position: relative; min-width: 150px;">
+          <button onClick="{{ pUf.onToggle }}" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid {{ pUf.triggerBorder }}; color: #e8edf7; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left;">
+            <span style="color: #6d7f9d; font-size: 11px; font-weight: 700; letter-spacing: .1em;">UF</span>
+            <span style="flex: 1;">{{ pUf.value }}</span>
+            <span style="font-size: 11px; color: #7f91af;">{{ pUf.caret }}</span>
+          </button>
+          <sc-if value="{{ pUf.open }}">
+            <div style="position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; right: 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #101a30; box-shadow: 0 22px 48px rgba(0,0,0,.55); overflow: hidden; animation: dcFade .14s ease both;">
+              <div style="padding: 9px; border-bottom: 1px solid rgba(255,255,255,.07);">
+                <input ref="{{ pUf.focusRef }}" value="{{ pUf.query }}" onChange="{{ pUf.onQuery }}" placeholder="Buscar…" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #e8edf7; font-size: 12px; outline: none;" style-focus="border-color: rgba(242,151,29,.5);" />
+              </div>
+              <div style="max-height: 200px; overflow-y: auto; padding: 6px;">
+                <sc-for list="{{ pUf.options }}" as="o" hint-placeholder-count="4">
+                  <div onClick="{{ o.onSelect }}" style="display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ o.bg }}; color: {{ o.fg }};" style-hover="background: rgba(255,255,255,.06);">
+                    <span style="flex: 1;">{{ o.label }}</span><span style="font-size: 12px;">{{ o.check }}</span>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ pUf.empty }}">
+                  <div style="padding: 12px 10px; font-size: 12px; color: #6d7f9d;">Nenhum resultado</div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="flex: 1;"></div>
+        <div style="font-size: 12px; color: #7486a5; font-weight: 600;">{{ countLabel }}</div>
+      </div>
+
+      <section style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px;">
+        <sc-for list="{{ cards }}" as="c" hint-placeholder-count="4">
+          <div onClick="{{ c.onOpen }}" style="position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: 20px 22px 20px 24px; border-radius: 16px; border: 1px solid rgba(255,255,255,.08); background: linear-gradient(140deg, rgba(17,26,46,.92), rgba(10,16,31,.92)); cursor: pointer; transition: transform .18s, border-color .18s, box-shadow .18s;" style-hover="transform: translateY(-3px); border-color: rgba(242,151,29,.4); box-shadow: 0 18px 40px rgba(0,0,0,.42);">
+            <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{ c.accent }};"></span>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <span style="display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: {{ c.statusBg }}; border: 1px solid {{ c.statusBorder }}; color: {{ c.statusFg }};">
+                <span style="width: 6px; height: 6px; border-radius: 99px; background: {{ c.statusFg }}; animation: dcPulse 2.4s ease-in-out infinite;"></span>{{ c.statusLabel }}
+              </span>
+              <span style="font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: rgba(240,180,41,.1); border: 1px solid rgba(240,180,41,.28); color: #fbbf24;">{{ c.stageLabel }}</span>
+            </div>
+
+            <div>
+              <div style="font-size: 17px; font-weight: 800; line-height: 1.3; text-wrap: pretty;">{{ c.company }}</div>
+              <div style="display: flex; align-items: center; gap: 9px; margin-top: 7px;">
+                <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #93a4c1;">{{ c.cnpj }}</code>
+                <span style="font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 3px 7px; border-radius: 6px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); color: #c6d4ea;">{{ c.uf }}</span>
+              </div>
+            </div>
+
+            <div style="height: 1px; background: rgba(255,255,255,.07);"></div>
+
+            <div>
+              <div style="font-size: 12px; font-weight: 700; color: #f2971d;">{{ c.regime }}</div>
+              <div style="font-size: 15px; font-weight: 600; margin-top: 4px;">{{ c.title }}</div>
+            </div>
+
+            <div style="display: flex; gap: 26px;">
+              <div>
+                <div style="font-size: 10px; letter-spacing: .13em; font-weight: 800; color: #6f81a0;">COMPETÊNCIAS</div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #cfdbef; margin-top: 4px;">{{ c.period }}</div>
+              </div>
+              <div>
+                <div style="font-size: 10px; letter-spacing: .13em; font-weight: 800; color: #6f81a0;">ETAPAS</div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #cfdbef; margin-top: 4px;">{{ c.stages }}</div>
+              </div>
+            </div>
+
+            <div>
+              <div style="height: 5px; border-radius: 99px; background: rgba(255,255,255,.07); overflow: hidden;">
+                <div style="height: 100%; width: {{ c.progress }}; border-radius: 99px; background: {{ c.progressBg }}; transition: width .4s;"></div>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; font-weight: 600; color: #7b8dab;">
+                <span>{{ c.nextStep }}</span><span>{{ c.updated }}</span>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+
+        <div onClick="{{ openNew }}" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 240px; padding: 24px; border-radius: 16px; border: 1px dashed rgba(255,255,255,.14); background: rgba(255,255,255,.015); cursor: pointer; transition: all .18s;" style-hover="border-color: rgba(242,151,29,.5); background: rgba(242,151,29,.05);">
+          <div style="width: 42px; height: 42px; border-radius: 12px; border: 1px solid rgba(242,151,29,.35); background: rgba(242,151,29,.12); display: flex; align-items: center; justify-content: center; color: #ffc478; font-size: 20px;">+</div>
+          <div style="font-size: 14px; font-weight: 700; color: #b7c5de;">Cadastrar trabalho</div>
+          <div style="font-size: 12px; color: #6d7f9d; text-align: center; max-width: 200px;">Novo projeto de apuração para uma empresa.</div>
+        </div>
+      </section>
+
+      <sc-if value="{{ empty }}">
+        <div style="padding: 54px 18px; text-align: center; color: #7486a5; border-radius: 16px; border: 1px solid rgba(255,255,255,.07); background: rgba(13,20,37,.6);">
+          <div style="font-size: 15px; font-weight: 700; color: #b7c5de;">Nenhum trabalho encontrado</div>
+          <div style="font-size: 13px; margin-top: 6px;">Ajuste a busca, a situação ou a UF.</div>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+
+  <sc-if value="{{ showNew }}">
+    <div style="position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-start; justify-content: center; padding: 48px 20px; background: rgba(4,8,16,.66); backdrop-filter: blur(6px); overflow-y: auto;">
+      <div style="width: 100%; max-width: 760px; border-radius: 20px; border: 1px solid rgba(255,255,255,.1); background: linear-gradient(150deg, rgba(19,28,50,.98), rgba(10,16,31,.98)); box-shadow: 0 40px 90px rgba(0,0,0,.6); animation: dcFade .22s ease both;">
+        <div style="padding: 22px 26px; border-bottom: 1px solid rgba(255,255,255,.07); display: flex; align-items: flex-start; gap: 16px;">
+          <div style="flex: 1;">
+            <h2 style="margin: 0; font-size: 20px; font-weight: 800;">Cadastrar trabalho</h2>
+            <p style="margin: 7px 0 0; font-size: 13px; color: #8798b6;">O trabalho nasce em Pré-cadastro. As etapas de processamento são liberadas em seguida.</p>
+          </div>
+          <button onClick="{{ closeNew }}" style="background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #a9b8d2; width: 32px; height: 32px; border-radius: 9px; font-size: 16px; cursor: pointer;" style-hover="color: #fff; background: rgba(255,255,255,.1);">×</button>
+        </div>
+
+        <div style="padding: 24px 26px; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px;">
+          <div style="display: flex; flex-direction: column; gap: 7px; grid-column: 1 / -1;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Empresa</label>
+            <div data-picker="empresa" style="position: relative;">
+              <button onClick="{{ pEmpresa.onToggle }}" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid {{ pEmpresa.triggerBorder }}; color: #e8edf7; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left;">
+                <span style="flex: 1;">{{ pEmpresa.value }}</span>
+                <span style="font-size: 11px; color: #7f91af;">{{ pEmpresa.caret }}</span>
+              </button>
+              <sc-if value="{{ pEmpresa.open }}">
+                <div style="position: absolute; z-index: 90; top: calc(100% + 6px); left: 0; right: 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #101a30; box-shadow: 0 22px 48px rgba(0,0,0,.55); overflow: hidden; animation: dcFade .14s ease both;">
+                  <div style="padding: 9px; border-bottom: 1px solid rgba(255,255,255,.07);">
+                    <input ref="{{ pEmpresa.focusRef }}" value="{{ pEmpresa.query }}" onChange="{{ pEmpresa.onQuery }}" placeholder="Buscar empresa ou CNPJ…" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #e8edf7; font-size: 12px; outline: none;" style-focus="border-color: rgba(242,151,29,.5);" />
+                  </div>
+                  <div style="max-height: 220px; overflow-y: auto; padding: 6px;">
+                    <sc-for list="{{ pEmpresa.options }}" as="o" hint-placeholder-count="3">
+                      <div onClick="{{ o.onSelect }}" style="display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ o.bg }}; color: {{ o.fg }};" style-hover="background: rgba(255,255,255,.06);">
+                        <span style="flex: 1;">{{ o.label }}</span><span style="font-size: 12px;">{{ o.check }}</span>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ pEmpresa.empty }}">
+                      <div style="padding: 12px 10px; font-size: 12px; color: #6d7f9d;">Nenhum resultado</div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Tipo de trabalho</label>
+            <div data-picker="tipo" style="position: relative;">
+              <button onClick="{{ pTipo.onToggle }}" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid {{ pTipo.triggerBorder }}; color: #e8edf7; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left;">
+                <span style="flex: 1;">{{ pTipo.value }}</span>
+                <span style="font-size: 11px; color: #7f91af;">{{ pTipo.caret }}</span>
+              </button>
+              <sc-if value="{{ pTipo.open }}">
+                <div style="position: absolute; z-index: 90; top: calc(100% + 6px); left: 0; right: 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #101a30; box-shadow: 0 22px 48px rgba(0,0,0,.55); overflow: hidden; animation: dcFade .14s ease both;">
+                  <div style="padding: 9px; border-bottom: 1px solid rgba(255,255,255,.07);">
+                    <input ref="{{ pTipo.focusRef }}" value="{{ pTipo.query }}" onChange="{{ pTipo.onQuery }}" placeholder="Buscar…" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #e8edf7; font-size: 12px; outline: none;" style-focus="border-color: rgba(242,151,29,.5);" />
+                  </div>
+                  <div style="max-height: 220px; overflow-y: auto; padding: 6px;">
+                    <sc-for list="{{ pTipo.options }}" as="o" hint-placeholder-count="3">
+                      <div onClick="{{ o.onSelect }}" style="display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ o.bg }}; color: {{ o.fg }};" style-hover="background: rgba(255,255,255,.06);">
+                        <span style="flex: 1;">{{ o.label }}</span><span style="font-size: 12px;">{{ o.check }}</span>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ pTipo.empty }}">
+                      <div style="padding: 12px 10px; font-size: 12px; color: #6d7f9d;">Nenhum resultado</div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Título do trabalho</label>
+            <input value="{{ form.title }}" onChange="{{ onFormTitle }}" placeholder="Ressarcimento ST 2025" style="padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-size: 13px; outline: none;" style-focus="border-color: rgba(242,151,29,.55);" />
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Competência inicial</label>
+            <input value="{{ form.from }}" onChange="{{ onFormFrom }}" placeholder="01/2025" style="padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none;" style-focus="border-color: rgba(242,151,29,.55);" />
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Competência final</label>
+            <input value="{{ form.to }}" onChange="{{ onFormTo }}" placeholder="12/2025" style="padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none;" style-focus="border-color: rgba(242,151,29,.55);" />
+          </div>
+        </div>
+
+        <div style="padding: 18px 26px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,.07);">
+          <div style="flex: 1; min-width: 180px; font-size: 12px; color: {{ messageColor }};">{{ formMessage }}</div>
+          <button onClick="{{ closeNew }}" style="padding: 11px 20px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 13px; font-weight: 700; cursor: pointer;" style-hover="background: rgba(255,255,255,.08);">Cancelar</button>
+          <button onClick="{{ createWork }}" style="padding: 11px 22px; border-radius: 10px; border: none; background: linear-gradient(135deg, #f9a72b, #e8801a); color: #121a2c; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 24px rgba(242,151,29,.28);" style-hover="transform: translateY(-1px);">Criar trabalho</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>]]>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  state = {
+    works: [
+      { id: 1, company: "ADVERTISING OPERATIONS AS.PL. PROPAG LTD", cnpj: "43.112.531/0001-89", uf: "SP", regime: "CAT 42 — ressarcimento de ICMS-ST", title: "Ressarcimento ST 2022", from: "01/2022", to: "09/2026", done: 2, of: 3, status: "andamento", stage: "Pré-cadastro", nextStep: "Próxima: validação de arquivos", updated: "há 2 dias" },
+      { id: 2, company: "Companhia Sulamericana De Distribuicao", cnpj: "11.517.841/0001-97", uf: "PR", regime: "CAT 42 — ressarcimento de ICMS-ST", title: "Ressarcimento ST 2025", from: "01/2025", to: "12/2025", done: 3, of: 3, status: "concluido", stage: "Apuração concluída", nextStep: "Arquivo final gerado", updated: "há 6 h" }
+    ],
+    query: "", filter: "Todos", uf: "Todas",
+    showNew: false,
+    form: { company: "Selecione a empresa", tipo: "CAT 42 — ressarcimento de ICMS-ST", title: "", from: "", to: "" },
+    formError: "",
+    openPicker: null, pickerQuery: "",
+    nextId: 3
+  };
+
+  componentDidMount() {
+    this._away = e => {
+      if (!this.state.openPicker) return;
+      const el = e.target.closest ? e.target.closest("[data-picker]") : null;
+      if (!el || el.getAttribute("data-picker") !== this.state.openPicker) this.setState({ openPicker: null, pickerQuery: "" });
+    };
+    document.addEventListener("mousedown", this._away, true);
+  }
+
+  componentWillUnmount() { document.removeEventListener("mousedown", this._away, true); }
+
+  picker(key, value, options, onSelect) {
+    const s = this.state;
+    const open = s.openPicker === key;
+    const q = s.pickerQuery.trim().toLowerCase();
+    const list = options.filter(o => !q || o.toLowerCase().indexOf(q) >= 0);
+    return {
+      value: value, open: open, query: s.pickerQuery,
+      caret: open ? "▴" : "▾",
+      triggerBorder: open ? "rgba(242,151,29,.55)" : "rgba(255,255,255,.11)",
+      empty: list.length === 0,
+      onToggle: () => this.setState(st => ({ openPicker: st.openPicker === key ? null : key, pickerQuery: "" })),
+      onQuery: e => this.setState({ pickerQuery: e.target.value }),
+      focusRef: el => { if (el && open) setTimeout(() => el.focus(), 0); },
+      options: list.map(o => ({
+        label: o,
+        bg: o === value ? "rgba(242,151,29,.14)" : "transparent",
+        fg: o === value ? "#ffc478" : "#cfdbef",
+        check: o === value ? "✓" : "",
+        onSelect: () => { this.setState({ openPicker: null, pickerQuery: "" }); onSelect(o); }
+      }))
+    };
+  }
+
+  createWork = () => {
+    const f = this.state.form;
+    if (f.company.indexOf("Selecione") === 0) return this.setState({ formError: "Selecione a empresa." });
+    if (!f.title.trim()) return this.setState({ formError: "Informe o título do trabalho." });
+    if (!/^\d{2}\/\d{4}$/.test(f.from) || !/^\d{2}\/\d{4}$/.test(f.to)) return this.setState({ formError: "Competências devem estar no formato MM/AAAA." });
+    const meta = { "ADVERTISING OPERATIONS AS.PL. PROPAG LTD": ["43.112.531/0001-89", "SP"], "Companhia Sulamericana De Distribuicao": ["11.517.841/0001-97", "PR"], "Distribuidora Norte Alimentos S.A.": ["09.442.118/0001-04", "BA"] }[f.company] || ["00.000.000/0001-00", "SP"];
+    this.setState(s => ({
+      works: s.works.concat([{ id: s.nextId, company: f.company, cnpj: meta[0], uf: meta[1], regime: f.tipo, title: f.title, from: f.from, to: f.to, done: 0, of: 3, status: "andamento", stage: "Pré-cadastro", nextStep: "Próxima: envio de arquivos", updated: "agora" }]),
+      nextId: s.nextId + 1, showNew: false, formError: "",
+      form: { company: "Selecione a empresa", tipo: "CAT 42 — ressarcimento de ICMS-ST", title: "", from: "", to: "" }
+    }));
+  };
+
+  renderVals() {
+    const s = this.state;
+    const q = s.query.trim().toLowerCase();
+    const EMPRESAS = ["ADVERTISING OPERATIONS AS.PL. PROPAG LTD", "Companhia Sulamericana De Distribuicao", "Distribuidora Norte Alimentos S.A."];
+    const TIPOS = ["CAT 42 — ressarcimento de ICMS-ST", "CAT 207 — complemento de ICMS-ST", "Apuração de créditos de PIS/COFINS", "Reenquadramento de NCM"];
+    const ufs = ["Todas"].concat(s.works.map(w => w.uf).filter((v, i, a) => a.indexOf(v) === i));
+
+    const filtered = s.works.filter(w => {
+      const hitQ = !q || (w.company + " " + w.cnpj + " " + w.title).toLowerCase().indexOf(q) >= 0;
+      const hitF = s.filter === "Todos" || (s.filter === "Em andamento" && w.status === "andamento") || (s.filter === "Concluídos" && w.status === "concluido") || (s.filter === "Pré-cadastro" && w.stage === "Pré-cadastro");
+      const hitU = s.uf === "Todas" || w.uf === s.uf;
+      return hitQ && hitF && hitU;
+    });
+
+    const statusMap = {
+      andamento: { label: "Em andamento", fg: "#93c5fd", bg: "rgba(59,130,246,.1)", border: "rgba(96,165,250,.3)", accent: "#f2971d", bar: "linear-gradient(90deg, #f9a72b, #e8801a)" },
+      concluido: { label: "Concluído", fg: "#6ee7b7", bg: "rgba(52,211,153,.1)", border: "rgba(52,211,153,.3)", accent: "#34d399", bar: "linear-gradient(90deg, #34d399, #10b981)" }
+    };
+
+    return {
+      total: s.works.length,
+      andamento: s.works.filter(w => w.status === "andamento").length,
+      concluidos: s.works.filter(w => w.status === "concluido").length,
+      pendentes: s.works.reduce((a, w) => a + (w.of - w.done), 0),
+      query: s.query,
+      onQuery: e => this.setState({ query: e.target.value }),
+      tabs: ["Todos", "Em andamento", "Concluídos", "Pré-cadastro"].map(label => ({
+        label,
+        bg: s.filter === label ? "rgba(242,151,29,.16)" : "transparent",
+        fg: s.filter === label ? "#ffbb5c" : "#8798b6",
+        onClick: () => this.setState({ filter: label })
+      })),
+      pUf: this.picker("uf", s.uf, ufs, v => this.setState({ uf: v })),
+      countLabel: filtered.length + (filtered.length === 1 ? " trabalho" : " trabalhos"),
+      empty: filtered.length === 0,
+      cards: filtered.map(w => {
+        const st = statusMap[w.status];
+        return {
+          company: w.company, cnpj: w.cnpj, uf: w.uf, regime: w.regime, title: w.title,
+          period: w.from + " a " + w.to,
+          stages: w.done + " de " + w.of,
+          progress: Math.round((w.done / w.of) * 100) + "%",
+          progressBg: st.bar,
+          accent: st.accent,
+          statusLabel: st.label, statusFg: st.fg, statusBg: st.bg, statusBorder: st.border,
+          stageLabel: w.stage, nextStep: w.nextStep, updated: "Atualizado " + w.updated,
+          onOpen: () => { window.location.href = "Trabalho.dc.html"; }
+        };
+      }),
+      showNew: s.showNew,
+      openNew: () => this.setState({ showNew: true, formError: "" }),
+      closeNew: () => this.setState({ showNew: false, formError: "" }),
+      form: s.form,
+      pEmpresa: this.picker("empresa", s.form.company, EMPRESAS, v => this.setState(st => ({ form: Object.assign({}, st.form, { company: v }), formError: "" }))),
+      pTipo: this.picker("tipo", s.form.tipo, TIPOS, v => this.setState(st => ({ form: Object.assign({}, st.form, { tipo: v }) }))),
+      onFormTitle: e => this.setState(st => ({ form: Object.assign({}, st.form, { title: e.target.value }), formError: "" })),
+      onFormFrom: e => this.setState(st => ({ form: Object.assign({}, st.form, { from: e.target.value }), formError: "" })),
+      onFormTo: e => this.setState(st => ({ form: Object.assign({}, st.form, { to: e.target.value }), formError: "" })),
+      formMessage: s.formError || "O trabalho é criado em Pré-cadastro.",
+      messageColor: s.formError ? "#fca5a5" : "#6d7f9d",
+      createWork: this.createWork
+    };
+  }
+}
+</script>
+</body>
+</html>

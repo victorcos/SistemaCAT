@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<![CDATA[<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #070c18; }
+    body { font-family: "Plus Jakarta Sans", "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #f2971d; text-decoration: none; }
+    a:hover { color: #ffb34d; }
+    input, button { font-family: inherit; }
+    input::placeholder { color: #55688a; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 99px; }
+    @keyframes dcFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes dcSweep { 0% { transform: translateX(-110%); } 100% { transform: translateX(210%); } }
+    @keyframes dcSpin { to { transform: rotate(360deg); } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; background: radial-gradient(900px 500px at 18% -10%, rgba(242,151,29,.10), transparent 60%), radial-gradient(900px 600px at 90% 0%, rgba(37,99,235,.14), transparent 65%), #070c18; color: #e8edf7;">
+
+  <aside style="width: 244px; flex: 0 0 244px; border-right: 1px solid rgba(255,255,255,.07); background: linear-gradient(180deg, rgba(12,19,36,.9), rgba(8,13,25,.9)); display: flex; flex-direction: column; padding: 22px 16px; gap: 28px; position: sticky; top: 0; height: 100vh;">
+    <div style="padding: 2px 6px;">
+      <img src="assets/bms-logo.png" alt="BMS Consultoria Tributária" style="width: 172px; height: auto; display: block;" />
+    </div>
+    <nav style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 10px; letter-spacing: .16em; color: #5f7191; font-weight: 700; padding: 0 10px 8px;">NAVEGAÇÃO</div>
+      <a href="Inicio.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;"><span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Início</a>
+      <a href="Cadastro.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;"><span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Cadastro</a>
+      <a href="Usuarios.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;"><span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Usuários</a>
+    </nav>
+    <div style="margin-top: auto; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.06); background: rgba(255,255,255,.02);">
+      <div style="font-size: 11px; color: #6d7f9d; font-weight: 600;">Sistema CAT</div>
+      <div style="font-size: 11px; color: #4d5d79; margin-top: 3px;">sessão não comercial</div>
+    </div>
+  </aside>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+    <header style="display: flex; align-items: center; gap: 14px; padding: 16px 28px; border-bottom: 1px solid rgba(255,255,255,.07); background: rgba(8,13,25,.72); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(140deg, #1e3a8a, #0f1e3f); border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #cfe0ff;">VP</div>
+        <div style="font-size: 14px; font-weight: 700;">Victor Pedroso</div>
+      </div>
+      <span style="font-size: 10px; font-weight: 700; letter-spacing: .1em; padding: 4px 8px; border-radius: 6px; background: rgba(242,151,29,.14); border: 1px solid rgba(242,151,29,.32); color: #ffbb5c;">DEV</span>
+      <div style="flex: 1;"></div>
+      <button style="padding: 9px 18px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dce6f7; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .18s;" style-hover="background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.4); color: #fecaca;">Sair</button>
+    </header>
+
+    <main style="padding: 24px 28px 40px; display: flex; flex-direction: column; gap: 20px; max-width: 1240px; width: 100%;">
+      <a href="Trabalho.dc.html" style="display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; width: fit-content;">← Voltar ao trabalho</a>
+
+      <section style="position: relative; overflow: hidden; border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: linear-gradient(120deg, rgba(18,27,48,.9), rgba(10,16,31,.9)); padding: 24px 26px; display: flex; flex-direction: column; gap: 20px;">
+        <div style="position: absolute; inset: 0; pointer-events: none; background: radial-gradient(420px 160px at 8% 0%, rgba(242,151,29,.16), transparent 70%);"></div>
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 1px; overflow: hidden;">
+          <div style="width: 40%; height: 100%; background: linear-gradient(90deg, transparent, #f2971d, transparent); animation: dcSweep 5.5s linear infinite;"></div>
+        </div>
+        <div style="position: relative;">
+          <div style="font-size: 11px; font-weight: 700; letter-spacing: .18em; color: #f2971d;">ETAPA 1 · CAT 42</div>
+          <h1 style="margin: 8px 0 8px; font-size: 28px; font-weight: 800; letter-spacing: -.02em;">Importar base de dados</h1>
+          <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #8798b6; max-width: 700px; text-wrap: pretty;">Base de trabalho de <strong style="color: #dbe5f6;">ADVERTISING OPERATIONS AS.PL. PROPAG LTD</strong>. Aponte a pasta onde estão a EFD ICMS/IPI, os XML e os relatórios do ERP. Nada é copiado: o sistema registra onde os arquivos estão e o que cada um é.</p>
+        </div>
+
+        <div style="position: relative; display: flex; flex-direction: column; gap: 8px;">
+          <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Pasta com os arquivos</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+            <input value="{{ path }}" onChange="{{ onPath }}" placeholder="Z:\\GRUPO\\...\\EFD Fiscal" style="flex: 1; min-width: 280px; padding: 13px 15px; border-radius: 11px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none;" style-focus="border-color: rgba(242,151,29,.55); background: rgba(242,151,29,.06);" />
+            <button onClick="{{ scan }}" disabled="{{ scanning }}" style="display: flex; align-items: center; gap: 9px; padding: 13px 24px; border-radius: 11px; border: none; background: linear-gradient(135deg, #f9a72b, #e8801a); color: #121a2c; font-size: 14px; font-weight: 800; cursor: pointer; box-shadow: 0 12px 28px rgba(242,151,29,.3); transition: all .18s;" style-hover="transform: translateY(-1px);">
+              <sc-if value="{{ scanning }}">
+                <span style="width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(18,26,44,.3); border-top-color: #121a2c; animation: dcSpin .7s linear infinite;"></span>
+              </sc-if>
+              {{ scanLabel }}
+            </button>
+          </div>
+          <span style="font-size: 12px; color: #6d7f9d; line-height: 1.5;">Caminho como esta máquina o enxerga. Subpastas entram junto. Pasta grande em unidade de rede leva alguns minutos na primeira vez — depois o Windows já a tem em cache.</span>
+        </div>
+      </section>
+
+      <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px;">
+        <h2 style="margin: 0; font-size: 19px; font-weight: 800;">Lotes já importados</h2>
+        <span style="font-size: 12px; font-weight: 600; color: #7486a5;">{{ summary }}</span>
+      </div>
+
+      <section style="display: flex; flex-direction: column; gap: 12px;">
+        <sc-for list="{{ lots }}" as="l" hint-placeholder-count="4">
+          <div style="position: relative; overflow: hidden; display: flex; flex-wrap: wrap; gap: 16px; padding: 18px 20px 18px 22px; border-radius: 14px; border: 1px solid rgba(255,255,255,.08); background: rgba(13,20,37,.72); transition: all .18s;" style-hover="border-color: rgba(242,151,29,.3); background: rgba(16,25,44,.85);">
+            <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #34d399;"></span>
+
+            <div style="flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 11px;">
+              <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #dbe5f6; word-break: break-all; line-height: 1.45;">{{ l.path }}</code>
+
+              <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 18px; font-size: 13px; color: #93a4c1;">
+                <span><strong style="color: #e8edf7; font-weight: 800;">{{ l.files }}</strong> arquivos</span>
+                <span><strong style="color: #e8edf7; font-weight: 800;">{{ l.useful }}</strong> para a CAT</span>
+                <span style="font-weight: 600;">{{ l.size }}</span>
+                <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8798b6;">{{ l.period }}</code>
+              </div>
+
+              <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <sc-for list="{{ l.kinds }}" as="k" hint-placeholder-count="2">
+                  <span style="font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 5px 11px; border-radius: 999px; background: {{ k.bg }}; border: 1px solid {{ k.border }}; color: {{ k.fg }};">{{ k.label }}</span>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+              <span style="font-size: 12px; font-weight: 600; color: #7b8dab; white-space: nowrap; padding-top: 2px;">{{ l.date }}</span>
+              <button onClick="{{ l.onRemove }}" title="Remover lote" aria-label="Remover lote" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); color: #9fb0cd; cursor: pointer; transition: all .16s;" style-hover="background: rgba(239,68,68,.16); border-color: rgba(239,68,68,.45); color: #fecaca;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
+              </button>
+            </div>
+          </div>
+        </sc-for>
+
+        <sc-if value="{{ empty }}">
+          <div style="padding: 48px 18px; text-align: center; border-radius: 14px; border: 1px dashed rgba(255,255,255,.12); background: rgba(255,255,255,.015);">
+            <div style="font-size: 15px; font-weight: 700; color: #b7c5de;">Nenhum lote importado</div>
+            <div style="font-size: 13px; color: #7486a5; margin-top: 6px;">Aponte uma pasta acima para registrar o primeiro lote.</div>
+          </div>
+        </sc-if>
+      </section>
+    </main>
+  </div>
+</div>]]>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  state = {
+    path: "Z:\\GRUPO PLURIX\\...\\EFD Fiscal - EFD ICMS IPI",
+    scanning: false,
+    lots: [
+      { id: 1, path: "D:\\Backup pc Pedro\\PROJETOS 2\\CAT 42 - Advertising Operations\\01 - SPEDS\\43112531000421\\41498", files: "25", useful: "25", size: "29.7 MB", period: "07/2022 a 06/2024", date: "11/09/2026", kinds: [["EFD ICMS/IPI · 25", "efd"]] },
+      { id: 2, path: "Z:\\_victor-costa\\42679", files: "10.811", useful: "10.811", size: "86.1 MB", period: "07/2023 a 06/2024", date: "11/09/2026", kinds: [["XML DE NF-E · 10.811", "xml"]] },
+      { id: 3, path: "D:\\Backup pc Pedro\\PROJETOS 2\\CAT 42 - Advertising Operations\\XML's", files: "887", useful: "882", size: "925 MB", period: "03/2023 a 05/2024", date: "10/09/2026", kinds: [["XML DE NF-E · 882", "xml"], ["COMPACTADO · 3", "zip"], ["XML DE OUTRO DOCUMENTO · 2", "outro"]] },
+      { id: 4, path: "D:\\Backup pc Pedro\\PROJETOS 2\\CAT 42 - Advertising Operations\\01 - SPEDS\\43112531000189", files: "44", useful: "43", size: "9.1 MB", period: "01/2022 a 06/2024", date: "10/09/2026", kinds: [["EFD ICMS/IPI · 43", "efd"], ["COMPACTADO · 1", "zip"]] }
+    ]
+  };
+
+  kindStyle = {
+    efd: { bg: "rgba(59,130,246,.12)", border: "rgba(96,165,250,.3)", fg: "#93c5fd" },
+    xml: { bg: "rgba(52,211,153,.1)", border: "rgba(52,211,153,.28)", fg: "#6ee7b7" },
+    zip: { bg: "rgba(255,255,255,.04)", border: "rgba(255,255,255,.12)", fg: "#a9b8d2" },
+    outro: { bg: "rgba(240,180,41,.1)", border: "rgba(240,180,41,.28)", fg: "#fbbf24" }
+  };
+
+  componentWillUnmount() { clearTimeout(this._t); }
+
+  scan = () => {
+    if (this.state.scanning) return;
+    this.setState({ scanning: true });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ scanning: false }), 1200);
+  };
+
+  renderVals() {
+    const s = this.state;
+    const totalFiles = s.lots.reduce((a, l) => a + Number(String(l.files).replace(/\./g, "")), 0);
+    return {
+      path: s.path,
+      onPath: e => this.setState({ path: e.target.value }),
+      scanning: s.scanning,
+      scan: this.scan,
+      scanLabel: s.scanning ? "Conferindo…" : "Conferir pasta",
+      summary: s.lots.length + " lote(s) · " + totalFiles.toLocaleString("pt-BR") + " arquivos registrados",
+      empty: s.lots.length === 0,
+      lots: s.lots.map(l => ({
+        path: l.path, files: l.files, useful: l.useful, size: l.size, period: l.period, date: l.date,
+        kinds: l.kinds.map(k => Object.assign({ label: k[0] }, this.kindStyle[k[1]])),
+        onRemove: () => this.setState(st => ({ lots: st.lots.filter(x => x.id !== l.id) }))
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

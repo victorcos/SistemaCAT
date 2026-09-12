@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<![CDATA[<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #070c18; }
+    body { font-family: "Plus Jakarta Sans", "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #f2971d; text-decoration: none; }
+    a:hover { color: #ffb34d; }
+    input, button { font-family: inherit; }
+    input::placeholder { color: #55688a; }
+    @keyframes dcFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes dcSweep { 0% { transform: translateX(-110%); } 100% { transform: translateX(210%); } }
+    @keyframes dcShake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-5px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(3px); } }
+    @keyframes dcSpin { to { transform: rotate(360deg); } }
+    @keyframes dcDrift { 0%,100% { transform: translate(0,0); } 50% { transform: translate(24px,-18px); } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; background: #070c18; color: #e8edf7;">
+
+  <div style="position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; padding: 48px; border-right: 1px solid rgba(242,151,29,.28); background: linear-gradient(160deg, #0b1c3a, #081527);">
+    <div style="position: absolute; inset: 0; background: linear-gradient(160deg, #0b1c3a 0%, #081527 100%);"></div>
+    <div style="position: absolute; width: 520px; height: 520px; border-radius: 50%; background: radial-gradient(circle, rgba(242,151,29,.10), transparent 68%); animation: dcDrift 16s ease-in-out infinite;"></div>
+    <div style="position: absolute; inset: 0; opacity: .35; background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size: 56px 56px; mask-image: radial-gradient(circle at 50% 45%, #000 20%, transparent 72%); -webkit-mask-image: radial-gradient(circle at 50% 45%, #000 20%, transparent 72%);"></div>
+
+    <div style="position: relative; display: flex; flex-direction: column; align-items: center; gap: 22px; animation: dcFade .5s ease both;">
+      <img src="assets/bms-logo.png" alt="BMS Consultoria Tributária" style="width: 100%; max-width: 420px; height: auto; display: block;" />
+      <div style="width: 64px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #f2971d, transparent);"></div>
+      <p style="margin: 0; max-width: 320px; text-align: center; font-size: 17px; line-height: 1.5; color: #8ba6d6; text-wrap: pretty;">Sistema de apuração das obrigações da CAT</p>
+    </div>
+  </div>
+
+  <div style="position: relative; display: flex; align-items: center; justify-content: center; padding: 48px 40px; background: radial-gradient(760px 520px at 80% 0%, rgba(37,99,235,.12), transparent 66%), radial-gradient(560px 420px at 10% 100%, rgba(242,151,29,.07), transparent 70%), #070c18;">
+    <div style="width: 100%; max-width: 412px; display: flex; flex-direction: column; animation: {{ cardAnim }};">
+
+      <h1 style="margin: 0; font-size: 34px; font-weight: 800; letter-spacing: -.02em;">{{ heading }}</h1>
+      <p style="margin: 10px 0 28px; font-size: 14px; line-height: 1.55; color: #8798b6; text-wrap: pretty;">{{ subheading }}</p>
+
+      <sc-if value="{{ isLogin }}">
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="login-user" style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Usuário</label>
+            <input id="login-user" value="{{ username }}" onChange="{{ onUsername }}" onKeyDown="{{ onKey }}" autoComplete="username" placeholder="seu.usuario" style="width: 100%; padding: 13px 15px; border-radius: 11px; background: rgba(255,255,255,.04); border: 1px solid {{ userBorder }}; color: #e8edf7; font-size: 14px; outline: none; transition: border-color .16s, box-shadow .16s, background .16s;" style-focus="border-color: #f2971d; background: rgba(242,151,29,.06); box-shadow: 0 0 0 3px rgba(242,151,29,.16);" />
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="login-pass" style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Senha</label>
+            <div style="position: relative; display: flex; align-items: center;">
+              <input id="login-pass" type="{{ passType }}" value="{{ password }}" onChange="{{ onPassword }}" onKeyDown="{{ onKey }}" autoComplete="current-password" placeholder="••••••••" style="width: 100%; padding: 13px 52px 13px 15px; border-radius: 11px; background: rgba(255,255,255,.04); border: 1px solid {{ passBorder }}; color: #e8edf7; font-size: 14px; outline: none; transition: border-color .16s, box-shadow .16s, background .16s;" style-focus="border-color: #f2971d; background: rgba(242,151,29,.06); box-shadow: 0 0 0 3px rgba(242,151,29,.16);" />
+              <button type="button" onClick="{{ toggleReveal }}" title="{{ revealLabel }}" aria-label="{{ revealLabel }}" style="position: absolute; right: 7px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 9px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); color: #9fb0cd; cursor: pointer; transition: all .16s;" style-hover="color: #ffc478; border-color: rgba(242,151,29,.45); background: rgba(242,151,29,.12);">
+                <sc-if value="{{ reveal }}">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 3l18 18"></path>
+                    <path d="M10.6 5.2A9.6 9.6 0 0 1 12 5c5.5 0 9 5.5 9 7a12 12 0 0 1-2.6 3.3"></path>
+                    <path d="M6.3 7.2C3.9 8.8 3 11.2 3 12c0 1.5 3.5 7 9 7 1.6 0 3-.4 4.2-1"></path>
+                    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path>
+                  </svg>
+                </sc-if>
+                <sc-if value="{{ hidden }}">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 12s3.5-7 9-7 9 5.5 9 7-3.5 7-9 7-9-5.5-9-7z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </sc-if>
+              </button>
+            </div>
+          </div>
+
+          <sc-if value="{{ error }}">
+            <div role="alert" style="display: flex; gap: 11px; padding: 13px 15px; border-radius: 11px; border: 1px solid rgba(239,68,68,.42); border-left: 3px solid #ef4444; background: rgba(127,29,29,.34); animation: dcFade .2s ease both;">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round" style="flex: 0 0 17px; margin-top: 1px;">
+                <circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5"></path><path d="M12 16.3v.2"></path>
+              </svg>
+              <div style="min-width: 0;">
+                <div style="font-size: 13px; font-weight: 700; color: #fecaca;">{{ error.title }}</div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #e6a3a3; margin-top: 4px;">Código para suporte: {{ error.code }}</div>
+              </div>
+            </div>
+          </sc-if>
+
+          <button onClick="{{ submit }}" disabled="{{ submitDisabled }}" style="position: relative; overflow: hidden; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 15px; border-radius: 11px; border: 1px solid {{ ctaBorder }}; background: {{ ctaBg }}; color: {{ ctaFg }}; font-size: 15px; font-weight: 800; cursor: {{ ctaCursor }}; box-shadow: {{ ctaShadow }}; transition: all .18s;" style-hover="transform: {{ ctaHoverLift }};">
+            <sc-if value="{{ loading }}">
+              <span style="width: 15px; height: 15px; border-radius: 50%; border: 2px solid rgba(18,26,44,.35); border-top-color: #121a2c; animation: dcSpin .7s linear infinite;"></span>
+            </sc-if>
+            {{ ctaLabel }}
+            <sc-if value="{{ ready }}">
+              <span style="position: absolute; top: 0; left: 0; width: 35%; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.9), transparent); animation: dcSweep 3.4s linear infinite;"></span>
+            </sc-if>
+          </button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isFirstAccess }}">
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="display: flex; gap: 11px; padding: 13px 15px; border-radius: 11px; border: 1px solid rgba(240,180,41,.34); border-left: 3px solid #f2971d; background: rgba(242,151,29,.09);">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style="flex: 0 0 17px; margin-top: 1px;">
+              <rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+            </svg>
+            <div style="font-size: 13px; line-height: 1.5; color: #f3d7ab;">Sua senha atual é provisória. Defina uma senha pessoal para continuar.</div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="new-pass" style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Nova senha</label>
+            <input id="new-pass" type="password" value="{{ newPass }}" onChange="{{ onNewPass }}" autoComplete="new-password" placeholder="mínimo 10 caracteres" style="width: 100%; padding: 13px 15px; border-radius: 11px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-size: 14px; outline: none; transition: all .16s;" style-focus="border-color: #f2971d; background: rgba(242,151,29,.06); box-shadow: 0 0 0 3px rgba(242,151,29,.16);" />
+            <div style="display: flex; gap: 5px; margin-top: 2px;">
+              <sc-for list="{{ strengthBars }}" as="b" hint-placeholder-count="4">
+                <span style="flex: 1; height: 4px; border-radius: 99px; background: {{ b.color }}; transition: background .2s;"></span>
+              </sc-for>
+            </div>
+            <span style="font-size: 11px; color: {{ strengthColor }}; font-weight: 600;">{{ strengthLabel }}</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="confirm-pass" style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Confirmar nova senha</label>
+            <input id="confirm-pass" type="password" value="{{ confirmPass }}" onChange="{{ onConfirmPass }}" autoComplete="new-password" placeholder="repita a nova senha" style="width: 100%; padding: 13px 15px; border-radius: 11px; background: rgba(255,255,255,.04); border: 1px solid {{ confirmBorder }}; color: #e8edf7; font-size: 14px; outline: none; transition: all .16s;" style-focus="border-color: #f2971d; background: rgba(242,151,29,.06); box-shadow: 0 0 0 3px rgba(242,151,29,.16);" />
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 7px; padding: 13px 15px; border-radius: 11px; border: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.025);">
+            <sc-for list="{{ rules }}" as="r" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 600; color: {{ r.color }};">
+                <span style="width: 15px; height: 15px; flex: 0 0 15px; border-radius: 50%; border: 1px solid {{ r.ring }}; display: flex; align-items: center; justify-content: center; font-size: 9px; background: {{ r.dotBg }};">{{ r.mark }}</span>{{ r.label }}
+              </div>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ passError }}">
+            <div role="alert" style="padding: 12px 15px; border-radius: 11px; border: 1px solid rgba(239,68,68,.42); border-left: 3px solid #ef4444; background: rgba(127,29,29,.34); font-size: 13px; font-weight: 600; color: #fecaca; animation: dcFade .2s ease both;">{{ passError }}</div>
+          </sc-if>
+
+          <button onClick="{{ savePassword }}" disabled="{{ saveDisabled }}" style="margin-top: 4px; width: 100%; padding: 15px; border-radius: 11px; border: none; background: {{ saveBg }}; color: {{ saveFg }}; font-size: 15px; font-weight: 800; cursor: {{ saveCursor }}; box-shadow: {{ saveShadow }}; transition: all .18s;" style-hover="transform: translateY(-1px);">Definir senha e entrar</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDone }}">
+        <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 18px; animation: dcFade .3s ease both;">
+          <div style="width: 52px; height: 52px; border-radius: 15px; background: rgba(52,211,153,.14); border: 1px solid rgba(52,211,153,.38); display: flex; align-items: center; justify-content: center;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7"></path></svg>
+          </div>
+          <div style="font-size: 14px; line-height: 1.6; color: #8798b6;">Redirecionando para o Sistema CAT…</div>
+          <button onClick="{{ restart }}" style="padding: 12px 20px; border-radius: 11px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 13px; font-weight: 700; cursor: pointer;" style-hover="background: rgba(255,255,255,.08);">Voltar ao início</button>
+        </div>
+      </sc-if>
+
+      <div style="margin-top: 26px; padding-top: 22px; border-top: 1px solid rgba(255,255,255,.07); display: flex; flex-direction: column; gap: 18px;">
+        <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #7b8dab; text-wrap: pretty;">Esqueceu a senha ou o acesso está bloqueado? Procure um gestor da equipe. Por segurança, a redefinição não é automática.</p>
+        <div style="font-size: 12px; color: #4d5d79; font-weight: 600;">BMS Consultoria Tributária · Sistema CAT</div>
+      </div>
+
+      <div style="margin-top: 18px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: .14em; color: #3f4e69;">DEMO</span>
+        <sc-for list="{{ demoButtons }}" as="d" hint-placeholder-count="3">
+          <button onClick="{{ d.onClick }}" style="padding: 6px 11px; border-radius: 8px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); color: #6d7f9d; font-size: 11px; font-weight: 700; cursor: pointer; transition: all .16s;" style-hover="color: #ffc478; border-color: rgba(242,151,29,.35);">{{ d.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</div>]]>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  state = { step: "login", username: "", password: "", reveal: false, loading: false, error: null, shake: 0, newPass: "", confirmPass: "", passError: "" };
+
+  code() { return Math.random().toString(16).slice(2, 14); }
+
+  submit = () => {
+    if (this.state.loading || !this.state.username.trim() || !this.state.password) return;
+    this.setState({ loading: true, error: null });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => {
+      const u = this.state.username.trim().toLowerCase();
+      if (this.state.password === "provisoria" || u === "novo") {
+        this.setState({ loading: false, step: "first", password: "" });
+      } else if (u === "vpedroso" && this.state.password === "senha-valida") {
+        this.setState({ loading: false, step: "done" });
+      } else {
+        this.setState(s => ({ loading: false, password: "", shake: s.shake + 1, error: { title: "Usuário ou senha inválidos.", code: this.code() } }));
+      }
+    }, 900);
+  };
+
+  savePassword = () => {
+    const { newPass, confirmPass } = this.state;
+    if (this.score(newPass) < 3) return this.setState({ passError: "A senha não atende aos requisitos mínimos." });
+    if (newPass !== confirmPass) return this.setState({ passError: "As senhas não conferem." });
+    this.setState({ step: "done", passError: "" });
+  };
+
+  score(p) {
+    let n = 0;
+    if (p.length >= 10) n++;
+    if (/[A-Z]/.test(p) && /[a-z]/.test(p)) n++;
+    if (/[0-9]/.test(p)) n++;
+    if (/[^A-Za-z0-9]/.test(p)) n++;
+    return n;
+  }
+
+  componentWillUnmount() { clearTimeout(this._t); }
+
+  renderVals() {
+    const s = this.state;
+    const filled = !!s.username.trim() && !!s.password;
+    const ready = filled && !s.loading;
+    const heads = {
+      login: ["Entrar", "Use as credenciais fornecidas pelo gestor da sua equipe."],
+      first: ["Primeiro acesso", "Troque a senha provisória antes de continuar."],
+      done: ["Acesso liberado", "Bem-vindo de volta ao Sistema CAT."]
+    };
+    const h = heads[s.step];
+
+    const sc = this.score(s.newPass);
+    const levels = [
+      { label: "Muito fraca", color: "#f87171" },
+      { label: "Fraca", color: "#fb923c" },
+      { label: "Razoável", color: "#fbbf24" },
+      { label: "Boa", color: "#6ee7b7" },
+      { label: "Forte", color: "#34d399" }
+    ];
+    const lvl = levels[sc];
+    const rules = [
+      { label: "Mínimo de 10 caracteres", ok: s.newPass.length >= 10 },
+      { label: "Maiúsculas e minúsculas", ok: /[A-Z]/.test(s.newPass) && /[a-z]/.test(s.newPass) },
+      { label: "Ao menos um número", ok: /[0-9]/.test(s.newPass) },
+      { label: "Ao menos um símbolo", ok: /[^A-Za-z0-9]/.test(s.newPass) }
+    ];
+    const saveOk = sc >= 3 && s.newPass === s.confirmPass && !!s.confirmPass;
+
+    return {
+      heading: h[0], subheading: h[1],
+      isLogin: s.step === "login", isFirstAccess: s.step === "first", isDone: s.step === "done",
+      cardAnim: s.error && s.step === "login" ? "dcShake .34s ease " + s.shake : "dcFade .45s ease both",
+      username: s.username, password: s.password,
+      onUsername: e => this.setState({ username: e.target.value, error: null }),
+      onPassword: e => this.setState({ password: e.target.value, error: null }),
+      onKey: e => { if (e.key === "Enter") this.submit(); },
+      userBorder: s.error ? "rgba(239,68,68,.4)" : "rgba(255,255,255,.11)",
+      passBorder: s.error ? "rgba(239,68,68,.4)" : "rgba(255,255,255,.11)",
+      reveal: s.reveal, hidden: !s.reveal,
+      passType: s.reveal ? "text" : "password",
+      revealLabel: s.reveal ? "Ocultar senha" : "Mostrar senha",
+      toggleReveal: () => this.setState(st => ({ reveal: !st.reveal })),
+      error: s.error, loading: s.loading, ready: ready,
+      submit: this.submit,
+      submitDisabled: !ready,
+      ctaLabel: s.loading ? "Verificando…" : "Entrar",
+      ctaBg: ready ? "linear-gradient(135deg, #f9a72b, #e8801a)" : "rgba(30,58,138,.42)",
+      ctaFg: ready ? "#121a2c" : "#7f93bb",
+      ctaBorder: ready ? "transparent" : "rgba(255,255,255,.08)",
+      ctaCursor: ready ? "pointer" : "not-allowed",
+      ctaShadow: ready ? "0 12px 28px rgba(242,151,29,.32)" : "none",
+      ctaHoverLift: ready ? "translateY(-1px)" : "none",
+      newPass: s.newPass, confirmPass: s.confirmPass,
+      onNewPass: e => this.setState({ newPass: e.target.value, passError: "" }),
+      onConfirmPass: e => this.setState({ confirmPass: e.target.value, passError: "" }),
+      confirmBorder: s.confirmPass && s.confirmPass !== s.newPass ? "rgba(239,68,68,.45)" : "rgba(255,255,255,.11)",
+      strengthBars: [0, 1, 2, 3].map(i => ({ color: i < sc ? lvl.color : "rgba(255,255,255,.08)" })),
+      strengthLabel: s.newPass ? "Força da senha: " + lvl.label : "Use letras, números e símbolos.",
+      strengthColor: s.newPass ? lvl.color : "#6d7f9d",
+      rules: rules.map(r => ({
+        label: r.label,
+        color: r.ok ? "#6ee7b7" : "#6d7f9d",
+        ring: r.ok ? "rgba(52,211,153,.5)" : "rgba(255,255,255,.14)",
+        dotBg: r.ok ? "rgba(52,211,153,.16)" : "transparent",
+        mark: r.ok ? "✓" : ""
+      })),
+      passError: s.passError,
+      savePassword: this.savePassword,
+      saveDisabled: !saveOk,
+      saveBg: saveOk ? "linear-gradient(135deg, #f9a72b, #e8801a)" : "rgba(30,58,138,.42)",
+      saveFg: saveOk ? "#121a2c" : "#7f93bb",
+      saveCursor: saveOk ? "pointer" : "not-allowed",
+      saveShadow: saveOk ? "0 12px 28px rgba(242,151,29,.32)" : "none",
+      restart: () => this.setState({ step: "login", username: "", password: "", newPass: "", confirmPass: "", error: null }),
+      demoButtons: [
+        { label: "Sucesso", onClick: () => this.setState({ step: "login", username: "vpedroso", password: "senha-valida", error: null }) },
+        { label: "Erro", onClick: () => this.setState({ step: "login", username: "vpedroso", password: "errada", error: null }) },
+        { label: "Primeiro acesso", onClick: () => this.setState({ step: "login", username: "vpedroso", password: "provisoria", error: null }) }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<![CDATA[<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #070c18; }
+    body { font-family: "Plus Jakarta Sans", "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #f2971d; text-decoration: none; }
+    a:hover { color: #ffb34d; }
+    input, button, textarea { font-family: inherit; }
+    input::placeholder, textarea::placeholder { color: #55688a; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 99px; }
+    @keyframes dcFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes dcSweep { 0% { transform: translateX(-110%); } 100% { transform: translateX(210%); } }
+    @keyframes dcSpin { to { transform: rotate(360deg); } }
+    @keyframes dcPulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; background: radial-gradient(900px 500px at 18% -10%, rgba(242,151,29,.10), transparent 60%), radial-gradient(900px 600px at 90% 0%, rgba(37,99,235,.14), transparent 65%), #070c18; color: #e8edf7;">
+
+  <aside style="width: 244px; flex: 0 0 244px; border-right: 1px solid rgba(255,255,255,.07); background: linear-gradient(180deg, rgba(12,19,36,.9), rgba(8,13,25,.9)); display: flex; flex-direction: column; padding: 22px 16px; gap: 28px; position: sticky; top: 0; height: 100vh;">
+    <div style="padding: 2px 6px;">
+      <img src="assets/bms-logo.png" alt="BMS Consultoria Tributária" style="width: 172px; height: auto; display: block;" />
+    </div>
+    <nav style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 10px; letter-spacing: .16em; color: #5f7191; font-weight: 700; padding: 0 10px 8px;">NAVEGAÇÃO</div>
+      <a href="Inicio.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;">
+        <span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Início
+      </a>
+      <div style="position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 700; color: #fff; background: linear-gradient(90deg, rgba(242,151,29,.16), rgba(242,151,29,.02)); border: 1px solid rgba(242,151,29,.28); overflow: hidden;">
+        <span style="position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: #f2971d;"></span>
+        <span style="width: 6px; height: 6px; border-radius: 99px; background: #f2971d; box-shadow: 0 0 10px #f2971d;"></span>Cadastro
+      </div>
+      <a href="Usuarios.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;">
+        <span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Usuários
+      </a>
+    </nav>
+    <div style="margin-top: auto; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.06); background: rgba(255,255,255,.02);">
+      <div style="font-size: 11px; color: #6d7f9d; font-weight: 600;">Sistema CAT</div>
+      <div style="font-size: 11px; color: #4d5d79; margin-top: 3px;">sessão não comercial</div>
+    </div>
+  </aside>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+
+    <header style="display: flex; align-items: center; gap: 14px; padding: 16px 28px; border-bottom: 1px solid rgba(255,255,255,.07); background: rgba(8,13,25,.72); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(140deg, #1e3a8a, #0f1e3f); border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #cfe0ff;">VP</div>
+        <div style="font-size: 14px; font-weight: 700;">Victor Pedroso</div>
+      </div>
+      <span style="font-size: 10px; font-weight: 700; letter-spacing: .1em; padding: 4px 8px; border-radius: 6px; background: rgba(242,151,29,.14); border: 1px solid rgba(242,151,29,.32); color: #ffbb5c;">DEV</span>
+      <div style="flex: 1;"></div>
+      <button style="padding: 9px 18px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dce6f7; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .18s;" style-hover="background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.4); color: #fecaca;">Sair</button>
+    </header>
+
+    <main style="padding: 28px; display: flex; flex-direction: column; gap: 20px; max-width: 1240px; width: 100%;">
+
+      <section style="position: relative; overflow: hidden; border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: linear-gradient(120deg, rgba(18,27,48,.9), rgba(10,16,31,.9)); padding: 24px 26px;">
+        <div style="position: absolute; inset: 0; pointer-events: none; background: radial-gradient(420px 160px at 8% 0%, rgba(242,151,29,.16), transparent 70%);"></div>
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 1px; overflow: hidden;">
+          <div style="width: 40%; height: 100%; background: linear-gradient(90deg, transparent, #f2971d, transparent); animation: dcSweep 5.5s linear infinite;"></div>
+        </div>
+        <div style="position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px;">
+          <div style="flex: 1; min-width: 280px;">
+            <div style="font-size: 11px; font-weight: 700; letter-spacing: .18em; color: #f2971d;">SISTEMA CAT</div>
+            <h1 style="margin: 8px 0 8px; font-size: 30px; font-weight: 800; letter-spacing: -.02em;">Cadastrar trabalho</h1>
+            <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #8798b6; max-width: 620px; text-wrap: pretty;">Envie o SPED, solto ou compactado. O sistema lê o cabeçalho de cada arquivo e identifica a empresa — sem digitar CNPJ.</p>
+          </div>
+          <button onClick="{{ restart }}" style="padding: 12px 20px; border-radius: 11px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .18s;" style-hover="background: rgba(255,255,255,.08); border-color: rgba(242,151,29,.4); color: #ffc478;">Começar de novo</button>
+        </div>
+
+        <div style="position: relative; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px;">
+          <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 10px 18px 10px 12px; border-radius: 999px; border: 1px solid {{ s.border }}; background: {{ s.bg }};">
+              <span style="width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; background: {{ s.dotBg }}; color: {{ s.dotFg }};">{{ s.mark }}</span>
+              <span style="font-size: 13px; font-weight: 700; color: {{ s.fg }};">{{ s.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <sc-if value="{{ isUpload }}">
+        <section style="border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: rgba(13,20,37,.72); padding: 26px; display: flex; flex-direction: column; gap: 20px; animation: dcFade .25s ease both;">
+          <div>
+            <h2 style="margin: 0; font-size: 19px; font-weight: 800;">Enviar arquivos</h2>
+            <p style="margin: 7px 0 0; font-size: 13px; color: #8798b6;">Aceita .txt do SPED Fiscal e pacotes .zip. Vários arquivos de uma vez.</p>
+          </div>
+
+          <div onClick="{{ pickFiles }}" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 46px 24px; border-radius: 16px; border: 1px dashed {{ dropBorder }}; background: {{ dropBg }}; cursor: pointer; transition: all .18s;" style-hover="border-color: rgba(242,151,29,.55); background: rgba(242,151,29,.05);">
+            <div style="width: 52px; height: 52px; border-radius: 15px; border: 1px solid rgba(242,151,29,.35); background: rgba(242,151,29,.12); display: flex; align-items: center; justify-content: center;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffc478" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 16V4"></path><path d="M7.5 8.5 12 4l4.5 4.5"></path><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"></path>
+              </svg>
+            </div>
+            <div style="font-size: 15px; font-weight: 700;">Arraste os arquivos aqui ou clique para selecionar</div>
+            <div style="font-size: 12px; color: #6d7f9d;">SPED Fiscal (.txt) · pacotes (.zip) · até 200 MB por envio</div>
+          </div>
+
+          <sc-if value="{{ hasFiles }}">
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <sc-for list="{{ files }}" as="f" hint-placeholder-count="2">
+                <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 11px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03);">
+                  <div style="width: 32px; height: 32px; flex: 0 0 32px; border-radius: 9px; background: rgba(59,130,246,.14); border: 1px solid rgba(96,165,250,.25); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #93c5fd;">{{ f.ext }}</div>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #dbe5f6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ f.name }}</div>
+                    <div style="font-size: 11px; color: #7b8dab; margin-top: 3px;">{{ f.meta }}</div>
+                  </div>
+                  <span style="font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: rgba(52,211,153,.1); border: 1px solid rgba(52,211,153,.3); color: #6ee7b7;">lido</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+            <div style="flex: 1; min-width: 180px; font-size: 12px; color: #6d7f9d;">{{ uploadHint }}</div>
+            <button onClick="{{ analyze }}" disabled="{{ analyzeDisabled }}" style="display: flex; align-items: center; gap: 9px; padding: 13px 22px; border-radius: 11px; border: none; background: {{ analyzeBg }}; color: {{ analyzeFg }}; font-size: 14px; font-weight: 800; cursor: {{ analyzeCursor }}; box-shadow: {{ analyzeShadow }}; transition: all .18s;" style-hover="transform: translateY(-1px);">
+              <sc-if value="{{ analyzing }}">
+                <span style="width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(18,26,44,.3); border-top-color: #121a2c; animation: dcSpin .7s linear infinite;"></span>
+              </sc-if>
+              {{ analyzeLabel }}
+            </button>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ isConfirm }}">
+        <section style="border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: rgba(13,20,37,.72); padding: 26px; display: flex; flex-direction: column; gap: 22px; animation: dcFade .25s ease both;">
+          <div>
+            <h2 style="margin: 0; font-size: 19px; font-weight: 800;">Confira a empresa</h2>
+            <p style="margin: 7px 0 0; font-size: 13px; color: #8798b6;">Estes dados vieram do registro 0000 dos próprios arquivos.</p>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+            <sc-for list="{{ facts }}" as="f" hint-placeholder-count="4">
+              <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 12px; border-left: 2px solid rgba(242,151,29,.28);">
+                <div style="font-size: 10px; letter-spacing: .13em; font-weight: 800; color: #6f81a0;">{{ f.label }}</div>
+                <div style="font-size: {{ f.size }}; font-weight: 700; font-family: {{ f.font }}; color: #e8edf7; line-height: 1.35; text-wrap: pretty;">{{ f.value }}</div>
+                <div style="font-size: 11px; color: #6d7f9d;">{{ f.hint }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-top: 6px;">
+            <div style="flex: 1; min-width: 200px; display: flex; align-items: center; gap: 9px; font-size: 12px; color: #8798b6;">
+              <span style="width: 7px; height: 7px; border-radius: 99px; background: #6ee7b7; animation: dcPulse 2.4s ease-in-out infinite;"></span>Empresa identificada automaticamente pelo CNPJ da matriz.
+            </div>
+            <button onClick="{{ back }}" style="padding: 12px 20px; border-radius: 11px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 13px; font-weight: 700; cursor: pointer;" style-hover="background: rgba(255,255,255,.08);">Voltar</button>
+            <button onClick="{{ toProject }}" style="padding: 13px 22px; border-radius: 11px; border: none; background: linear-gradient(135deg, #f9a72b, #e8801a); color: #121a2c; font-size: 14px; font-weight: 800; cursor: pointer; box-shadow: 0 12px 28px rgba(242,151,29,.3); transition: all .18s;" style-hover="transform: translateY(-1px);">Pré-cadastrar empresa</button>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ isProject }}">
+        <section style="border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: rgba(13,20,37,.72); padding: 26px; display: flex; flex-direction: column; gap: 22px; animation: dcFade .25s ease both;">
+          <div>
+            <h2 style="margin: 0; font-size: 19px; font-weight: 800;">Novo projeto</h2>
+            <p style="margin: 7px 0 0; font-size: 13px; color: #8798b6; text-wrap: pretty;">{{ projectSubtitle }}</p>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px;">
+            <div style="display: flex; flex-direction: column; gap: 7px;">
+              <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Frente</label>
+              <div data-picker="frente" style="position: relative;">
+                <button onClick="{{ pFrente.onToggle }}" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid {{ pFrente.triggerBorder }}; color: #e8edf7; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left;">
+                  <span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ pFrente.value }}</span>
+                  <span style="font-size: 11px; color: #7f91af;">{{ pFrente.caret }}</span>
+                </button>
+                <sc-if value="{{ pFrente.open }}">
+                  <div style="position: absolute; z-index: 90; top: calc(100% + 6px); left: 0; right: 0; min-width: 280px; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #101a30; box-shadow: 0 22px 48px rgba(0,0,0,.55); overflow: hidden; animation: dcFade .14s ease both;">
+                    <div style="padding: 9px; border-bottom: 1px solid rgba(255,255,255,.07);">
+                      <input ref="{{ pFrente.focusRef }}" value="{{ pFrente.query }}" onChange="{{ pFrente.onQuery }}" placeholder="Buscar frente…" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #e8edf7; font-size: 12px; outline: none;" style-focus="border-color: rgba(242,151,29,.5);" />
+                    </div>
+                    <div style="max-height: 220px; overflow-y: auto; padding: 6px;">
+                      <sc-for list="{{ pFrente.options }}" as="o" hint-placeholder-count="4">
+                        <div onClick="{{ o.onSelect }}" style="display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ o.bg }}; color: {{ o.fg }};" style-hover="background: rgba(255,255,255,.06);">
+                          <span style="flex: 1;">{{ o.label }}</span><span style="font-size: 12px;">{{ o.check }}</span>
+                        </div>
+                      </sc-for>
+                      <sc-if value="{{ pFrente.empty }}">
+                        <div style="padding: 12px 10px; font-size: 12px; color: #6d7f9d;">Nenhum resultado</div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 7px;">
+              <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Nome do projeto</label>
+              <input value="{{ form.name }}" onChange="{{ onName }}" placeholder="Ressarcimento ST 2021" style="padding: 12px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-size: 13px; outline: none;" style-focus="border-color: rgba(242,151,29,.55);" />
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 7px;">
+              <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Competência inicial</label>
+              <input type="date" value="{{ form.from }}" onChange="{{ onFrom }}" style="padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none; color-scheme: dark;" style-focus="border-color: rgba(242,151,29,.55);" />
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 7px;">
+              <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Competência final</label>
+              <input type="date" value="{{ form.to }}" onChange="{{ onTo }}" style="padding: 11px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none; color-scheme: dark;" style-focus="border-color: rgba(242,151,29,.55);" />
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <label style="font-size: 12px; font-weight: 700; color: #a9b8d2;">Observação</label>
+            <textarea value="{{ form.note }}" onChange="{{ onNote }}" rows="3" placeholder="Contexto do projeto, combinados com o cliente, pendências…" style="padding: 12px 13px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.11); color: #e8edf7; font-size: 13px; line-height: 1.5; outline: none; resize: vertical;" style-focus="border-color: rgba(242,151,29,.55);"></textarea>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+            <div style="flex: 1; min-width: 180px; font-size: 12px; color: {{ messageColor }};">{{ projectMessage }}</div>
+            <button onClick="{{ back }}" style="padding: 12px 20px; border-radius: 11px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 13px; font-weight: 700; cursor: pointer;" style-hover="background: rgba(255,255,255,.08);">Voltar</button>
+            <button onClick="{{ createProject }}" style="padding: 13px 22px; border-radius: 11px; border: none; background: linear-gradient(135deg, #f9a72b, #e8801a); color: #121a2c; font-size: 14px; font-weight: 800; cursor: pointer; box-shadow: 0 12px 28px rgba(242,151,29,.3); transition: all .18s;" style-hover="transform: translateY(-1px);">Criar projeto</button>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ isDone }}">
+        <section style="border-radius: 18px; border: 1px solid rgba(52,211,153,.22); background: linear-gradient(120deg, rgba(6,46,38,.5), rgba(13,20,37,.8)); padding: 30px 26px; display: flex; flex-direction: column; gap: 18px; animation: dcFade .25s ease both;">
+          <div style="width: 46px; height: 46px; border-radius: 14px; background: rgba(52,211,153,.14); border: 1px solid rgba(52,211,153,.38); display: flex; align-items: center; justify-content: center;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7"></path></svg>
+          </div>
+          <div>
+            <h2 style="margin: 0; font-size: 19px; font-weight: 800;">Projeto criado</h2>
+            <p style="margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: #a9b8d2; max-width: 700px; text-wrap: pretty;">{{ doneText }}</p>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; max-width: 720px;">
+            <sc-for list="{{ summary }}" as="s" hint-placeholder-count="3">
+              <div style="padding: 13px 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.03);">
+                <div style="font-size: 10px; letter-spacing: .13em; font-weight: 800; color: #6f81a0;">{{ s.label }}</div>
+                <div style="font-size: 14px; font-weight: 700; margin-top: 5px; text-wrap: pretty;">{{ s.value }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px;">
+            <a href="Inicio.dc.html" style="padding: 13px 22px; border-radius: 11px; background: linear-gradient(135deg, #f9a72b, #e8801a); color: #121a2c; font-size: 14px; font-weight: 800; box-shadow: 0 12px 28px rgba(242,151,29,.3);">Ver o trabalho</a>
+            <button onClick="{{ restart }}" style="padding: 13px 22px; border-radius: 11px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 14px; font-weight: 700; cursor: pointer;" style-hover="background: rgba(255,255,255,.08);">Cadastrar outra empresa</button>
+          </div>
+        </section>
+      </sc-if>
+    </main>
+  </div>
+</div>]]>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  state = {
+    step: 0, analyzing: false,
+    files: [],
+    form: { frente: "CAT 42 — ressarcimento de ICMS-ST", name: "Ressarcimento ST 2021", from: "2021-06-01", to: "2021-06-30", note: "" },
+    error: "",
+    openPicker: null, pickerQuery: ""
+  };
+
+  company = { razao: "GOIAS IND COM DE COLCHOES E ESPUMAS LTDA", cnpj: "02.748.383/0001-06", uf: "GO", ie: "103108530", filiais: "0", periodo: "06/2021 a 06/2021", arquivos: "1 lidos" };
+
+  componentDidMount() {
+    this._away = e => {
+      if (!this.state.openPicker) return;
+      const el = e.target.closest ? e.target.closest("[data-picker]") : null;
+      if (!el || el.getAttribute("data-picker") !== this.state.openPicker) this.setState({ openPicker: null, pickerQuery: "" });
+    };
+    document.addEventListener("mousedown", this._away, true);
+  }
+
+  componentWillUnmount() { document.removeEventListener("mousedown", this._away, true); clearTimeout(this._t); }
+
+  picker(key, value, options, onSelect) {
+    const s = this.state;
+    const open = s.openPicker === key;
+    const q = s.pickerQuery.trim().toLowerCase();
+    const list = options.filter(o => !q || o.toLowerCase().indexOf(q) >= 0);
+    return {
+      value: value, open: open, query: s.pickerQuery,
+      caret: open ? "▴" : "▾",
+      triggerBorder: open ? "rgba(242,151,29,.55)" : "rgba(255,255,255,.11)",
+      empty: list.length === 0,
+      onToggle: () => this.setState(st => ({ openPicker: st.openPicker === key ? null : key, pickerQuery: "" })),
+      onQuery: e => this.setState({ pickerQuery: e.target.value }),
+      focusRef: el => { if (el && open) setTimeout(() => el.focus(), 0); },
+      options: list.map(o => ({
+        label: o,
+        bg: o === value ? "rgba(242,151,29,.14)" : "transparent",
+        fg: o === value ? "#ffc478" : "#cfdbef",
+        check: o === value ? "✓" : "",
+        onSelect: () => { this.setState({ openPicker: null, pickerQuery: "" }); onSelect(o); }
+      }))
+    };
+  }
+
+  pickFiles = () => {
+    this.setState({ files: [{ name: "SPEDFISCAL_02748383000106_062021.txt", ext: "TXT", meta: "18,4 MB · registro 0000 detectado · competência 06/2021" }] });
+  };
+
+  analyze = () => {
+    if (!this.state.files.length || this.state.analyzing) return;
+    this.setState({ analyzing: true });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ analyzing: false, step: 1 }), 1100);
+  };
+
+  createProject = () => {
+    const f = this.state.form;
+    if (!f.name.trim()) return this.setState({ error: "Informe o nome do projeto." });
+    if (!f.from || !f.to) return this.setState({ error: "Informe as duas competências." });
+    if (f.from > f.to) return this.setState({ error: "A competência inicial não pode ser posterior à final." });
+    this.setState({ step: 3, error: "" });
+  };
+
+  br(d) { if (!d) return "—"; const p = d.split("-"); return p[2] + "/" + p[1] + "/" + p[0]; }
+
+  renderVals() {
+    const s = this.state;
+    const c = this.company;
+    const labels = ["Enviar", "Conferir empresa", "Criar projeto", "Pronto"];
+    const FRENTES = ["CAT 42 — ressarcimento de ICMS-ST", "De-para de produto", "Quebra de SPED", "Nota fiscal", "Reenquadramento de NCM"];
+
+    return {
+      steps: labels.map((label, i) => {
+        const done = i < s.step, active = i === s.step;
+        return {
+          label: label,
+          mark: done ? "✓" : String(i + 1),
+          bg: active ? "rgba(242,151,29,.14)" : (done ? "rgba(52,211,153,.08)" : "rgba(255,255,255,.03)"),
+          border: active ? "rgba(242,151,29,.5)" : (done ? "rgba(52,211,153,.28)" : "rgba(255,255,255,.08)"),
+          fg: active ? "#fff" : (done ? "#a7d9c4" : "#7b8dab"),
+          dotBg: active ? "#f2971d" : (done ? "rgba(52,211,153,.2)" : "rgba(255,255,255,.07)"),
+          dotFg: active ? "#121a2c" : (done ? "#6ee7b7" : "#8798b6")
+        };
+      }),
+      isUpload: s.step === 0, isConfirm: s.step === 1, isProject: s.step === 2, isDone: s.step === 3,
+
+      files: s.files, hasFiles: s.files.length > 0,
+      pickFiles: this.pickFiles,
+      dropBorder: s.files.length ? "rgba(52,211,153,.35)" : "rgba(255,255,255,.14)",
+      dropBg: s.files.length ? "rgba(52,211,153,.04)" : "rgba(255,255,255,.015)",
+      uploadHint: s.files.length ? s.files.length + " arquivo(s) prontos para leitura." : "Nenhum arquivo selecionado ainda.",
+      analyzing: s.analyzing,
+      analyze: this.analyze,
+      analyzeDisabled: !s.files.length || s.analyzing,
+      analyzeLabel: s.analyzing ? "Lendo cabeçalhos…" : "Ler arquivos",
+      analyzeBg: s.files.length && !s.analyzing ? "linear-gradient(135deg, #f9a72b, #e8801a)" : "rgba(30,58,138,.42)",
+      analyzeFg: s.files.length && !s.analyzing ? "#121a2c" : "#7f93bb",
+      analyzeCursor: s.files.length && !s.analyzing ? "pointer" : "not-allowed",
+      analyzeShadow: s.files.length && !s.analyzing ? "0 12px 28px rgba(242,151,29,.3)" : "none",
+
+      facts: [
+        { label: "RAZÃO SOCIAL", value: c.razao, size: "16px", font: "inherit", hint: "" },
+        { label: "CNPJ DA MATRIZ", value: c.cnpj, size: "15px", font: "'JetBrains Mono', monospace", hint: "" },
+        { label: "UF", value: c.uf, size: "16px", font: "inherit", hint: "" },
+        { label: "INSCRIÇÃO ESTADUAL", value: c.ie, size: "15px", font: "'JetBrains Mono', monospace", hint: "" },
+        { label: "FILIAIS NA REMESSA", value: c.filiais, size: "16px", font: "inherit", hint: "só a matriz identifica a empresa" },
+        { label: "COMPETÊNCIAS", value: c.periodo, size: "15px", font: "'JetBrains Mono', monospace", hint: "" },
+        { label: "ARQUIVOS", value: c.arquivos, size: "16px", font: "inherit", hint: "1 serve à CAT 42" }
+      ],
+      toProject: () => this.setState({ step: 2 }),
+      back: () => this.setState(st => ({ step: Math.max(0, st.step - 1), error: "" })),
+
+      projectSubtitle: "Para " + c.razao + ". As competências vieram dos arquivos enviados e podem ser ajustadas.",
+      form: s.form,
+      pFrente: this.picker("frente", s.form.frente, FRENTES, v => this.setState(st => ({ form: Object.assign({}, st.form, { frente: v }) }))),
+      onName: e => this.setState(st => ({ form: Object.assign({}, st.form, { name: e.target.value }), error: "" })),
+      onFrom: e => this.setState(st => ({ form: Object.assign({}, st.form, { from: e.target.value }), error: "" })),
+      onTo: e => this.setState(st => ({ form: Object.assign({}, st.form, { to: e.target.value }), error: "" })),
+      onNote: e => this.setState(st => ({ form: Object.assign({}, st.form, { note: e.target.value }) })),
+      projectMessage: s.error || "O projeto nasce em Pré-cadastro; a leitura do conteúdo entra na próxima etapa.",
+      messageColor: s.error ? "#fca5a5" : "#6d7f9d",
+      createProject: this.createProject,
+
+      doneText: c.razao + " está cadastrada e o projeto foi aberto. A leitura do conteúdo dos arquivos entra na próxima etapa.",
+      summary: [
+        { label: "EMPRESA", value: c.razao },
+        { label: "FRENTE", value: s.form.frente },
+        { label: "PROJETO", value: s.form.name },
+        { label: "COMPETÊNCIAS", value: this.br(s.form.from) + " a " + this.br(s.form.to) }
+      ],
+      restart: () => this.setState({ step: 0, files: [], analyzing: false, error: "", form: { frente: "CAT 42 — ressarcimento de ICMS-ST", name: "Ressarcimento ST 2021", from: "2021-06-01", to: "2021-06-30", note: "" } })
+    };
+  }
+}
+</script>
+</body>
+</html>

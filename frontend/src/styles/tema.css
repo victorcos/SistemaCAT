@@ -13,22 +13,19 @@
    bloco de imports logo abaixo.
    ========================================================================== */
 
-/* A ordem das camadas decide quem vence. O legado (pages/*.css e
-   legacy-kit.css) e CSS sem camada, e CSS sem camada vence QUALQUER camada —
-   por isso um utilitario Tailwind nao sobrepoe .botao ou .cartao hoje.
-   Regra de convivencia: componente migrado abandona a classe legada; nunca
-   misturar as duas no mesmo elemento. */
+/* A ordem das camadas decide quem vence. */
 @layer theme, base, components, utilities;
 
 @import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
 @import "tailwindcss/utilities.css" layer(utilities);
 
-/* O preflight (tailwindcss/preflight.css) NAO entra agora: ele zera margem de
-   h1-h6/p/dl/dd e o background de <button>, o que quebraria as 7 paginas que
-   ainda rodam no CSS legado (o <dl> de Inicio e todo .botao, por exemplo).
-   Ligar so quando nao houver mais nada em pages/*.css. Ate la, a unica
-   regra do preflight que as utilitarias realmente exigem esta em tokens.css:
-   o box-sizing: border-box global. */
+/* O preflight ficou DESLIGADO enquanto houve CSS legado — ele zera margem de
+   h1-h6/p/dl/dd e o desenho de button/a/dialog, e isso derrubaria as telas
+   que ainda rodavam em pages/*.css. Em 12/09/2026 a ultima delas migrou e
+   styles/legacy-kit.css saiu do projeto; agora o preflight entra, e com ele
+   somem as correcoes manuais que cada componente carregava (bg-transparent
+   em botao, border-0 em dialog, no-underline em link). */
 
 /* ---------- tema escuro por atributo ----------
    tokens.css ja responde a [data-tema="escuro"] e a prefers-color-scheme.
@@ -36,6 +33,26 @@
    semantico e precisa ser dita explicitamente. */
 /* keyframes e utilitarias de animacao do redesenho */
 @import "./animations.css";
+
+/* ---------- o que o preflight nao faz e o sistema quer ----------
+   O preflight ja tira sublinhado e cor de <a>, e zera borda e fundo de
+   <button>. Falta a mao: cursor de ponteiro em botao (o preflight deixa o
+   padrao, que e seta) e <dialog> sem fundo proprio, porque o cartao do modal
+   e que pinta. */
+@layer base {
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  dialog {
+    background-color: transparent;
+    color: inherit;
+  }
+}
 
 @custom-variant escuro (&:where([data-tema="escuro"], [data-tema="escuro"] *));
 

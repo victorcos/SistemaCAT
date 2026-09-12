@@ -1,13 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { dinheiro, numero, tamanho } from "@/lib/format";
-import { comoErro } from "@/lib/errors";
-import { INTERVALO_POLL_MS } from "@/constants/polling";
-import { Link, useParams } from "react-router-dom";
-import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
+import { useParams } from "react-router-dom";
+import { Andamento } from "@/components/ui/Andamento";
+import { Aviso } from "@/components/ui/Aviso";
+import { Botao } from "@/components/ui/Botao";
+import { GrupoDeChips, Pilula } from "@/components/ui/Filtros";
 import {
-  EM_CURSO,
-  type Fatia,
-} from "@/services/conferencia";
+  Barra,
+  CabecalhoDePagina,
+  Metrica,
+  Metricas,
+  Numerao,
+  Secao,
+  Vazio,
+  Voltar,
+} from "@/components/ui/Pagina";
+import { IconeBaixar, IconeTentarDeNovo } from "@/constants/icons";
+import { ROTAS } from "@/constants/routes";
+import { comoErro } from "@/lib/errors";
+import { dinheiro, numero } from "@/lib/format";
+import { EM_CURSO, type Fatia } from "@/services/conferencia";
+import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
 import {
   baixarPlanilhaDeMovimentos,
   detalharMovimentos,
@@ -17,11 +29,13 @@ import {
   type PlanilhaDeMovimentos,
   type ResumoDaMovimentacao,
 } from "@/services/movimentos";
-import { ErroApi } from "@/types/erro";
-import "./Conferencia.css";
+import type { ErroApi } from "@/types/erro";
+import { Filtro } from "./Conferencia";
+
+const INTERVALO_MS = 2000;
 
 /**
- * Histórico de movimentação — terceira etapa.
+ * Etapa 3 — histórico de movimentação.
  *
  * Lê os itens de cada documento da EFD (C170), o analítico (C190/C850), o
  * cadastro (0200) e o inventário (bloco H), e marca cada movimento com o que
@@ -60,10 +74,7 @@ export default function Movimentos() {
         const ultima = lista[0] ?? null;
         setExecucao(ultima);
         if (ultima && EM_CURSO.includes(ultima.situacao)) {
-          relogio.current = window.setInterval(
-            () => acompanhar(ultima.id),
-            INTERVALO_POLL_MS,
-          );
+          relogio.current = window.setInterval(() => acompanhar(ultima.id), INTERVALO_MS);
         }
       })
       .catch((e) => setErro(comoErro(e)));
@@ -80,7 +91,7 @@ export default function Movimentos() {
       const nova = await iniciarMovimentos(projetoId);
       setExecucao(nova);
       setClasses([]);
-      relogio.current = window.setInterval(() => acompanhar(nova.id), INTERVALO_POLL_MS);
+      relogio.current = window.setInterval(() => acompanhar(nova.id), INTERVALO_MS);
     } catch (e) {
       setErro(comoErro(e));
     } finally {
@@ -110,66 +121,52 @@ export default function Movimentos() {
   const resumo = execucao?.situacao === "concluida" ? execucao.resumo : null;
 
   return (
-    <div className="pagina">
-      <Link to={`/projetos/${projetoId}`} className="voltar">
-        ← Voltar ao trabalho
-      </Link>
+    <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
+      <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
 
-      <header className="pagina__topo">
-        <div>
-          <h1 className="pagina__titulo">Extrair movimentos</h1>
-          <p className="pagina__sub">
-            {projeto ? (
-              <>
-                Lê os itens de cada documento da EFD de{" "}
-                <strong>{projeto.projeto.empresa}</strong> (C170), o analítico,
-                o cadastro de item e o inventário — e marca cada movimento com o
-                que a conferência achou. É a matéria-prima do razão.
-              </>
-            ) : (
-              "Carregando…"
-            )}
-          </p>
-        </div>
-        <button
-          type="button"
-          className="botao botao--principal"
-          onClick={comecar}
-          disabled={ocupado || rodando}
-        >
-          {rodando ? "Extraindo…" : execucao ? "Extrair de novo" : "Extrair"}
-        </button>
-      </header>
+      <CabecalhoDePagina
+        eyebrow="Etapa 3"
+        titulo="Extrair movimentos"
+        sub={
+          projeto ? (
+            <>
+              Lê os itens de cada documento da EFD de{" "}
+              <strong className="text-texto">{projeto.projeto.empresa}</strong> (C170), o
+              analítico, o cadastro de item e o inventário — e marca cada movimento com o que a
+              conferência achou. É a matéria-prima do razão.
+            </>
+          ) : (
+            "Carregando…"
+          )
+        }
+        acao={
+          <Botao
+            icone={IconeTentarDeNovo}
+            onClick={comecar}
+            carregando={ocupado || rodando}
+            className="shadow-acao"
+          >
+            {rodando ? "Extraindo…" : execucao ? "Extrair de novo" : "Extrair"}
+          </Botao>
+        }
+      />
 
-      {erro && (
-        <div className="aviso aviso--erro" role="alert">
-          <strong>{erro.message}</strong>
-          {erro.requisicaoId && (
-            <span className="aviso__codigo">
-              Código para suporte: {erro.requisicaoId}
-            </span>
-          )}
-        </div>
-      )}
+      {erro && <Aviso titulo={erro.message} codigo={erro.requisicaoId} />}
 
       {!execucao && (
-        <div className="vazio">
-          <h2 className="vazio__titulo">Nenhuma extração ainda</h2>
-          <p className="vazio__texto">
-            Precisa de uma conferência concluída: é a lista de conferidos dela
-            que marca cada movimento. Lê toda a EFD do trabalho — numa base
-            grande leva minutos, e continua rodando se você sair desta tela.
-          </p>
-        </div>
+        <Vazio titulo="Nenhuma extração ainda">
+          Precisa de uma conferência concluída: é a lista de conferidos dela que marca cada
+          movimento. Lê toda a EFD do trabalho — numa base grande leva minutos, e continua rodando
+          se você sair desta tela.
+        </Vazio>
       )}
 
       {rodando && execucao && <Andamento e={execucao} />}
 
       {execucao?.situacao === "falhou" && (
-        <div className="aviso aviso--erro" role="alert">
-          <strong>A extração falhou.</strong>
-          <span className="aviso__codigo mono">{execucao.erro}</span>
-        </div>
+        <Aviso titulo="A extração falhou.">
+          <span className="font-mono text-xs">{execucao.erro}</span>
+        </Aviso>
       )}
 
       {resumo && (
@@ -179,9 +176,7 @@ export default function Movimentos() {
           classes={classes}
           aoAlternarClasse={(codigo) =>
             setClasses((atuais) =>
-              atuais.includes(codigo)
-                ? atuais.filter((c) => c !== codigo)
-                : [...atuais, codigo],
+              atuais.includes(codigo) ? atuais.filter((c) => c !== codigo) : [...atuais, codigo],
             )
           }
           aoBaixar={baixar}
@@ -192,24 +187,7 @@ export default function Movimentos() {
   );
 }
 
-function Andamento({ e }: { e: ExecucaoDeMovimentos }) {
-  const pct = Math.round(e.fracao * 100);
-  return (
-    <section className="cartao">
-      <h2 className="cartao__titulo">{e.passo ?? "Processando"}</h2>
-      <p className="cartao__sub">
-        {numero(e.arquivos_lidos)} de {numero(e.arquivos_totais)} arquivos ·{" "}
-        {numero(e.documentos)} documentos · {tamanho(e.bytes_lidos)}
-      </p>
-      <div className="barra" aria-label={`${pct}% concluído`}>
-        <div className="barra__preenchida" style={{ width: `${pct}%` }} />
-      </div>
-      <p className="campo__dica">
-        Pode fechar esta tela. A extração continua rodando no servidor.
-      </p>
-    </section>
-  );
-}
+/* ------------------------------------------------------------------ */
 
 function Resultado({
   resumo,
@@ -230,206 +208,183 @@ function Resultado({
 
   return (
     <>
-      <section className="cartao">
-        <h2 className="cartao__titulo">Resultado</h2>
-        <p className="cartao__sub">
-          {execucao?.terminada_em &&
-            `Concluída em ${new Date(execucao.terminada_em).toLocaleString("pt-BR")}`}
-        </p>
-
-        <dl className="ficha">
-          <div className="ficha__item">
-            <dt className="ficha__rotulo">Documentos na EFD</dt>
-            <dd className="ficha__valor">{numero(resumo.documentos)}</dd>
-          </div>
-          <div className="ficha__item">
-            <dt className="ficha__rotulo">Com item na EFD</dt>
-            <dd className="ficha__valor ficha__valor--destaque">
-              {numero(resumo.documentos_com_item)}
-              <span className="ficha__nota">{cobertura}% dos documentos</span>
-            </dd>
-          </div>
-          <div className="ficha__item">
-            <dt className="ficha__rotulo">Movimentos (linhas de item)</dt>
-            <dd className="ficha__valor ficha__valor--destaque">
-              {numero(resumo.movimentos)}
-              <span className="ficha__nota">
-                {dinheiro(resumo.valor_entradas)} em entradas ·{" "}
-                {dinheiro(resumo.st_nas_entradas)} de ICMS-ST
-              </span>
-            </dd>
-          </div>
-          <div className="ficha__item">
-            <dt className="ficha__rotulo">Saídas sem item na EFD</dt>
-            <dd className="ficha__valor ficha__valor--destaque">
-              {numero(resumo.saidas_sem_item)}
-              <span className="ficha__nota">
-                {dinheiro(resumo.valor_saidas_sem_item_st)} com CST 60
-              </span>
-            </dd>
-          </div>
-        </dl>
-
-        <div className="barra barra--larga" aria-label="Cobertura de item">
-          <div className="barra__preenchida" style={{ width: `${cobertura}%` }} />
+      <Secao
+        titulo="Resultado"
+        sub={
+          execucao?.terminada_em
+            ? `Concluída em ${new Date(execucao.terminada_em).toLocaleString("pt-BR")}`
+            : undefined
+        }
+      >
+        <div className="mt-4">
+          <Metricas>
+            <Metrica rotulo="Documentos na EFD" valor={resumo.documentos} />
+            <Metrica
+              rotulo="Com item na EFD"
+              valor={resumo.documentos_com_item}
+              nota={`${cobertura}% dos documentos`}
+              tom="sucesso"
+            />
+            <Metrica
+              rotulo="Movimentos"
+              valor={resumo.movimentos}
+              nota={`${dinheiro(resumo.valor_entradas)} em entradas`}
+              tom="info"
+            />
+            <Metrica
+              rotulo="Saídas sem item na EFD"
+              valor={resumo.saidas_sem_item}
+              nota={`${dinheiro(resumo.valor_saidas_sem_item_st)} com CST 60`}
+              tom="atencao"
+            />
+          </Metricas>
         </div>
 
-        {resumo.avisos.map((a) => (
-          <div key={a} className="aviso aviso--atencao">
-            {a}
-          </div>
-        ))}
+        <Barra de={cobertura} para={100} tom="sucesso" className="mt-4" />
 
-        {resumo.recusados.length > 0 && (
-          <div className="aviso aviso--atencao">
-            <strong>Arquivos com problema na leitura</strong> — o que está
-            aqui não entrou:
-            <ul className="recusados">
-              {resumo.recusados.map((r) => (
-                <li key={r}>{r}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
+        <div className="mt-4 flex flex-col gap-2">
+          {resumo.avisos.map((a) => (
+            <Aviso key={a} tom="atencao">
+              {a}
+            </Aviso>
+          ))}
+          {resumo.recusados.length > 0 && (
+            <Aviso tom="atencao" titulo="Arquivos com problema na leitura">
+              O que está aqui não entrou:
+              <ul className="m-0 mt-2 list-disc pl-5 text-[13px] leading-relaxed">
+                {resumo.recusados.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+            </Aviso>
+          )}
+        </div>
+      </Secao>
 
-      <section className="cartao">
-        <h2 className="cartao__titulo">Movimentos</h2>
-        <p className="cartao__sub">
-          Cada item de documento com o cadastro (descrição, NCM, CEST) e a marca
-          da conferência. Ordenado por estabelecimento, item e data — é a ordem
-          em que a ficha se lê.
-        </p>
-        <p className="numerao">{numero(resumo.movimentos)}</p>
+      <Secao
+        destaque
+        titulo="Movimentos"
+        sub="Cada item de documento com o cadastro (descrição, NCM, CEST) e a marca da conferência. Ordenado por estabelecimento, item e data — é a ordem em que a ficha se lê."
+      >
+        <Numerao
+          tom="destaque"
+          nota={`${dinheiro(resumo.st_nas_entradas)} de ICMS-ST nas entradas.`}
+        >
+          {numero(resumo.movimentos)}
+        </Numerao>
+
         <Recortes titulo="Por CST das entradas" fatias={resumo.por_cst} />
         <Filtro
           titulo="Por marca da conferência"
-          explicacao="Sem escolher nenhuma, a planilha traz todos."
+          explicacao="Sem escolher nenhuma, a planilha traz todos os movimentos."
           fatias={resumo.por_classificacao}
           escolhidos={classes}
           aoAlternar={aoAlternarClasse}
         />
-        <button
-          type="button"
-          className="botao botao--principal"
-          onClick={() => aoBaixar("movimentos")}
-          disabled={ocupado || resumo.movimentos === 0}
-        >
-          {classes.length ? "Baixar planilha filtrada" : "Baixar planilha"}
-        </button>
-      </section>
 
-      <section className="cartao">
-        <h2 className="cartao__titulo">Cadastro de itens</h2>
-        <p className="cartao__sub">
-          O 0200 que vale: por estabelecimento e código, o do período mais
-          recente. {numero(resumo.itens_movimentados)} códigos movimentados
-          {resumo.itens_sem_cadastro > 0 &&
-            `, ${numero(resumo.itens_sem_cadastro)} sem cadastro`}
-          .
-        </p>
-        <p className="numerao">{numero(resumo.itens_cadastrados)}</p>
-        <button
-          type="button"
-          className="botao botao--secundario"
-          onClick={() => aoBaixar("itens")}
-          disabled={ocupado || resumo.itens_cadastrados === 0}
-        >
-          Baixar planilha
-        </button>
-      </section>
+        <div className="mt-6">
+          <Botao
+            icone={IconeBaixar}
+            onClick={() => aoBaixar("movimentos")}
+            disabled={ocupado || resumo.movimentos === 0}
+            className="shadow-acao"
+          >
+            {classes.length ? "Baixar planilha filtrada" : "Baixar planilha"}
+          </Botao>
+        </div>
+      </Secao>
 
-      <section className="cartao">
-        <h2 className="cartao__titulo">Inventário</h2>
-        <p className="cartao__sub">
-          O bloco H: o saldo de abertura da ficha, item a item.{" "}
-          {numero(resumo.inventarios)} inventário(s),{" "}
-          {dinheiro(resumo.valor_em_estoque)} em estoque.
-        </p>
-        <p className="numerao">{numero(resumo.itens_em_estoque)}</p>
-        <button
-          type="button"
-          className="botao botao--secundario"
-          onClick={() => aoBaixar("inventario")}
-          disabled={ocupado || resumo.itens_em_estoque === 0}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
+        <Secao
+          titulo="Cadastro de itens"
+          sub={
+            <>
+              O 0200 que vale: por estabelecimento e código, o do período mais recente.{" "}
+              {numero(resumo.itens_movimentados)} códigos movimentados
+              {resumo.itens_sem_cadastro > 0 &&
+                `, ${numero(resumo.itens_sem_cadastro)} sem cadastro`}
+              .
+            </>
+          }
         >
-          Baixar planilha
-        </button>
-      </section>
+          <Numerao>{numero(resumo.itens_cadastrados)}</Numerao>
+          <div className="mt-5">
+            <Botao
+              variante="secundario"
+              icone={IconeBaixar}
+              onClick={() => aoBaixar("itens")}
+              disabled={ocupado || resumo.itens_cadastrados === 0}
+            >
+              Baixar planilha
+            </Botao>
+          </div>
+        </Secao>
 
-      <section className="cartao">
-        <h2 className="cartao__titulo">Analítico por documento</h2>
-        <p className="cartao__sub">
-          C190 e C850: o total por CST e CFOP de cada documento, com a marca de
-          quem tem item na EFD e quem não tem. É por aqui que se vê o que o
-          XML terá de detalhar.
-        </p>
-        <p className="numerao">{numero(resumo.analiticos)}</p>
+        <Secao
+          titulo="Inventário"
+          sub={
+            <>
+              O bloco H: o saldo de abertura da ficha, item a item.{" "}
+              {numero(resumo.inventarios)} inventário(s), {dinheiro(resumo.valor_em_estoque)} em
+              estoque.
+            </>
+          }
+        >
+          <Numerao>{numero(resumo.itens_em_estoque)}</Numerao>
+          <div className="mt-5">
+            <Botao
+              variante="secundario"
+              icone={IconeBaixar}
+              onClick={() => aoBaixar("inventario")}
+              disabled={ocupado || resumo.itens_em_estoque === 0}
+            >
+              Baixar planilha
+            </Botao>
+          </div>
+        </Secao>
+      </div>
+
+      <Secao
+        titulo="Analítico por documento"
+        sub="C190 e C850: o total por CST e CFOP de cada documento, com a marca de quem tem item na EFD e quem não tem. É por aqui que se vê o que o XML terá de detalhar."
+        acao={
+          <Botao
+            variante="secundario"
+            icone={IconeBaixar}
+            onClick={() => aoBaixar("analitico")}
+            disabled={ocupado || resumo.analiticos === 0}
+          >
+            Baixar planilha
+          </Botao>
+        }
+      >
+        <Numerao
+          nota={`${dinheiro(resumo.valor_saidas_sem_item)} em saídas sem item detalhado.`}
+        >
+          {numero(resumo.analiticos)}
+        </Numerao>
         <Recortes
           titulo="Saídas sem item, por modelo"
           fatias={resumo.saidas_sem_item_por_modelo}
         />
-        <button
-          type="button"
-          className="botao botao--secundario"
-          onClick={() => aoBaixar("analitico")}
-          disabled={ocupado || resumo.analiticos === 0}
-        >
-          Baixar planilha
-        </button>
-      </section>
+      </Secao>
     </>
   );
 }
 
-/** Uma lista de recortes só para ler, sem filtro. */
+/** Recortes só para ler: não filtram nada, mostram a composição. */
 function Recortes({ titulo, fatias }: { titulo: string; fatias: Fatia[] }) {
-  if (!fatias.length) return null;
+  if (fatias.length === 0) return null;
   return (
-    <>
-      <p className="filtro__titulo">{titulo}</p>
-      <div className="modelos">
-        {fatias.map((f) => (
-          <span key={f.codigo || f.rotulo} className="modelo">
-            {f.rotulo} · {numero(f.documentos)} · {dinheiro(f.valor)}
+    <GrupoDeChips titulo={titulo}>
+      {fatias.map((f) => (
+        <Pilula key={f.codigo || f.rotulo}>
+          {f.rotulo}
+          <span className="font-mono text-xs text-texto-fraco">
+            {numero(f.documentos)} · {dinheiro(f.valor)}
           </span>
-        ))}
-      </div>
-    </>
+        </Pilula>
+      ))}
+    </GrupoDeChips>
   );
 }
-
-function Filtro({
-  titulo,
-  explicacao,
-  fatias,
-  escolhidos,
-  aoAlternar,
-}: {
-  titulo: string;
-  explicacao: string;
-  fatias: Fatia[];
-  escolhidos: string[];
-  aoAlternar: (codigo: string) => void;
-}) {
-  if (!fatias.length) return null;
-  return (
-    <>
-      <p className="filtro__titulo">{titulo}</p>
-      <p className="campo__dica">{explicacao}</p>
-      <div className="modelos">
-        {fatias.map((f) => (
-          <label key={f.codigo} className="modelo">
-            <input
-              type="checkbox"
-              checked={escolhidos.includes(f.codigo)}
-              onChange={() => aoAlternar(f.codigo)}
-            />
-            {f.rotulo} · {numero(f.documentos)}
-          </label>
-        ))}
-      </div>
-    </>
-  );
-}
-

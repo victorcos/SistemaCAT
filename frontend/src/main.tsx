@@ -13,10 +13,6 @@ import "@fontsource/ibm-plex-mono/600.css";
 import "@/styles/tokens.css";
 // ponte tokens -> Tailwind. Depois de tokens.css porque le as variaveis dele.
 import "@/styles/tema.css";
-// primitivas compartilhadas (.botao, .campo, .aviso, .tabela, .cartao...).
-// Ficavam dentro de pages/Login.css e pages/Usuarios.css e so valiam
-// globalmente por acidente de bundling — ver o cabecalho do arquivo.
-import "@/styles/legacy-kit.css";
 
 const raiz = document.getElementById("raiz");
 if (!raiz) throw new Error("Elemento #raiz não encontrado no index.html");

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<![CDATA[<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #070c18; }
+    body { font-family: "Plus Jakarta Sans", "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #f2971d; text-decoration: none; }
+    a:hover { color: #ffb34d; }
+    button { font-family: inherit; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 99px; }
+    @keyframes dcFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes dcSweep { 0% { transform: translateX(-110%); } 100% { transform: translateX(210%); } }
+    @keyframes dcSpin { to { transform: rotate(360deg); } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; background: radial-gradient(900px 500px at 18% -10%, rgba(242,151,29,.10), transparent 60%), radial-gradient(900px 600px at 90% 0%, rgba(37,99,235,.14), transparent 65%), #070c18; color: #e8edf7;">
+
+  <aside style="width: 244px; flex: 0 0 244px; border-right: 1px solid rgba(255,255,255,.07); background: linear-gradient(180deg, rgba(12,19,36,.9), rgba(8,13,25,.9)); display: flex; flex-direction: column; padding: 22px 16px; gap: 28px; position: sticky; top: 0; height: 100vh;">
+    <div style="padding: 2px 6px;">
+      <img src="assets/bms-logo.png" alt="BMS Consultoria Tributária" style="width: 172px; height: auto; display: block;" />
+    </div>
+    <nav style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 10px; letter-spacing: .16em; color: #5f7191; font-weight: 700; padding: 0 10px 8px;">NAVEGAÇÃO</div>
+      <a href="Inicio.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;"><span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Início</a>
+      <a href="Cadastro.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;"><span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Cadastro</a>
+      <a href="Usuarios.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: #9fb0cd; font-size: 14px; font-weight: 600;" style-hover="background: rgba(255,255,255,.05); color: #e8edf7;"><span style="width: 6px; height: 6px; border-radius: 99px; background: #3c4a66;"></span>Usuários</a>
+    </nav>
+    <div style="margin-top: auto; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.06); background: rgba(255,255,255,.02);">
+      <div style="font-size: 11px; color: #6d7f9d; font-weight: 600;">Sistema CAT</div>
+      <div style="font-size: 11px; color: #4d5d79; margin-top: 3px;">sessão não comercial</div>
+    </div>
+  </aside>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+    <header style="display: flex; align-items: center; gap: 14px; padding: 16px 28px; border-bottom: 1px solid rgba(255,255,255,.07); background: rgba(8,13,25,.72); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(140deg, #1e3a8a, #0f1e3f); border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #cfe0ff;">VP</div>
+        <div style="font-size: 14px; font-weight: 700;">Victor Pedroso</div>
+      </div>
+      <span style="font-size: 10px; font-weight: 700; letter-spacing: .1em; padding: 4px 8px; border-radius: 6px; background: rgba(242,151,29,.14); border: 1px solid rgba(242,151,29,.32); color: #ffbb5c;">DEV</span>
+      <div style="flex: 1;"></div>
+      <button style="padding: 9px 18px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dce6f7; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .18s;" style-hover="background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.4); color: #fecaca;">Sair</button>
+    </header>
+
+    <main style="padding: 24px 28px 40px; display: flex; flex-direction: column; gap: 20px; max-width: 1240px; width: 100%;">
+      <a href="Trabalho.dc.html" style="display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; width: fit-content;">← Voltar ao trabalho</a>
+
+      <section style="position: relative; overflow: hidden; border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: linear-gradient(120deg, rgba(18,27,48,.9), rgba(10,16,31,.9)); padding: 24px 26px;">
+        <div style="position: absolute; inset: 0; pointer-events: none; background: radial-gradient(420px 160px at 8% 0%, rgba(242,151,29,.16), transparent 70%);"></div>
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 1px; overflow: hidden;">
+          <div style="width: 40%; height: 100%; background: linear-gradient(90deg, transparent, #f2971d, transparent); animation: dcSweep 5.5s linear infinite;"></div>
+        </div>
+        <div style="position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px;">
+          <div style="flex: 1; min-width: 300px;">
+            <div style="font-size: 11px; font-weight: 700; letter-spacing: .18em; color: #f2971d;">ETAPA 2 · CAT 42</div>
+            <h1 style="margin: 8px 0 8px; font-size: 28px; font-weight: 800; letter-spacing: -.02em;">Conferir documentos</h1>
+            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #8798b6; max-width: 700px; text-wrap: pretty;">Cruza o que a EFD de <strong style="color: #dbe5f6;">ADVERTISING OPERATIONS AS.PL. PROPAG LTD</strong> escriturou (C100 e C800) com o XML e o relatório do cliente. O que está na pasta e não foi escriturado sai da análise; o que foi escriturado sem documento é o que se cobra.</p>
+          </div>
+          <button onClick="{{ rerun }}" style="display: flex; align-items: center; gap: 9px; padding: 13px 22px; border-radius: 11px; border: none; background: linear-gradient(135deg, #f9a72b, #e8801a); color: #121a2c; font-size: 14px; font-weight: 800; cursor: pointer; box-shadow: 0 12px 28px rgba(242,151,29,.3); transition: all .18s;" style-hover="transform: translateY(-1px);">
+            <sc-if value="{{ running }}">
+              <span style="width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(18,26,44,.3); border-top-color: #121a2c; animation: dcSpin .7s linear infinite;"></span>
+            </sc-if>
+            {{ runLabel }}
+          </button>
+        </div>
+      </section>
+
+      <section style="border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: rgba(13,20,37,.72); padding: 24px 26px; display: flex; flex-direction: column; gap: 20px;">
+        <div>
+          <h2 style="margin: 0; font-size: 19px; font-weight: 800;">Resultado</h2>
+          <p style="margin: 6px 0 0; font-size: 13px; color: #8798b6;">Concluída em 11/09/2026, 15:41:49</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 18px;">
+          <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+            <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 12px; border-left: 2px solid {{ k.rule }};">
+              <div style="font-size: 10px; letter-spacing: .13em; font-weight: 800; color: #6f81a0;">{{ k.label }}</div>
+              <div style="font-size: 26px; font-weight: 800; color: {{ k.color }};">{{ k.value }}</div>
+              <div style="font-size: 12px; color: #7b8dab;">{{ k.hint }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #8798b6; margin-bottom: 8px;">
+            <span>Cobertura de documentos</span><span>11%</span>
+          </div>
+          <div style="height: 6px; border-radius: 99px; background: rgba(255,255,255,.07); overflow: hidden;">
+            <div style="height: 100%; width: 11%; border-radius: 99px; background: linear-gradient(90deg, #34d399, #6ee7b7);"></div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <sc-for list="{{ notes }}" as="n" hint-placeholder-count="3">
+            <div style="position: relative; overflow: hidden; padding: 14px 16px 14px 18px; border-radius: 12px; border: 1px solid {{ n.border }}; background: {{ n.bg }}; font-size: 13px; line-height: 1.6; color: {{ n.fg }}; text-wrap: pretty;">
+              <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{ n.accent }};"></span>{{ n.text }}
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section style="border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: rgba(13,20,37,.72); padding: 24px 26px; display: flex; flex-direction: column; gap: 12px;">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 800;">Notas conferidas</h2>
+        <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #8798b6; max-width: 780px;">Escrituradas na EFD e com documento correspondente na pasta.</p>
+        <div style="font-size: 34px; font-weight: 800; letter-spacing: -.02em;">11.693</div>
+        <div style="font-size: 13px; color: #93a4c1;">R$ 1.071.533,30 em documentos conferidos.</div>
+        <button style="width: fit-content; margin-top: 6px; padding: 11px 18px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .16s;" style-hover="background: rgba(242,151,29,.12); border-color: rgba(242,151,29,.4); color: #ffc478;">Baixar planilha</button>
+      </section>
+
+      <section style="border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: rgba(13,20,37,.72); padding: 24px 26px; display: flex; flex-direction: column; gap: 12px;">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 800;">Notas não escrituradas</h2>
+        <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #8798b6; max-width: 780px; text-wrap: pretty;">Estão na pasta do cliente e não estão na EFD. Ficam fora da análise: ressarcimento se pede sobre o que foi declarado ao fisco.</p>
+        <div style="font-size: 34px; font-weight: 800; letter-spacing: -.02em;">0</div>
+        <button style="width: fit-content; margin-top: 6px; padding: 11px 18px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .16s;" style-hover="background: rgba(242,151,29,.12); border-color: rgba(242,151,29,.4); color: #ffc478;">Baixar planilha</button>
+      </section>
+
+      <section style="position: relative; overflow: hidden; border-radius: 18px; border: 1px solid rgba(242,151,29,.24); background: linear-gradient(120deg, rgba(46,31,10,.4), rgba(13,20,37,.78)); padding: 24px 26px; display: flex; flex-direction: column; gap: 16px;">
+        <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #f2971d;"></span>
+        <div>
+          <h2 style="margin: 0; font-size: 18px; font-weight: 800;">Notas a cobrar do cliente</h2>
+          <p style="margin: 8px 0 0; font-size: 13px; line-height: 1.6; color: #b9c7e0; max-width: 820px; text-wrap: pretty;">Foram escrituradas e o documento não veio. Sem o XML não há como saber o ICMS-ST retido daquela nota. A planilha sai inteira: nada é excluído, e o que não se espera cobrar vai marcado do que é.</p>
+        </div>
+
+        <div>
+          <div style="font-size: 38px; font-weight: 800; color: #f2971d; letter-spacing: -.02em;">92.786</div>
+          <div style="font-size: 13px; color: #93a4c1; margin-top: 4px;">90.728 esperam documento do cliente.</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="font-size: 10px; letter-spacing: .13em; font-weight: 800; color: #6f81a0;">POR CLASSIFICAÇÃO</div>
+          <div style="font-size: 12px; color: #7b8dab;">Sem escolher nenhuma, a planilha traz todas — inclusive as canceladas e as sem chave, cada uma marcada.</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            <sc-for list="{{ classChips }}" as="c" hint-placeholder-count="3">
+              <button onClick="{{ c.onToggle }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 999px; border: 1px solid {{ c.border }}; background: {{ c.bg }}; color: {{ c.fg }}; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .16s;" style-hover="border-color: rgba(242,151,29,.5);">
+                <span style="width: 16px; height: 16px; border-radius: 5px; border: 1px solid {{ c.boxBorder }}; background: {{ c.boxBg }}; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #121a2c;">{{ c.mark }}</span>{{ c.label }}
+              </button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="font-size: 10px; letter-spacing: .13em; font-weight: 800; color: #6f81a0;">POR MODELO DE DOCUMENTO</div>
+          <div style="font-size: 12px; color: #7b8dab;">Cupom de consumidor costuma dominar o volume, e não é XML que se peça um a um.</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            <sc-for list="{{ modelChips }}" as="c" hint-placeholder-count="2">
+              <button onClick="{{ c.onToggle }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 999px; border: 1px solid {{ c.border }}; background: {{ c.bg }}; color: {{ c.fg }}; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .16s;" style-hover="border-color: rgba(242,151,29,.5);">
+                <span style="width: 16px; height: 16px; border-radius: 5px; border: 1px solid {{ c.boxBorder }}; background: {{ c.boxBg }}; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #121a2c;">{{ c.mark }}</span>{{ c.label }}
+              </button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 4px;">
+          <button style="padding: 13px 22px; border-radius: 11px; border: none; background: linear-gradient(135deg, #f9a72b, #e8801a); color: #121a2c; font-size: 14px; font-weight: 800; cursor: pointer; box-shadow: 0 12px 28px rgba(242,151,29,.3); transition: all .18s;" style-hover="transform: translateY(-1px);">Baixar planilha</button>
+          <span style="font-size: 12px; color: #8798b6;">{{ selectionLabel }}</span>
+        </div>
+      </section>
+
+      <section style="border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: rgba(13,20,37,.72); padding: 24px 26px; display: flex; flex-direction: column; gap: 14px;">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 800;">O cliente mandou o que faltava?</h2>
+        <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #8798b6; max-width: 860px; text-wrap: pretty;">Importe os arquivos novos na base de dados e rode a conferência de novo. A próxima rodada compara com esta e diz quantas pendências saíram, quantas continuam e quantas apareceram — por isso nada é excluído da lista.</p>
+        <a href="Etapa Importar.dc.html" style="width: fit-content; padding: 12px 20px; border-radius: 11px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: #dbe5f6; font-size: 13px; font-weight: 700;" style-hover="background: rgba(242,151,29,.12); border-color: rgba(242,151,29,.4); color: #ffc478;">Importar mais arquivos</a>
+      </section>
+    </main>
+  </div>
+</div>]]>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  state = { running: false, sel: {} };
+
+  componentWillUnmount() { clearTimeout(this._t); }
+
+  rerun = () => {
+    if (this.state.running) return;
+    this.setState({ running: true });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ running: false }), 1400);
+  };
+
+  chip(key, label) {
+    const on = !!this.state.sel[key];
+    return {
+      label: label,
+      mark: on ? "✓" : "",
+      bg: on ? "rgba(242,151,29,.14)" : "rgba(255,255,255,.03)",
+      border: on ? "rgba(242,151,29,.45)" : "rgba(255,255,255,.1)",
+      fg: on ? "#ffc478" : "#cfdbef",
+      boxBg: on ? "#f2971d" : "transparent",
+      boxBorder: on ? "#f2971d" : "rgba(255,255,255,.25)",
+      onToggle: () => this.setState(s => ({ sel: Object.assign({}, s.sel, { [key]: !s.sel[key] }) }))
+    };
+  }
+
+  renderVals() {
+    const count = Object.keys(this.state.sel).filter(k => this.state.sel[k]).length;
+    return {
+      running: this.state.running,
+      rerun: this.rerun,
+      runLabel: this.state.running ? "Conferindo…" : "Conferir de novo",
+      kpis: [
+        { label: "ESCRITURADAS NA EFD", value: "104.479", hint: "C100 e C800", color: "#e8edf7", rule: "rgba(255,255,255,.14)" },
+        { label: "COM DOCUMENTO", value: "11.693", hint: "11% de cobertura", color: "#6ee7b7", rule: "rgba(52,211,153,.4)" },
+        { label: "SEM DOCUMENTO", value: "92.786", hint: "R$ 173.324.349,09", color: "#f2971d", rule: "rgba(242,151,29,.45)" },
+        { label: "NÃO ESCRITURADAS", value: "0", hint: "saíram da análise", color: "#94a3b8", rule: "rgba(148,163,184,.3)" }
+      ],
+      notes: [
+        { text: "Desde a conferência anterior: 0 resolvida(s), 92.786 ainda pendente(s).", accent: "#34d399", border: "rgba(52,211,153,.24)", bg: "rgba(6,38,32,.42)", fg: "#c8e6d9" },
+        { text: "868 documento(s) da EFD estão sem chave de acesso — costuma ser nota modelo 1 ou cupom antigo. Entram na lista marcados como 'conferir à mão': não dá para casar por chave, mas eles não somem do controle.", accent: "#f2971d", border: "rgba(242,151,29,.24)", bg: "rgba(46,31,10,.42)", fg: "#e9cfa6" },
+        { text: "2.058 das pendências são canceladas, denegadas, inutilizadas ou sem chave. Continuam na lista, marcadas — de cancelada e denegada não se espera documento, mas quem decide pedir ou não é quem trabalha, não o sistema.", accent: "#f2971d", border: "rgba(242,151,29,.24)", bg: "rgba(46,31,10,.42)", fg: "#e9cfa6" }
+      ],
+      classChips: [this.chip("cobrar", "A cobrar do cliente · 90.728"), this.chip("cancel", "Cancelada, denegada ou inutilizada · 1.190"), this.chip("semchave", "Sem chave — conferir à mão · 868")],
+      modelChips: [this.chip("nfe", "NF-e · 103.663"), this.chip("mod1", "NF modelo 1/1-A · 816")],
+      selectionLabel: count ? count + " filtro(s) aplicados à planilha." : "Nenhum filtro: a planilha traz todas as pendências."
+    };
+  }
+}
+</script>
+</body>
+</html>

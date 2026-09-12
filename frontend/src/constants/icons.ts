@@ -22,6 +22,7 @@ export {
   Trash2 as IconeApagar,
   Copy as IconeCopiar,
   Download as IconeBaixar,
+  FolderSearch as IconePasta,
   Upload as IconeEnviar,
   RefreshCw as IconeTentarDeNovo,
 

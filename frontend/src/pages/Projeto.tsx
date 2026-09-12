@@ -1,18 +1,76 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Aviso } from "@/components/ui/Aviso";
+import { Botao, BotaoLink } from "@/components/ui/Botao";
+import { Campo, CampoSenha } from "@/components/ui/Campo";
+import { Carregando } from "@/components/ui/Carregando";
+import { Etiqueta, type TomDeEtiqueta } from "@/components/ui/Etiqueta";
+import { Modal } from "@/components/ui/Modal";
+import {
+  Barra,
+  CabecalhoDePagina,
+  Secao,
+  Voltar,
+} from "@/components/ui/Pagina";
+import { IconeApagar, IconeConfirma } from "@/constants/icons";
+import { ROTAS } from "@/constants/routes";
 import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/cn";
+import { periodo } from "@/lib/competencia";
 import { comoErro } from "@/lib/errors";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { numero } from "@/lib/format";
 import {
   detalharProjeto,
   excluirProjeto,
   previaDaExclusao,
+  type Etapa,
   type OQueSeraApagado,
   type ProjetoDetalhe,
 } from "@/services/importacao";
+import type { ErroApi } from "@/types/erro";
 
-import { ErroApi } from "@/types/erro";
+/* ------------------------------------------------------------------ */
 
-import "./Projeto.css";
+/** Para onde cada etapa leva, e com que palavras. A tela não decide o que
+ *  está disponível — isso vem do domínio, em `etapa.acessivel`. */
+const DESTINOS: Record<
+  string,
+  { rota: (id: number) => string; rotulos: Record<string, string> }
+> = {
+  importar: {
+    rota: ROTAS.arquivos,
+    rotulos: {
+      concluida: "Importar mais arquivos",
+      padrao: "Importar a base de dados",
+    },
+  },
+  conferencia: {
+    rota: ROTAS.conferencia,
+    rotulos: {
+      concluida: "Ver o resultado e baixar as planilhas",
+      em_andamento: "Acompanhar a conferência",
+      padrao: "Conferir documentos",
+    },
+  },
+  movimentos: {
+    rota: ROTAS.movimentos,
+    rotulos: {
+      concluida: "Ver o histórico e baixar as planilhas",
+      em_andamento: "Acompanhar a extração",
+      padrao: "Extrair movimentos",
+    },
+  },
+};
+
+const TOM_DA_SITUACAO: Record<string, TomDeEtiqueta> = {
+  concluida: "sucesso",
+  em_andamento: "info",
+  pendente: "atencao",
+  bloqueada: "neutro",
+  nao_disponivel: "neutro",
+};
+
+/* ------------------------------------------------------------------ */
 
 export default function Projeto() {
   const { podeExcluirTrabalho } = useAuth();
@@ -20,134 +78,96 @@ export default function Projeto() {
   const [d, setD] = useState<ProjetoDetalhe | null>(null);
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [aExcluir, setAExcluir] = useState<OQueSeraApagado | null>(null);
-  const podeExcluir = podeExcluirTrabalho;
 
   useEffect(() => {
     if (!id) return;
     detalharProjeto(Number(id))
       .then(setD)
-      .catch((e) =>
-        setErro(e instanceof ErroApi ? e : new ErroApi("Erro inesperado.", 0)),
-      );
+      .catch((e) => setErro(comoErro(e)));
   }, [id]);
 
   if (erro) {
     return (
-      <div className="pagina">
-        <div className="aviso aviso--erro" role="alert">
-          <strong>{erro.message}</strong>
-          {erro.requisicaoId && (
-            <span className="aviso__codigo">
-              Código para suporte: {erro.requisicaoId}
-            </span>
-          )}
-        </div>
-        <Link to="/">Voltar aos trabalhos</Link>
+      <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
+        <Voltar para={ROTAS.inicio}>Trabalhos</Voltar>
+        <Aviso titulo={erro.message} codigo={erro.requisicaoId} />
       </div>
     );
   }
 
-  if (!d) return <p className="pagina__carregando">Carregando…</p>;
+  if (!d) return <Carregando texto="Carregando o trabalho…" />;
 
   const p = d.projeto;
+  const disponiveis = d.etapas.filter((e) => e.implementada);
+  const feitas = disponiveis.filter((e) => e.situacao === "concluida").length;
 
   return (
-    <div className="pagina">
-      <Link to="/" className="voltar">
-        ← Trabalhos
-      </Link>
+    <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
+      <Voltar para={ROTAS.inicio}>Trabalhos</Voltar>
 
-      <header className="projeto__cabecalho">
-        <div>
-          <h1 className="pagina__titulo">{p.empresa}</h1>
-          <p className="projeto__cnpj mono">
+      <CabecalhoDePagina
+        eyebrow={p.frente_rotulo}
+        titulo={p.empresa}
+        sub={
+          <span className="flex flex-wrap items-center gap-2 font-mono">
             {p.cnpj_matriz_formatado ?? "CNPJ não informado"}
-            {p.uf && <span className="projeto__uf">{p.uf}</span>}
-          </p>
+            {p.uf && (
+              <span className="rounded border border-borda px-1.5 py-0.5 text-[11px] font-sans font-bold text-texto-fraco">
+                {p.uf}
+              </span>
+            )}
+          </span>
+        }
+        acao={
+          <dl className="m-0 grid gap-2 text-right">
+            <div>
+              <dt className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-texto-fraco">
+                Projeto
+              </dt>
+              <dd className="m-0 text-sm font-semibold text-texto">{p.nome}</dd>
+            </div>
+            <div>
+              <dt className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-texto-fraco">
+                Competências
+              </dt>
+              <dd className="m-0 font-mono text-sm text-texto-suave">
+                {periodo(p.competencia_ini, p.competencia_fim)}
+              </dd>
+            </div>
+          </dl>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <Barra de={feitas} para={disponiveis.length} className="min-w-[200px] flex-1" />
+          <span className="text-[13px] font-semibold text-texto-suave">
+            {feitas} de {disponiveis.length} etapas concluídas
+          </span>
         </div>
-        <dl className="projeto__resumo">
-          <div>
-            <dt>Frente</dt>
-            <dd>{p.frente_rotulo}</dd>
-          </div>
-          <div>
-            <dt>Projeto</dt>
-            <dd>{p.nome}</dd>
-          </div>
-          <div>
-            <dt>Competências</dt>
-            <dd className="mono">
-              {mes(p.competencia_ini)} a {mes(p.competencia_fim)}
-            </dd>
-          </div>
-        </dl>
-      </header>
+      </CabecalhoDePagina>
 
-      <h2 className="secao__titulo">Etapas do processamento</h2>
-      <p className="secao__sub">
-        A ordem é de dependência real: sem os movimentos não há razão, e sem o
-        razão não há apuração.
-      </p>
+      <Secao
+        titulo="Etapas do processamento"
+        sub="A ordem é de dependência real: sem os movimentos não há razão, e sem o razão não há apuração."
+      >
+        <ol className="m-0 mt-4 flex list-none flex-col gap-2.5 p-0">
+          {d.etapas.map((e, i) => (
+            <LinhaDeEtapa key={e.chave} e={e} numero={i + 1} projetoId={Number(id)} />
+          ))}
+        </ol>
+      </Secao>
 
-      <ol className="etapas">
-        {d.etapas.map((e, i) => (
-          <li key={e.chave} className={`etapa etapa--${e.situacao}`}>
-            <div className="etapa__marca">
-              {e.situacao === "concluida" ? "✓" : i + 1}
-            </div>
-            <div className="etapa__corpo">
-              <div className="etapa__linha">
-                <h3 className="etapa__nome">{e.nome}</h3>
-                <span className={`selo selo--${e.situacao}`}>
-                  {e.situacao_rotulo}
-                </span>
-              </div>
-              <p className="etapa__descricao">{e.descricao}</p>
-              {/* leva ao lote DESTE trabalho. Antes apontava para /importar,
-                  que é o cadastro: recomeçaria a criação da empresa. */}
-              {e.chave === "importar" && e.acessivel && (
-                <Link className="etapa__acao" to={`/projetos/${id}/arquivos`}>
-                  {e.situacao === "concluida"
-                    ? "Importar mais arquivos"
-                    : "Importar a base de dados"}
-                </Link>
-              )}
-              {e.chave === "conferencia" && e.acessivel && (
-                <Link className="etapa__acao" to={`/projetos/${id}/conferencia`}>
-                  {e.situacao === "concluida"
-                    ? "Ver o resultado e baixar as planilhas"
-                    : e.situacao === "em_andamento"
-                      ? "Acompanhar a conferência"
-                      : "Conferir documentos"}
-                </Link>
-              )}
-              {e.chave === "movimentos" && e.acessivel && (
-                <Link className="etapa__acao" to={`/projetos/${id}/movimentos`}>
-                  {e.situacao === "concluida"
-                    ? "Ver o histórico e baixar as planilhas"
-                    : e.situacao === "em_andamento"
-                      ? "Acompanhar a extração"
-                      : "Extrair movimentos"}
-                </Link>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
-
-      {podeExcluir && (
-        <section className="zona-perigosa">
-          <div>
-            <h2 className="zona-perigosa__titulo">Excluir este trabalho</h2>
-            <p className="zona-perigosa__texto">
-              Some o projeto, os lotes importados e as conferências já feitas.
-              Não há como desfazer, e não há lixeira. Os arquivos do cliente em
-              disco não são tocados.
+      {podeExcluirTrabalho && (
+        <section className="flex flex-wrap items-center justify-between gap-4 rounded-cartao border border-erro/30 border-l-[3px] border-l-erro bg-erro-fundo p-6">
+          <div className="min-w-0">
+            <h2 className="m-0 text-base font-extrabold text-erro">Excluir este trabalho</h2>
+            <p className="m-0 mt-1.5 max-w-[620px] text-[13px] leading-relaxed text-texto-suave">
+              Some o projeto, os lotes importados e as conferências já feitas. Não há como
+              desfazer, e não há lixeira. Os arquivos do cliente em disco não são tocados.
             </p>
           </div>
-          <button
-            type="button"
-            className="botao botao--perigo"
+          <Botao
+            variante="perigo"
+            icone={IconeApagar}
             onClick={() =>
               previaDaExclusao(Number(id))
                 .then(setAExcluir)
@@ -155,20 +175,85 @@ export default function Projeto() {
             }
           >
             Excluir trabalho
-          </button>
+          </Botao>
         </section>
       )}
 
-      {aExcluir && (
-        <ConfirmarExclusao
-          projetoId={Number(id)}
-          alvo={aExcluir}
-          aoFechar={() => setAExcluir(null)}
-        />
-      )}
+      <ConfirmarExclusao
+        projetoId={Number(id)}
+        alvo={aExcluir}
+        aoFechar={() => setAExcluir(null)}
+      />
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+
+function LinhaDeEtapa({
+  e,
+  numero: n,
+  projetoId,
+}: {
+  e: Etapa;
+  numero: number;
+  projetoId: number;
+}) {
+  const concluida = e.situacao === "concluida";
+  const atual = e.acessivel && !concluida;
+  const destino = DESTINOS[e.chave];
+  const rotulo = destino
+    ? destino.rotulos[e.situacao] ?? destino.rotulos.padrao
+    : null;
+
+  return (
+    <li
+      className={cn(
+        "flex gap-3.5 rounded-[14px] border border-l-[3px] p-4 transition-colors",
+        concluida && "border-sucesso/25 border-l-sucesso bg-sucesso-fundo",
+        atual && "border-laranja-500/35 border-l-marca-laranja bg-laranja-500/8",
+        !concluida && !atual && "border-borda border-l-borda-forte bg-superficie-vidro opacity-70",
+      )}
+    >
+      <div
+        aria-hidden
+        className={cn(
+          "flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold",
+          concluida && "bg-sucesso text-marca-branco",
+          atual && "bg-marca-laranja text-acao-texto",
+          !concluida && !atual && "border border-borda-forte text-texto-fraco",
+        )}
+      >
+        {concluida ? <IconeConfirma size={15} strokeWidth={3} /> : n}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="m-0 text-[15px] font-bold text-texto">{e.nome}</h3>
+          <Etiqueta tom={TOM_DA_SITUACAO[e.situacao] ?? "neutro"} pulso={e.situacao === "em_andamento"}>
+            {e.situacao_rotulo}
+          </Etiqueta>
+        </div>
+        <p className="m-0 mt-1.5 max-w-[720px] text-[13px] leading-[1.6] text-texto-suave [text-wrap:pretty]">
+          {e.descricao}
+        </p>
+        {rotulo && e.acessivel && (
+          <div className="mt-3">
+            <BotaoLink
+              para={destino.rota(projetoId)}
+              tamanho="sm"
+              variante={atual ? "principal" : "secundario"}
+            >
+              {rotulo}
+            </BotaoLink>
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 
 /**
  * A confirmação da exclusão.
@@ -183,7 +268,7 @@ function ConfirmarExclusao({
   aoFechar,
 }: {
   projetoId: number;
-  alvo: OQueSeraApagado;
+  alvo: OQueSeraApagado | null;
   aoFechar: () => void;
 }) {
   const navegar = useNavigate();
@@ -191,13 +276,20 @@ function ConfirmarExclusao({
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
+  useEffect(() => {
+    if (alvo) {
+      setSenha("");
+      setErro(null);
+    }
+  }, [alvo]);
+
   async function apagar(evento: FormEvent) {
     evento.preventDefault();
     setOcupado(true);
     setErro(null);
     try {
       await excluirProjeto(projetoId, senha);
-      navegar("/", { replace: true });
+      navegar(ROTAS.inicio, { replace: true });
     } catch (e) {
       setErro(comoErro(e));
       setSenha("");
@@ -207,83 +299,64 @@ function ConfirmarExclusao({
   }
 
   return (
-    <div className="cortina" role="dialog" aria-modal="true"
-         aria-labelledby="titulo-exclusao">
-      <form className="caixa" onSubmit={apagar}>
-        <h2 className="caixa__titulo" id="titulo-exclusao">
-          Apagar &ldquo;{alvo.projeto}&rdquo;?
-        </h2>
-        <p className="caixa__texto">
-          De <strong>{alvo.empresa}</strong>. Vão junto:
-        </p>
-        <ul className="caixa__lista">
+    <Modal
+      aberto={alvo !== null}
+      aoFechar={aoFechar}
+      tamanho="sm"
+      titulo={`Apagar "${alvo?.projeto ?? ""}"?`}
+      sub={<>De {alvo?.empresa}.</>}
+      rodape={
+        <>
+          <Botao variante="fantasma" onClick={aoFechar} disabled={ocupado}>
+            Cancelar
+          </Botao>
+          <Botao
+            type="submit"
+            form="form-excluir-trabalho"
+            variante="perigo"
+            carregando={ocupado}
+            disabled={senha.length === 0}
+          >
+            Sim, apagar
+          </Botao>
+        </>
+      }
+    >
+      <form id="form-excluir-trabalho" onSubmit={apagar} className="flex flex-col gap-4">
+        <ul className="m-0 flex list-none flex-col gap-1.5 rounded-raio-g border border-borda bg-superficie-vidro p-3.5 text-[13px] text-texto-suave">
           <li>
-            <strong>{alvo.lotes.toLocaleString("pt-BR")}</strong> lote(s)
+            <strong className="font-mono text-texto">{numero(alvo?.lotes ?? 0)}</strong> lote(s)
             importado(s)
           </li>
           <li>
-            <strong>{alvo.arquivos.toLocaleString("pt-BR")}</strong> arquivo(s)
-            registrado(s)
+            <strong className="font-mono text-texto">{numero(alvo?.arquivos ?? 0)}</strong>{" "}
+            arquivo(s) registrado(s)
           </li>
           <li>
-            <strong>{alvo.execucoes.toLocaleString("pt-BR")}</strong>{" "}
-            conferência(s)
+            <strong className="font-mono text-texto">{numero(alvo?.execucoes ?? 0)}</strong>{" "}
+            execução(ões)
           </li>
         </ul>
-        <p className="caixa__texto">
-          Não há como desfazer. Os arquivos do cliente em disco continuam onde
-          estão — some o trabalho dentro do sistema.
+
+        <p className="m-0 text-[13px] leading-relaxed text-texto-suave">
+          Não há como desfazer. Os arquivos do cliente em disco continuam onde estão — some o
+          trabalho dentro do sistema.
         </p>
 
-        {erro && (
-          <div className="aviso aviso--erro" role="alert">
-            <strong>{erro.message}</strong>
-            {erro.requisicaoId && (
-              <span className="aviso__codigo">
-                Código para suporte: {erro.requisicaoId}
-              </span>
-            )}
-          </div>
-        )}
+        {erro && <Aviso titulo={erro.message} codigo={erro.requisicaoId} />}
 
-        <div className="campo campo--largo">
-          <label htmlFor="senha-exclusao">
-            Confirme com a sua senha de acesso
-          </label>
-          <input
-            id="senha-exclusao"
-            type="password"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            autoComplete="current-password"
-            autoFocus
-            required
-          />
-        </div>
-
-        <div className="caixa__acoes">
-          <button
-            type="submit"
-            className="botao botao--perigo"
-            disabled={ocupado || senha.length === 0}
-          >
-            {ocupado ? "Apagando…" : "Sim, apagar este trabalho"}
-          </button>
-          <button
-            type="button"
-            className="botao botao--secundario"
-            onClick={aoFechar}
-            disabled={ocupado}
-          >
-            Cancelar
-          </button>
-        </div>
+        <Campo rotulo="Confirme com a sua senha de acesso">
+          {(props) => (
+            <CampoSenha
+              {...props}
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
+              autoComplete="current-password"
+              autoFocus
+            />
+          )}
+        </Campo>
       </form>
-    </div>
+    </Modal>
   );
-}
-
-function mes(iso: string): string {
-  const [a, m] = iso.split("-");
-  return `${m}/${a}`;
 }
