@@ -68,6 +68,8 @@ export interface Sucessor {
   usuario: string;
   papel: string;
   cargo: string;
+  /** receber o trabalho vai dar a esta pessoa acesso à empresa */
+  precisa_de_acesso: boolean;
 }
 
 /** As quatro famílias do filtro da tela, sobre os dez tipos do servidor. */

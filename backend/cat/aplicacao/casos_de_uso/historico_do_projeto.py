@@ -13,6 +13,7 @@ chama: o evento entra na mesma transação do fato que descreve, quando há uma.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select
@@ -283,22 +284,26 @@ def suceder(
             f"{novo.nome_exibicao} está com o acesso desativado. Reative antes "
             "de passar o trabalho, ou escolha outra pessoa."
         )
-    if not _alcanca(novo, p.empresa_id, sessao):
-        raise SucessorInvalido(
-            f"{novo.nome_exibicao} não tem acesso a esta empresa. Aloque a "
-            "pessoa na empresa antes de passar o trabalho — senão ela recebe "
-            "um trabalho que não consegue abrir."
-        )
+
     if p.responsavel_id == novo.id:
         raise SucessorInvalido(f"{novo.nome_exibicao} já responde por este trabalho.")
 
     anterior = p.responsavel.nome_exibicao if p.responsavel else None
+    anterior_id = p.responsavel_id
+
+    # quem recebe o trabalho precisa enxergar a empresa dele. Não existe tela
+    # de alocação no sistema, e exigir uma que não existe deixava a sucessão
+    # impossível — então ela é criada aqui. É o significado de passar o
+    # trabalho: junto vai o acesso, e o histórico registra que foi assim.
+    alocou = _garantir_acesso(novo, p.empresa_id, por, sessao)
+
     p.responsavel_id = novo.id
     registrar(
         sessao, p.id, TipoDeEvento.SUCESSAO,
         texto=motivo.strip(),
         dados={"de": anterior, "para": novo.nome_exibicao,
-               "de_id": p.responsavel_id, "para_id": novo.id,
+               "de_id": anterior_id, "para_id": novo.id,
+               "alocou_na_empresa": alocou,
                "frase": frase_de_sucessao(anterior, novo.nome_exibicao)},
         por=por,
         commit=False,
@@ -307,8 +312,29 @@ def suceder(
     sessao.refresh(p)
     log.warning("trabalho passado para outra pessoa",
                 extra={"projeto_id": p.id, "de": anterior,
-                       "para": novo.nome_exibicao, "por_usuario_id": por.id})
+                       "para": novo.nome_exibicao, "por_usuario_id": por.id,
+                       "alocou_na_empresa": alocou})
     return p
+
+
+def _garantir_acesso(
+    u: UsuarioDB, empresa_id: int, por: Usuario, sessao: Session
+) -> bool:
+    """Aloca o usuário na empresa se ele ainda não estiver. Devolve se alocou.
+
+    Dev não precisa: o papel já enxerga todas, e criar alocação para ele só
+    encheria a tabela.
+    """
+    if _alcanca(u, empresa_id, sessao):
+        return False
+    sessao.add(
+        AlocacaoDB(usuario_id=u.id, empresa_id=empresa_id,
+                   papel_projeto="responsavel", alocado_por=por.id)
+    )
+    log.warning("acesso à empresa concedido pela sucessão",
+                extra={"usuario_id": u.id, "usuario": u.usuario,
+                       "empresa": empresa_id, "por_usuario_id": por.id})
+    return True
 
 
 class TrabalhoParado(ValueError):
@@ -348,20 +374,17 @@ def _status_de(p: ProjetoDB) -> StatusDoProjeto:
         return StatusDoProjeto.EM_ANDAMENTO
 
 
-def sucessores_possiveis(projeto_id: int, sessao: Session) -> list[UsuarioDB]:
-    """Quem pode receber ESTE trabalho.
+def sucessores_possiveis(projeto_id: int, sessao: Session) -> list[Sucessor]:
+    """Quem pode receber ESTE trabalho: conta ativa e papel que escreve.
 
-    Três condições, e cada uma existe porque violá-la deixa o trabalho com um
-    dono que não consegue trabalhar nele:
+    Quem só lê não entra — receberia um trabalho que não pode tocar. Quem
+    está desativado também não: seria trabalho sem dono.
 
-    * **conta ativa** — responsável desativado é trabalho sem dono;
-    * **papel que escreve** — quem só lê não roda etapa nem comenta;
-    * **acesso à empresa** — alocação nela, ou o papel dev, que enxerga
-      todas. Sem isso o novo responsável abre o trabalho e leva 403.
-
-    A terceira só apareceu na conferência visual: a lista oferecia gente que
-    não alcançava a empresa, e o trabalho passado ficava inacessível para
-    quem o recebeu.
+    **Acesso à empresa não é condição, é consequência.** Uma primeira versão
+    exigia alocação prévia, e isso deixou a sucessão impossível: não há tela
+    para alocar ninguém, então a lista vinha vazia. Agora quem não alcança a
+    empresa aparece marcado (`precisa_de_acesso`), e a alocação é criada no
+    ato da transferência.
     """
     p = _projeto(projeto_id, sessao)
     papeis = [x.value for x in Papel if x.pode_escrever]
@@ -370,7 +393,18 @@ def sucessores_possiveis(projeto_id: int, sessao: Session) -> list[UsuarioDB]:
         .where(UsuarioDB.ativo.is_(True), UsuarioDB.papel.in_(papeis))
         .order_by(UsuarioDB.nome_exibicao)
     )
-    return [u for u in candidatos if _alcanca(u, p.empresa_id, sessao)]
+    return [
+        Sucessor(usuario=u, precisa_de_acesso=not _alcanca(u, p.empresa_id, sessao))
+        for u in candidatos
+    ]
+
+
+@dataclass(frozen=True)
+class Sucessor:
+    """Um candidato, e se receber o trabalho lhe dará acesso à empresa."""
+
+    usuario: UsuarioDB
+    precisa_de_acesso: bool
 
 
 def _alcanca(u: UsuarioDB, empresa_id: int, sessao: Session) -> bool:

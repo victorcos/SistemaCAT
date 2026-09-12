@@ -102,6 +102,8 @@ class PessoaDto(BaseModel):
     usuario: str
     papel: str
     cargo: str
+    # receber o trabalho vai dar a esta pessoa acesso à empresa; a tela avisa
+    precisa_de_acesso: bool = False
 
 
 class StatusDto(BaseModel):
@@ -246,14 +248,19 @@ def listar_sucessores(
     usuario: UsuarioAtual,
     sessao: Annotated[Session, Depends(obter_sessao)],
 ) -> list[PessoaDto]:
-    """Quem pode receber o trabalho: conta ativa e papel que escreve."""
+    """Quem pode receber o trabalho: conta ativa e papel que escreve.
+
+    Quem ainda não enxerga a empresa vem marcado com `precisa_de_acesso`:
+    pode receber, e a transferência lhe dá o acesso.
+    """
     _projeto(projeto_id, usuario, sessao)
     return [
         PessoaDto(
-            id=u.id, nome_exibicao=u.nome_exibicao, usuario=u.usuario,
-            papel=u.papel, cargo=u.cargo,
+            id=s.usuario.id, nome_exibicao=s.usuario.nome_exibicao,
+            usuario=s.usuario.usuario, papel=s.usuario.papel,
+            cargo=s.usuario.cargo, precisa_de_acesso=s.precisa_de_acesso,
         )
-        for u in sucessores_possiveis(projeto_id, sessao)
+        for s in sucessores_possiveis(projeto_id, sessao)
     ]
 
 

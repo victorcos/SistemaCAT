@@ -1303,3 +1303,20 @@ aparecia pela metade e "Concluído" sumia. O painel passou a ser renderizado
 em **portal** com posição fixa presa ao botão, recalculada em rolagem e
 redimensionamento. Some com isso a exigência que o `Modal` carregava de não
 ter `overflow` por causa do dropdown.
+
+**E a sucessão que ficou impossível (v0.22.2).** A regra que entrou na
+v0.22.0 — só recebe quem já tem alocação na empresa — estava certa no
+diagnóstico e errada no remédio. **Não existe tela para alocar ninguém numa
+empresa**: a alocação nasce só de quem cadastra a empresa. Com isso a lista
+de sucessores vinha vazia e a funcionalidade não funcionava.
+
+Agora o acesso à empresa **não é condição, é consequência**: quem não alcança
+a empresa aparece na lista marcado (`precisa_de_acesso`, e a tela diz "ganha
+acesso"), e a transferência cria a alocação. É o que passar o trabalho quer
+dizer — junto vai o acesso —, e o evento de sucessão registra que foi assim
+(`dados.alocou_na_empresa`), com aviso no log.
+
+Fica anotado o que isto revelou: **alocar pessoa a empresa não tem tela**. Os
+três gestores reais do sistema não enxergam empresa alguma. Enquanto não
+houver essa tela, a sucessão é o único caminho para dar acesso — o que é
+pouco.

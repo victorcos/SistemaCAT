@@ -216,12 +216,14 @@ export default function Historico() {
   const p = detalhe.projeto;
   const status = p.status as Status;
   const parado = avisoDeTrabalhoParado(status);
-  const opcoesDeSucessor: OpcaoDeCombobox<string>[] = sucessores
-    .filter((s) => s.id !== p.responsavel_id)
-    .map((s) => ({
-      valor: String(s.id),
-      rotulo: `${s.nome_exibicao} — ${PAPEIS[s.papel as Papel]?.rotulo ?? s.papel}`,
-    }));
+  const candidatos = sucessores.filter((s) => s.id !== p.responsavel_id);
+  const opcoesDeSucessor: OpcaoDeCombobox<string>[] = candidatos.map((s) => ({
+    valor: String(s.id),
+    rotulo:
+      `${s.nome_exibicao} — ${PAPEIS[s.papel as Papel]?.rotulo ?? s.papel}` +
+      (s.precisa_de_acesso ? " · ganha acesso" : ""),
+  }));
+  const escolhido = candidatos.find((s) => String(s.id) === sucessor);
 
   return (
     <div className="mx-auto flex max-w-[1320px] flex-col gap-4">
@@ -345,27 +347,42 @@ export default function Historico() {
                 </div>
               </div>
 
-              <div className="mt-4">
-                <p className="mb-1.5 text-[13px] font-semibold text-texto-suave">Passar para</p>
-                <Combobox
-                  valor={sucessor}
-                  opcoes={opcoesDeSucessor}
-                  aoMudar={setSucessor}
-                  placeholderDaBusca="Buscar pessoa…"
-                />
-              </div>
+              {candidatos.length === 0 ? (
+                <p className="m-0 mt-4 text-[13px] leading-relaxed text-texto-fraco">
+                  Não há mais ninguém para quem passar: você é a única pessoa ativa com papel
+                  que escreve. Cadastre alguém em Usuários antes.
+                </p>
+              ) : (
+                <>
+                  <div className="mt-4">
+                    <p className="mb-1.5 text-[13px] font-semibold text-texto-suave">
+                      Passar para
+                    </p>
+                    <Combobox
+                      valor={sucessor}
+                      opcoes={opcoesDeSucessor}
+                      aoMudar={setSucessor}
+                      placeholderDaBusca="Buscar pessoa…"
+                    />
+                    {escolhido?.precisa_de_acesso && (
+                      <p className="m-0 mt-1.5 text-xs leading-relaxed text-texto-fraco">
+                        {escolhido.nome_exibicao} ainda não enxerga esta empresa. Transferir dá
+                        o acesso, e isso fica registrado no histórico.
+                      </p>
+                    )}
+                  </div>
 
-              <div className="mt-4">
-                <Botao
-                  disabled={!sucessor}
-                  onClick={() =>
-                    setATransferir(sucessores.find((s) => String(s.id) === sucessor) ?? null)
-                  }
-                  className="shadow-acao"
-                >
-                  Transferir projeto
-                </Botao>
-              </div>
+                  <div className="mt-4">
+                    <Botao
+                      disabled={!sucessor}
+                      onClick={() => setATransferir(escolhido ?? null)}
+                      className="shadow-acao"
+                    >
+                      Transferir projeto
+                    </Botao>
+                  </div>
+                </>
+              )}
             </Secao>
           )}
         </div>
@@ -384,7 +401,11 @@ export default function Historico() {
       <ModalComJustificativa
         aberto={aTransferir !== null}
         titulo={`Passar o trabalho para ${aTransferir?.nome_exibicao ?? ""}?`}
-        sub="Quem criou o trabalho não muda — só quem responde por ele daqui para a frente."
+        sub={
+          aTransferir?.precisa_de_acesso
+            ? "Quem criou o trabalho não muda — só quem responde por ele. Como esta pessoa ainda não enxerga a empresa, a transferência também lhe dá o acesso."
+            : "Quem criou o trabalho não muda — só quem responde por ele daqui para a frente."
+        }
         exigeMotivo={false}
         rotuloConfirmar="Transferir"
         aoFechar={() => setATransferir(null)}

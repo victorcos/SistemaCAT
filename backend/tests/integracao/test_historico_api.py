@@ -254,19 +254,38 @@ class TestSucessao:
         assert r.status_code == 422
         assert "já responde" in r.json()["detail"]
 
-    def test_passar_para_quem_nao_alcanca_a_empresa_e_recusado(self, cliente, projeto):
-        """Apareceu na conferência visual: a lista oferecia gente sem acesso à
-        empresa, e o trabalho passado ficava inacessível para quem o recebeu."""
+    def test_quem_nao_alcanca_a_empresa_aparece_marcado(self, cliente, projeto):
+        """Não há tela para alocar ninguém numa empresa. Exigir alocação
+        prévia deixava a lista vazia e a sucessão impossível — então quem não
+        alcança aparece marcado, e a transferência dá o acesso."""
+        sucessores = cliente.get(f"/api/projetos/{projeto['id']}/sucessores",
+                                 headers=cab(cliente, "hist_gestor")).json()
+        por_usuario = {p["usuario"]: p for p in sucessores}
+        assert por_usuario["hist_sem_acesso"]["precisa_de_acesso"] is True
+        assert por_usuario["hist_analista"]["precisa_de_acesso"] is False
+
+    def test_transferir_da_acesso_a_empresa(self, cliente, projeto):
         alvo = id_de(cliente, "hist_sem_acesso")
         r = cliente.patch(f"/api/projetos/{projeto['id']}/responsavel",
                           headers=cab(cliente, "hist_gestor"),
-                          json={"responsavel_id": alvo, "motivo": ""})
-        assert r.status_code == 422
-        assert "não tem acesso a esta empresa" in r.json()["detail"]
+                          json={"responsavel_id": alvo, "motivo": "Carteira nova."})
+        assert r.status_code == 200, r.text
 
-        sucessores = cliente.get(f"/api/projetos/{projeto['id']}/sucessores",
-                                 headers=cab(cliente, "hist_gestor")).json()
-        assert "hist_sem_acesso" not in [p["usuario"] for p in sucessores]
+        # quem recebeu passa a enxergar o trabalho, que é o ponto
+        d = cliente.get(f"/api/projetos/{projeto['id']}",
+                        headers=cab(cliente, "hist_sem_acesso"))
+        assert d.status_code == 200
+        assert d.json()["projeto"]["responsavel"] == "Analista de Outra Carteira"
+
+        topo = historico(cliente, projeto["id"])["eventos"][0]
+        assert topo["tipo"] == "sucessao"
+        assert topo["dados"]["alocou_na_empresa"] is True
+
+        # e devolve para quem estava, para os testes seguintes seguirem
+        cliente.patch(f"/api/projetos/{projeto['id']}/responsavel",
+                      headers=cab(cliente, "hist_gestor"),
+                      json={"responsavel_id": id_de(cliente, "hist_analista"),
+                            "motivo": "Devolvendo."})
 
     def test_passar_para_conta_desativada_e_recusado(self, cliente, projeto):
         alvo = id_de(cliente, "hist_inativo")
