@@ -1,11 +1,15 @@
 import {
+  useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { IconeAbrir, IconeBusca, IconeConfirma, IconeFechar2 } from "@/constants/icons";
 import { cn } from "@/lib/cn";
 
@@ -37,9 +41,15 @@ interface Props<T extends string> {
  * implementação real: teclado (↑ ↓ Enter Esc Home End), papéis ARIA de
  * combobox/listbox/option e `aria-activedescendant`.
  *
- * Abre para baixo; quando não há espaço abaixo, abre para cima. Sem
- * portal: o Modal do sistema não tem `overflow: hidden` justamente para o
- * painel não ser cortado.
+ * O painel vai para um **portal** com posição fixa, presa ao botão. Sem
+ * isso ele era cortado por qualquer ancestral com `overflow` — e foi o que
+ * aconteceu no seletor de situação do histórico, dentro do cartão de
+ * cabeçalho, que tem `overflow-hidden` para conter o brilho: a lista
+ * aparecia pela metade e a última opção sumia.
+ *
+ * Abre para baixo; quando não há espaço abaixo, abre para cima. A posição é
+ * recalculada em rolagem e redimensionamento, porque `fixed` não acompanha o
+ * que se move debaixo dele.
  */
 export function Combobox<T extends string>({
   id,
@@ -54,11 +64,31 @@ export function Combobox<T extends string>({
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState("");
   const [ativo, setAtivo] = useState(0);
-  const [paraCima, setParaCima] = useState(false);
+  const [posicao, setPosicao] = useState<CSSProperties>({});
   const raiz = useRef<HTMLDivElement>(null);
+  const painel = useRef<HTMLDivElement>(null);
   const campo = useRef<HTMLInputElement>(null);
   const lista = useRef<HTMLUListElement>(null);
   const idLista = useId();
+
+  /** Onde o painel cabe: colado ao botão, para baixo ou para cima. */
+  const medir = useCallback(() => {
+    const caixa = raiz.current?.getBoundingClientRect();
+    if (!caixa) return;
+    const altura = painel.current?.offsetHeight ?? 280;
+    const abaixo = window.innerHeight - caixa.bottom;
+    const cabeAbaixo = abaixo >= altura + 8 || abaixo >= caixa.top;
+    setPosicao({
+      position: "fixed",
+      left: caixa.left,
+      width: caixa.width,
+      ...(cabeAbaixo
+        ? { top: caixa.bottom + 6 }
+        : { bottom: window.innerHeight - caixa.top + 6 }),
+      // teto para a lista nunca estourar a janela
+      maxHeight: Math.max(180, (cabeAbaixo ? abaixo : caixa.top) - 14),
+    });
+  }, []);
 
   const filtradas = useMemo(() => {
     const termo = busca.trim().toLocaleLowerCase("pt-BR");
@@ -73,9 +103,7 @@ export function Combobox<T extends string>({
     if (disabled) return;
     setBusca("");
     setAtivo(Math.max(0, opcoes.findIndex((o) => o.valor === valor)));
-    // painel de 260px (busca + lista): se não couber abaixo, vai para cima
-    const caixa = raiz.current?.getBoundingClientRect();
-    setParaCima(!!caixa && window.innerHeight - caixa.bottom < 260 && caixa.top > 260);
+    medir();
     setAberto(true);
     // o input só existe depois do render do painel
     window.setTimeout(() => campo.current?.focus(), 0);
@@ -92,11 +120,32 @@ export function Combobox<T extends string>({
     fechar();
   }
 
-  // clique fora fecha — em captura, para ganhar de qualquer stopPropagation
+  // mede de novo assim que o painel existe: só aí se sabe a altura real
+  useLayoutEffect(() => {
+    if (aberto) medir();
+  }, [aberto, medir]);
+
+  // `fixed` não acompanha o que rola debaixo dele
+  useEffect(() => {
+    if (!aberto) return;
+    const aoMover = () => medir();
+    window.addEventListener("scroll", aoMover, true);
+    window.addEventListener("resize", aoMover);
+    return () => {
+      window.removeEventListener("scroll", aoMover, true);
+      window.removeEventListener("resize", aoMover);
+    };
+  }, [aberto, medir]);
+
+  // clique fora fecha — em captura, para ganhar de qualquer stopPropagation.
+  // O painel está no portal, então "fora" é fora do botão E fora do painel.
   useEffect(() => {
     if (!aberto) return;
     function aoClicar(e: MouseEvent) {
-      if (!raiz.current?.contains(e.target as Node)) fechar(false);
+      const alvo = e.target as Node;
+      if (!raiz.current?.contains(alvo) && !painel.current?.contains(alvo)) {
+        fechar(false);
+      }
     }
     document.addEventListener("mousedown", aoClicar, true);
     return () => document.removeEventListener("mousedown", aoClicar, true);
@@ -178,14 +227,17 @@ export function Combobox<T extends string>({
         <Caret size={15} strokeWidth={2} className="shrink-0 text-texto-fraco" aria-hidden />
       </button>
 
-      {aberto && (
-        <div
-          className={cn(
-            "absolute left-0 right-0 z-[90] overflow-hidden rounded-raio-g border border-borda-forte",
-            "bg-superficie-elevada shadow-cat-alta animate-entrada",
-            paraCima ? "bottom-[calc(100%+6px)]" : "top-[calc(100%+6px)]",
-          )}
-        >
+      {aberto &&
+        createPortal(
+          <div
+            ref={painel}
+            style={posicao}
+            onKeyDown={aoTeclar}
+            className={cn(
+              "z-[100] flex flex-col overflow-hidden rounded-raio-g border border-borda-forte",
+              "bg-superficie-elevada shadow-cat-alta animate-entrada",
+            )}
+          >
           <div className="relative border-b border-borda p-2">
             <IconeBusca
               size={13}
@@ -215,7 +267,7 @@ export function Combobox<T extends string>({
             ref={lista}
             id={idLista}
             role="listbox"
-            className="m-0 max-h-[200px] list-none overflow-y-auto p-1.5"
+            className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-1.5"
           >
             {filtradas.length === 0 && (
               <li className="px-2.5 py-3 text-xs text-texto-fraco">Nenhum resultado</li>
@@ -246,8 +298,9 @@ export function Combobox<T extends string>({
               );
             })}
           </ul>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

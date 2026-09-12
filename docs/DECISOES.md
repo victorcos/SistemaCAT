@@ -1295,3 +1295,11 @@ da conta desativada, que já estava coberto.
 não roda lá: a migração `62fe3d195ce5` (bem anterior) usa `create_foreign_key`
 direto e quebra. Fica registrado — o caminho sem Docker do `instalar.ps1`
 depende disso e ainda não foi exercitado de verdade.
+
+**Correção logo em seguida (v0.22.1).** O painel do combobox era cortado por
+qualquer ancestral com `overflow` — no seletor de situação, dentro do cartão
+de cabeçalho (que tem `overflow-hidden` para conter o brilho), a lista
+aparecia pela metade e "Concluído" sumia. O painel passou a ser renderizado
+em **portal** com posição fixa presa ao botão, recalculada em rolagem e
+redimensionamento. Some com isso a exigência que o `Modal` carregava de não
+ter `overflow` por causa do dropdown.
