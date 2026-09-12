@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import os
 import re
+from collections import Counter
 from collections.abc import Callable, Iterable, Iterator
+from enum import Enum
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
@@ -80,6 +82,11 @@ class Progresso:
     bytes_lidos: int = 0
     documentos: int = 0
     recusados: list[str] = field(default_factory=list)
+    # o que o leitor deixou de fora **de propósito**, e não é defeito: linha
+    # de movimentação interna, que nunca teve nota. Fica separado de
+    # `recusados` porque misturar as duas coisas transforma o bloco de erro
+    # em ruído e esconde o arquivo que falhou de verdade
+    observacoes: list[str] = field(default_factory=list)
 
     @property
     def fracao(self) -> float:
@@ -232,6 +239,32 @@ def _chave_do_relatorio(bruto: str | None) -> str | None:
     return digitos if len(digitos) == 44 else None
 
 
+class SemChave(str, Enum):
+    """Por que esta linha não tem chave. São três coisas diferentes.
+
+    A mensagem antiga chutava uma única causa para as três, e chutava a mais
+    rara: dizia "costuma ser chave que o Excel converteu em número". Nos
+    relatórios do Amigão isso era 0% dos casos — as 1.270 linhas tinham a
+    coluna vazia, e 1.205 delas nem número de documento tinham.
+    """
+
+    #: nem chave nem número: movimentação interna de estoque, nunca teve nota
+    SEM_DOCUMENTO = "sem_documento"
+    #: o documento existe e está identificado, mas o relatório não trouxe a chave
+    DOCUMENTO_SEM_CHAVE = "documento_sem_chave"
+    #: veio algo na coluna que não são 44 dígitos — aí sim, costuma ser o Excel
+    CHAVE_ILEGIVEL = "chave_ilegivel"
+
+
+def _por_que_sem_chave(bruto: str | None, numero_doc: str | None) -> SemChave:
+    """Classifica pelo que a linha tem, em vez de supor."""
+    if (bruto or "").strip():
+        return SemChave.CHAVE_ILEGIVEL
+    if (numero_doc or "").strip():
+        return SemChave.DOCUMENTO_SEM_CHAVE
+    return SemChave.SEM_DOCUMENTO
+
+
 def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
                   avisar: Aviso | None = None) -> Progresso:
     """Escreve um parquet com a chave de cada documento que o cliente entregou.
@@ -264,7 +297,7 @@ def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
 
     for caminho in relatorios:
         nome = os.path.basename(caminho)
-        sem_chave = 0
+        motivos: Counter[SemChave] = Counter()
         try:
             leitura = Leitura(caminho)
             # inventário e resumo não têm documento nem chave; passar por
@@ -276,9 +309,10 @@ def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
                 progresso.arquivos_lidos += 1
                 continue
             for _numero, dados in leitura.brutos():
-                chave = _chave_do_relatorio(dados.get("chave"))
+                bruto = dados.get("chave")
+                chave = _chave_do_relatorio(bruto)
                 if chave is None:
-                    sem_chave += 1
+                    motivos[_por_que_sem_chave(bruto, dados.get("numero_doc"))] += 1
                 elif chave not in vistas:
                     vistas.add(chave)
                     escritor.acrescentar({
@@ -290,14 +324,7 @@ def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
             progresso.recusados.append(f"{nome}: {erro}")
             log.warning("relatório ilegível no confronto",
                         extra={"arquivo": nome, "motivo": str(erro)})
-        if sem_chave:
-            # a nota dessas linhas vai cair como pendente, e quem for cobrar
-            # precisa saber que o relatório a trazia — só que sem chave
-            progresso.recusados.append(
-                f"{nome}: {sem_chave} linha(s) sem chave de acesso válida, "
-                "ignoradas — costuma ser chave que o Excel converteu em número")
-            log.warning("relatório com linhas sem chave válida",
-                        extra={"arquivo": nome, "linhas": sem_chave})
+        _relatar_sem_chave(nome, motivos, progresso)
         progresso.arquivos_lidos += 1
         if avisar is not None:
             avisar(progresso)
@@ -307,6 +334,49 @@ def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
              extra={"xmls": len(xmls), "relatorios": len(relatorios),
                     "chaves": escritor.total})
     return progresso
+
+
+def _relatar_sem_chave(nome: str, motivos: "Counter[SemChave]",
+                       progresso: Progresso) -> None:
+    """Cada motivo na sua caixa, com a frase que corresponde ao que houve.
+
+    Só os dois primeiros são problema de quem entrega o dado. Movimentação
+    interna vai para `observacoes`: contar isso como falha de leitura é o que
+    enchia a tela de alarme e escondia o arquivo que de fato não abriu.
+    """
+    if not motivos:
+        return
+
+    ilegiveis = motivos[SemChave.CHAVE_ILEGIVEL]
+    sem_chave = motivos[SemChave.DOCUMENTO_SEM_CHAVE]
+    internas = motivos[SemChave.SEM_DOCUMENTO]
+
+    if ilegiveis:
+        progresso.recusados.append(
+            f"{nome}: {ilegiveis} linha(s) com chave ilegível, ignoradas — "
+            "veio algo na coluna que não são 44 dígitos, costuma ser chave "
+            "que o Excel converteu em número")
+    if sem_chave:
+        # a nota dessas linhas vai cair como pendente, e quem for cobrar
+        # precisa saber que o relatório a trazia — só que sem chave
+        progresso.recusados.append(
+            f"{nome}: {sem_chave} linha(s) de documento identificado mas sem "
+            "chave, ignoradas — a nota existe no relatório e não tem como "
+            "cruzar com a EFD")
+    if internas:
+        progresso.observacoes.append(
+            f"{nome}: {internas} linha(s) sem documento nenhum, fora do "
+            "confronto — movimentação interna de estoque, que não tem nota "
+            "para conferir")
+
+    if ilegiveis or sem_chave:
+        log.warning("relatório com linhas sem chave válida",
+                    extra={"arquivo": nome, "chave_ilegivel": ilegiveis,
+                           "documento_sem_chave": sem_chave,
+                           "sem_documento": internas})
+    else:
+        log.info("relatório com linhas fora do confronto por não serem documento",
+                 extra={"arquivo": nome, "sem_documento": internas})
 
 
 def _tamanho(caminho: str) -> int:

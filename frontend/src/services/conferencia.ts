@@ -32,6 +32,9 @@ export interface ResumoDaConferencia {
   por_classificacao: Fatia[];
   avisos: string[];
   recusados: string[];
+  /** Fora do confronto de propósito, e não por defeito: linha que não é
+   *  documento. Opcional porque execução antiga não gravou o campo. */
+  observacoes?: string[];
   /** O que andou desde a rodada anterior. Vazio na primeira. */
   comparou: boolean;
   pendencias_resolvidas: number;

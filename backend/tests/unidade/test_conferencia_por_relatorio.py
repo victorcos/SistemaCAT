@@ -229,16 +229,86 @@ class TestChaveComoElaVem:
         relatorio = escrever(tmp_path, "movimento.txt", [
             CABECALHO_MOVIMENTO,
             item("4,12105E+43"),
-            item("", numero="44624"),
         ])
         pasta, progresso = _pasta(tmp_path, [], [relatorio])
         assert progresso.documentos == 0
         assert len(progresso.recusados) == 1
-        assert "2 linha(s) sem chave" in progresso.recusados[0]
+        assert "1 linha(s) com chave ilegível" in progresso.recusados[0]
+        assert "Excel" in progresso.recusados[0]
         assert "movimento.txt" in progresso.recusados[0]
 
         resumo = confrontar(efd, pasta, str(tmp_path / "saida"))
         assert resumo.sem_documento == 1          # a nota fica pendente
+
+
+class TestPorQueNaoTemChave:
+    """Três coisas diferentes, que a mensagem antiga tratava como uma só.
+
+    Ela dizia sempre "costuma ser chave que o Excel converteu em número". Nos
+    relatórios do Amigão isso era 0% dos casos: as 1.270 linhas sem chave
+    tinham a coluna **vazia**, e 1.205 delas nem número de documento tinham —
+    movimentação interna de estoque, CFOP 1.949, R$ 0,00 de ST. Chamar isso de
+    problema de leitura enchia a tela de alarme e escondia falha de verdade.
+    """
+
+    def test_documento_identificado_sem_chave_e_recusado(self, efd, tmp_path):
+        """A nota existe e está numerada, mas não dá para cruzar com a EFD.
+
+        Isto é problema de quem entrega o dado: a nota vai cair como pendente
+        e quem for cobrar precisa saber que o relatório a trazia."""
+        relatorio = escrever(tmp_path, "movimento.txt", [
+            CABECALHO_MOVIMENTO,
+            item("", numero="44624"),
+        ])
+        _pasta_, progresso = _pasta(tmp_path, [], [relatorio])
+        assert progresso.documentos == 0
+        assert progresso.observacoes == []
+        assert len(progresso.recusados) == 1
+        assert "1 linha(s) de documento identificado mas sem chave" in \
+            progresso.recusados[0]
+        assert "Excel" not in progresso.recusados[0]
+
+    def test_linha_sem_documento_nenhum_nao_e_problema(self, efd, tmp_path):
+        """Movimentação interna de estoque nunca teve nota.
+
+        Sai do bloco de erro e vai para `observacoes`: continua visível, para
+        a conta fechar, sem disputar atenção com arquivo que não abriu."""
+        relatorio = escrever(tmp_path, "movimento.txt", [
+            CABECALHO_MOVIMENTO,
+            item("", numero=""),
+            item("", numero=""),
+        ])
+        _pasta_, progresso = _pasta(tmp_path, [], [relatorio])
+        assert progresso.documentos == 0
+        assert progresso.recusados == []
+        assert len(progresso.observacoes) == 1
+        assert "2 linha(s) sem documento nenhum" in progresso.observacoes[0]
+        assert "movimentação interna" in progresso.observacoes[0]
+
+    def test_os_tres_motivos_juntos_ficam_separados(self, efd, tmp_path):
+        """Um arquivo com os três casos não vira uma linha só de aviso."""
+        relatorio = escrever(tmp_path, "movimento.txt", [
+            CABECALHO_MOVIMENTO,
+            item("4,12105E+43"),
+            item("", numero="44624"),
+            item("", numero=""),
+            item(CHAVE_NA_EFD),
+        ])
+        _pasta_, progresso = _pasta(tmp_path, [], [relatorio])
+        assert progresso.documentos == 1
+        assert len(progresso.recusados) == 2
+        assert len(progresso.observacoes) == 1
+        assert any("chave ilegível" in r for r in progresso.recusados)
+        assert any("documento identificado mas sem chave" in r
+                   for r in progresso.recusados)
+
+    def test_relatorio_limpo_nao_gera_observacao(self, efd, tmp_path):
+        """Sem linha fora, nada aparece — nem no erro, nem na informação."""
+        relatorio = escrever(tmp_path, "movimento.txt",
+                             [CABECALHO_MOVIMENTO, item(CHAVE_NA_EFD)])
+        _pasta_, progresso = _pasta(tmp_path, [], [relatorio])
+        assert progresso.recusados == []
+        assert progresso.observacoes == []
 
 
 class TestRelatorioErrado:

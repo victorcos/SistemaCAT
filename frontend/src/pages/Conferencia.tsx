@@ -279,6 +279,17 @@ function Resultado({
               </ul>
             </Aviso>
           )}
+          {(resumo.observacoes ?? []).length > 0 && (
+            <Aviso tom="info" titulo="Fora do confronto, e está certo assim">
+              Linha que não é documento não tem o que conferir. Fica aqui para
+              a conta fechar, não porque houve erro de leitura:
+              <ul className="m-0 mt-2 list-disc pl-5 text-[13px] leading-relaxed">
+                {(resumo.observacoes ?? []).map((o) => (
+                  <li key={o}>{o}</li>
+                ))}
+              </ul>
+            </Aviso>
+          )}
         </div>
       </Secao>
 

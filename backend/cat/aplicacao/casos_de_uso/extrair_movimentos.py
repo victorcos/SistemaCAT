@@ -211,6 +211,7 @@ def _serializar(resumo: ResumoDaMovimentacao, progresso: ProgressoDeItens,
     dados["cobertura_de_item"] = round(resumo.cobertura_de_item, 4)
     dados["avisos"] = resumo.avisos
     dados["recusados"] = progresso.recusados[:20]
+    dados["observacoes"] = progresso.observacoes[:20]
     dados["efd_originais_substituidas"] = substituidas
     dados["analiticos"] = progresso.analiticos
     return dados

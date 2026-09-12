@@ -36,6 +36,9 @@ export interface ResumoDaMovimentacao {
   cobertura_de_item: number;
   avisos: string[];
   recusados: string[];
+  /** Fora do confronto de propósito, e não por defeito. Opcional porque
+   *  execução antiga não gravou o campo. */
+  observacoes?: string[];
   efd_originais_substituidas: number;
   analiticos: number;
 }

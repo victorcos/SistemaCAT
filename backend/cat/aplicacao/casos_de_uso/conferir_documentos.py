@@ -329,6 +329,7 @@ def _serializar(resumo: ResumoDaConferencia, efd: Progresso,
     dados["avisos"] = resumo.avisos
     dados["andou"] = resumo.andou
     dados["recusados"] = (efd.recusados + pasta.recusados)[:20]
+    dados["observacoes"] = (efd.observacoes + pasta.observacoes)[:20]
     return dados
 
 

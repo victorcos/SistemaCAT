@@ -5,6 +5,52 @@
 
 ---
 
+## 2026-09-12 — Linha sem chave: três motivos, e só um é problema de leitura
+
+**Decisão.** O aviso de "linha sem chave de acesso válida" foi partido em três,
+pelo que a linha de fato tem, e o que não é erro saiu do bloco de erro.
+
+| A linha tem | É | Vai para |
+|---|---|---|
+| algo na coluna que não são 44 dígitos | chave ilegível, aí sim costuma ser o Excel | `recusados` |
+| chave vazia, mas número de documento | nota sem chave, não dá para cruzar | `recusados` |
+| nem chave nem número | movimentação interna, nunca teve nota | `observacoes` |
+
+**Por quê.** A mensagem antiga chutava uma causa só para os três casos, e
+chutava a mais rara: "costuma ser chave que o Excel converteu em número".
+
+Medido nos relatórios do Amigão, três arquivos de 2020.01, 670.156 linhas:
+
+| | |
+|---|---|
+| Linhas sem chave | 1.270 (0,190%) |
+| Com a coluna vazia | 1.270 (100%) |
+| Estragadas pelo Excel | 0 |
+| Sem número de documento | 1.205 |
+| ST que carregam | R$ 0,00 |
+| ST do arquivo inteiro | R$ 9.482.165,30 |
+
+Ou seja: nenhuma era o caso que a mensagem citava, e 95% delas nem documento
+eram — CFOP 1.949, movimentação interna das centrais de Reciclável, Açougue,
+Padaria e Confeitaria. Sobram 65 linhas, 42 notas, todas sem ST.
+
+**Consequência.** Nos mesmos arquivos, o bloco "Arquivos com problema na
+leitura" saiu de 3 alarmes para 1, e esse 1 é achado de verdade: 65 linhas de
+documento identificado sem chave. O resto aparece como informação, no tom
+`info`, porque quem confere quer saber o que ficou de fora sem ser avisado de
+um erro que não houve.
+
+O motivo de fazer isso, e não só reescrever a frase: aviso que grita onde não
+há problema treina quem lê a ignorá-lo. Eram 21 linhas de alarme por remessa,
+e o dia em que um arquivo não abrir de verdade a mensagem vai estar no meio
+delas.
+
+**Contrato.** `observacoes` é campo novo no resumo da conferência e no de
+movimentação. Opcional no front, porque execução gravada antes desta versão
+não o tem.
+
+---
+
 ## 2026-09-12 — Gestor enxerga toda a carteira, sem alocação
 
 **Decisão.** `Papel.ignora_escopo_de_empresa` passa a valer para **gestor** além

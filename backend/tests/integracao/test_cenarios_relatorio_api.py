@@ -370,10 +370,15 @@ class TestCenarioMedioUsual:
         assert any("canceladas, denegadas" in a for a in r["avisos"])
         # o que o relatório traz e a EFD não tem
         assert any("não estão na EFD" in a for a in r["avisos"])
-        # as linhas sem chave não somem em silêncio
+        # as linhas sem chave não somem em silêncio. Aqui o documento está
+        # identificado e só falta a chave, que é problema de quem entrega:
+        # a nota existe e não tem como cruzar
         [recusado] = r["recusados"]
         assert "movimento.txt" in recusado
-        assert f"{self.LINHAS_SEM_CHAVE} linha(s) sem chave" in recusado
+        assert (f"{self.LINHAS_SEM_CHAVE} linha(s) de documento identificado "
+                "mas sem chave") in recusado
+        # e o motivo não é chutado: nada de Excel onde não houve Excel
+        assert "Excel" not in recusado
         # e o que NÃO é problema não vira aviso
         assert not any("filiais diferentes" in a for a in r["avisos"])
         assert not any("em dobro" in a for a in r["avisos"])
@@ -430,10 +435,11 @@ class TestCenarioPior:
         # o relatório inteiro é de outra filial: é isto, não falta de documento
         assert "filiais diferentes" in avisos
         assert OUTRA_FILIAL in avisos and CNPJ in avisos
-        # o Excel comeu as chaves: 400 linhas, e o motivo provável
+        # o Excel comeu as chaves: 400 linhas. Veio algo na coluna que não
+        # são 44 dígitos, e é o único caso em que citar o Excel se sustenta
         [recusado] = r["recusados"]
         assert "movimento.txt" in recusado
-        assert "400 linha(s) sem chave" in recusado
+        assert "400 linha(s) com chave ilegível" in recusado
         assert "Excel" in recusado
         # as 3 sem chave e as 4 canceladas continuam na lista, marcadas
         assert f"{self.SEM_CHAVE} documento(s) da EFD estão sem chave" in avisos
