@@ -200,6 +200,47 @@ public sealed class AutenticacaoTestes(BancoDeTeste banco) : IDisposable
         Assert.Equal(HttpStatusCode.OK, (await Entrar(Cliente(), nome, BancoDeTeste.SenhaPadrao)).StatusCode);
     }
 
+    // Os três seguintes vieram de tests/unidade/test_autenticar.py, apagado quando
+    // o login saiu do Python: eram os únicos cenários que esta bateria não provava.
+
+    [Fact]
+    public async Task Inativo_e_recusado_antes_de_conferir_a_senha_e_nao_conta_tentativa()
+    {
+        var nome = Nome();
+        await banco.CriarUsuario(nome, ativo: false);
+
+        var r = await Entrar(Cliente(), nome, "Senha-Errada-2026");
+
+        // mesmo com a senha errada a resposta é "inativo": a senha nem foi olhada
+        Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
+        Assert.Equal("Usuário inativo. Procure um gestor.", await Detalhe(r));
+        Assert.Equal(0, await banco.Escalar<int>($"SELECT tentativas_falhas FROM usuario WHERE usuario = '{nome}'"));
+    }
+
+    [Fact]
+    public async Task Senha_errada_nao_regrava_resumo_antigo()
+    {
+        var nome = Nome();
+        var bcrypt = BCrypt.Net.BCrypt.HashPassword(BancoDeTeste.SenhaPadrao, 4);
+        await banco.CriarUsuario(nome, resumo: bcrypt);
+
+        await Entrar(Cliente(), nome, "Senha-Errada-2026");
+
+        // regravar só é possível com a senha em claro certa em mãos
+        Assert.Equal(bcrypt, await banco.Escalar<string>($"SELECT senha_hash FROM usuario WHERE usuario = '{nome}'"));
+    }
+
+    [Fact]
+    public async Task Resumo_atual_nao_e_regravado_a_cada_login()
+    {
+        var nome = Nome();
+        await banco.CriarUsuario(nome);
+
+        await Entrar(Cliente(), nome, BancoDeTeste.SenhaPadrao);
+
+        Assert.Equal(banco.ResumoPadrao, await banco.Escalar<string>($"SELECT senha_hash FROM usuario WHERE usuario = '{nome}'"));
+    }
+
     [Fact]
     public async Task Senha_e_resumo_nunca_voltam_na_resposta()
     {

@@ -17,6 +17,7 @@ from cat.dominio.comum.cnpj import Cnpj
 from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
+from tests.integracao.sessao import cabecalhos_de
 
 SENHA = "Sistema2026cat"
 
@@ -61,10 +62,7 @@ def cliente():
 
 @pytest.fixture(scope="module")
 def cabecalhos(cliente):
-    r = cliente.post("/api/auth/token",
-                     data={"username": "copia_analista", "password": SENHA})
-    assert r.status_code == 200, r.text
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+    return cabecalhos_de("copia_analista", SENHA)
 
 
 @pytest.fixture(scope="module")

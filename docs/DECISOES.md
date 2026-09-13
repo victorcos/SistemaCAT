@@ -34,11 +34,31 @@ pelas rotas do Python, que aplicou a própria regra de permissão (papel
 `leitura` recebeu 403 em `/api/usuarios`). Feito com um usuário temporário,
 apagado ao final.
 
-**A rota de login do Python não foi apagada.** Dez arquivos de teste de
-integração do backend obtêm token por ela. Pela porta da tela ela não é mais
-alcançável — a rota em C# vence o repasse —, e o motor só escuta em
-`127.0.0.1`. Sai quando a bateria Python deixar de depender dela; até lá, a
-regra de login existe nos dois lados, e mudança nela precisa ir aos dois.
+**O login saiu do Python na mesma entrega.** A primeira versão desta fatia
+deixava `auth_router.py` e o caso de uso `autenticar.py` no motor, porque dez
+arquivos de teste de integração obtinham token pela rota — e a regra de login
+ficaria viva nos dois lados, com toda mudança precisando ir aos dois. Pesou
+mais não ter duas regras: os dois arquivos foram apagados.
+
+- Os testes do motor pegam o token por `tests/integracao/sessao.py`, que
+  **confere a senha e o estado da conta antes de emitir**. Sem essa conferência,
+  "a senha nova funciona" passaria com qualquer senha.
+- O ciclo da senha provisória e o bloqueio por tentativas, que antes passavam
+  pela rota de login, agora conferem o resumo e o estado gravados — que é o que
+  o login em C# lê.
+- `test_auth_api.py` e `test_autenticar.py` saíram. Os três cenários do
+  segundo que a bateria em C# ainda não provava explicitamente vieram para
+  ela (inativo recusado antes de conferir a senha, senha errada não regrava,
+  resumo atual não é regravado). Saúde, identificador de requisição e senha
+  irrecuperável do banco ficaram no motor, em `test_motor_api.py`, junto de um
+  teste que falha se a rota de login voltar a existir nele.
+
+O que o motor **ainda** faz com autenticação, e até quando: valida o token nas
+rotas que atende (até cada uma migrar) e gera resumo de senha em criar, trocar e
+redefinir senha e nos comandos `semear` e `emergencia` (até a fatia 2).
+
+Baterias depois da remoção: 527 no Python (eram 547; saíram 24 de login e
+entraram 4) e 84 no C#.
 
 **Três diferenças deliberadas.**
 
@@ -57,7 +77,7 @@ regra de login existe nos dois lados, e mudança nela precisa ir aos dois.
 cada rodada e migrado pelo Alembic, no mesmo contêiner do desenvolvimento e
 sem tocar em dado de trabalho. Os testes precisam do Docker de pé e do
 ambiente Python instalado — a compatibilidade com o motor não se prova sem ele.
-81 testes em C#: 29 de domínio, 21 de compatibilidade, 31 de API.
+84 testes em C#: 29 de domínio, 21 de compatibilidade, 34 de API.
 
 ---
 

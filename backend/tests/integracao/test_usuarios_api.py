@@ -16,6 +16,7 @@ from cat.infraestrutura.repositorios.modelos import Base  # noqa: E402
 from cat.infraestrutura.repositorios.usuario_repositorio import (  # noqa: E402
     UsuarioRepositorioSql,
 )
+from tests.integracao.sessao import cabecalhos_de, senha_confere, usuario
 
 SENHA = "Sistema2026cat"
 
@@ -43,15 +44,8 @@ def cliente():
         yield c
 
 
-def token(cliente, usuario, senha=SENHA):
-    r = cliente.post("/api/auth/token",
-                     data={"username": usuario, "password": senha})
-    assert r.status_code == 200, r.text
-    return r.json()["access_token"]
-
-
-def cab(cliente, usuario, senha=SENHA):
-    return {"Authorization": f"Bearer {token(cliente, usuario, senha)}"}
+def cab(cliente, nome, senha=SENHA):
+    return cabecalhos_de(nome, senha)
 
 
 def id_de(cliente, nome, como="diretor"):
@@ -208,27 +202,22 @@ class TestFluxoDaSenhaProvisoria:
         assert r.status_code == 200
         provisoria = r.json()["senha_provisoria"]
 
-        # entra com a provisória e o sistema avisa que precisa trocar
-        entrada = cliente.post("/api/auth/token",
-                               data={"username": "ana", "password": provisoria})
-        assert entrada.status_code == 200
-        assert entrada.json()["usuario"]["senha_provisoria"] is True
+        # a provisória confere e a conta fica marcada para trocar (o login em
+        # C# lê esta marca e a tela obriga a troca)
+        assert senha_confere("ana", provisoria)
+        assert usuario("ana").senha_provisoria is True
 
         # troca
         nova = "TrocadaPelaAna2026"
-        t = {"Authorization": f"Bearer {entrada.json()['access_token']}"}
+        t = cabecalhos_de("ana", provisoria)
         troca = cliente.post("/api/usuarios/eu/senha", headers=t,
                              json={"senha_atual": provisoria, "senha_nova": nova})
         assert troca.status_code == 204
 
         # a provisória morreu, a nova funciona e a marca de troca sumiu
-        assert cliente.post("/api/auth/token",
-                            data={"username": "ana",
-                                  "password": provisoria}).status_code == 401
-        depois = cliente.post("/api/auth/token",
-                              data={"username": "ana", "password": nova})
-        assert depois.status_code == 200
-        assert depois.json()["usuario"]["senha_provisoria"] is False
+        assert not senha_confere("ana", provisoria)
+        assert senha_confere("ana", nova)
+        assert usuario("ana").senha_provisoria is False
 
     def test_troca_exige_a_senha_atual(self, cliente):
         t = cab(cliente, "coordenador")
@@ -255,13 +244,17 @@ class TestDesbloqueio:
         lista = cliente.get("/api/usuarios", headers=gestor).json()
         alvo = next(u for u in lista if u["usuario"] == "joao.novo")
 
-        for _ in range(5):
-            cliente.post("/api/auth/token",
-                         data={"username": "joao.novo", "password": "errada"})
-        recusa = cliente.post("/api/auth/token",
-                              data={"username": "joao.novo", "password": "errada"})
-        assert recusa.status_code == 403
-        assert "minuto" in recusa.json()["detail"]
+        # cinco senhas erradas, gravadas como o login em C# grava
+        from cat.dominio.acesso.usuario import UsuarioBloqueadoTemporariamente
+        from cat.infraestrutura.repositorios.banco import Sessao
+        with Sessao() as s:
+            repo = UsuarioRepositorioSql(s)
+            joao = repo.buscar_por_usuario("joao.novo")
+            for _ in range(5):
+                joao.registrar_falha()
+            repo.salvar_tentativa(joao)
+        with pytest.raises(UsuarioBloqueadoTemporariamente, match="minuto"):
+            usuario("joao.novo").garantir_que_pode_entrar()
 
         r = cliente.post(f"/api/usuarios/{alvo['id']}/desbloquear", headers=gestor)
         assert r.status_code == 200

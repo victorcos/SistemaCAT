@@ -9,7 +9,7 @@
 | # | Fatia | Situação |
 |---|---|---|
 | 0 | Fundação | **entregue em 13/09/2026, v0.28.0** — C# na 8010 repassando tudo ao motor na 8020 |
-| 1 | Autenticação | **entregue em 13/09/2026, v0.29.0** — `auth/token` e `auth/eu` em C#; senha e token cruzados com o Python |
+| 1 | Autenticação | **entregue em 13/09/2026, v0.29.0** — `auth/token` e `auth/eu` só em C# (apagados do Python); senha e token cruzados com o Python |
 | 2 | Usuários e acesso | próxima |
 | 3–7 | — | não iniciadas |
 

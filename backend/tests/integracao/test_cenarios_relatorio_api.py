@@ -31,6 +31,7 @@ from cat.dominio.acesso.usuario import Cargo, Papel
 from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
+from tests.integracao.sessao import cabecalhos_de
 
 SENHA = "Sistema2026cat"
 
@@ -155,10 +156,7 @@ def cliente():
 
 @pytest.fixture(scope="module")
 def cabecalhos(cliente):
-    r = cliente.post("/api/auth/token",
-                     data={"username": "cenarios_analista", "password": SENHA})
-    assert r.status_code == 200, r.text
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+    return cabecalhos_de("cenarios_analista", SENHA)
 
 
 @pytest.fixture(scope="module")

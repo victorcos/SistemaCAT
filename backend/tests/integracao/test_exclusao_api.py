@@ -21,6 +21,7 @@ from cat.dominio.acesso.usuario import Cargo, Papel
 from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
+from tests.integracao.sessao import cabecalhos_de, usuario
 
 SENHA = "Sistema2026cat"
 
@@ -64,9 +65,7 @@ def cliente():
 
 
 def entrar(cliente, quem):
-    r = cliente.post("/api/auth/token", data={"username": quem, "password": SENHA})
-    assert r.status_code == 200, r.text
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+    return cabecalhos_de(quem, SENHA)
 
 
 @pytest.fixture(scope="module")
@@ -175,9 +174,10 @@ class TestSenhaNaConfirmacao:
         for _ in range(6):
             cliente.request("DELETE", f"/api/projetos/{projeto_id}",
                             headers=dono, json={"senha": "errada"})
-        r = cliente.post("/api/auth/token",
-                         data={"username": "exc_dono", "password": SENHA})
-        assert r.status_code == 200
+        # o login mora na API em C#; o que importa aqui é o estado que ele lê
+        dono_agora = usuario("exc_dono")
+        assert dono_agora.tentativas_falhas == 0
+        dono_agora.garantir_que_pode_entrar()
 
     def test_senha_vazia_e_recusada(self, cliente, dono, trabalho):
         projeto_id, _ = trabalho

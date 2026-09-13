@@ -119,11 +119,12 @@ def saude() -> dict[str, object]:
 
 
 from cat.apresentacao.api.routers import (  # noqa: E402
-    auth_router, conferencia_router, historico_router, importacao_router,
+    conferencia_router, historico_router, importacao_router,
     lote_router, movimentos_router, usuarios_router,
 )
 
-app.include_router(auth_router.router)
+# O login (/api/auth/token e /api/auth/eu) mora na API em C# desde 13/09/2026.
+# O motor só valida o token nas rotas que ainda atende (seguranca.py).
 app.include_router(usuarios_router.router)
 app.include_router(importacao_router.router)
 app.include_router(lote_router.router)
