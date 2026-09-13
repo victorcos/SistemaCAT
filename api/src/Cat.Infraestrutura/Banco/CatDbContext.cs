@@ -14,6 +14,7 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
 {
     public DbSet<UsuarioLinha> Usuarios => Set<UsuarioLinha>();
     public DbSet<AlocacaoLinha> Alocacoes => Set<AlocacaoLinha>();
+    public DbSet<EmpresaLinha> Empresas => Set<EmpresaLinha>();
 
     protected override void OnModelCreating(ModelBuilder modelo)
     {
@@ -33,6 +34,8 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
             e.Property(u => u.BloqueadoAte).HasColumnName("bloqueado_ate");
             e.Property(u => u.SenhaProvisoria).HasColumnName("senha_provisoria");
             e.Property(u => u.UltimoAcesso).HasColumnName("ultimo_acesso");
+            // NOT NULL sem valor padrão no banco: o SQLAlchemy preenche do lado da aplicação
+            e.Property(u => u.CriadoEm).HasColumnName("criado_em");
             e.HasMany(u => u.Alocacoes).WithOne().HasForeignKey(a => a.UsuarioId);
         });
 
@@ -43,7 +46,24 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
             e.Property(a => a.Id).HasColumnName("id");
             e.Property(a => a.UsuarioId).HasColumnName("usuario_id");
             e.Property(a => a.EmpresaId).HasColumnName("empresa_id");
+            e.Property(a => a.PapelProjeto).HasColumnName("papel_projeto");
+            e.Property(a => a.Inicio).HasColumnName("inicio");
             e.Property(a => a.Fim).HasColumnName("fim");
+            e.Property(a => a.AlocadoPor).HasColumnName("alocado_por");
+            e.Property(a => a.MotivoSaida).HasColumnName("motivo_saida");
+        });
+
+        modelo.Entity<EmpresaLinha>(e =>
+        {
+            e.ToTable("empresa");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.CnpjRaiz).HasColumnName("cnpj_raiz");
+            e.Property(x => x.RazaoSocial).HasColumnName("razao_social");
+            e.Property(x => x.GrupoEconomico).HasColumnName("grupo_economico");
+            e.Property(x => x.Uf).HasColumnName("uf");
+            // NOT NULL sem valor padrão no banco; pre_cadastro e criada_em têm, e ficam com o banco
+            e.Property(x => x.Ativa).HasColumnName("ativa");
         });
     }
 }
@@ -63,6 +83,7 @@ public sealed class UsuarioLinha
     public DateTime? BloqueadoAte { get; set; }
     public bool SenhaProvisoria { get; set; }
     public DateTime? UltimoAcesso { get; set; }
+    public DateTime CriadoEm { get; set; }
     public List<AlocacaoLinha> Alocacoes { get; set; } = [];
 }
 
@@ -71,6 +92,20 @@ public sealed class AlocacaoLinha
     public int Id { get; set; }
     public int UsuarioId { get; set; }
     public int EmpresaId { get; set; }
+    public string PapelProjeto { get; set; } = "";
+    public DateTime Inicio { get; set; }
     /// <summary>Nunca se apaga alocação: quando a pessoa sai, preenche-se o fim.</summary>
     public DateTime? Fim { get; set; }
+    public int? AlocadoPor { get; set; }
+    public string? MotivoSaida { get; set; }
+}
+
+public sealed class EmpresaLinha
+{
+    public int Id { get; set; }
+    public string CnpjRaiz { get; set; } = "";
+    public string RazaoSocial { get; set; } = "";
+    public string? GrupoEconomico { get; set; }
+    public string? Uf { get; set; }
+    public bool Ativa { get; set; } = true;
 }

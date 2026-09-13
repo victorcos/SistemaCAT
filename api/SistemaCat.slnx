@@ -3,6 +3,7 @@
     <Project Path="src/Cat.Api/Cat.Api.csproj" />
     <Project Path="src/Cat.Aplicacao/Cat.Aplicacao.csproj" />
     <Project Path="src/Cat.Dominio/Cat.Dominio.csproj" />
+    <Project Path="src/Cat.Ferramentas/Cat.Ferramentas.csproj" />
     <Project Path="src/Cat.Infraestrutura/Cat.Infraestrutura.csproj" />
   </Folder>
   <Folder Name="/tests/">

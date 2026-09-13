@@ -9,19 +9,19 @@ namespace Cat.Api.Testes;
 /// Alembic — o dono do esquema. Testar contra SQLite provaria outra coisa: a API
 /// em C# fala só com Postgres, e é no Postgres que fuso horário e tipo pegam.
 /// </summary>
-public sealed class BancoDeTeste : IAsyncLifetime
+public class BancoDeTeste : IAsyncLifetime
 {
     public const string Pimenta = "pimenta-de-teste-nao-e-segredo";
     public const string Segredo = "segredo-de-teste-com-mais-de-trinta-e-dois-bytes-nao-e-segredo";
     public const string SenhaPadrao = "Senha-Certa-2026";
 
-    private const string Nome = "cat_testes_csharp";
+    protected virtual string Nome => "cat_testes_csharp";
 
     // mesmo contêiner do desenvolvimento; banco próprio para nunca tocar em dado de trabalho
     private static readonly string Servidor =
         Environment.GetEnvironmentVariable("CAT_TESTES_POSTGRES") ?? "Host=127.0.0.1;Port=55432;Username=cat;Password=cat";
 
-    public string Url { get; } = $"postgresql+psycopg://cat:cat@127.0.0.1:55432/{Nome}";
+    public string Url => $"postgresql+psycopg://cat:cat@127.0.0.1:55432/{Nome}";
     public string ResumoPadrao { get; } = new SenhasArgon2(Pimenta).Gerar(SenhaPadrao);
 
     public async Task InitializeAsync()
@@ -143,4 +143,10 @@ public static class RaizDoRepositorio
 public sealed class ColecaoDoBanco : ICollectionFixture<BancoDeTeste>
 {
     public const string Nome = "banco";
+}
+
+/// <summary>Migrado e sem usuário nenhum: o único estado em que semear faz algo.</summary>
+public sealed class BancoVazio : BancoDeTeste
+{
+    protected override string Nome => "cat_testes_csharp_vazio";
 }

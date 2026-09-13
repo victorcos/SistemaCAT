@@ -5,6 +5,66 @@
 
 ---
 
+## 2026-09-13 — Usuários e acesso em C#, e dois defeitos que a portagem achou
+
+**O que entrou.** As 12 rotas de `/api/usuarios` (listar, criar, redefinir
+senha, trocar a própria, papel, cargo, dados, situação, desbloquear, listar e
+definir acesso a empresas) e os comandos `semear` e `emergencia`, agora em
+`api/src/Cat.Ferramentas`. As regras vieram com as mesmas mensagens: política
+de senha, nome de usuário e e-mail, senha provisória gerada pelo sistema com o
+mesmo alfabeto sem caractere ambíguo, mínimo de três gestores ativos (dev não
+conta), ninguém rebaixa nem desativa a si mesmo, ninguém tira o próprio acesso
+a uma empresa, e alocação encerrada em vez de apagada.
+
+**Tudo isso saiu do Python na mesma entrega**, pela razão da fatia 1: regra
+viva em dois lugares diverge. Apagados `usuarios_router.py`,
+`gerir_usuarios.py`, `alocar_em_empresas.py`, os dois comandos e as regras de
+cadastro do domínio (`validar_*`, `gerar_senha_provisoria`, mínimo de
+gestores). `test_usuarios_api.py`, `test_gerir_usuarios.py` e a parte de
+política de `test_usuario.py` foram portados para C# e apagados; o teste de
+histórico deixou de usar a rota de usuários como ferramenta. O motor ganhou um
+teste que falha se `/api/usuarios` voltar a existir nele.
+
+**Dois defeitos do Python, corrigidos de propósito, cada um com teste.**
+
+1. **Senha atual errada na troca derrubava a sessão.** A rota respondia 401, e
+   a tela entende 401 com token como sessão vencida: quem errava a senha atual
+   na tela de troca era mandado para o login. Agora é **403**, o mesmo código
+   que a confirmação de exclusão de trabalho já usa para senha errada — e
+   justamente para não expulsar ninguém.
+2. **Rebaixar um gestor inativo era recusado com exatamente três ativos.** A
+   checagem descontava da contagem quem já não estava nela. `definir_situacao`
+   olhava se o alvo estava ativo; `alterar_papel` não olhava. Agora os dois olham.
+
+**Outras diferenças deliberadas.** Corpo JSON inválido ou campo fora do
+formato dá 422 com texto em `detail` (o FastAPI mandava a própria lista de
+erros, que a tela não lê). `semear` roda numa transação só: pela metade, o
+banco ficaria com menos de três gestores e "já existe usuário" impediria semear
+de novo. E as ferramentas não criam tabela: em banco sem esquema, mandam rodar
+o Alembic.
+
+**O instalador compila o C# antes de semear**, porque é por ele que os
+gestores nascem agora. As migrações continuam no Alembic.
+
+**Correção do que a fatia 1 registrou.** Ali ficou dito que o motor deixaria
+de mexer em senha depois desta fatia. Não é exato: a exclusão de trabalho pede
+a senha de confirmação e ela é conferida no motor — sai na fatia 3, junto das
+rotas de projeto. Os testes do motor também seguem gerando resumo para montar
+os próprios usuários.
+
+**Verificado na pilha real**, pela porta da tela, com uma conta temporária de
+manutenção criada pelo `criar-dev` em C# e apagada ao final: listagem e acesso
+a empresas atendidos pelo C#, recusa de rebaixar a si mesmo, senha atual errada
+com 403, o mesmo token aceito por uma rota do motor, e 404 do motor em
+`/api/usuarios`. O `listar-gestores` em C# leu o banco real e mostrou os mesmos
+três gestores que a versão Python mostrava.
+
+Baterias: C# 152 (54 de domínio, 21 de compatibilidade, 77 de API e
+ferramentas, com um banco vazio próprio para o `semear`); Python 466 (eram
+527: saíram 62 de usuários e política, entrou 1).
+
+---
+
 ## 2026-09-13 — Login em C#: provado nos dois sentidos, e o que ficou para trás
 
 **O que entrou.** `POST /api/auth/token` e `GET /api/auth/eu` passam a ser

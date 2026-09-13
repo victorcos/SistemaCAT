@@ -12,7 +12,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Cat.Dominio\Cat.Dominio.csproj" />
     <ProjectReference Include="..\Cat.Aplicacao\Cat.Aplicacao.csproj" />
   </ItemGroup>
 

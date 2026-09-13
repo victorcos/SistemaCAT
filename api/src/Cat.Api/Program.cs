@@ -49,7 +49,10 @@ builder.Services.AddSingleton<IEmissorDeToken>(sp =>
     return new TokensJwt(c.JwtSegredo, c.JwtMinutos, sp.GetRequiredService<TimeProvider>());
 });
 builder.Services.AddScoped<IRepositorioDeUsuario, UsuarioRepositorio>();
+builder.Services.AddScoped<IRepositorioDeAcesso, AcessoRepositorio>();
 builder.Services.AddScoped<Autenticar>();
+builder.Services.AddScoped<GerirUsuarios>();
+builder.Services.AddScoped<AcessoAEmpresas>();
 
 builder.Services.AddCors();
 builder.Services.AddOptions<CorsOptions>().Configure<ConfigCat>((opcoes, config) =>
@@ -99,6 +102,7 @@ app.UseCors();
 
 app.MapearSaude();
 app.MapearAuth();
+app.MapearUsuarios();
 app.MapReverseProxy(repasse =>
 {
     repasse.Use(RepasseAoMotor.TraduzirFalha);

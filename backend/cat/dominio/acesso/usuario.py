@@ -6,8 +6,6 @@ precisar de um banco para testar o que está aqui, o desenho quebrou.
 
 from __future__ import annotations
 
-import re
-import secrets
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -23,17 +21,6 @@ from enum import Enum
 TENTATIVAS_BLOQUEIO_TEMPORARIO = 5
 MINUTOS_BLOQUEIO_TEMPORARIO = 15
 TENTATIVAS_BLOQUEIO_PERMANENTE = 20
-
-# O sistema recusa ficar com menos de três gestores ativos. São os cargos de
-# direção, gerência e coordenação. Com um só, férias, desligamento ou senha
-# esquecida travam o sistema inteiro e não há quem destrave; com três, sempre
-# sobram dois. É regra de domínio, não de tela, para valer também na API.
-MINIMO_DE_GESTORES = 3
-
-TAMANHO_MINIMO_SENHA = 10
-
-_RE_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$")
-_RE_USUARIO = re.compile(r"^[a-z0-9._-]{3,40}$")
 
 
 def agora() -> datetime:
@@ -137,10 +124,6 @@ class Papel(str, Enum):
 # ---------------------------------------------------------------------------
 # Erros
 # ---------------------------------------------------------------------------
-class SenhaFraca(ValueError):
-    """Senha que não atende à política."""
-
-
 class CredencialInvalida(Exception):
     """Usuário ou senha errados. A mensagem é sempre a mesma, de propósito:
     dizer 'usuário não existe' entrega quais contas existem."""
@@ -169,88 +152,6 @@ class UsuarioBloqueado(Exception):
         super().__init__(
             "Usuário bloqueado por excesso de tentativas. Procure um gestor."
         )
-
-
-class UltimoGestor(Exception):
-    """Impede o sistema de ficar sem quem administre."""
-
-    def __init__(self, restantes: int) -> None:
-        self.restantes = restantes
-        super().__init__(
-            f"O sistema precisa de pelo menos {MINIMO_DE_GESTORES} gestores "
-            f"ativos. Promova outra pessoa antes de fazer esta alteração."
-        )
-
-
-class NaoPodeAlterarSiMesmo(Exception):
-    def __init__(self, acao: str) -> None:
-        super().__init__(f"Você não pode {acao} a si mesmo.")
-
-
-# ---------------------------------------------------------------------------
-# Validações
-# ---------------------------------------------------------------------------
-def validar_politica_de_senha(senha: str) -> None:
-    """Levanta SenhaFraca se a senha não servir.
-
-    Comprimento pesa mais que exigência de caractere especial, que só empurra o
-    usuário para 'Senha@123'. Exigimos tamanho e alguma variedade.
-    """
-    if len(senha) < TAMANHO_MINIMO_SENHA:
-        raise SenhaFraca(
-            f"A senha precisa de pelo menos {TAMANHO_MINIMO_SENHA} caracteres."
-        )
-    if senha.lower() == senha or senha.upper() == senha:
-        raise SenhaFraca("A senha precisa misturar maiúsculas e minúsculas.")
-    if not any(c.isdigit() for c in senha):
-        raise SenhaFraca("A senha precisa de pelo menos um número.")
-    if senha.strip() != senha:
-        raise SenhaFraca("A senha não pode começar nem terminar com espaço.")
-
-
-def validar_nome_de_usuario(nome: str) -> str:
-    nome = nome.strip().lower()
-    if not _RE_USUARIO.match(nome):
-        raise ValueError(
-            "Nome de usuário deve ter de 3 a 40 caracteres, entre letras "
-            "minúsculas, números, ponto, hífen e sublinhado."
-        )
-    return nome
-
-
-def validar_email(email: str) -> str:
-    email = email.strip().lower()
-    if not _RE_EMAIL.match(email):
-        raise ValueError("E-mail inválido.")
-    return email
-
-
-# alfabeto sem caractere ambíguo: quem recebe a senha provisória vai digitá-la
-# lendo de um bilhete ou de uma mensagem
-_ALFABETO_PROVISORIA = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-
-
-def gerar_senha_provisoria(tamanho: int = 14) -> str:
-    """Senha de uso único, gerada pelo sistema.
-
-    O gestor nunca escolhe a senha de ninguém. Se escolhesse, passaria a saber a
-    senha da pessoa, e toda a proteção do resumo perderia sentido na prática.
-    """
-    while True:
-        candidata = "".join(
-            secrets.choice(_ALFABETO_PROVISORIA) for _ in range(tamanho)
-        )
-        try:
-            validar_politica_de_senha(candidata)
-            return candidata
-        except SenhaFraca:
-            continue
-
-
-def garantir_minimo_de_gestores(gestores_ativos_apos: int) -> None:
-    """Chamado antes de desativar, rebaixar ou excluir um gestor."""
-    if gestores_ativos_apos < MINIMO_DE_GESTORES:
-        raise UltimoGestor(gestores_ativos_apos)
 
 
 # ---------------------------------------------------------------------------

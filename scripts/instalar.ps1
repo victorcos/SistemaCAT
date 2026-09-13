@@ -12,9 +12,9 @@
        (segredos de servidor não viajam entre máquinas) e a pasta de trabalho
        em disco local;
     4. sobe o Postgres em Docker (porta 55432). Sem Docker, usa SQLite;
-    5. aplica as migrações e cria os três gestores iniciais — as senhas
-       provisórias saem no terminal, uma vez só;
-    6. compila a API em C# (dotnet build);
+    5. compila a API em C# e as ferramentas de servidor (dotnet build);
+    6. aplica as migrações (Alembic) e cria os três gestores iniciais pelas
+       ferramentas em C# — as senhas provisórias saem no terminal, uma vez só;
     7. instala o front (npm install).
 
   É idempotente: rodar de novo não apaga .env, banco nem senhas.
@@ -170,21 +170,24 @@ if ($docker) {
     Ok "Postgres no ar"
 }
 
-# ---------------------------------------------------------------- 5. esquema e gestores
-Passo "Migrações e gestores iniciais"
-Push-Location $backend
-try {
-    Rodar "aplicar as migrações" { & $venvPython -m alembic upgrade head }
-    Ok "esquema em dia"
-    Write-Host ""
-    Rodar "criar os gestores iniciais" { & $venvPython -m cat.apresentacao.cli.semear }
-} finally { Pop-Location }
-
-# ---------------------------------------------------------------- 6. API em C#
+# ---------------------------------------------------------------- 5. API em C#
+# antes das migrações: é por ela que os gestores iniciais nascem
 Passo "API em C# (dotnet build)"
 Push-Location (Join-Path $raiz "api")
 try { Rodar "compilar a API" { dotnet build SistemaCat.slnx --nologo -v q } } finally { Pop-Location }
 Ok "API compilada"
+
+# ---------------------------------------------------------------- 6. esquema e gestores
+Passo "Migrações e gestores iniciais"
+Push-Location $backend
+try {
+    # o esquema continua com o Alembic, dono único das tabelas
+    Rodar "aplicar as migrações" { & $venvPython -m alembic upgrade head }
+    Ok "esquema em dia"
+} finally { Pop-Location }
+Write-Host ""
+$ferramentas = Join-Path $raiz "api\src\Cat.Ferramentas"
+Rodar "criar os gestores iniciais" { dotnet run --no-build --project $ferramentas -- semear }
 
 # ---------------------------------------------------------------- 7. front
 Passo "Front (npm install)"
@@ -195,5 +198,5 @@ Ok "front instalado"
 Write-Host ""
 Write-Host "Pronto. Para subir o motor, a API e a tela:" -ForegroundColor Cyan
 Write-Host "    .\scripts\subir.ps1"
-Write-Host "Depois: http://localhost:5173 (tela) e http://localhost:8010/docs (API)."
+Write-Host "Depois: http://localhost:5173 (tela) e http://localhost:8010/api/saude (quem está no ar)."
 Write-Host "Primeiro acesso com um dos gestores acima; a troca de senha é obrigatória."

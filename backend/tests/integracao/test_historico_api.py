@@ -17,7 +17,7 @@ from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import AlocacaoDB, Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
-from tests.integracao.sessao import cabecalhos_de
+from tests.integracao.sessao import cabecalhos_de, usuario
 
 SENHA = "Sistema2026cat"
 
@@ -73,8 +73,8 @@ def cab(cliente, quem):
 
 
 def id_de(cliente, nome):
-    lista = cliente.get("/api/usuarios", headers=cab(cliente, "hist_gestor")).json()
-    return next(u["id"] for u in lista if u["usuario"] == nome)
+    # a gestão de usuários mora na API em C#; aqui basta o id gravado
+    return usuario(nome).id
 
 
 @pytest.fixture(scope="module")
@@ -301,9 +301,10 @@ class TestSucessao:
 
     def test_passar_para_conta_desativada_e_recusado(self, cliente, projeto):
         alvo = id_de(cliente, "hist_inativo")
-        assert cliente.patch(f"/api/usuarios/{alvo}/situacao",
-                             headers=cab(cliente, "hist_gestor"),
-                             json={"ativo": False}).status_code == 200
+        # desativar é da gestão de usuários, que mora na API em C#
+        from cat.infraestrutura.repositorios.banco import Sessao
+        with Sessao() as s:
+            UsuarioRepositorioSql(s).definir_situacao(alvo, False)
 
         r = cliente.patch(f"/api/projetos/{projeto['id']}/responsavel",
                           headers=cab(cliente, "hist_gestor"),

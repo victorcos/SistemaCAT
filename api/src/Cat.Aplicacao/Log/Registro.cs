@@ -47,7 +47,7 @@ public static class Registro
         log.Log(nivel, default, evento, excecao, static (e, _) => e.Mensagem);
     }
 
-    internal static IReadOnlyDictionary<string, object?> ParaDicionario(object? campos) =>
+    public static IReadOnlyDictionary<string, object?> ParaDicionario(object? campos) =>
         campos switch
         {
             null => new Dictionary<string, object?>(),

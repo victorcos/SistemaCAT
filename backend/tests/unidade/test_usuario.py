@@ -3,10 +3,12 @@
 import pytest
 
 from cat.dominio.acesso.usuario import (
-    Cargo, Papel, SenhaFraca, TENTATIVAS_BLOQUEIO_PERMANENTE, Usuario,
-    UsuarioBloqueado, UsuarioInativo, validar_email, validar_nome_de_usuario,
-    validar_politica_de_senha,
+    Cargo, Papel, TENTATIVAS_BLOQUEIO_PERMANENTE, Usuario, UsuarioBloqueado,
+    UsuarioInativo,
 )
+
+# Política de senha, nome de usuário e e-mail saíram daqui quando a gestão de
+# usuários foi para a API em C# (13/09/2026): api/tests/Cat.Dominio.Testes/PoliticaTestes.cs
 
 
 def novo(**troca) -> Usuario:
@@ -14,41 +16,6 @@ def novo(**troca) -> Usuario:
                 nome_exibicao="Ana", papel=Papel.ANALISTA)
     base.update(troca)
     return Usuario(**base)
-
-
-class TestPolitica:
-    @pytest.mark.parametrize("senha", ["Sistema2026cat", "Xyz12345678A"])
-    def test_aceita_senha_boa(self, senha):
-        validar_politica_de_senha(senha)
-
-    @pytest.mark.parametrize("senha,pedaco", [
-        ("Curta1A", "10 caracteres"),
-        ("tudominusculo1", "maiúsculas"),
-        ("TUDOMAIUSCULO1", "maiúsculas"),
-        ("SemNumeroAqui", "número"),
-        (" ComEspaco123 ", "espaço"),
-    ])
-    def test_recusa_senha_ruim(self, senha, pedaco):
-        with pytest.raises(SenhaFraca, match=pedaco):
-            validar_politica_de_senha(senha)
-
-
-class TestIdentificadores:
-    def test_normaliza_usuario(self):
-        assert validar_nome_de_usuario("  Ana.Silva  ") == "ana.silva"
-
-    @pytest.mark.parametrize("nome", ["ab", "com espaco", "acento_ç", "A" * 41])
-    def test_recusa_usuario_invalido(self, nome):
-        with pytest.raises(ValueError):
-            validar_nome_de_usuario(nome)
-
-    def test_normaliza_email(self):
-        assert validar_email("  Ana@BMS.com  ") == "ana@bms.com"
-
-    @pytest.mark.parametrize("email", ["sem-arroba", "a@b", "@b.com"])
-    def test_recusa_email_invalido(self, email):
-        with pytest.raises(ValueError):
-            validar_email(email)
 
 
 class TestEntrada:

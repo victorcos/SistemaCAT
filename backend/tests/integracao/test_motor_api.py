@@ -52,6 +52,12 @@ def test_login_nao_mora_mais_no_motor(cliente):
     assert r.status_code in (404, 405)
 
 
+def test_gestao_de_usuarios_nao_mora_mais_no_motor(cliente):
+    """Mínimo de gestores e senha provisória existem num lugar só: a API em C#."""
+    assert cliente.get("/api/usuarios").status_code in (404, 405)
+    assert cliente.post("/api/usuarios/eu/senha", json={}).status_code in (404, 405)
+
+
 def test_senha_nao_e_recuperavel_do_banco(cliente):
     """O sistema não pode ser capaz de descobrir a senha de ninguém."""
     motor = create_engine(obter_config().banco_url,

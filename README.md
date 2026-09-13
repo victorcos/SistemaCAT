@@ -85,7 +85,7 @@ cd backend
 python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"
 cp ../.env.example .env          # e ajuste CAT_JWT_SEGREDO
 alembic upgrade head                     # cria o esquema
-python -m cat.apresentacao.cli.semear    # cria os três gestores
+dotnet run --project ../api/src/Cat.Ferramentas -- semear   # cria os três gestores
 python -m uvicorn cat.apresentacao.api.app:app --reload --host 127.0.0.1 --port 8020
 ```
 
@@ -111,9 +111,11 @@ Se um gestor perder o acesso e não houver outro disponível, a saída é pelo
 servidor:
 
 ```
-python -m cat.apresentacao.cli.emergencia listar-gestores
-python -m cat.apresentacao.cli.emergencia promover <usuario>
-python -m cat.apresentacao.cli.emergencia redefinir <usuario>
+cd api
+dotnet run --project src/Cat.Ferramentas -- emergencia listar-gestores
+dotnet run --project src/Cat.Ferramentas -- emergencia promover <usuario>
+dotnet run --project src/Cat.Ferramentas -- emergencia redefinir <usuario>
+dotnet run --project src/Cat.Ferramentas -- emergencia desbloquear <usuario>
 ```
 
 Testes:

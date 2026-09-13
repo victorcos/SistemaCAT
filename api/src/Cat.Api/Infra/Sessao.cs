@@ -28,6 +28,25 @@ public static class Sessao
             return await proximo(contexto);
         });
 
+    /// <summary>
+    /// Exige uma CAPACIDADE do domínio, não um papel: enumerar papéis na rota
+    /// faz todo papel novo exigir caçar rotas para atualizar. Vem depois de
+    /// <see cref="ExigirUsuario"/> — sem sessão é 401, sem permissão é 403.
+    /// </summary>
+    public static RouteHandlerBuilder ExigirCapacidade(this RouteHandlerBuilder rota,
+        Func<Papel, bool> capacidade, string nome, string descricao) =>
+        rota.ExigirUsuario().AddEndpointFilter(async (contexto, proximo) =>
+        {
+            var usuario = contexto.HttpContext.UsuarioAtual();
+            if (capacidade(usuario.Papel))
+                return await proximo(contexto);
+            contexto.HttpContext.RequestServices.GetRequiredService<ILogger<Usuario>>()
+                .Aviso("acesso negado por falta de capacidade",
+                    new { usuario_id = usuario.Id, papel = usuario.Papel.Valor(), capacidade_exigida = nome });
+            return Results.Json(new Dictionary<string, string> { ["detail"] = $"Você não tem permissão para {descricao}." },
+                statusCode: StatusCodes.Status403Forbidden);
+        });
+
     public static Usuario UsuarioAtual(this HttpContext http) =>
         http.Items[Chave] as Usuario
         ?? throw new InvalidOperationException("Rota sem ExigirUsuario() pediu o usuário atual.");

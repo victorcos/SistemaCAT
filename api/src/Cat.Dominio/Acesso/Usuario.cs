@@ -58,6 +58,9 @@ public sealed class Usuario
         return (int)Math.Max(0, (inteiros + 59) / 60);
     }
 
+    /// <summary>Qualquer forma de bloqueio, para a listagem do gestor.</summary>
+    public bool Bloqueado(DateTimeOffset agora) => BloqueadoEmDefinitivo || MinutosDeEspera(agora) > 0;
+
     /// <summary>
     /// Ordem importa: inativo antes de bloqueado, porque desativar é decisão do
     /// gestor e bloquear é consequência automática. E o permanente antes do

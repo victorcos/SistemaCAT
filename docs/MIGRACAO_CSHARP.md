@@ -10,8 +10,9 @@
 |---|---|---|
 | 0 | Fundação | **entregue em 13/09/2026, v0.28.0** — C# na 8010 repassando tudo ao motor na 8020 |
 | 1 | Autenticação | **entregue em 13/09/2026, v0.29.0** — `auth/token` e `auth/eu` só em C# (apagados do Python); senha e token cruzados com o Python |
-| 2 | Usuários e acesso | próxima |
-| 3–7 | — | não iniciadas |
+| 2 | Usuários e acesso | **entregue em 13/09/2026, v0.30.0** — as 12 rotas de `/api/usuarios`, `semear` e `emergencia` só em C# |
+| 3 | Empresas e projetos | próxima |
+| 4–7 | — | não iniciadas |
 
 ---
 
@@ -170,9 +171,9 @@ o original deixa duas regras vivas para divergir.
 As fatias 1 a 4 não tocam arquivo fiscal e dão para validar numa máquina sem
 base de cliente. A 5 e a 6 pedem uma rodada com dado real antes de fechar.
 
-As ferramentas de linha de comando (`semear`, `emergencia`) ficam em Python até
-a fatia 2 e são portadas junto dela, para a regra de senha provisória não
-existir em dois lugares.
+As ferramentas de linha de comando (`semear`, `emergencia`) foram portadas na
+fatia 2, para a regra de senha provisória não existir em dois lugares. Moram em
+`api/src/Cat.Ferramentas` e rodam com `dotnet run --project api/src/Cat.Ferramentas -- <comando>`.
 
 ---
 
