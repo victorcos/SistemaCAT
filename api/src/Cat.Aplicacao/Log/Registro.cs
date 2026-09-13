@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 
-namespace Cat.Infraestrutura.Log;
+namespace Cat.Aplicacao.Log;
 
 /// <summary>
 /// Uma linha de log com mensagem fixa e campos à parte, como o

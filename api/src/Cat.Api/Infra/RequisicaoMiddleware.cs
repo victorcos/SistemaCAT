@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using Cat.Infraestrutura.Log;
+using Cat.Aplicacao.Log;
 
 namespace Cat.Api.Infra;
 

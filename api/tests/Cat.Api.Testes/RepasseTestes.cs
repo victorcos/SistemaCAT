@@ -42,9 +42,9 @@ public sealed class MotorFalso : IAsyncLifetime
                 corpo = await leitor.ReadToEndAsync(),
             });
         });
-        // o FastAPI recusando credencial: o repasse não pode reescrever isto
-        _app.MapPost("/api/auth/token", () => Results.Json(
-            new { detail = "Usuário ou senha inválidos." }, statusCode: 401));
+        // o FastAPI recusando uma regra: o repasse não pode reescrever isto
+        _app.MapPost("/api/projetos/{id}/conferencias", () => Results.Json(
+            new { detail = "Já existe uma conferência em andamento neste trabalho." }, statusCode: 409));
 
         await _app.StartAsync();
         var endereco = _app.Services.GetRequiredService<IServer>()
@@ -171,12 +171,11 @@ public sealed class RepasseTestes(MotorFalso motor) : IClassFixture<MotorFalso>,
     [Fact]
     public async Task Recusa_do_motor_passa_intacta()
     {
-        var resposta = await Cliente().PostAsync("/api/auth/token",
-            new FormUrlEncodedContent(new Dictionary<string, string> { ["username"] = "x", ["password"] = "y" }));
+        var resposta = await Cliente().PostAsync("/api/projetos/7/conferencias", null);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, resposta.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, resposta.StatusCode);
         var corpo = await resposta.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("Usuário ou senha inválidos.", corpo.GetProperty("detail").GetString());
+        Assert.Equal("Já existe uma conferência em andamento neste trabalho.", corpo.GetProperty("detail").GetString());
     }
 
     [Fact]

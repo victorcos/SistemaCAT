@@ -1,0 +1,49 @@
+{
+  "_origem": "gerado por argon2-cffi 25.1.0, bcrypt e python-jose 3.5.0 a partir do backend Python; pimenta e segredo de teste, nao sao segredo",
+  "argon2": [
+    {
+      "senha": "Senha-De-Teste-2026",
+      "pimenta": "pimenta-de-teste-nao-e-segredo",
+      "resumo": "$argon2id$v=19$m=65536,t=3,p=4$1Rh6civjQVV06+5Toh7/YA$ZU25y6ZH806nyXwcgLGwztM+wBnX5G7XLK4cTjTQixI"
+    },
+    {
+      "senha": "Açúcar com Ção e émoji 🎉 9X",
+      "pimenta": "pimenta-de-teste-nao-e-segredo",
+      "resumo": "$argon2id$v=19$m=65536,t=3,p=4$I5CTtZA4f86te2ILemyhcg$RZWFYzU4IrUy4tvbfShm+aMoT/QvhmP9GtcPvCfy9o0"
+    },
+    {
+      "senha": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "pimenta": "pimenta-de-teste-nao-e-segredo",
+      "resumo": "$argon2id$v=19$m=65536,t=3,p=4$OPX1/QjVlJ6aP+Ywguxa2Q$lyz4AQiRS5+HFjTUVM5oV/+Z4p6jAa5BcI2OZckTtLY"
+    },
+    {
+      "senha": "Senha-De-Teste-2026",
+      "pimenta": "",
+      "resumo": "$argon2id$v=19$m=65536,t=3,p=4$IpqZQ0uGmZoSOxaiJeRJ0g$hYis/4xP8F+AleZRxQxSpjCTjQ9aada/2UTiUfjwpSc"
+    }
+  ],
+  "bcrypt_legado": {
+    "senha": "Senha-Antiga-1",
+    "resumo": "$2b$04$e7sIz8hwJKsbgWHGlnaI0.ttQ087gNGdaMM0U7dJqhTIHHCRUKS9u"
+  },
+  "defasado": {
+    "senha": "Senha-De-Teste-2026",
+    "pimenta": "pimenta-de-teste-nao-e-segredo",
+    "resumo": "$argon2id$v=19$m=19456,t=2,p=1$PPf/EsF+sdtcH1YvCJn5pA$HuWhBBNOKD7Vpf0AiBrHIf5Y1lStKvRHG/EXk0QZXg4"
+  },
+  "token": {
+    "segredo": "segredo-de-teste-com-mais-de-trinta-e-dois-bytes-nao-e-segredo",
+    "carga": {
+      "sub": "7",
+      "usr": "analista.um",
+      "pap": "analista",
+      "emp": [
+        3,
+        11
+      ],
+      "iat": 1789000000,
+      "exp": 4102444800
+    },
+    "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3IiwidXNyIjoiYW5hbGlzdGEudW0iLCJwYXAiOiJhbmFsaXN0YSIsImVtcCI6WzMsMTFdLCJpYXQiOjE3ODkwMDAwMDAsImV4cCI6NDEwMjQ0NDgwMH0.yoIQtmJRo4bDkVaMYJSDJlRK6BN5TvkqrZkzgCT1mqE"
+  }
+}

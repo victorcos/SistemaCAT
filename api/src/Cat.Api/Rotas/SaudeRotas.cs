@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Cat.Infraestrutura.Configuracao;
-using Cat.Infraestrutura.Log;
+using Cat.Aplicacao.Log;
 
 namespace Cat.Api.Rotas;
 

@@ -1,5 +1,5 @@
 using Cat.Infraestrutura.Configuracao;
-using Cat.Infraestrutura.Log;
+using Cat.Aplicacao.Log;
 using Microsoft.Extensions.Primitives;
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Forwarder;

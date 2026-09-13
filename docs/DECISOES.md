@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-09-13 — Login em C#: provado nos dois sentidos, e o que ficou para trás
+
+**O que entrou.** `POST /api/auth/token` e `GET /api/auth/eu` passam a ser
+atendidos pela API em C#, com o domínio de acesso portado regra por regra
+(bloqueio em 5, 15 minutos e 20; inativo antes de bloqueado; escopo pelas
+alocações vigentes; papel desconhecido no banco rebaixa para leitura).
+
+**A compatibilidade foi provada antes de qualquer rota.** Dois tipos de teste,
+porque cada um prova só uma direção:
+
+1. **Vetores gravados pelo Python** (`tests/Cat.Compatibilidade.Testes/vetores-python.json`):
+   resumos Argon2id com e sem pimenta, com acento e emoji, com mais de 72
+   bytes, um bcrypt legado, um Argon2 de parâmetros defasados e um token. O
+   C# confere todos. Pimenta e segredo ali são de teste.
+2. **Cruzamento ao vivo**: o C# gera o resumo e emite o token, e o código
+   Python de verdade confere — e diz que **não** quer regravar. Se quisesse,
+   cada login alternaria o resumo entre os dois lados para sempre.
+
+O detalhe que decidia tudo: a pimenta entra por HMAC-SHA256, e o que vai ao
+Argon2 é o **hexadecimal** do HMAC, não os bytes. Errar isso passa em todo
+teste feito só de um lado.
+
+**Ensaio na pilha real.** Com o motor Python **derrubado de propósito**, o
+login, o `/auth/eu` e a recusa de senha funcionaram pela porta da tela — quem
+respondeu foi o C#. Com o motor de volta, o token emitido pelo C# foi aceito
+pelas rotas do Python, que aplicou a própria regra de permissão (papel
+`leitura` recebeu 403 em `/api/usuarios`). Feito com um usuário temporário,
+apagado ao final.
+
+**A rota de login do Python não foi apagada.** Dez arquivos de teste de
+integração do backend obtêm token por ela. Pela porta da tela ela não é mais
+alcançável — a rota em C# vence o repasse —, e o motor só escuta em
+`127.0.0.1`. Sai quando a bateria Python deixar de depender dela; até lá, a
+regra de login existe nos dois lados, e mudança nela precisa ir aos dois.
+
+**Três diferenças deliberadas.**
+
+- **Formulário incompleto dá 422 com texto em `detail`.** O FastAPI devolvia
+  a própria lista de erros de validação, que a tela não lê: aparecia a
+  mensagem genérica.
+- **Segredo do token com menos de 32 bytes impede a API de subir.** A
+  biblioteca recusa chave HS256 abaixo de 256 bits, e sem este aviso nenhum
+  login funcionaria, com um erro que não diz o motivo. O instalador já gera 64
+  caracteres.
+- **A carga do token é escrita à mão**, sem descritor: o descritor acrescenta
+  `nbf` e reordena campos. Igual ao Python é mais fácil de conferir do que
+  equivalente.
+
+**Testes em Postgres de verdade.** O banco `cat_testes_csharp` é recriado a
+cada rodada e migrado pelo Alembic, no mesmo contêiner do desenvolvimento e
+sem tocar em dado de trabalho. Os testes precisam do Docker de pé e do
+ambiente Python instalado — a compatibilidade com o motor não se prova sem ele.
+81 testes em C#: 29 de domínio, 21 de compatibilidade, 31 de API.
+
+---
+
 ## 2026-09-13 — Fundação da API em C#: o que o repasse precisou saber
 
 **O que entrou.** A API em C# (`api/`, .NET 10) sobe na 8010 e atende

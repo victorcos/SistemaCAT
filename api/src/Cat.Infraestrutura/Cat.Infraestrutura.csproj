@@ -11,4 +11,16 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Cat.Dominio\Cat.Dominio.csproj" />
+    <ProjectReference Include="..\Cat.Aplicacao\Cat.Aplicacao.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
+    <PackageReference Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.22.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+  </ItemGroup>
+
 </Project>

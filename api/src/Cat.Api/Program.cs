@@ -1,7 +1,12 @@
 using System.Text.Json;
 using Cat.Api.Infra;
 using Cat.Api.Rotas;
+using Cat.Aplicacao.Acesso;
+using Cat.Infraestrutura.Auth;
+using Cat.Infraestrutura.Banco;
 using Cat.Infraestrutura.Configuracao;
+using Microsoft.EntityFrameworkCore;
+using Cat.Aplicacao.Log;
 using Cat.Infraestrutura.Log;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.Extensions.Logging.Console;
@@ -32,6 +37,20 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 });
 builder.Services.AddHttpClient(SaudeRotas.ClienteDoMotor, c => c.Timeout = TimeSpan.FromSeconds(3));
 
+// ---------- acesso ----------
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddDbContext<CatDbContext>((sp, o) =>
+    o.UseNpgsql(ConexaoPostgres.DeUrl(sp.GetRequiredService<ConfigCat>().BancoUrl)));
+builder.Services.AddSingleton<IConferidorDeSenha>(sp => new SenhasArgon2(
+    sp.GetRequiredService<ConfigCat>().SenhaPimenta, sp.GetRequiredService<ILogger<SenhasArgon2>>()));
+builder.Services.AddSingleton<IEmissorDeToken>(sp =>
+{
+    var c = sp.GetRequiredService<ConfigCat>();
+    return new TokensJwt(c.JwtSegredo, c.JwtMinutos, sp.GetRequiredService<TimeProvider>());
+});
+builder.Services.AddScoped<IRepositorioDeUsuario, UsuarioRepositorio>();
+builder.Services.AddScoped<Autenticar>();
+
 builder.Services.AddCors();
 builder.Services.AddOptions<CorsOptions>().Configure<ConfigCat>((opcoes, config) =>
     opcoes.AddDefaultPolicy(p => p
@@ -57,14 +76,29 @@ log.Info("API no ar", new
     porta = config.PortaApi,
     motor = config.MotorUrl.ToString(),
     origens = config.Origens,
+    banco = ConexaoPostgres.Mascarar(config.BancoUrl),
     pasta_de_trabalho = config.PastaDeTrabalho,
     raiz_backend = config.RaizBackend,
 });
+
+if (config.SegredoEPadrao)
+    log.Erro("CAT_JWT_SEGREDO está com o valor padrão. Qualquer um pode forjar um token. " +
+             "Definir a variável antes de expor o serviço.", new { acao = "definir CAT_JWT_SEGREDO" });
+if (System.Text.Encoding.UTF8.GetByteCount(config.JwtSegredo) < 32)
+    // abaixo de 256 bits a biblioteca de token recusa a chave e nenhum login funciona
+    throw new InvalidOperationException("CAT_JWT_SEGREDO precisa de pelo menos 32 bytes para HS256.");
+if (config.JwtAlgoritmo != "HS256")
+    throw new InvalidOperationException($"CAT_JWT_ALGORITMO={config.JwtAlgoritmo}: a API em C# só emite HS256.");
+if (config.SemPimenta)
+    log.Aviso("CAT_SENHA_PIMENTA não definida. As senhas seguem protegidas por Argon2id com sal, " +
+              "mas um vazamento do banco não teria a barreira extra do segredo de servidor.",
+        new { acao = "definir CAT_SENHA_PIMENTA" });
 
 app.UseMiddleware<RequisicaoMiddleware>();
 app.UseCors();
 
 app.MapearSaude();
+app.MapearAuth();
 app.MapReverseProxy(repasse =>
 {
     repasse.Use(RepasseAoMotor.TraduzirFalha);

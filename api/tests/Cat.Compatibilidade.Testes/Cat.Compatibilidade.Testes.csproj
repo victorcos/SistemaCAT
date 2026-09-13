@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -8,11 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="Npgsql" Version="10.0.3" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
@@ -22,8 +20,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Cat.Api\Cat.Api.csproj" />
     <ProjectReference Include="..\..\src\Cat.Infraestrutura\Cat.Infraestrutura.csproj" />
+    <ProjectReference Include="..\..\src\Cat.Aplicacao\Cat.Aplicacao.csproj" />
+    <ProjectReference Include="..\..\src\Cat.Dominio\Cat.Dominio.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="vetores-python.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
