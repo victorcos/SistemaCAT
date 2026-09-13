@@ -202,6 +202,30 @@ public sealed class CruzamentoComOPythonTestes
         Assert.Equal([5, 8], saida.GetProperty("empresas").EnumerateArray().Select(x => x.GetInt32()));
     }
 
+    [Fact]
+    public async Task Digito_do_cnpj_calculado_no_csharp_confere_no_python_inclusive_alfanumerico()
+    {
+        // o motor lê CNPJ de todo arquivo; a API valida o que a pessoa digita.
+        // Um dígito diferente entre os dois recusaria na tela o CNPJ que o SPED traz.
+        const string alfabeto = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        var aleatorio = new Random(20260913);
+        var cnpjs = Enumerable.Range(0, 300).Select(i =>
+        {
+            var baseDoze = new string(Enumerable.Range(0, 12)
+                .Select(_ => alfabeto[aleatorio.Next(i % 3 == 0 ? 10 : alfabeto.Length)]).ToArray());
+            return baseDoze + Cat.Dominio.Comum.Cnpj.DigitosVerificadores(baseDoze);
+        }).ToList();
+
+        var saida = await Python("""
+            import json, sys
+            from cat.dominio.comum.cnpj import tentar
+            e = json.load(sys.stdin)
+            print(json.dumps({"recusados": [c for c in e["cnpjs"] if tentar(c) is None and len(set(c)) > 1]}))
+            """, new { cnpjs });
+
+        Assert.Empty(saida.GetProperty("recusados").EnumerateArray());
+    }
+
     /// <summary>Roda um trecho com o Python do backend, que é o que está em produção.</summary>
     private static async Task<JsonElement> Python(string codigo, object entrada)
     {

@@ -85,29 +85,3 @@ class TestValorNoBanco:
         """Rebaixar para leitura é o padrão; virar dev por acidente, jamais."""
         with pytest.raises(ValueError):
             Papel("desenvolvedor")
-
-
-class TestQuemApagaTrabalho:
-    """Apagar um trabalho é de quem responde por ele.
-
-    Vale como teste de unidade porque a regra mora no domínio; a API só
-    pergunta. E porque a bateria de integração não pode criar gestor extra sem
-    furar a salvaguarda do mínimo de três.
-    """
-
-    @pytest.mark.parametrize(("papel", "pode"), [
-        (Papel.DEV, True),
-        (Papel.GESTOR, True),
-        (Papel.ANALISTA, False),
-        (Papel.REVISOR, False),
-        (Papel.LEITURA, False),
-    ])
-    def test_capacidade_por_papel(self, papel, pode):
-        assert papel.pode_excluir_trabalho is pode
-
-    def test_quem_escreve_nem_sempre_apaga(self):
-        # analista e revisor escrevem, apuram e entregam — e não desfazem
-        # meses de trabalho de uma vez
-        for papel in (Papel.ANALISTA, Papel.REVISOR):
-            assert papel.pode_escrever
-            assert not papel.pode_excluir_trabalho

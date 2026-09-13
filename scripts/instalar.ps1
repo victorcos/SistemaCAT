@@ -125,9 +125,17 @@ Passo "backend\.env"
 $env_ = Join-Path $backend ".env"
 if (Test-Path $env_) {
     Ok ".env já existe — mantido (segredos e pimenta não se trocam por acidente)"
+    # O segredo do canal interno chegou depois (13/09/2026). Acrescentar a um
+    # .env antigo é seguro: ao contrário da pimenta, trocá-lo não invalida nada.
+    if (-not (Select-String -Path $env_ -Pattern "^CAT_MOTOR_SEGREDO=." -Quiet)) {
+        $motorSegredo = & $venvPython -c "import secrets; print(secrets.token_urlsafe(32))"
+        Add-Content -Path $env_ -Encoding UTF8 -Value "`r`n# Segredo do canal interno entre a API em C# e o motor. Trocar exige reiniciar os dois.`r`nCAT_MOTOR_SEGREDO=$motorSegredo"
+        Ok "CAT_MOTOR_SEGREDO acrescentado ao .env existente"
+    }
 } else {
     $segredo = & $venvPython -c "import secrets; print(secrets.token_urlsafe(48))"
     $pimenta = & $venvPython -c "import secrets; print(secrets.token_urlsafe(32))"
+    $motorSegredo = & $venvPython -c "import secrets; print(secrets.token_urlsafe(32))"
     $trabalho = Join-Path $backend "data\trabalho"
     New-Item -ItemType Directory -Force $trabalho | Out-Null
     $bancoUrl = if ($docker) { "postgresql+psycopg://cat:cat@localhost:55432/cat" }
@@ -144,6 +152,9 @@ CAT_JWT_MINUTOS=480
 
 # Pimenta da senha, gerada aqui. Trocar invalida TODAS as senhas.
 CAT_SENHA_PIMENTA=$pimenta
+
+# Segredo do canal interno entre a API em C# e o motor. Trocar exige reiniciar os dois.
+CAT_MOTOR_SEGREDO=$motorSegredo
 
 CAT_LOG_NIVEL=INFO
 CAT_ORIGENS_PERMITIDAS=http://localhost:5173

@@ -23,6 +23,7 @@ os.environ.setdefault(
 )
 os.environ.setdefault("CAT_JWT_SEGREDO", "segredo-so-de-teste-nao-usar-em-producao")
 os.environ.setdefault("CAT_SENHA_PIMENTA", "pimenta-so-de-teste")
+os.environ.setdefault("CAT_MOTOR_SEGREDO", "segredo-do-canal-so-de-teste")
 os.environ.setdefault("CAT_LOG_NIVEL", "WARNING")
 
 # O disco precisa ser isolado tanto quanto o banco. Sem isto, a execução

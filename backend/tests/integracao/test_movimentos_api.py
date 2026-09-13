@@ -19,6 +19,7 @@ from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
+from tests.integracao.cadastro import criar_empresa, criar_projeto, ultima_situacao
 
 SENHA = "Sistema2026cat"
 
@@ -82,20 +83,10 @@ def base(tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def projeto_id(cliente, cabecalhos, base):
-    r = cliente.post("/api/empresas", headers=cabecalhos, json={
-        "cnpj_raiz": RAIZ, "cnpj_matriz": CNPJ,
-        "razao_social": "EMPRESA DOS MOVIMENTOS", "uf": "SP",
-        "inscricao_estadual": "123456789012",
-    })
-    assert r.status_code == 201, r.text
-    r = cliente.post("/api/projetos", headers=cabecalhos, json={
-        "empresa_id": r.json()["id"], "frente": "cat42",
-        "nome": "Movimentos de teste",
-        "competencia_ini": "2021-05-01", "competencia_fim": "2021-05-01",
-        "observacao": None,
-    })
-    assert r.status_code == 201, r.text
-    projeto = r.json()["id"]
+    empresa = criar_empresa(raiz=RAIZ, cnpj=CNPJ, razao="EMPRESA DOS MOVIMENTOS",
+                            ie="123456789012", por="mov_analista")
+    projeto = criar_projeto(empresa_id=empresa, nome="Movimentos de teste",
+                            por="mov_analista")
     r = cliente.post(f"/api/projetos/{projeto}/lotes", headers=cabecalhos,
                      json={"pasta": base, "observacao": None})
     assert r.status_code == 201, r.text
@@ -111,9 +102,6 @@ def rodar_na_hora():
         yield
 
 
-def _etapa(cliente, cabecalhos, projeto_id, chave):
-    d = cliente.get(f"/api/projetos/{projeto_id}", headers=cabecalhos).json()
-    return next(e for e in d["etapas"] if e["chave"] == chave)
 
 
 class TestOrdemDasEtapas:
@@ -121,7 +109,8 @@ class TestOrdemDasEtapas:
         r = cliente.post(f"/api/projetos/{projeto_id}/movimentos", headers=cabecalhos)
         assert r.status_code == 422
         assert "conferência" in r.json()["detail"].lower()
-        assert _etapa(cliente, cabecalhos, projeto_id, "movimentos")["situacao"] == "bloqueada"
+        # recusada, não chegou a nascer rodada — a etapa segue bloqueada no C#
+        assert ultima_situacao(projeto_id, "movimentos") is None
 
 
 class TestFluxo:
@@ -156,7 +145,7 @@ class TestFluxo:
                    for a in r["avisos"])
 
     def test_a_etapa_do_projeto_conclui(self, cliente, cabecalhos, projeto_id, execucao):
-        assert _etapa(cliente, cabecalhos, projeto_id, "movimentos")["situacao"] == "concluida"
+        assert ultima_situacao(projeto_id, "movimentos") == "concluida"
 
     def test_lista_e_detalha(self, cliente, cabecalhos, projeto_id, execucao):
         lista = cliente.get(f"/api/projetos/{projeto_id}/movimentos",

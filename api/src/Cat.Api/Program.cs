@@ -2,6 +2,8 @@ using System.Text.Json;
 using Cat.Api.Infra;
 using Cat.Api.Rotas;
 using Cat.Aplicacao.Acesso;
+using Cat.Aplicacao.Trabalhos;
+using Cat.Infraestrutura.Motor;
 using Cat.Infraestrutura.Auth;
 using Cat.Infraestrutura.Banco;
 using Cat.Infraestrutura.Configuracao;
@@ -54,6 +56,13 @@ builder.Services.AddScoped<Autenticar>();
 builder.Services.AddScoped<GerirUsuarios>();
 builder.Services.AddScoped<AcessoAEmpresas>();
 
+// ---------- trabalhos ----------
+builder.Services.AddScoped<IRepositorioDeTrabalhos, TrabalhoRepositorio>();
+builder.Services.AddScoped<Trabalhos>();
+builder.Services.AddScoped<ExcluirTrabalho>();
+// canal interno com o motor: apagar pasta de trabalho grande leva tempo
+builder.Services.AddHttpClient<IMotor, MotorHttp>(c => c.Timeout = TimeSpan.FromMinutes(5));
+
 builder.Services.AddCors();
 builder.Services.AddOptions<CorsOptions>().Configure<ConfigCat>((opcoes, config) =>
     opcoes.AddDefaultPolicy(p => p
@@ -92,6 +101,10 @@ if (System.Text.Encoding.UTF8.GetByteCount(config.JwtSegredo) < 32)
     throw new InvalidOperationException("CAT_JWT_SEGREDO precisa de pelo menos 32 bytes para HS256.");
 if (config.JwtAlgoritmo != "HS256")
     throw new InvalidOperationException($"CAT_JWT_ALGORITMO={config.JwtAlgoritmo}: a API em C# só emite HS256.");
+if (string.IsNullOrEmpty(config.MotorSegredo))
+    log.Erro("CAT_MOTOR_SEGREDO não definido. O canal interno com o motor fica fechado: apagar trabalho " +
+             "com execuções vai falhar. Rodar scripts\\instalar.ps1 acrescenta o segredo ao backend/.env.",
+        new { acao = "definir CAT_MOTOR_SEGREDO" });
 if (config.SemPimenta)
     log.Aviso("CAT_SENHA_PIMENTA não definida. As senhas seguem protegidas por Argon2id com sal, " +
               "mas um vazamento do banco não teria a barreira extra do segredo de servidor.",
@@ -103,6 +116,7 @@ app.UseCors();
 app.MapearSaude();
 app.MapearAuth();
 app.MapearUsuarios();
+app.MapearTrabalhos();
 app.MapReverseProxy(repasse =>
 {
     repasse.Use(RepasseAoMotor.TraduzirFalha);

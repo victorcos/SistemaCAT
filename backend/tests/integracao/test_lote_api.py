@@ -17,6 +17,7 @@ from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
+from tests.integracao.cadastro import criar_empresa, criar_projeto, quantas_empresas, tem_base
 
 SENHA = "Sistema2026cat"
 
@@ -61,21 +62,11 @@ def cabecalhos(cliente):
 
 @pytest.fixture(scope="module")
 def projeto_id(cliente, cabecalhos):
-    r = cliente.post("/api/empresas", headers=cabecalhos, json={
-        "cnpj_raiz": "77665544", "cnpj_matriz": "77665544000105",
-        "razao_social": "EMPRESA DO LOTE LTDA", "uf": "SP",
-        "inscricao_estadual": "407048962113",
-    })
-    assert r.status_code == 201, r.text
-    empresa = r.json()["id"]
-
-    r = cliente.post("/api/projetos", headers=cabecalhos, json={
-        "empresa_id": empresa, "frente": "cat42", "nome": "CAT 42 de teste",
-        "competencia_ini": "2025-01-01", "competencia_fim": "2025-12-01",
-        "observacao": None,
-    })
-    assert r.status_code == 201, r.text
-    return r.json()["id"]
+    empresa = criar_empresa(raiz="77665544", cnpj="77665544000105",
+                            razao="EMPRESA DO LOTE LTDA", ie="407048962113",
+                            por="lote_analista")
+    return criar_projeto(empresa_id=empresa, nome="CAT 42 de teste",
+                         ini="2025-01-01", fim="2025-12-01", por="lote_analista")
 
 
 def escrever(pasta, nome, conteudo):
@@ -101,7 +92,7 @@ class TestConferirAntesDeGravar:
     def test_diz_o_que_ha_sem_criar_nada(
         self, cliente, cabecalhos, projeto_id, pasta_com_base
     ):
-        antes = len(cliente.get("/api/empresas", headers=cabecalhos).json())
+        antes = quantas_empresas()
 
         r = cliente.post(f"/api/projetos/{projeto_id}/lotes/inspecionar",
                          headers=cabecalhos, json={"pasta": pasta_com_base})
@@ -115,7 +106,7 @@ class TestConferirAntesDeGravar:
         assert corpo["competencia_ini"] == "2025-01-01"
 
         # conferir não cria empresa: é o que separa esta tela do cadastro
-        assert len(cliente.get("/api/empresas", headers=cabecalhos).json()) == antes
+        assert quantas_empresas() == antes
         assert cliente.get(f"/api/projetos/{projeto_id}/lotes",
                            headers=cabecalhos).json() == []
 
@@ -158,14 +149,11 @@ class TestRegistrar:
                             headers=cabecalhos).json()
         assert [l["id"] for l in lista] == [lote["id"]]
 
-    def test_a_etapa_de_importar_so_conclui_com_base(
+    def test_o_lote_grava_a_base_de_que_a_etapa_de_importar_depende(
         self, cliente, cabecalhos, projeto_id
     ):
-        # o projeto já existia antes deste lote, e a etapa não estava concluída;
-        # agora que há base, está
-        d = cliente.get(f"/api/projetos/{projeto_id}", headers=cabecalhos).json()
-        etapa = next(e for e in d["etapas"] if e["chave"] == "importar")
-        assert etapa["situacao"] == "concluida"
+        # a etapa "importar" é calculada no C# a partir disto: lote com arquivo útil
+        assert tem_base(projeto_id)
 
     def test_a_mesma_pasta_nao_entra_duas_vezes(
         self, cliente, cabecalhos, projeto_id, pasta_com_base

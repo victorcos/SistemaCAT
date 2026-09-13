@@ -29,6 +29,12 @@ public sealed partial class ConfigCat
     public required int JwtMinutos { get; init; }
     public required string SenhaPimenta { get; init; }
 
+    /// <summary>
+    /// Segredo do canal interno com o motor. Quem chega à porta do motor sem
+    /// ele não apaga pasta nem lê disco, mesmo estando na própria máquina.
+    /// </summary>
+    public required string MotorSegredo { get; init; }
+
     public const string SegredoPadrao = "trocar-em-producao-isto-nao-e-segredo";
     public bool SegredoEPadrao => JwtSegredo.StartsWith("trocar-em-producao", StringComparison.Ordinal);
     public bool SemPimenta => SenhaPimenta.Length == 0;
@@ -79,6 +85,7 @@ public sealed partial class ConfigCat
             JwtAlgoritmo = Valor("CAT_JWT_ALGORITMO", "HS256"),
             JwtMinutos = int.Parse(Valor("CAT_JWT_MINUTOS", "480")),
             SenhaPimenta = Valor("CAT_SENHA_PIMENTA", ""),
+            MotorSegredo = Valor("CAT_MOTOR_SEGREDO", ""),
         };
     }
 

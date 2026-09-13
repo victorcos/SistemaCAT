@@ -18,6 +18,9 @@ from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import AlocacaoDB, Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de, usuario
+from tests.integracao.cadastro import (
+    comentarios, criar_empresa, criar_projeto, nome_de, projeto as projeto_do_banco,
+)
 
 SENHA = "Sistema2026cat"
 
@@ -79,14 +82,8 @@ def id_de(cliente, nome):
 
 @pytest.fixture(scope="module")
 def projeto(cliente):
-    c = cab(cliente, "hist_gestor")
-    r = cliente.post("/api/empresas", headers=c, json={
-        "cnpj_raiz": RAIZ, "cnpj_matriz": CNPJ,
-        "razao_social": "EMPRESA DO HISTORICO", "uf": "SP",
-        "inscricao_estadual": "123456789012",
-    })
-    assert r.status_code == 201, r.text
-    empresa_id = r.json()["id"]
+    empresa_id = criar_empresa(raiz=RAIZ, cnpj=CNPJ, razao="EMPRESA DO HISTORICO",
+                               ie="123456789012", por="hist_gestor")
     # o analista precisa de alocação para enxergar a empresa; sem ela, a
     # recusa viria do escopo e não da regra que se quer provar
     with Sessao() as s:
@@ -95,14 +92,9 @@ def projeto(cliente):
                              empresa_id=empresa_id, papel_projeto="executor"))
         s.commit()
 
-    r = cliente.post("/api/projetos", headers=c, json={
-        "empresa_id": empresa_id, "frente": "cat42",
-        "nome": "Trabalho com história",
-        "competencia_ini": "2021-05-01", "competencia_fim": "2021-05-31",
-        "observacao": None,
-    })
-    assert r.status_code == 201, r.text
-    return r.json()
+    projeto_id = criar_projeto(empresa_id=empresa_id, nome="Trabalho com história",
+                               fim="2021-05-31", por="hist_gestor")
+    return {"id": projeto_id, "empresa_id": empresa_id}
 
 
 def historico(cliente, projeto_id, quem="hist_gestor", **params):
@@ -123,12 +115,10 @@ class TestNascimento:
         assert not e["e_comentario"]
 
     def test_quem_cria_responde_pelo_trabalho(self, cliente, projeto):
-        d = cliente.get(f"/api/projetos/{projeto['id']}",
-                        headers=cab(cliente, "hist_gestor")).json()["projeto"]
-        assert d["criado_por"] == "Gestora do Histórico"
-        assert d["responsavel"] == "Gestora do Histórico"
-        assert d["status"] == "em_andamento"
-        assert d["status_rotulo"] == "Em andamento"
+        p = projeto_do_banco(projeto["id"])
+        assert nome_de(p.criado_por) == "Gestora do Histórico"
+        assert nome_de(p.responsavel_id) == "Gestora do Histórico"
+        assert p.status == "em_andamento"
 
 
 class TestComentario:
@@ -147,9 +137,8 @@ class TestComentario:
         assert topo["tipo"] == "comentario"
 
     def test_conta_no_resumo_do_projeto(self, cliente, projeto):
-        d = cliente.get(f"/api/projetos/{projeto['id']}",
-                        headers=cab(cliente, "hist_gestor")).json()["projeto"]
-        assert d["comentarios"] == 1
+        # o cartão do projeto (no C#) conta os eventos de comentário
+        assert comentarios(projeto["id"]) == 1
 
     def test_vazio_e_recusado(self, cliente, projeto):
         r = cliente.post(f"/api/projetos/{projeto['id']}/historico/comentarios",
@@ -252,11 +241,10 @@ class TestSucessao:
         assert topo["dados"]["frase"] == "Gestora do Histórico → Analista do Histórico"
         assert topo["texto"] == "Férias da gestora."
 
-        d = cliente.get(f"/api/projetos/{projeto['id']}",
-                        headers=cab(cliente, "hist_gestor")).json()["projeto"]
-        assert d["responsavel"] == "Analista do Histórico"
+        p = projeto_do_banco(projeto["id"])
+        assert nome_de(p.responsavel_id) == "Analista do Histórico"
         # quem criou não muda: são coisas diferentes
-        assert d["criado_por"] == "Gestora do Histórico"
+        assert nome_de(p.criado_por) == "Gestora do Histórico"
 
     def test_passar_para_quem_ja_responde_e_recusado(self, cliente, projeto):
         r = cliente.patch(f"/api/projetos/{projeto['id']}/responsavel",
@@ -284,10 +272,8 @@ class TestSucessao:
         assert r.status_code == 200, r.text
 
         # quem recebeu passa a enxergar o trabalho, que é o ponto
-        d = cliente.get(f"/api/projetos/{projeto['id']}",
-                        headers=cab(cliente, "hist_sem_acesso"))
-        assert d.status_code == 200
-        assert d.json()["projeto"]["responsavel"] == "Analista de Outra Carteira"
+        assert usuario("hist_sem_acesso").enxerga_empresa(projeto["empresa_id"])
+        assert nome_de(projeto_do_banco(projeto["id"]).responsavel_id) == "Analista de Outra Carteira"
 
         topo = historico(cliente, projeto["id"])["eventos"][0]
         assert topo["tipo"] == "sucessao"

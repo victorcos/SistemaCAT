@@ -5,6 +5,73 @@
 
 ---
 
+## 2026-09-13 — Empresas, projetos e exclusão em C#, e o canal interno com o motor
+
+**O que entrou.** `GET/POST /api/empresas`, `GET /api/frentes`, `GET/POST
+/api/projetos`, o detalhe com as etapas, a prévia e a exclusão de trabalho. O
+domínio veio junto: CNPJ nos dois formatos (inclusive o alfanumérico da
+Receita), as etapas da CAT 42 com a regra de bloqueio e o progresso, os rótulos
+de status e de frente. Criar projeto grava o evento "criado" no mesmo formato
+que o histórico em Python lê — o histórico é a fatia 4.
+
+**A análise da remessa ficou no motor**: lê o arquivo enviado, e ler arquivo
+fiscal é do motor. No Python, `importacao_router.py` ficou só com ela;
+`excluir_trabalho.py` ficou só com remover lote (rota de lotes, fatia 5);
+`dominio/cat42/etapas.py` e a capacidade `pode_excluir_trabalho` saíram.
+
+**O canal interno nasceu aqui.** Apagar trabalho leva junto as pastas de
+trabalho das execuções, e disco é do motor. `POST /interno/pastas/apagar`, no
+motor, com três portas fechadas: só escuta em 127.0.0.1, `/interno` não entra no
+repasse público do C#, e toda chamada traz `CAT_MOTOR_SEGREDO`. Sem o segredo
+configurado o canal responde 503 — fechado, e não aberto.
+
+**E o canal apaga menos do que o Python apagava.** O Python fazia `rmtree` no
+caminho que estivesse gravado na execução, sem conferir. Agora só apaga o que
+está **dentro** da pasta de trabalho; o que está fora, a própria raiz e caminho
+com `..` voltam como recusados e ficam no log. Um valor torto no banco, ou uma
+pasta de trabalho trocada no `.env`, não manda mais apagar outra coisa.
+
+**Ordem da exclusão: senha, pastas, banco.** Se o motor não responder, a
+resposta é 502 e **nada** foi apagado — a pessoa tenta de novo, em vez de sobrar
+pasta sem dono. Trabalho sem execução não precisa do motor. Senha errada
+continua sem contar tentativa de login.
+
+**Duas diferenças deliberadas.**
+
+1. **Criar projeto confere o escopo.** O Python só conferia se a pessoa podia
+   escrever: um analista criava projeto em empresa que não enxergava — e em
+   seguida não via o que acabara de criar. Agora é 403, como em todo acesso a
+   empresa.
+2. **A listagem de projetos deixou de fazer quatro consultas por projeto.** O
+   cartão (base, última rodada de cada etapa, comentários) sai de poucas
+   consultas para a lista inteira.
+
+**O segredo chega às máquinas que já existem.** O `instalar.ps1` gera
+`CAT_MOTOR_SEGREDO` em instalação nova e o acrescenta a um `.env` antigo que não
+o tenha — ao contrário da pimenta, trocá-lo não invalida nada.
+
+**Os testes do motor deixaram de usar as rotas migradas como preparação.** Oito
+arquivos criavam empresa e projeto pela API; agora usam
+`tests/integracao/cadastro.py`, que grava o mesmo que o C# grava. Onde
+conferiam a etapa do projeto, conferem o **fato** de que ela depende (há base no
+lote, a última conferência concluiu) — a regra de montar o roteiro tem teste em
+C#, e recalcular no Python seria manter duas.
+
+**Verificado na pilha real**, com conta temporária e empresa temporária,
+apagadas ao final: cadastro de empresa e projeto pela tela, evento "criado"
+lido pelo histórico do motor, etapas refletindo execuções gravadas, prévia,
+senha errada com 403 sem tocar em nada, exclusão com a senha certa apagando a
+pasta de trabalho real pelo motor e as linhas do banco, 404 do motor nas rotas
+migradas, `/interno` com 404 pela porta pública e 403 sem segredo. Direto no
+motor real: a pasta fora da raiz, a raiz e o caminho com `..` foram recusados e
+preservados.
+
+Baterias: C# 192 (74 de domínio, 22 de compatibilidade — agora com o dígito do
+CNPJ cruzado em 300 casos, inclusive alfanuméricos —, 96 de API); Python 455
+(eram 466: saíram 16 portados, entraram 5 do canal interno e das guardas).
+
+---
+
 ## 2026-09-13 — Usuários e acesso em C#, e dois defeitos que a portagem achou
 
 **O que entrou.** As 12 rotas de `/api/usuarios` (listar, criar, redefinir

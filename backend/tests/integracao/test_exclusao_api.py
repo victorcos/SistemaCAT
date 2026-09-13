@@ -1,11 +1,15 @@
-"""Exclusão de trabalho e remoção de lote, pela API.
+"""Remoção de lote, pela API do motor.
 
-São as duas operações destrutivas do sistema. O que este módulo prova:
+Tirar um lote do trabalho desfaz a importação, não o dado do cliente: o
+arquivo continua no servidor de arquivos. O que este módulo prova:
 
-* quem escreve não necessariamente apaga — analista é barrado;
-* senha errada não apaga nada, e o trabalho continua lá;
-* apagar leva junto lotes, arquivos e execuções;
-* remover um lote não toca no arquivo do cliente em disco.
+* remover um lote não toca no arquivo do cliente em disco;
+* quem escreve pode desfazer uma importação;
+* sem lote com base, a etapa de importar deixa de estar concluída.
+
+A exclusão do trabalho inteiro — a outra operação destrutiva, que pede a
+senha — mora na API em C# desde 13/09/2026, com os testes em
+api/tests/Cat.Api.Testes/TrabalhosTestes.cs.
 """
 
 import os
@@ -21,7 +25,8 @@ from cat.dominio.acesso.usuario import Cargo, Papel
 from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
-from tests.integracao.sessao import cabecalhos_de, usuario
+from tests.integracao.sessao import cabecalhos_de
+from tests.integracao.cadastro import criar_empresa, criar_projeto, tem_base
 
 SENHA = "Sistema2026cat"
 
@@ -108,124 +113,16 @@ def _alocar(empresa_id: int, usuario: str) -> None:
 @pytest.fixture
 def trabalho(cliente, dono, pasta):
     """Um trabalho novo a cada teste, já com um lote dentro."""
-    empresas = cliente.get("/api/empresas", headers=dono).json()
-    existente = next((e for e in empresas if e["cnpj_raiz"] == RAIZ), None)
-    if existente:
-        empresa_id = existente["id"]
-    else:
-        r = cliente.post("/api/empresas", headers=dono, json={
-            "cnpj_raiz": RAIZ, "cnpj_matriz": CNPJ,
-            "razao_social": "EMPRESA DA EXCLUSAO", "uf": "SP",
-            "inscricao_estadual": "9030138187"})
-        assert r.status_code == 201, r.text
-        empresa_id = r.json()["id"]
+    empresa_id = criar_empresa(raiz=RAIZ, cnpj=CNPJ, razao="EMPRESA DA EXCLUSAO",
+                               ie="9030138187", por="exc_dono")
     _alocar(empresa_id, "exc_analista")
-
-    nome = f"Trabalho {os.urandom(4).hex()}"
-    r = cliente.post("/api/projetos", headers=dono, json={
-        "empresa_id": empresa_id, "frente": "cat42", "nome": nome,
-        "competencia_ini": "2021-05-01", "competencia_fim": "2021-05-01",
-        "observacao": None})
-    assert r.status_code == 201, r.text
-    projeto_id = r.json()["id"]
+    projeto_id = criar_projeto(empresa_id=empresa_id,
+                               nome=f"Trabalho {os.urandom(4).hex()}", por="exc_dono")
 
     r = cliente.post(f"/api/projetos/{projeto_id}/lotes", headers=dono,
                      json={"pasta": pasta, "observacao": None})
     assert r.status_code == 201, r.text
     return projeto_id, r.json()["id"]
-
-
-class TestQuemPodeApagar:
-    def test_analista_e_barrado(self, cliente, analista, trabalho):
-        projeto_id, _ = trabalho
-        r = cliente.request("DELETE", f"/api/projetos/{projeto_id}",
-                            headers=analista, json={"senha": SENHA})
-        assert r.status_code == 403
-        assert "permissão" in r.json()["detail"]
-        # e o trabalho continua lá
-        assert cliente.get(f"/api/projetos/{projeto_id}",
-                           headers=analista).status_code == 200
-
-    def test_analista_nao_ve_nem_a_previa(self, cliente, analista, trabalho):
-        projeto_id, _ = trabalho
-        r = cliente.get(f"/api/projetos/{projeto_id}/exclusao", headers=analista)
-        assert r.status_code == 403
-
-    def test_sem_token_nao_entra(self, cliente, trabalho):
-        projeto_id, _ = trabalho
-        r = cliente.request("DELETE", f"/api/projetos/{projeto_id}",
-                            json={"senha": SENHA})
-        assert r.status_code == 401
-
-
-class TestSenhaNaConfirmacao:
-    def test_senha_errada_nao_apaga(self, cliente, dono, trabalho):
-        projeto_id, _ = trabalho
-        r = cliente.request("DELETE", f"/api/projetos/{projeto_id}",
-                            headers=dono, json={"senha": "senha errada"})
-        assert r.status_code == 403
-        assert "não foi apagado" in r.json()["detail"]
-        assert cliente.get(f"/api/projetos/{projeto_id}",
-                           headers=dono).status_code == 200
-
-    def test_senha_errada_nao_bloqueia_o_login(self, cliente, dono, trabalho):
-        # errar a confirmação não pode trancar a pessoa fora do sistema
-        projeto_id, _ = trabalho
-        for _ in range(6):
-            cliente.request("DELETE", f"/api/projetos/{projeto_id}",
-                            headers=dono, json={"senha": "errada"})
-        # o login mora na API em C#; o que importa aqui é o estado que ele lê
-        dono_agora = usuario("exc_dono")
-        assert dono_agora.tentativas_falhas == 0
-        dono_agora.garantir_que_pode_entrar()
-
-    def test_senha_vazia_e_recusada(self, cliente, dono, trabalho):
-        projeto_id, _ = trabalho
-        r = cliente.request("DELETE", f"/api/projetos/{projeto_id}",
-                            headers=dono, json={"senha": ""})
-        assert r.status_code == 422    # o contrato exige senha não vazia
-
-
-class TestApagar:
-    def test_a_previa_diz_o_que_some(self, cliente, dono, trabalho):
-        projeto_id, _ = trabalho
-        r = cliente.get(f"/api/projetos/{projeto_id}/exclusao", headers=dono)
-        assert r.status_code == 200, r.text
-        corpo = r.json()
-        assert corpo["lotes"] == 1
-        assert corpo["arquivos"] == 1
-        assert corpo["empresa"] == "EMPRESA DA EXCLUSAO"
-
-    def test_apaga_o_trabalho_e_o_que_pendura_nele(
-        self, cliente, dono, trabalho
-    ):
-        projeto_id, _ = trabalho
-        r = cliente.request("DELETE", f"/api/projetos/{projeto_id}",
-                            headers=dono, json={"senha": SENHA})
-        assert r.status_code == 200, r.text
-        assert r.json()["lotes"] == 1
-
-        assert cliente.get(f"/api/projetos/{projeto_id}",
-                           headers=dono).status_code == 404
-        assert cliente.get(f"/api/projetos/{projeto_id}/lotes",
-                           headers=dono).status_code == 404
-        ids = [p["id"] for p in cliente.get("/api/projetos",
-                                            headers=dono).json()]
-        assert projeto_id not in ids
-
-    def test_a_empresa_continua(self, cliente, dono, trabalho):
-        # outros trabalhos da mesma empresa não podem ser levados junto
-        projeto_id, _ = trabalho
-        cliente.request("DELETE", f"/api/projetos/{projeto_id}",
-                        headers=dono, json={"senha": SENHA})
-        raizes = [e["cnpj_raiz"] for e in cliente.get("/api/empresas",
-                                                      headers=dono).json()]
-        assert RAIZ in raizes
-
-    def test_trabalho_inexistente(self, cliente, dono):
-        r = cliente.request("DELETE", "/api/projetos/999999",
-                            headers=dono, json={"senha": SENHA})
-        assert r.status_code == 404
 
 
 class TestRemoverLote:
@@ -260,10 +157,9 @@ class TestRemoverLote:
                            headers=dono)
         assert r.status_code == 404
 
-    def test_a_etapa_volta_a_pendente_sem_lote(self, cliente, dono, trabalho):
+    def test_sem_lote_o_trabalho_fica_sem_base(self, cliente, dono, trabalho):
         projeto_id, lote_id = trabalho
         cliente.delete(f"/api/projetos/{projeto_id}/lotes/{lote_id}",
                        headers=dono)
-        d = cliente.get(f"/api/projetos/{projeto_id}", headers=dono).json()
-        etapa = next(e for e in d["etapas"] if e["chave"] == "importar")
-        assert etapa["situacao"] == "pendente"
+        # a etapa "importar" é calculada no C# a partir disto: sem base, pendente
+        assert not tem_base(projeto_id)

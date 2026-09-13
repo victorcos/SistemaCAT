@@ -11,8 +11,9 @@
 | 0 | Fundação | **entregue em 13/09/2026, v0.28.0** — C# na 8010 repassando tudo ao motor na 8020 |
 | 1 | Autenticação | **entregue em 13/09/2026, v0.29.0** — `auth/token` e `auth/eu` só em C# (apagados do Python); senha e token cruzados com o Python |
 | 2 | Usuários e acesso | **entregue em 13/09/2026, v0.30.0** — as 12 rotas de `/api/usuarios`, `semear` e `emergencia` só em C# |
-| 3 | Empresas e projetos | próxima |
-| 4–7 | — | não iniciadas |
+| 3 | Empresas e projetos | **entregue em 13/09/2026, v0.31.0** — empresas, frentes, projetos, etapas e exclusão só em C#; canal interno com o motor no ar |
+| 4 | Histórico | próxima |
+| 5–7 | — | não iniciadas |
 
 ---
 
@@ -143,11 +144,13 @@ Senha, token e chave saem como `***`.
 | Acompanhar execução | rota Python lê `execucao` | o C# lê a mesma tabela |
 | Inspecionar pasta, analisar remessa | rota Python lê o disco | o C# chama o motor em `localhost:8020` e devolve o resumo |
 | Gerar planilha | rota Python gera e serve | o C# pede ao motor, que gera e devolve o caminho; o C# serve o arquivo em fluxo |
-| Excluir trabalho | rota Python apaga banco e pasta | o C# apaga o banco; a pasta de trabalho é apagada pelo motor |
+| Excluir trabalho | ~~rota Python apaga banco e pasta~~ | **feito (fatia 3):** o C# confere a senha e apaga o banco; as pastas vão ao motor por `POST /interno/pastas/apagar`, que só apaga dentro da pasta de trabalho |
 
 O motor só aceita conexão de `localhost` e exige um segredo interno em
-cabeçalho (`CAT_MOTOR_SEGREDO`). Não recebe token de usuário: quem decide se a
-pessoa pode é o C#, antes de chamar.
+cabeçalho (`X-Cat-Motor-Segredo`, valor em `CAT_MOTOR_SEGREDO` no `backend/.env`).
+Não recebe token de usuário: quem decide se a pessoa pode é o C#, antes de
+chamar. Sem o segredo configurado, o canal fica **fechado** (503), não aberto.
+As rotas `/interno` não entram no repasse público nem no `/openapi.json`.
 
 ---
 

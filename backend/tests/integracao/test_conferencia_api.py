@@ -19,6 +19,7 @@ from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
+from tests.integracao.cadastro import criar_empresa, criar_projeto, ultima_situacao
 
 SENHA = "Sistema2026cat"
 
@@ -84,21 +85,10 @@ def base(tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def projeto_id(cliente, cabecalhos, base):
-    r = cliente.post("/api/empresas", headers=cabecalhos, json={
-        "cnpj_raiz": RAIZ, "cnpj_matriz": CNPJ,
-        "razao_social": "EMPRESA DA CONFERENCIA", "uf": "SP",
-        "inscricao_estadual": "9030138187",
-    })
-    assert r.status_code == 201, r.text
-    empresa = r.json()["id"]
-
-    r = cliente.post("/api/projetos", headers=cabecalhos, json={
-        "empresa_id": empresa, "frente": "cat42", "nome": "Conferência de teste",
-        "competencia_ini": "2021-05-01", "competencia_fim": "2021-05-01",
-        "observacao": None,
-    })
-    assert r.status_code == 201, r.text
-    return r.json()["id"]
+    empresa = criar_empresa(raiz=RAIZ, cnpj=CNPJ, razao="EMPRESA DA CONFERENCIA",
+                            ie="9030138187", por="conf_analista")
+    return criar_projeto(empresa_id=empresa, nome="Conferência de teste",
+                         por="conf_analista")
 
 
 @pytest.fixture(autouse=True)
@@ -140,10 +130,9 @@ class TestFluxo:
         assert resumo["sem_documento"] == 1
         assert resumo["nao_escrituradas"] == 1    # o XML que não está na EFD
 
-    def test_a_etapa_do_projeto_conclui(self, cliente, cabecalhos, projeto_id):
-        d = cliente.get(f"/api/projetos/{projeto_id}", headers=cabecalhos).json()
-        etapa = next(e for e in d["etapas"] if e["chave"] == "conferencia")
-        assert etapa["situacao"] == "concluida"
+    def test_a_ultima_conferencia_fica_concluida(self, cliente, cabecalhos, projeto_id):
+        # é disto que a etapa do projeto depende; a etapa em si é calculada no C#
+        assert ultima_situacao(projeto_id, "conferencia") == "concluida"
 
     def test_baixa_as_tres_planilhas(self, cliente, cabecalhos, projeto_id):
         execucao_id = cliente.get(f"/api/projetos/{projeto_id}/conferencias",

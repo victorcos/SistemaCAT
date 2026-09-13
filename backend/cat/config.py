@@ -27,6 +27,10 @@ class Config(BaseSettings):
     # Trocar a pimenta invalida todas as senhas existentes — só com plano.
     senha_pimenta: str = ""
 
+    # Segredo do canal interno com a API em C# (routers/interno_router.py).
+    # Vazio fecha o canal para todo mundo, em vez de abri-lo.
+    motor_segredo: str = ""
+
     log_nivel: str = "INFO"
     origens_permitidas: str = "http://localhost:5173"
 

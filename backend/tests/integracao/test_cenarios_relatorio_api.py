@@ -32,6 +32,7 @@ from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
+from tests.integracao.cadastro import criar_empresa, criar_projeto
 
 SENHA = "Sistema2026cat"
 
@@ -161,13 +162,8 @@ def cabecalhos(cliente):
 
 @pytest.fixture(scope="module")
 def empresa_id(cliente, cabecalhos):
-    r = cliente.post("/api/empresas", headers=cabecalhos, json={
-        "cnpj_raiz": RAIZ, "cnpj_matriz": CNPJ,
-        "razao_social": "EMPRESA DOS CENARIOS", "uf": "SP",
-        "inscricao_estadual": "123456789012",
-    })
-    assert r.status_code == 201, r.text
-    return r.json()["id"]
+    return criar_empresa(raiz=RAIZ, cnpj=CNPJ, razao="EMPRESA DOS CENARIOS",
+                         ie="123456789012", por="cenarios_analista")
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -186,13 +182,7 @@ def rodar_na_hora():
 
 
 def _projeto(cliente, cabecalhos, empresa_id, nome: str) -> int:
-    r = cliente.post("/api/projetos", headers=cabecalhos, json={
-        "empresa_id": empresa_id, "frente": "cat42", "nome": nome,
-        "competencia_ini": "2021-05-01", "competencia_fim": "2021-05-01",
-        "observacao": None,
-    })
-    assert r.status_code == 201, r.text
-    return r.json()["id"]
+    return criar_projeto(empresa_id=empresa_id, nome=nome, por="cenarios_analista")
 
 
 def _conferir(cliente, cabecalhos, projeto_id: int, pasta: str) -> dict:
