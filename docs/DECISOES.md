@@ -5,6 +5,61 @@
 
 ---
 
+## 2026-09-13 — Fundação da API em C#: o que o repasse precisou saber
+
+**O que entrou.** A API em C# (`api/`, .NET 10) sobe na 8010 e atende
+`/api/saude`; todo o resto vai por repasse (YARP) ao motor Python, que passou
+para `127.0.0.1:8020`. A tela não mudou uma linha: o proxy do Vite continua
+apontando para a 8010. `subir.ps1` sobe os três processos e `instalar.ps1`
+exige o .NET 10 e compila a API.
+
+**Cinco detalhes que um repasse ingênuo erraria, cada um com teste.**
+
+1. **O `X-Request-Id` volta para o pedido, não só para a resposta.** Só assim
+   ele segue ao motor, que já reusa o que recebe: a linha de log do C# e a do
+   Python saem com o mesmo `requisicao_id`.
+2. **O `Origin` não segue para o motor.** O C# responde o CORS; se o cabeçalho
+   seguisse, o FastAPI poria o próprio `Access-Control-Allow-Origin` e a
+   resposta sairia com dois, que o navegador recusa.
+3. **Trinta minutos sem atividade, não os 100 s padrão.** A planilha de dezenas
+   de milhões de linhas é gerada antes do primeiro byte; o padrão cortaria o
+   download que a entrega de 12/09 acabou de fazer funcionar.
+4. **Motor fora do ar vira `{"detail": ...}` com 502.** O YARP devolve corpo
+   vazio, e a tela mostraria só "erro".
+5. **`127.0.0.1`, não `localhost`.** No Windows, `localhost` tenta `::1`
+   primeiro, e o motor escuta só em IPv4: cada repasse pagaria a tentativa
+   frustrada.
+
+**A saúde ganhou dois campos.** `api`, para saber quem respondeu, e `motor`,
+com situação e versão do Python. Versões diferentes nos dois lados é o sinal
+de que um processo não foi reiniciado depois do `git pull` — o mesmo defeito
+que já fez o `/api/saude` mentir uma vez, agora com dois lugares onde
+acontecer. E a saúde da API não cai junto com a do motor: quem pergunta quer
+saber justamente qual dos dois está fora.
+
+**Um arquivo de segredos por máquina.** O C# lê o mesmo `backend/.env`, com a
+mesma precedência do pydantic-settings (ambiente, arquivo, padrão). A pasta de
+trabalho relativa resolve contra `backend/`, e não contra o diretório de onde o
+processo subiu — que para o C# é outro.
+
+**O `subir.ps1` recusa porta ocupada.** No ensaio, o processo-filho do
+`--reload` do uvicorn herdou o socket da 8010 depois de o pai morrer, e a porta
+seguiu ocupada sem dono aparente. Subir por cima faria a tela conversar com o
+processo velho sem aviso nenhum.
+
+**Log.** Mesmos campos do `cat/log.py` (`instante`, `nivel`, `origem`,
+`mensagem`, `local`, contexto), com `local` vindo do arquivo e linha de quem
+chamou. O ASP.NET e o YARP ficam em aviso para cima: narram cada requisição, e
+a linha da API já diz o que importa.
+
+**Verificado** com os três processos no ar, pela porta da tela: saúde com as
+duas versões iguais, login recusado com `detail` e `X-Request-Id`, rotas
+autenticadas atendidas pelo motor através do C#, 401 sem token, `/docs` e
+`/openapi.json` pelo repasse. 15 testes no C#, com um motor falso em socket
+real — o YARP usa o próprio cliente HTTP e não enxerga servidor em memória.
+
+---
+
 ## 2026-09-13 — A API vai para C#; o motor pesado fica em Python
 
 **O pedido.** Migrar o sistema para C#. Tudo que não for quebra de arquivo nem

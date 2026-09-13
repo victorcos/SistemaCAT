@@ -1,0 +1,104 @@
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.Configuration;
+
+namespace Cat.Infraestrutura.Configuracao;
+
+/// <summary>
+/// Configuração por variável de ambiente, com o mesmo prefixo <c>CAT_</c> do
+/// Python. Nenhum segredo no código.
+///
+/// Precedência igual à do pydantic-settings: variável de ambiente, depois o
+/// <c>backend/.env</c>, depois o padrão escrito aqui.
+/// </summary>
+public sealed partial class ConfigCat
+{
+    public required string RaizBackend { get; init; }
+    public required string LogNivel { get; init; }
+    public required IReadOnlyList<string> Origens { get; init; }
+    public required string PastaDeTrabalho { get; init; }
+    public required string MemoriaAnalitica { get; init; }
+    public required int ThreadsAnaliticas { get; init; }
+    public required int PortaApi { get; init; }
+    public required Uri MotorUrl { get; init; }
+    public required string Versao { get; init; }
+
+    /// <param name="config">
+    /// Configuração do host. Já traz as variáveis de ambiente, e é por ela que
+    /// os testes trocam um valor sem mexer no ambiente do processo inteiro.
+    /// </param>
+    public static ConfigCat Carregar(IConfiguration config)
+    {
+        var raiz = config["CAT_RAIZ_BACKEND"] is { Length: > 0 } explicita
+            ? Path.GetFullPath(explicita)
+            : LocalizarBackend();
+
+        var arquivo = config["CAT_ENV_ARQUIVO"] is { Length: > 0 } envExplicito
+            ? envExplicito
+            : Path.Combine(raiz, ".env");
+        var env = ArquivoEnv.Ler(arquivo);
+
+        string Valor(string chave, string padrao) =>
+            config[chave] is { Length: > 0 } doAmbiente ? doAmbiente
+            : env.TryGetValue(chave, out var doArquivo) && doArquivo.Length > 0 ? doArquivo
+            : padrao;
+
+        return new ConfigCat
+        {
+            RaizBackend = raiz,
+            LogNivel = Valor("CAT_LOG_NIVEL", "INFO").ToUpperInvariant(),
+            Origens = Valor("CAT_ORIGENS_PERMITIDAS", "http://localhost:5173")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            // Relativo ao backend, não ao diretório de onde o processo subiu. O
+            // Python resolve contra o diretório corrente, que é sempre backend/
+            // quando sobe pelo subir.ps1; aqui o diretório corrente é outro, e
+            // dois processos gravando em pastas diferentes sem ninguém perceber
+            // é exatamente o defeito que o /api/saude existe para denunciar.
+            PastaDeTrabalho = Path.GetFullPath(Valor("CAT_PASTA_DE_TRABALHO", "data/trabalho"), raiz),
+            MemoriaAnalitica = Valor("CAT_MEMORIA_ANALITICA", "4GB"),
+            ThreadsAnaliticas = int.Parse(Valor("CAT_THREADS_ANALITICAS", "4")),
+            PortaApi = int.Parse(Valor("CAT_API_PORTA", "8010")),
+            // 127.0.0.1 e não localhost: no Windows "localhost" tenta ::1
+            // primeiro, e o motor escuta só em IPv4 — cada chamada pagaria a
+            // tentativa frustrada antes de acertar.
+            MotorUrl = new Uri(Valor("CAT_MOTOR_URL", "http://127.0.0.1:8020")),
+            Versao = LerVersao(Path.Combine(raiz, "pyproject.toml")),
+        };
+    }
+
+    /// <summary>
+    /// A versão vem do <c>pyproject.toml</c>, a fonte única do projeto hoje.
+    /// Escrever o número aqui repetiria o defeito de quando a API dizia 0.3.0
+    /// com as etiquetas do git em v0.15.2.
+    /// </summary>
+    public static string LerVersao(string pyproject)
+    {
+        if (!File.Exists(pyproject))
+            return "desconhecida";
+        var achado = LinhaDeVersao().Match(File.ReadAllText(pyproject));
+        return achado.Success ? achado.Groups[1].Value : "desconhecida";
+    }
+
+    /// <summary>
+    /// Sobe a partir de onde o programa está até achar <c>backend/pyproject.toml</c>.
+    /// Assim a API acha o .env tanto por <c>dotnet run</c> quanto pelo binário
+    /// compilado, sem caminho escrito à mão.
+    /// </summary>
+    private static string LocalizarBackend()
+    {
+        foreach (var partida in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() })
+        {
+            for (var pasta = new DirectoryInfo(partida); pasta is not null; pasta = pasta.Parent)
+            {
+                var candidato = Path.Combine(pasta.FullName, "backend");
+                if (File.Exists(Path.Combine(candidato, "pyproject.toml")))
+                    return candidato;
+            }
+        }
+        throw new InvalidOperationException(
+            "Não achei a pasta backend/ com o pyproject.toml subindo a partir de " +
+            $"{AppContext.BaseDirectory}. Defina CAT_RAIZ_BACKEND.");
+    }
+
+    [GeneratedRegex("""^version\s*=\s*"([^"]+)"\s*$""", RegexOptions.Multiline)]
+    private static partial Regex LinhaDeVersao();
+}

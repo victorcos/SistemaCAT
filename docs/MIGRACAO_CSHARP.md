@@ -4,6 +4,14 @@
 > `DECISOES.md`, 13/09/2026. Este documento diz **como** e **em que ordem**.
 > Atualizado a cada fatia entregue.
 
+## Onde estamos
+
+| # | Fatia | Situação |
+|---|---|---|
+| 0 | Fundação | **entregue em 13/09/2026, v0.28.0** — C# na 8010 repassando tudo ao motor na 8020 |
+| 1 | Autenticação | próxima |
+| 2–7 | — | não iniciadas |
+
 ---
 
 ## 1. O desenho de chegada
@@ -42,7 +50,7 @@ uma camada só conhece a de dentro.
 
 ```
 api/                                 (C#; o Python segue em backend/)
-├── SistemaCat.sln
+├── SistemaCat.slnx
 ├── src/
 │   ├── Cat.Dominio/                 regra pura: Usuario, Papel, Cargo, políticas
 │   ├── Cat.Aplicacao/               casos de uso + portas (interfaces)
@@ -53,6 +61,10 @@ api/                                 (C#; o Python segue em backend/)
     ├── Cat.Compatibilidade.Testes/  senha e token cruzados com o Python
     └── Cat.Api.Testes/              integração contra Postgres real
 ```
+
+Na fundação existem só `Cat.Infraestrutura` (configuração e log), `Cat.Api` e
+`Cat.Api.Testes`. Domínio e aplicação nascem na fatia 1, junto da primeira
+regra que precisa deles: projeto vazio só serviria para ser mantido.
 
 | Peça | Escolha | Observação |
 |---|---|---|

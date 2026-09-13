@@ -5,7 +5,8 @@
 .DESCRIPTION
   Roda de dentro do repositório clonado (qualquer pasta). Faz, nesta ordem:
 
-    1. confere os pré-requisitos: git, Python 3.11+, Node 20+, Docker (opcional);
+    1. confere os pré-requisitos: git, Python 3.11+, Node 20+, .NET 10 SDK,
+       Docker (opcional);
     2. cria o ambiente Python em backend\.venv e instala o backend;
     3. cria backend\.env a partir de .env.example, com JWT e pimenta NOVOS
        (segredos de servidor não viajam entre máquinas) e a pasta de trabalho
@@ -13,12 +14,13 @@
     4. sobe o Postgres em Docker (porta 55432). Sem Docker, usa SQLite;
     5. aplica as migrações e cria os três gestores iniciais — as senhas
        provisórias saem no terminal, uma vez só;
-    6. instala o front (npm install).
+    6. compila a API em C# (dotnet build);
+    7. instala o front (npm install).
 
   É idempotente: rodar de novo não apaga .env, banco nem senhas.
 
 .PARAMETER InstalarPreRequisitos
-  Instala o que faltar via winget (Git, Python, Node LTS, GitHub CLI).
+  Instala o que faltar via winget (Git, Python, Node LTS, .NET 10 SDK).
   Docker Desktop não entra aqui: pede reinício e conta própria.
 
 .EXAMPLE
@@ -58,6 +60,8 @@ Passo "Pré-requisitos"
 $faltam = @()
 if (-not (Tem git))    { $faltam += "Git.Git" }
 if (-not (Tem node))   { $faltam += "OpenJS.NodeJS.LTS" }
+# a API em C# fixa o SDK em api\global.json; ter só o .NET 8 não serve
+if (-not (Tem dotnet) -or -not ((dotnet --list-sdks) -match "^10\.")) { $faltam += "Microsoft.DotNet.SDK.10" }
 $python = $null
 foreach ($candidato in @("py -3.14", "py -3.13", "py -3.12", "py -3.11", "python")) {
     $exe, $arg = $candidato.Split(" ", 2)
@@ -84,7 +88,7 @@ if ($faltam.Count -gt 0) {
     exit 1
 }
 $pyExe, $pyArg = $python.Split(" ", 2)
-Ok "git, node e Python ($python) encontrados"
+Ok "git, node, .NET 10 e Python ($python) encontrados"
 
 $docker = (-not $SemDocker) -and (Tem docker)
 if ($docker) {
@@ -176,14 +180,20 @@ try {
     Rodar "criar os gestores iniciais" { & $venvPython -m cat.apresentacao.cli.semear }
 } finally { Pop-Location }
 
-# ---------------------------------------------------------------- 6. front
+# ---------------------------------------------------------------- 6. API em C#
+Passo "API em C# (dotnet build)"
+Push-Location (Join-Path $raiz "api")
+try { Rodar "compilar a API" { dotnet build SistemaCat.slnx --nologo -v q } } finally { Pop-Location }
+Ok "API compilada"
+
+# ---------------------------------------------------------------- 7. front
 Passo "Front (npm install)"
 Push-Location $frontend
 try { Rodar "npm install" { npm install --no-fund --no-audit } } finally { Pop-Location }
 Ok "front instalado"
 
 Write-Host ""
-Write-Host "Pronto. Para subir a API e a tela:" -ForegroundColor Cyan
+Write-Host "Pronto. Para subir o motor, a API e a tela:" -ForegroundColor Cyan
 Write-Host "    .\scripts\subir.ps1"
 Write-Host "Depois: http://localhost:5173 (tela) e http://localhost:8010/docs (API)."
 Write-Host "Primeiro acesso com um dos gestores acima; a troca de senha é obrigatória."

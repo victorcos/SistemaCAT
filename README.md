@@ -29,7 +29,8 @@ Ler nesta ordem:
 ## Estrutura
 
 ```
-backend/    Python: domínio, aplicação, infraestrutura, apresentação, workers
+api/        C#: a API que a tela usa, em migração a partir do Python
+backend/    Python: o motor (leitura, DuckDB, planilhas) e as rotas ainda não portadas
 frontend/   React + TypeScript, fala só por API
 data/       entrada, trabalho e saída (não versionado)
 docker/
@@ -47,16 +48,16 @@ scripts/
 
 ## Instalar numa máquina nova (Windows)
 
-Três comandos, do zero ao primeiro login. Precisa de Git, Python 3.11+ e
-Node 20+ (o script instala o que faltar via `winget` com
+Três comandos, do zero ao primeiro login. Precisa de Git, Python 3.11+,
+Node 20+ e .NET 10 SDK (o script instala o que faltar via `winget` com
 `-InstalarPreRequisitos`); Docker Desktop é opcional — sem ele o banco é SQLite.
 
 ```
 gh auth login                           # o repositório é privado: entrar no GitHub uma vez
 gh repo clone victorcos/SistemaCAT      # ou: git clone https://github.com/victorcos/SistemaCAT.git
 cd SistemaCAT
-.\scripts\instalar.ps1                  # venv, .env com segredos novos, banco, migrações, gestores, front
-.\scripts\subir.ps1                     # API na 8010, tela na 5173, abre o navegador
+.\scripts\instalar.ps1                  # venv, .env com segredos novos, banco, migrações, gestores, API C#, front
+.\scripts\subir.ps1                     # motor na 8020, API na 8010, tela na 5173, abre o navegador
 ```
 
 O `instalar.ps1` é idempotente e imprime as senhas provisórias dos três
@@ -67,13 +68,17 @@ de fora do escritório, as pastas em `Z:` só existem pela VPN.
 
 ## Como rodar
 
+São três processos. A tela fala só com a API em C#; a API atende o que já foi
+portado e repassa o resto ao motor Python, que também faz o trabalho pesado
+(`docs/MIGRACAO_CSHARP.md`). O `subir.ps1` sobe os três; à mão, é assim.
+
 Banco, opcional em desenvolvimento (sem ele usa SQLite):
 
 ```
 docker compose -f docker/docker-compose.yml up -d
 ```
 
-Backend:
+Motor Python:
 
 ```
 cd backend
@@ -81,7 +86,14 @@ python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"
 cp ../.env.example .env          # e ajuste CAT_JWT_SEGREDO
 alembic upgrade head                     # cria o esquema
 python -m cat.apresentacao.cli.semear    # cria os três gestores
-python -m uvicorn cat.apresentacao.api.app:app --reload --port 8010
+python -m uvicorn cat.apresentacao.api.app:app --reload --host 127.0.0.1 --port 8020
+```
+
+API em C# (lê o mesmo `backend/.env`):
+
+```
+cd api/src/Cat.Api
+dotnet watch run --non-interactive --no-launch-profile
 ```
 
 Front:
@@ -108,4 +120,5 @@ Testes:
 
 ```
 cd backend && .venv/Scripts/python -m pytest
+cd api && dotnet test SistemaCat.slnx
 ```
