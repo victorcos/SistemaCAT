@@ -86,8 +86,7 @@ public sealed class Trabalhos(
     public async Task<ProjetoComEtapas> Detalhar(int projetoId, Usuario usuario, CancellationToken cancelar)
     {
         var projeto = await repositorio.BuscarProjeto(projetoId, cancelar) ?? throw new ProjetoNaoEncontrado();
-        if (!usuario.EnxergaEmpresa(projeto.EmpresaId))
-            throw new SemAcessoAEmpresa();
+        Escopo.Exigir(usuario, projeto.EmpresaId, log);
         return ComEtapas(projeto);
     }
 
@@ -102,8 +101,7 @@ public sealed class Trabalhos(
             throw new EmpresaNaoEncontrada();
         // O Python não conferia: quem escreve criava projeto em empresa que não
         // enxerga, e em seguida não via o que acabara de criar (DECISOES, 13/09/2026).
-        if (!por.EnxergaEmpresa(empresaId))
-            throw new SemAcessoAEmpresa();
+        Escopo.Exigir(por, empresaId, log);
 
         nome = nome.Trim();
         if (await repositorio.ProjetoRepetido(empresaId, frente, nome, cancelar))
@@ -178,8 +176,7 @@ public sealed class ExcluirTrabalho(
     {
         var projeto = await repositorio.BuscarProjeto(projetoId, cancelar)
                       ?? throw new ProjetoNaoEncontrado("Trabalho não encontrado.");
-        if (!usuario.EnxergaEmpresa(projeto.EmpresaId))
-            throw new SemAcessoAEmpresa();
+        Escopo.Exigir(usuario, projeto.EmpresaId, log);
         return await repositorio.ResumirExclusao(projetoId, cancelar)
                ?? throw new ProjetoNaoEncontrado("Trabalho não encontrado.");
     }

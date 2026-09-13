@@ -70,6 +70,14 @@ def test_empresas_projetos_e_exclusao_nao_moram_mais_no_motor(cliente):
         assert cliente.request(metodo, rota).status_code in (404, 405), rota
 
 
+def test_historico_nao_mora_mais_no_motor(cliente):
+    """Linha do tempo, comentário, status e sucessão: num lugar só, o C#."""
+    for metodo, rota in [("GET", "/api/projetos/1/historico"), ("POST", "/api/projetos/1/historico/comentarios"),
+                         ("GET", "/api/status-de-projeto"), ("PATCH", "/api/projetos/1/status"),
+                         ("GET", "/api/projetos/1/sucessores"), ("PATCH", "/api/projetos/1/responsavel")]:
+        assert cliente.request(metodo, rota).status_code in (404, 405), rota
+
+
 class TestCanalInterno:
     """A API em C# pede, o motor apaga — só com o segredo, e só na pasta de trabalho."""
 

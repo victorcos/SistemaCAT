@@ -76,6 +76,13 @@ def criar_projeto(*, empresa_id: int, nome: str, por: str,
         return p.id
 
 
+def definir_status(projeto_id: int, status: str) -> None:
+    """Mudar status é da API em C#; aqui só se põe o trabalho no estado do teste."""
+    with Sessao() as s:
+        s.get(ProjetoDB, projeto_id).status = status
+        s.commit()
+
+
 def projeto(projeto_id: int) -> ProjetoDB | None:
     with Sessao() as s:
         return s.get(ProjetoDB, projeto_id)

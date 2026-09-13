@@ -60,6 +60,8 @@ builder.Services.AddScoped<AcessoAEmpresas>();
 builder.Services.AddScoped<IRepositorioDeTrabalhos, TrabalhoRepositorio>();
 builder.Services.AddScoped<Trabalhos>();
 builder.Services.AddScoped<ExcluirTrabalho>();
+builder.Services.AddScoped<IRepositorioDeHistorico, HistoricoRepositorio>();
+builder.Services.AddScoped<HistoricoDoProjeto>();
 // canal interno com o motor: apagar pasta de trabalho grande leva tempo
 builder.Services.AddHttpClient<IMotor, MotorHttp>(c => c.Timeout = TimeSpan.FromMinutes(5));
 
@@ -117,6 +119,7 @@ app.MapearSaude();
 app.MapearAuth();
 app.MapearUsuarios();
 app.MapearTrabalhos();
+app.MapearHistorico();
 app.MapReverseProxy(repasse =>
 {
     repasse.Use(RepasseAoMotor.TraduzirFalha);

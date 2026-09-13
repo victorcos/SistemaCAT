@@ -119,12 +119,13 @@ def saude() -> dict[str, object]:
 
 
 from cat.apresentacao.api.routers import (  # noqa: E402
-    conferencia_router, historico_router, importacao_router, interno_router,
-    lote_router, movimentos_router,
+    conferencia_router, importacao_router, interno_router, lote_router,
+    movimentos_router,
 )
 
 # O login (/api/auth), a gestão de usuários (/api/usuarios), empresas, frentes,
-# projetos e a exclusão de trabalho moram na API em C# desde 13/09/2026; os
+# projetos, a exclusão de trabalho e o histórico (linha do tempo, comentário,
+# status e sucessão) moram na API em C# desde 13/09/2026; os
 # comandos semear e emergencia em api/src/Cat.Ferramentas. O motor atende o
 # que lê disco e o canal interno com a API.
 app.include_router(interno_router.router)
@@ -133,4 +134,3 @@ app.include_router(importacao_router.router)
 app.include_router(lote_router.router)
 app.include_router(conferencia_router.router)
 app.include_router(movimentos_router.router)
-app.include_router(historico_router.router)

@@ -5,6 +5,49 @@
 
 ---
 
+## 2026-09-13 — Histórico em C#, com a linha do tempo escrita pelos dois lados
+
+**O que entrou.** As seis rotas do histórico: ler a linha do tempo (paginada
+por `antes_de`, com filtro de comentários), comentar, o catálogo de status,
+mudar status, a lista de quem pode receber o trabalho e a sucessão. O domínio
+veio junto: status com rótulo, explicação e exigência de motivo, validação do
+comentário, as frases do sistema e os rótulos de cada tipo de evento.
+
+**Desta vez metade ficou no motor, de propósito.** Registrar evento de lote e
+de etapa e barrar etapa em trabalho parado (`exigir_que_ande`) são feitos pelas
+próprias etapas, que moram no motor. O histórico passa a ser **escrito pelos
+dois lados** na mesma tabela e no mesmo formato: o C# grava criação,
+comentário, status e sucessão; o motor grava lote importado ou removido e etapa
+iniciada, concluída ou falhou. Do Python saíram `historico_router.py`, a leitura,
+o comentário, a mudança de status, a sucessão e as regras de tela do domínio;
+ficaram `registrar`, `registrar_de_etapa`, `exigir_que_ande`, o status e o tipo
+de evento.
+
+**Um defeito corrigido: sucessão contava acesso encerrado.** Para decidir se
+quem recebe o trabalho precisa de acesso à empresa, o Python contava qualquer
+alocação, inclusive a encerrada. Quem teve o acesso retirado aparecia como quem
+não precisa, a transferência não realocava, e a pessoa passava a responder por
+um trabalho que não enxergava. Agora só conta alocação vigente, na lista de
+sucessores e na transferência. Com teste dos dois casos.
+
+**O escopo de empresa ganhou um lugar só em C#** (`Escopo.Exigir`), com o log
+de acesso por exceção de dev que o `exigir_empresa` do Python tinha e que a
+fatia 3 não trazia. Projetos, exclusão e histórico passam por ele.
+
+**Verificado na pilha real**, com conta, analista, empresa e trabalho
+temporários apagados ao final: lote importado **pelo motor**, comentário, pausa
+e sucessão **pelo C#**, e a linha do tempo lida pelo C# com os seis eventos dos
+dois lados na ordem em que aconteceram. Pausado pelo C#, o trabalho foi barrado
+na conferência pelo motor; retomado, voltou a andar. A sucessão alocou a
+analista na empresa, e o motor respondeu 404 às rotas migradas.
+
+Baterias: C# 215 (84 de domínio, 22 de compatibilidade, 109 de API); Python 427
+(eram 455: saíram 29 portados, entrou 1 guarda). O teste de integração do
+histórico no motor ficou com o que é dele: pausado e cancelado não rodam etapa,
+retomado e concluído rodam.
+
+---
+
 ## 2026-09-13 — Empresas, projetos e exclusão em C#, e o canal interno com o motor
 
 **O que entrou.** `GET/POST /api/empresas`, `GET /api/frentes`, `GET/POST

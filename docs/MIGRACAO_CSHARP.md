@@ -12,8 +12,9 @@
 | 1 | Autenticação | **entregue em 13/09/2026, v0.29.0** — `auth/token` e `auth/eu` só em C# (apagados do Python); senha e token cruzados com o Python |
 | 2 | Usuários e acesso | **entregue em 13/09/2026, v0.30.0** — as 12 rotas de `/api/usuarios`, `semear` e `emergencia` só em C# |
 | 3 | Empresas e projetos | **entregue em 13/09/2026, v0.31.0** — empresas, frentes, projetos, etapas e exclusão só em C#; canal interno com o motor no ar |
-| 4 | Histórico | próxima |
-| 5–7 | — | não iniciadas |
+| 4 | Histórico | **entregue em 13/09/2026, v0.32.0** — linha do tempo, comentário, status e sucessão só em C#; registrar evento de etapa e barrar trabalho parado seguem no motor |
+| 5 | Lotes | próxima |
+| 6–7 | — | não iniciadas |
 
 ---
 
