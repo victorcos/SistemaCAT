@@ -5,6 +5,77 @@
 
 ---
 
+## 2026-09-13 — A API vai para C#; o motor pesado fica em Python
+
+**O pedido.** Migrar o sistema para C#. Tudo que não for quebra de arquivo nem
+automação passa a ser escrito em C#: API, endpoints, regras de acesso,
+cadastros.
+
+**A pergunta que o pedido deixava aberta.** Metade do backend não é "quebra"
+nem "API": a leitura da EFD e dos XML que grava parquet, o confronto e a
+conferência em DuckDB, a extração de movimentos e a geração das planilhas
+grandes. De que lado isso fica decide o tamanho da migração inteira.
+
+**Decisão.** Fica em Python, junto da quebra. A regra passa a ser:
+
+| Vai para C# | Fica em Python (o "motor") |
+|---|---|
+| as rotas públicas da API, todas | quebra de SPED e automações |
+| autenticação, token, senha | leitura de pasta, remessa, EFD e XML |
+| usuários, acesso a empresa, salvaguardas | extração para parquet |
+| empresas, projetos, histórico | confronto e conferência (DuckDB) |
+| registro de lote e de execução | extração de movimentos |
+| acompanhar execução e servir o download | geração das planilhas xlsx/csv |
+
+O critério de corte é um só: **o que lê arquivo fiscal ou atravessa volume é
+motor; o que conversa com a pessoa é API.**
+
+**Por quê, e não "tudo em C#".**
+
+1. **É o código mais caro de acertar, e já está acertado.** O confronto passou
+   por uma sequência de correções que só apareceu em base real: filtrar antes
+   de agrupar, derramar em disco em vez de morrer, um plano que cabe em 4 GB,
+   XML de fornecedor, SPED retificador. Validado em 400 milhões de linhas e
+   numa rodada de 884 EFD. Reescrever isso não entrega nada novo à pessoa que
+   usa e reabre cada um desses defeitos.
+2. **O ecossistema é melhor do lado de lá.** DuckDB, pyarrow e xlsxwriter em
+   memória constante são o que o volume pede. Em .NET existem equivalentes,
+   mas nenhum com a mesma maturidade para parquet e para planilha de milhões
+   de linhas sem carregar tudo em memória.
+3. **É a mesma natureza do que já ficou em Python por pedido do dono.** Quebra
+   de arquivo e leitura de arquivo são o mesmo trabalho: fluxo, disco, volume.
+   Separar os dois poria a leitura da EFD num lado e o índice por offset dela
+   no outro.
+
+**Como os dois convivem.**
+
+- **O front fala só com o C#.** O Python perde a porta pública.
+- **Pedido demorado passa pelo banco, não por chamada.** O C# grava a linha em
+  `execucao` como pendente; o motor pega a linha, trabalha e grava progresso e
+  conclusão. É o contrato que a ARQUITETURA §5 já previa, e é exatamente a
+  troca que `infraestrutura/tarefas.py` anunciava: "o dia da migração troca
+  este arquivo e mais nada". Sem Redis, sem Celery.
+- **Pedido rápido que lê disco é chamada interna.** Inspecionar pasta, analisar
+  remessa e gerar planilha respondem na hora; o C# chama o motor em
+  `localhost`, e o motor não aceita conexão de fora.
+- **Um banco, um dono do esquema.** O Alembic continua sendo o único a criar e
+  alterar tabela. O C# mapeia as tabelas que existem e não gera migração. Dois
+  donos do mesmo esquema divergem em silêncio.
+- **Senha e token são intercambiáveis.** O C# confere o mesmo Argon2id com a
+  mesma pimenta e emite o mesmo JWT com o mesmo segredo. Um token emitido de
+  um lado vale do outro, o que deixa migrar rota por rota sem derrubar sessão.
+
+**Como migra.** Por substituição gradual: o C# nasce na frente de tudo,
+repassando ao Python o que ainda não foi portado, e cada rota migrada sai do
+repasse. O front não muda. Plano, ordem e critério de pronto em
+`MIGRACAO_CSHARP.md`.
+
+**O que isto não decide.** Se um dia o motor for para C#. A fronteira fica
+num contrato — tabela `execucao` e três chamadas internas — justamente para
+essa troca, se vier, não arrastar a API junto.
+
+---
+
 ## 2026-09-12 — Baixar escolhendo a pasta, e cancelar o que carrega
 
 **Decisão.** Três coisas, que vieram juntas porque uma depende da outra.

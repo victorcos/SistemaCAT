@@ -24,6 +24,7 @@ Ler nesta ordem:
 5. `docs/PLANEJAMENTO.md` — o que já foi apurado e o roteiro
 6. `docs/VERSIONAMENTO.md` — como se sobe código neste projeto
 7. `docs/IDENTIDADE.md` — a paleta da marca BMS e como aplicá-la
+8. `docs/MIGRACAO_CSHARP.md` — a troca da API para C#, em fatias
 
 ## Estrutura
 
