@@ -5,6 +5,49 @@
 
 ---
 
+## 2026-09-14 — Etapa 4 começa pelo ICMS suportado, e ele é uma cascata
+
+**Decisão.** O ICMS suportado na entrada ganhou módulo próprio de domínio,
+`cat42/suportado.py`, e não é uma soma: é uma **cascata de fontes** que devolve
+o valor **e de onde ele veio**.
+
+**Por quê.** O manual define o suportado como o imposto da operação própria do
+substituto somado ao retido, com FECOEP. Somar dois campos do C170 parece
+resolver. Não resolve, e o motivo está na base real, 8.761.002 itens de entrada:
+
+| CST | Itens | Traz ICMS | Traz ST |
+|---|---|---|---|
+| 60 | 3.705.774 | 0,0% | 0,0% |
+| 40 | 2.066.118 | 0,0% | 0,0% |
+| 00 | 1.235.767 | 99,9% | 2,0% |
+| 20 | 1.073.629 | 98,9% | 0,0% |
+| 10 | 58.339 | 99,5% | 95,9% |
+
+O CST 60 é 42% das entradas e vem zerado nos dois campos, corretamente: o
+imposto foi retido antes e o remetente não destaca nada. Uma soma devolveria
+zero e pareceria certa.
+
+**As quatro fontes, em ordem de prova.** Destacado na entrada; informado pelo
+fornecedor, no `infAdFisco` da nota ou na coluna "ST integral" do relatório do
+cliente; reconstruído por base e alíquota; e não apurável, com o motivo escrito.
+
+Guardar a procedência por linha não é luxo. Um valor lido da nota e um valor
+reconstruído por alíquota não podem virar a mesma coluna sem aviso: é a
+diferença entre um pedido de ressarcimento sustentável e um chute. O resumo
+separa `valor_documental` do total justamente para essa pergunta.
+
+**O que a medição mostrou.** Rodando a cascata sobre a base real, **só 0,92%
+dos itens têm suportado apurável hoje**, R$ 1.482.436,74, todos por destaque na
+entrada. A reconstrução por base e alíquota não salva nada: a BC ST também vem
+zerada no CST 60.
+
+**O caminho está medido.** O relatório gerencial de entradas do cliente traz
+"ST integral" preenchido em 43,40% das linhas, somando R$ 335.819.112,61. É a
+fonte 2 da cascata, e ligá-la é o próximo passo da etapa 4. Sem ela, esta etapa
+não tem o que apurar.
+
+---
+
 ## 2026-09-14 — O rascunho da planilha sai do disco do Windows
 
 **Decisão.** O xlsxwriter passa a escrever o rascunho na pasta do arquivo que
