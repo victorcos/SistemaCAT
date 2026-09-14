@@ -5,6 +5,40 @@
 
 ---
 
+## 2026-09-14 — Fim da migração: sem repasse, motor sem rota pública, versão em VERSAO
+
+**O que saiu.** O repasse YARP do C# ao motor: rota que a API não conhece
+responde 404 com `detail` e não chega ao Python. Do motor saíram a
+`/api/saude` pública (virou `GET /interno/saude`, com o segredo), o CORS e a
+documentação interativa (`/docs`, `/redoc`, `/openapi.json`). E todo o código
+Python que só existia para as rotas públicas: `seguranca.py`, senha e token
+(`infraestrutura/auth`), o repositório e o domínio de usuário, as portas, e as
+dependências `python-jose`, `argon2-cffi` e `bcrypt`. Um teste do motor falha se
+aparecer nele rota fora de `/interno`.
+
+**Senha e token deixaram de cruzar ao vivo com o Python.** Não há mais código
+Python que confira senha ou leia token. O que prova que quem já tinha senha
+continua entrando são os vetores gravados pelo Python
+(`Cat.Compatibilidade.Testes`), que ficam. O cruzamento ao vivo segue para o que
+os dois lados ainda compartilham: o dígito do CNPJ e a tabela de tipos de arquivo.
+
+**Três pendências do plano, decididas com o usuário.**
+
+- **A versão mora no arquivo `VERSAO`, na raiz**, lido pela API e pelo motor.
+  O `pyproject.toml` fica com `0.0.0` e não é lido: o setuptools não aceita
+  buscar o número fora de `backend/`, e duas cópias do número é o defeito que
+  a regra existe para evitar.
+- **`backend/` não vira `motor/`.** Renomear moveria a `.venv` (que quebra), o
+  `.env` e a pasta de trabalho com dados reais; e as execuções guardam o caminho
+  absoluto da pasta — planilhas antigas dariam 410 e excluir trabalho recusaria
+  apagar a pasta, por estar "fora" da pasta de trabalho.
+- **Postgres obrigatório.** O `instalar.ps1` para, com instrução, sem Docker
+  instalado e rodando. A instalação com SQLite nunca funcionou (migração
+  `62fe3d195ce5`) e a API em C# fala só Postgres. O SQLite fica só na bateria
+  de testes do motor.
+
+---
+
 ## 2026-09-13 — Conferência e movimentos pedidos em C#, rodando na fila do motor
 
 **O que entrou.** Pedir a conferência e os movimentos, listar as rodadas de um

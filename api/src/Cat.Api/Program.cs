@@ -12,7 +12,6 @@ using Cat.Aplicacao.Log;
 using Cat.Infraestrutura.Log;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.Extensions.Logging.Console;
-using Yarp.ReverseProxy.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,9 +25,8 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole(o => o.FormatterName = FormatadorJson.Nome);
 builder.Logging.AddConsoleFormatter<FormatadorJson, ConsoleFormatterOptions>();
 builder.Logging.SetMinimumLevel(FormatadorJson.ParaNivel(inicial.LogNivel));
-// o ASP.NET e o YARP narram cada requisição; a nossa linha já diz o que importa
+// o ASP.NET narra cada requisição; a nossa linha já diz o que importa
 builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
-builder.Logging.AddFilter("Yarp", LogLevel.Warning);
 
 builder.Services.AddSingleton(sp => ConfigCat.Carregar(sp.GetRequiredService<IConfiguration>()));
 builder.Services.ConfigureHttpJsonOptions(o =>
@@ -80,9 +78,6 @@ builder.Services.AddOptions<CorsOptions>().Configure<ConfigCat>((opcoes, config)
         .AllowAnyHeader()
         .WithExposedHeaders(RequisicaoMiddleware.Cabecalho)));
 
-builder.Services.AddSingleton<IProxyConfigProvider, RepasseAoMotor>();
-builder.Services.AddReverseProxy();
-
 var app = builder.Build();
 
 var config = app.Services.GetRequiredService<ConfigCat>();
@@ -128,11 +123,11 @@ app.MapearTrabalhos();
 app.MapearHistorico();
 app.MapearLotes();
 app.MapearExecucoes();
-app.MapReverseProxy(repasse =>
-{
-    repasse.Use(RepasseAoMotor.TraduzirFalha);
-    repasse.UseLoadBalancing();
-});
+// Desde a fatia 7 nada de /api segue ao motor. Rota que não existe responde
+// aqui, com texto em "detail" — o ASP.NET sozinho devolveria 404 de corpo
+// vazio, e a tela mostraria só "erro".
+app.MapFallback("/api/{**resto}", () =>
+    CorpoJson.Recusar("Esta rota não existe na API.", StatusCodes.Status404NotFound));
 
 app.Run();
 

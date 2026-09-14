@@ -22,7 +22,6 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from cat.dominio.acesso.usuario import Usuario
 from cat.dominio.projeto.historico import StatusDoProjeto, TipoDeEvento
 from cat.infraestrutura.repositorios.modelos import (
     EventoDoProjetoDB,
@@ -44,16 +43,14 @@ def registrar(
     *,
     texto: str = "",
     dados: dict | None = None,
-    por: Usuario | UsuarioDB | None = None,
+    por: UsuarioDB | None = None,
     autor_id: int | None = None,
     autor_nome: str = "",
     commit: bool = True,
 ) -> None:
     """Põe uma linha na história. Falhar aqui não derruba a operação.
 
-    `por` aceita tanto o usuário do domínio quanto a linha do banco, porque
-    metade dos pontos de registro tem um e metade tem o outro — exigir
-    conversão em cada ponto só espalharia ruído.
+    `por` é a linha do usuário no banco; quem só tem o id passa `autor_id`.
     """
     if por is not None:
         autor_id = getattr(por, "id", None)

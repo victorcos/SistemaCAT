@@ -26,16 +26,11 @@ from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
 from cat.config import obter_config
-from cat.dominio.acesso.usuario import Cargo, Papel
-from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
-from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
-from tests.integracao.sessao import cabecalhos_de
 from tests.integracao.cadastro import (
+    criar_usuario,
     conferir, criar_empresa, criar_lote, criar_projeto, planilha, tipos_nos_lotes,
 )
-
-SENHA = "Sistema2026cat"
 
 # raiz própria deste módulo: a bateria compartilha um banco só
 CNPJ = "66778899000186"
@@ -146,32 +141,25 @@ def cliente():
                           connect_args={"check_same_thread": False})
     Base.metadata.create_all(motor)
     s = sessionmaker(bind=motor, expire_on_commit=False)()
-    UsuarioRepositorioSql(s).criar(
-        usuario="cenarios_analista", email="cenarios@bms.local",
-        nome_exibicao="Analista dos Cenários",
-        senha_hash=SenhasArgon2(obter_config().senha_pimenta).gerar(SENHA),
-        papel=Papel.DEV, cargo=Cargo.ANALISTA)
+    criar_usuario(s, usuario="cenarios_analista", email="cenarios@bms.local",
+                     nome_exibicao="Analista dos Cenários",
+                     papel="dev", cargo="analista")
     s.close()
     with TestClient(app) as c:
         yield c
 
 
 @pytest.fixture(scope="module")
-def cabecalhos(cliente):
-    return cabecalhos_de("cenarios_analista", SENHA)
-
-
-@pytest.fixture(scope="module")
-def empresa_id(cliente, cabecalhos):
+def empresa_id(cliente):
     return criar_empresa(raiz=RAIZ, cnpj=CNPJ, razao="EMPRESA DOS CENARIOS",
                          ie="123456789012", por="cenarios_analista")
 
 
-def _projeto(cliente, cabecalhos, empresa_id, nome: str) -> int:
+def _projeto(cliente, empresa_id, nome: str) -> int:
     return criar_projeto(empresa_id=empresa_id, nome=nome, por="cenarios_analista")
 
 
-def _conferir(cliente, cabecalhos, projeto_id: int, pasta: str) -> dict:
+def _conferir(cliente, projeto_id: int, pasta: str) -> dict:
     """Importa a pasta, roda a conferência e devolve a execução concluída."""
     criar_lote(projeto_id=projeto_id, pasta=pasta)
     d = conferir(cliente, projeto_id, "cenarios_analista")
@@ -179,7 +167,7 @@ def _conferir(cliente, cabecalhos, projeto_id: int, pasta: str) -> dict:
     return d
 
 
-def _planilha(cliente, cabecalhos, execucao_id: int, qual: str, **filtro) -> int:
+def _planilha(cliente, execucao_id: int, qual: str, **filtro) -> int:
     """Baixa a planilha e devolve quantas linhas de dado ela tem."""
     import io  # noqa: PLC0415
 
@@ -191,8 +179,8 @@ def _planilha(cliente, cabecalhos, execucao_id: int, qual: str, **filtro) -> int
     return sum(aba.max_row - 1 for aba in livro.worksheets)
 
 
-def _contar(cliente, cabecalhos, execucao_id: int) -> dict[str, int]:
-    return {qual: _planilha(cliente, cabecalhos, execucao_id, qual)
+def _contar(cliente, execucao_id: int) -> dict[str, int]:
+    return {qual: _planilha(cliente, execucao_id, qual)
             for qual in ("conferidas", "a-cobrar", "nao-escrituradas")}
 
 
@@ -216,7 +204,7 @@ def _relatar(nome: str, resumo: dict, planilhas: dict[str, int]) -> None:
 class TestCenarioPerfeito:
     @pytest.fixture(scope="class")
     @classmethod
-    def execucao(cls, cliente, cabecalhos, empresa_id, tmp_path_factory):
+    def execucao(cls, cliente, empresa_id, tmp_path_factory):
         base = Base200()
         pasta = tmp_path_factory.mktemp("perfeito")
         escrever(pasta, "efd.txt", base.efd())
@@ -224,12 +212,12 @@ class TestCenarioPerfeito:
         for n in range(1, 11):                       # XML de dez NF-e
             (pasta / f"{base.nfe[n]}-nfe.xml").write_text(
                 xml_de(base.nfe[n]), encoding="utf-8")
-        projeto = _projeto(cliente, cabecalhos, empresa_id, "Cenário perfeito")
-        return _conferir(cliente, cabecalhos, projeto, str(pasta))
+        projeto = _projeto(cliente, empresa_id, "Cenário perfeito")
+        return _conferir(cliente, projeto, str(pasta))
 
-    def test_fecha_sem_aviso(self, cliente, cabecalhos, execucao):
+    def test_fecha_sem_aviso(self, cliente, execucao):
         r = execucao["resumo"]
-        planilhas = _contar(cliente, cabecalhos, execucao["id"])
+        planilhas = _contar(cliente, execucao["id"])
         _relatar("PERFEITO", r, planilhas)
 
         assert r["escriturados"] == 200
@@ -243,7 +231,7 @@ class TestCenarioPerfeito:
         assert planilhas == {"conferidas": 200, "a-cobrar": 0,
                              "nao-escrituradas": 0}
 
-    def test_o_xml_venceu_onde_havia_os_dois(self, cliente, cabecalhos, execucao):
+    def test_o_xml_venceu_onde_havia_os_dois(self, cliente, execucao):
         # dez notas tinham XML e relatório: dez conferidas pelo XML
         import duckdb  # noqa: PLC0415
 
@@ -273,7 +261,7 @@ class TestCenarioMedioUsual:
 
     @pytest.fixture(scope="class")
     @classmethod
-    def execucao(cls, cliente, cabecalhos, empresa_id, tmp_path_factory):
+    def execucao(cls, cliente, empresa_id, tmp_path_factory):
         base = Base200(canceladas=cls.CANCELADAS)
         pasta = tmp_path_factory.mktemp("medio")
         escrever(pasta, "efd.txt", base.efd())
@@ -298,12 +286,12 @@ class TestCenarioMedioUsual:
                    + no_relatorio[-cls.XML_REPETIDOS:]):
             (pasta / f"{ch}-nfe.xml").write_text(xml_de(ch), encoding="utf-8")
 
-        projeto = _projeto(cliente, cabecalhos, empresa_id, "Cenário médio")
-        return _conferir(cliente, cabecalhos, projeto, str(pasta))
+        projeto = _projeto(cliente, empresa_id, "Cenário médio")
+        return _conferir(cliente, projeto, str(pasta))
 
-    def test_os_numeros(self, cliente, cabecalhos, execucao):
+    def test_os_numeros(self, cliente, execucao):
         r = execucao["resumo"]
-        planilhas = _contar(cliente, cabecalhos, execucao["id"])
+        planilhas = _contar(cliente, execucao["id"])
         _relatar("MÉDIO USUAL", r, planilhas)
 
         conferidos = self.COBERTAS_PELO_RELATORIO + self.XML_QUE_COMPLETAM
@@ -319,14 +307,14 @@ class TestCenarioMedioUsual:
                              "nao-escrituradas": self.SO_NO_RELATORIO}
 
     def test_a_planilha_de_cobranca_filtra_o_que_se_cobra(
-        self, cliente, cabecalhos, execucao
+        self, cliente, execucao
     ):
-        so_cobrar = _planilha(cliente, cabecalhos, execucao["id"], "a-cobrar",
+        so_cobrar = _planilha(cliente, execucao["id"], "a-cobrar",
                               classificacoes="a_cobrar")
         assert so_cobrar == 200 - 175 - self.CANCELADAS               # 21
-        so_nfe = _planilha(cliente, cabecalhos, execucao["id"], "a-cobrar",
+        so_nfe = _planilha(cliente, execucao["id"], "a-cobrar",
                            modelos="55")
-        so_cfe = _planilha(cliente, cabecalhos, execucao["id"], "a-cobrar",
+        so_cfe = _planilha(cliente, execucao["id"], "a-cobrar",
                            modelos="59")
         assert so_nfe + so_cfe == 25
 
@@ -359,7 +347,7 @@ class TestCenarioPior:
 
     @pytest.fixture(scope="class")
     @classmethod
-    def execucao(cls, cliente, cabecalhos, empresa_id, tmp_path_factory):
+    def execucao(cls, cliente, empresa_id, tmp_path_factory):
         base = Base200(canceladas=cls.CANCELADAS, sem_chave=cls.SEM_CHAVE)
         pasta = tmp_path_factory.mktemp("pior")
         escrever(pasta, "efd.txt", base.efd())
@@ -377,12 +365,12 @@ class TestCenarioPior:
             [chave(OUTRA_FILIAL, "55", n)
              for n in range(1, cls.NOTAS_DA_OUTRA_FILIAL + 1)]))
 
-        projeto = _projeto(cliente, cabecalhos, empresa_id, "Cenário pior")
-        return _conferir(cliente, cabecalhos, projeto, str(pasta))
+        projeto = _projeto(cliente, empresa_id, "Cenário pior")
+        return _conferir(cliente, projeto, str(pasta))
 
-    def test_nada_casa_e_nada_some(self, cliente, cabecalhos, execucao):
+    def test_nada_casa_e_nada_some(self, cliente, execucao):
         r = execucao["resumo"]
-        planilhas = _contar(cliente, cabecalhos, execucao["id"])
+        planilhas = _contar(cliente, execucao["id"])
         _relatar("PIOR", r, planilhas)
 
         total = 200 + self.SEM_CHAVE
@@ -414,7 +402,7 @@ class TestCenarioPior:
         assert "50 nota(s) da pasta não estão na EFD" in avisos
 
     def test_o_inventario_ficou_no_lote_mas_fora_da_conferencia(
-        self, cliente, cabecalhos, execucao
+        self, cliente, execucao
     ):
         tipos = tipos_nos_lotes(execucao["projeto_id"])
         assert tipos.get("gerencial_inventario") == 1

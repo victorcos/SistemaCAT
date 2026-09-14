@@ -8,25 +8,40 @@ commit de bump, antes de etiquetar.
 
 import shutil
 import subprocess
-import tomllib
 from pathlib import Path
 
 import pytest
 
-from cat.versao import DESCONHECIDA, _PYPROJECT, como_tupla, versao
+from cat.versao import ARQUIVO, DESCONHECIDA, como_tupla, ler, versao
 
 
-def test_le_do_pyproject():
-    with _PYPROJECT.open("rb") as f:
-        esperada = tomllib.load(f)["project"]["version"]
-    assert versao() == esperada
+def test_le_do_arquivo_VERSAO_na_raiz():
+    assert ARQUIVO.parent == Path(__file__).resolve().parents[3]
+    assert versao() == ARQUIVO.read_text(encoding="utf-8-sig").strip()
     assert versao() != DESCONHECIDA
 
 
-def test_a_api_expoe_a_mesma_versao():
+def test_o_motor_expoe_a_mesma_versao():
     from cat.apresentacao.api.app import app  # noqa: PLC0415
 
     assert app.version == versao()
+
+
+@pytest.mark.parametrize("conteudo, esperada", [
+    ("1.2.3\n", "1.2.3"),
+    ("\ufeff1.2.3\r\n", "1.2.3"),
+    ("0.35.0-rc.1", "0.35.0-rc.1"),
+    ('version = "1.2.3"', DESCONHECIDA),
+    ("1.2.3\n4.5.6\n", DESCONHECIDA),
+])
+def test_so_aceita_o_numero_sozinho(tmp_path, conteudo, esperada):
+    arquivo = tmp_path / "VERSAO"
+    arquivo.write_text(conteudo, encoding="utf-8")
+    assert ler(arquivo) == esperada
+
+
+def test_sem_arquivo_diz_que_nao_sabe(tmp_path):
+    assert ler(tmp_path / "VERSAO") == DESCONHECIDA
 
 
 class TestTupla:
@@ -56,11 +71,11 @@ def _etiqueta_mais_recente() -> str | None:
     return saida.stdout.strip() or None
 
 
-def test_a_etiqueta_do_git_nao_corre_na_frente_do_pyproject():
+def test_a_etiqueta_do_git_nao_corre_na_frente_do_arquivo_VERSAO():
     etiqueta = _etiqueta_mais_recente()
     if etiqueta is None:
         pytest.skip("fora de um repositório git, ou sem git")
     assert como_tupla(etiqueta) <= como_tupla(versao()), (
-        f"a etiqueta {etiqueta} está à frente do pyproject ({versao()}). "
-        "Bump no pyproject vem ANTES de etiquetar."
+        f"a etiqueta {etiqueta} está à frente do VERSAO ({versao()}). "
+        "Bump no VERSAO vem ANTES de etiquetar."
     )

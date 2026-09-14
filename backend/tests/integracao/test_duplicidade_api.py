@@ -13,18 +13,11 @@ from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
 from cat.config import obter_config
-from cat.dominio.acesso.usuario import Cargo, Papel
 from cat.dominio.comum.cnpj import Cnpj
-from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
-from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
-from tests.integracao.sessao import cabecalhos_de
 from tests.integracao.cadastro import (
-    SEGREDO, criar_empresa, criar_lote, criar_projeto, hashes_nos_lotes,
+    SEGREDO, criar_usuario, criar_empresa, criar_lote, criar_projeto, hashes_nos_lotes,
 )
-
-SENHA = "Sistema2026cat"
-
 
 def _cnpj_valido(raiz: str, ordem: str = "0001") -> str:
     for dv in range(100):
@@ -54,19 +47,12 @@ def cliente():
                           connect_args={"check_same_thread": False})
     Base.metadata.create_all(motor)
     s = sessionmaker(bind=motor, expire_on_commit=False)()
-    UsuarioRepositorioSql(s).criar(
-        usuario="copia_analista", email="copia@bms.local",
-        nome_exibicao="Analista da Cópia",
-        senha_hash=SenhasArgon2(obter_config().senha_pimenta).gerar(SENHA),
-        papel=Papel.DEV, cargo=Cargo.ANALISTA)
+    criar_usuario(s, usuario="copia_analista", email="copia@bms.local",
+                     nome_exibicao="Analista da Cópia",
+                     papel="dev", cargo="analista")
     s.close()
     with TestClient(app) as c:
         yield c
-
-
-@pytest.fixture(scope="module")
-def cabecalhos(cliente):
-    return cabecalhos_de("copia_analista", SENHA)
 
 
 @pytest.fixture(scope="module")
@@ -81,7 +67,7 @@ def pastas(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
-def projeto_id(cliente, cabecalhos):
+def projeto_id(cliente):
     empresa = criar_empresa(raiz=RAIZ, cnpj=CNPJ, razao="EMPRESA DA COPIA",
                             ie="9030138187", por="copia_analista")
     return criar_projeto(empresa_id=empresa, nome="Cópia de teste",

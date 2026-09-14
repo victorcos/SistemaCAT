@@ -24,7 +24,8 @@ export default defineConfig({
     // (o Reenquadrador roda nela). Apontar para uma API alheia faz todo login
     // falhar com 404 e nenhuma pista na tela.
     //
-    // Para mudar sem editar codigo: CAT_API_PORT=8020 npm run dev
+    // Para mudar sem editar codigo: CAT_API_PORT=8011 npm run dev. O motor (8020)
+    // nao serve: ele nao tem rota /api desde a fatia 7.
     proxy: {
       "/api": {
         target: `http://localhost:${process.env.CAT_API_PORT ?? 8010}`,

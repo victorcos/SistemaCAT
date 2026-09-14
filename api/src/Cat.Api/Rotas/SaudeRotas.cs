@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cat.Infraestrutura.Configuracao;
+using Cat.Infraestrutura.Motor;
 using Cat.Aplicacao.Log;
 
 namespace Cat.Api.Rotas;
@@ -35,7 +36,12 @@ public static class SaudeRotas
         var situacao = new Dictionary<string, object?> { ["url"] = config.MotorUrl.ToString() };
         try
         {
-            using var resposta = await cliente.GetAsync(new Uri(config.MotorUrl, "api/saude"), cancelar);
+            // pelo canal interno, como tudo o que a API pede ao motor: sem o
+            // segredo certo ele responde 403 (ou 503, sem segredo configurado),
+            // e a saúde mostra isso em vez de "ok"
+            using var pedido = new HttpRequestMessage(HttpMethod.Get, new Uri(config.MotorUrl, "interno/saude"));
+            pedido.Headers.Add(MotorHttp.CabecalhoSegredo, config.MotorSegredo);
+            using var resposta = await cliente.SendAsync(pedido, cancelar);
             await using var corpo = await resposta.Content.ReadAsStreamAsync(cancelar);
             using var json = await JsonDocument.ParseAsync(corpo, cancellationToken: cancelar);
             situacao["situacao"] = resposta.IsSuccessStatusCode ? "ok" : $"http {(int)resposta.StatusCode}";

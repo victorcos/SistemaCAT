@@ -14,14 +14,8 @@ from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
 from cat.config import obter_config
-from cat.dominio.acesso.usuario import Cargo, Papel
-from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
-from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
-from tests.integracao.cadastro import criar_empresa, criar_projeto, definir_status, iniciar
-from tests.integracao.sessao import cabecalhos_de
-
-SENHA = "Sistema2026cat"
+from tests.integracao.cadastro import criar_usuario, criar_empresa, criar_projeto, definir_status, iniciar
 
 # raiz própria deste módulo: a bateria compartilha um banco só
 CNPJ = "99887766000105"
@@ -34,11 +28,9 @@ def cliente():
                           connect_args={"check_same_thread": False})
     Base.metadata.create_all(motor)
     s = sessionmaker(bind=motor, expire_on_commit=False)()
-    UsuarioRepositorioSql(s).criar(
-        usuario="hist_gestor", email="hist.gestor@bms.local",
-        nome_exibicao="Gestora do Histórico",
-        senha_hash=SenhasArgon2(obter_config().senha_pimenta).gerar(SENHA),
-        papel=Papel.DEV, cargo=Cargo.DIRETOR)
+    criar_usuario(s, usuario="hist_gestor", email="hist.gestor@bms.local",
+                     nome_exibicao="Gestora do Histórico",
+                     papel="dev", cargo="diretor")
     s.close()
     with TestClient(app) as c:
         yield c

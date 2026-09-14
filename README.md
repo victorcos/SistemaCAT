@@ -50,7 +50,8 @@ scripts/
 
 Três comandos, do zero ao primeiro login. Precisa de Git, Python 3.11+,
 Node 20+ e .NET 10 SDK (o script instala o que faltar via `winget` com
-`-InstalarPreRequisitos`); Docker Desktop é opcional — sem ele o banco é SQLite.
+`-InstalarPreRequisitos`) e Docker Desktop aberto — o banco é Postgres em
+contêiner, sem alternativa.
 
 ```
 gh auth login                           # o repositório é privado: entrar no GitHub uma vez
@@ -68,11 +69,12 @@ de fora do escritório, as pastas em `Z:` só existem pela VPN.
 
 ## Como rodar
 
-São três processos. A tela fala só com a API em C#; a API atende o que já foi
-portado e repassa o resto ao motor Python, que também faz o trabalho pesado
-(`docs/MIGRACAO_CSHARP.md`). O `subir.ps1` sobe os três; à mão, é assim.
+São três processos. A tela fala só com a API em C#, e a API pede ao motor
+Python, pelo canal interno, tudo o que é de disco: ler lote e remessa, conferir,
+extrair movimentos, gerar planilha (`docs/MIGRACAO_CSHARP.md`). O motor não tem
+rota pública. O `subir.ps1` sobe os três; à mão, é assim.
 
-Banco, opcional em desenvolvimento (sem ele usa SQLite):
+Banco:
 
 ```
 docker compose -f docker/docker-compose.yml up -d
@@ -83,7 +85,7 @@ Motor Python:
 ```
 cd backend
 python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"
-cp ../.env.example .env          # e ajuste CAT_JWT_SEGREDO
+cp ../.env.example .env          # e preencha CAT_JWT_SEGREDO e CAT_MOTOR_SEGREDO
 alembic upgrade head                     # cria o esquema
 dotnet run --project ../api/src/Cat.Ferramentas -- semear   # cria os três gestores
 python -m uvicorn cat.apresentacao.api.app:app --reload --host 127.0.0.1 --port 8020
@@ -104,8 +106,8 @@ npm install
 npm run dev
 ```
 
-A tela abre em http://localhost:5173 e a documentação da API em
-http://localhost:8010/docs.
+A tela abre em http://localhost:5173. Quem está no ar, e com qual versão de
+cada lado: http://localhost:8010/api/saude.
 
 Se um gestor perder o acesso e não houver outro disponível, a saída é pelo
 servidor:

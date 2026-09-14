@@ -21,8 +21,6 @@ _TMP = tempfile.mkdtemp(prefix="cat_testes_")
 os.environ.setdefault(
     "CAT_BANCO_URL", f"sqlite:///{_TMP}/testes.db".replace("\\", "/")
 )
-os.environ.setdefault("CAT_JWT_SEGREDO", "segredo-so-de-teste-nao-usar-em-producao")
-os.environ.setdefault("CAT_SENHA_PIMENTA", "pimenta-so-de-teste")
 os.environ.setdefault("CAT_MOTOR_SEGREDO", "segredo-do-canal-so-de-teste")
 # a fila roda na hora, chamada pelo teste (tests/integracao/cadastro.py: rodar_fila)
 os.environ.setdefault("CAT_FILA_AUTOMATICA", "false")

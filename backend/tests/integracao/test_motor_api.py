@@ -1,8 +1,9 @@
-"""O que o motor segue garantindo por conta própria, sem rota de login.
+"""O motor por fora: só o canal interno, e o que ele garante por conta própria.
 
-Estes três vieram de test_auth_api.py quando o login foi para a API em C#
-(13/09/2026). Os cenários de login em si estão em
-api/tests/Cat.Api.Testes/AutenticacaoTestes.cs.
+Desde a fatia 7 (docs/MIGRACAO_CSHARP.md) o motor não tem rota pública. Login,
+usuários, empresas, projetos, histórico, lotes, execuções e planilhas moram na
+API em C#; os cenários delas estão em api/tests/Cat.Api.Testes. O que chega
+aqui vem da API, pelo canal interno, com o segredo.
 """
 
 import os
@@ -10,18 +11,16 @@ import shutil
 import tempfile
 
 import pytest
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
 from cat.config import obter_config
-from cat.dominio.acesso.usuario import Papel
-from cat.infraestrutura.auth.senha import SenhasArgon2
-from cat.infraestrutura.repositorios.modelos import Base, UsuarioDB
-from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
-
-SENHA = "Sistema2026cat"
+from cat.infraestrutura.repositorios.modelos import Base
+from cat.versao import versao
+from tests.integracao.cadastro import SEGREDO, criar_usuario
 
 
 @pytest.fixture(scope="module")
@@ -30,60 +29,65 @@ def cliente():
                           connect_args={"check_same_thread": False})
     Base.metadata.create_all(motor)
     s = sessionmaker(bind=motor, expire_on_commit=False)()
-    UsuarioRepositorioSql(s).criar(
-        usuario="motor.ana", email="motor.ana@bms.local", nome_exibicao="Ana",
-        senha_hash=SenhasArgon2(obter_config().senha_pimenta).gerar(SENHA),
-        papel=Papel.ANALISTA)
+    criar_usuario(s, usuario="motor.ana", email="motor.ana@bms.local",
+                     nome_exibicao="Ana", papel="analista")
     s.close()
     with TestClient(app) as c:
         yield c
 
 
-def test_saude_responde(cliente):
-    r = cliente.get("/api/saude")
-    assert r.status_code == 200
-    assert r.json()["status"] == "ok"
+class TestSemRotaPublica:
+    """Uma regra existe num lugar só. Se uma rota pública voltar ao motor,
+    voltam as duas — e a de cá sem conferir quem pede."""
+
+    @staticmethod
+    def _caminhos(rotas, prefixo=""):
+        # o FastAPI 0.14x guarda o router incluído embrulhado, com o prefixo à parte
+        for r in rotas:
+            if isinstance(r, APIRoute):
+                yield prefixo + r.path
+            elif hasattr(r, "original_router"):
+                yield from TestSemRotaPublica._caminhos(
+                    r.original_router.routes, prefixo + r.include_context.prefix)
+
+    def test_toda_rota_do_motor_e_do_canal_interno(self):
+        caminhos = list(self._caminhos(app.routes))
+        assert caminhos, "o motor ficou sem rota nenhuma"
+        assert [c for c in caminhos if not c.startswith("/interno/")] == []
+
+    @pytest.mark.parametrize("metodo, rota", [
+        ("GET", "/api/saude"), ("POST", "/api/auth/token"), ("GET", "/api/usuarios"),
+        ("GET", "/api/empresas"), ("GET", "/api/projetos/1"), ("GET", "/api/projetos/1/historico"),
+        ("POST", "/api/projetos/1/lotes"), ("POST", "/api/importacoes/analisar"),
+        ("POST", "/api/projetos/1/conferencias"), ("GET", "/api/movimentos/1/planilhas/itens"),
+    ])
+    def test_rotas_que_foram_para_o_csharp_nao_respondem_aqui(self, cliente, metodo, rota):
+        assert cliente.request(metodo, rota).status_code in (404, 405)
+
+    @pytest.mark.parametrize("rota", ["/docs", "/redoc", "/openapi.json"])
+    def test_sem_documentacao_publica(self, cliente, rota):
+        # quem descreve a API para a tela é o C#; o canal interno não se anuncia
+        assert cliente.get(rota).status_code == 404
 
 
-def test_resposta_traz_identificador_de_requisicao(cliente):
-    """Sem isso não dá para juntar as linhas de log de um mesmo pedido."""
-    assert cliente.get("/api/saude").headers.get("X-Request-Id")
+class TestSaude:
+    def test_responde_pelo_canal_com_a_versao_e_a_pasta(self, cliente):
+        r = cliente.get("/interno/saude", headers=SEGREDO)
+        assert r.status_code == 200, r.text
+        corpo = r.json()
+        assert corpo["status"] == "ok"
+        assert corpo["versao"] == versao()
+        assert corpo["pasta_de_trabalho"] == obter_config().raiz_de_trabalho
 
+    def test_sem_segredo_nao_diz_nada(self, cliente):
+        r = cliente.get("/interno/saude")
+        assert r.status_code == 403
+        assert "versao" not in r.text
 
-def test_login_nao_mora_mais_no_motor(cliente):
-    """A regra de login existe num lugar só. Se esta rota voltar, voltam as duas."""
-    r = cliente.post("/api/auth/token", data={"username": "motor.ana", "password": SENHA})
-    assert r.status_code in (404, 405)
-
-
-def test_gestao_de_usuarios_nao_mora_mais_no_motor(cliente):
-    """Mínimo de gestores e senha provisória existem num lugar só: a API em C#."""
-    assert cliente.get("/api/usuarios").status_code in (404, 405)
-    assert cliente.post("/api/usuarios/eu/senha", json={}).status_code in (404, 405)
-
-
-def test_empresas_projetos_e_exclusao_nao_moram_mais_no_motor(cliente):
-    """Cadastro, etapas do projeto e a exclusão que pede senha: num lugar só, o C#."""
-    for metodo, rota in [("GET", "/api/empresas"), ("POST", "/api/empresas"), ("GET", "/api/frentes"),
-                         ("GET", "/api/projetos"), ("POST", "/api/projetos"), ("GET", "/api/projetos/1"),
-                         ("GET", "/api/projetos/1/exclusao"), ("DELETE", "/api/projetos/1")]:
-        assert cliente.request(metodo, rota).status_code in (404, 405), rota
-
-
-def test_historico_nao_mora_mais_no_motor(cliente):
-    """Linha do tempo, comentário, status e sucessão: num lugar só, o C#."""
-    for metodo, rota in [("GET", "/api/projetos/1/historico"), ("POST", "/api/projetos/1/historico/comentarios"),
-                         ("GET", "/api/status-de-projeto"), ("PATCH", "/api/projetos/1/status"),
-                         ("GET", "/api/projetos/1/sucessores"), ("PATCH", "/api/projetos/1/responsavel")]:
-        assert cliente.request(metodo, rota).status_code in (404, 405), rota
-
-
-def test_lotes_e_remessa_nao_moram_mais_no_motor(cliente):
-    """Registrar, listar e remover lote, e a análise da remessa: rota pública só no C#."""
-    for metodo, rota in [("POST", "/api/projetos/1/lotes/inspecionar"), ("POST", "/api/projetos/1/lotes"),
-                         ("GET", "/api/projetos/1/lotes"), ("DELETE", "/api/projetos/1/lotes/1"),
-                         ("POST", "/api/importacoes/analisar")]:
-        assert cliente.request(metodo, rota).status_code in (404, 405), rota
+    def test_resposta_traz_identificador_de_requisicao(self, cliente):
+        """Sem isso não dá para juntar as linhas de log de um mesmo pedido."""
+        r = cliente.get("/interno/saude", headers={**SEGREDO, "X-Request-Id": "pedido-42"})
+        assert r.headers.get("X-Request-Id") == "pedido-42"
 
 
 class TestRemessaPeloCanal:
@@ -108,15 +112,6 @@ class TestRemessaPeloCanal:
         r = cliente.post("/interno/remessas/analisar",
                          files={"arquivo": ("efd.txt", self.SPED, "text/plain")})
         assert r.status_code == 403
-
-
-def test_execucoes_e_planilhas_nao_moram_mais_no_motor(cliente):
-    """Conferência, movimentos e os downloads: rota pública só no C#. O motor não tem mais nenhuma."""
-    for metodo, rota in [("POST", "/api/projetos/1/conferencias"), ("GET", "/api/projetos/1/conferencias"),
-                         ("GET", "/api/conferencias/1"), ("GET", "/api/conferencias/1/planilhas/a-cobrar"),
-                         ("POST", "/api/projetos/1/movimentos"), ("GET", "/api/projetos/1/movimentos"),
-                         ("GET", "/api/movimentos/1"), ("GET", "/api/movimentos/1/planilhas/movimentos")]:
-        assert cliente.request(metodo, rota).status_code in (404, 405), rota
 
 
 class TestFila:
@@ -219,23 +214,9 @@ class TestCanalInterno:
         assert os.path.isdir(fora)
         assert os.path.isdir(raiz)
 
-    def test_canal_fica_fora_da_documentacao_publica(self, cliente):
-        assert "/interno" not in cliente.get("/openapi.json").text
-
     def test_sem_segredo_configurado_o_canal_fica_fechado(self, cliente, pastas, monkeypatch):
         dentro, _, _ = pastas
         monkeypatch.setattr(obter_config(), "motor_segredo", "")
         r = cliente.post("/interno/pastas/apagar", headers=self.SEGREDO, json={"pastas": [dentro]})
         assert r.status_code == 503
         assert os.path.isdir(dentro)
-
-
-def test_senha_nao_e_recuperavel_do_banco(cliente):
-    """O sistema não pode ser capaz de descobrir a senha de ninguém."""
-    motor = create_engine(obter_config().banco_url,
-                          connect_args={"check_same_thread": False})
-    s = sessionmaker(bind=motor)()
-    for h in s.scalars(select(UsuarioDB.senha_hash)):
-        assert SENHA not in h
-        assert h.startswith(("$argon2", "$2"))
-    s.close()

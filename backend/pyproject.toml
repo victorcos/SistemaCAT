@@ -1,8 +1,9 @@
 [project]
 name = "sistema-cat"
-# FONTE ÚNICA da versão. A API lê daqui (cat/versao.py) e a etiqueta do git
-# repete este número: `git tag v<version>`. Bump aqui primeiro, sempre.
-version = "0.34.0"
+# NÃO é a versão do sistema: essa está no arquivo VERSAO, na raiz, lido pelo
+# motor (cat/versao.py) e pela API em C#. O setuptools exige um número aqui e
+# não aceita buscá-lo fora de backend/; este fica parado de propósito.
+version = "0.0.0"
 description = "Sistema de apuração das obrigações da CAT — BMS Consultoria Tributária"
 requires-python = ">=3.11"
 dependencies = [
@@ -12,9 +13,6 @@ dependencies = [
     "alembic",         # instalar.ps1 e o README rodam `alembic upgrade head`
     "pydantic>=2",
     "pydantic-settings",
-    "python-jose[cryptography]",
-    "argon2-cffi",
-    "bcrypt",          # só para ler resumo antigo durante a migração
     "python-multipart",
     "psycopg[binary]",
     # extração e confronto: parquet entre etapas, DuckDB para agregar e

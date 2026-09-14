@@ -33,6 +33,18 @@ from cat.infraestrutura.repositorios.modelos import (
 SEGREDO = {"X-Cat-Motor-Segredo": "segredo-do-canal-so-de-teste"}
 
 
+def criar_usuario(s, *, usuario: str, email: str, nome_exibicao: str,
+                  papel: str, cargo: str = "outro") -> None:
+    """Uma pessoa no banco, para ser autora de empresa, trabalho e evento.
+
+    Sem senha que sirva: o motor não confere senha nem lê token desde a fatia 7
+    (docs/MIGRACAO_CSHARP.md). Entrar no sistema é assunto da API em C#.
+    """
+    s.add(UsuarioDB(usuario=usuario, email=email, nome_exibicao=nome_exibicao,
+                    senha_hash="!sem-senha-no-motor", papel=papel, cargo=cargo))
+    s.commit()
+
+
 def _usuario(s, nome: str) -> UsuarioDB:
     u = s.scalar(select(UsuarioDB).where(UsuarioDB.usuario == nome))
     assert u is not None, f"usuário {nome!r} não existe no banco de teste"

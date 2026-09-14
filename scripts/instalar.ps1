@@ -5,13 +5,13 @@
 .DESCRIPTION
   Roda de dentro do repositório clonado (qualquer pasta). Faz, nesta ordem:
 
-    1. confere os pré-requisitos: git, Python 3.11+, Node 20+, .NET 10 SDK,
-       Docker (opcional);
+    1. confere os pré-requisitos: git, Python 3.11+, Node 20+, .NET 10 SDK e
+       Docker em execução;
     2. cria o ambiente Python em backend\.venv e instala o backend;
     3. cria backend\.env a partir de .env.example, com JWT e pimenta NOVOS
        (segredos de servidor não viajam entre máquinas) e a pasta de trabalho
        em disco local;
-    4. sobe o Postgres em Docker (porta 55432). Sem Docker, usa SQLite;
+    4. sobe o Postgres em Docker (porta 55432);
     5. compila a API em C# e as ferramentas de servidor (dotnet build);
     6. aplica as migrações (Alembic) e cria os três gestores iniciais pelas
        ferramentas em C# — as senhas provisórias saem no terminal, uma vez só;
@@ -23,6 +23,10 @@
   Instala o que faltar via winget (Git, Python, Node LTS, .NET 10 SDK).
   Docker Desktop não entra aqui: pede reinício e conta própria.
 
+  O banco é Postgres, sempre (docs/DECISOES.md, 14/09/2026). A instalação sem
+  Docker, com SQLite, nunca chegou a funcionar: uma migração usa recurso que o
+  SQLite não tem, e a API em C# fala só com Postgres.
+
 .EXAMPLE
   gh repo clone victorcos/SistemaCAT
   cd SistemaCAT
@@ -31,8 +35,7 @@
 #>
 [CmdletBinding()]
 param(
-    [switch]$InstalarPreRequisitos,
-    [switch]$SemDocker
+    [switch]$InstalarPreRequisitos
 )
 
 $ErrorActionPreference = "Stop"
@@ -90,22 +93,23 @@ if ($faltam.Count -gt 0) {
 $pyExe, $pyArg = $python.Split(" ", 2)
 Ok "git, node, .NET 10 e Python ($python) encontrados"
 
-$docker = (-not $SemDocker) -and (Tem docker)
-if ($docker) {
-    # Nao usar try/catch com `docker info *> $null`: no PowerShell 5.1 redirecionar
-    # o stderr de um executavel nativo vira NativeCommandError e, com
-    # $ErrorActionPreference = "Stop", cai no catch ate quando o docker responde.
-    # Perguntar a versao do servidor: so o daemon no ar sabe responder.
-    $versaoDocker = (docker info --format "{{.ServerVersion}}" 2>$null | Select-Object -Last 1)
-    if ($versaoDocker -and $versaoDocker -notmatch "error|cannot find") {
-        Ok "Docker em execução (servidor $versaoDocker)"
-    } else {
-        $docker = $false
-        Aviso "Docker instalado mas não está rodando: vou usar SQLite"
-    }
-} else {
-    Aviso "Sem Docker: o banco será SQLite (serve para desenvolver; Postgres é o de produção)"
+# O Postgres roda em Docker; sem ele não há banco. Parar aqui, antes de criar
+# .venv e .env, é melhor que descobrir no passo 4 com metade feita.
+if (-not (Tem docker)) {
+    Write-Host "    Falta o Docker Desktop: o banco do sistema é Postgres em contêiner." -ForegroundColor Red
+    Write-Host "    Instale (winget install --id Docker.DockerDesktop -e), reinicie, abra o Docker e rode de novo."
+    exit 1
 }
+# Nao usar try/catch com `docker info *> $null`: no PowerShell 5.1 redirecionar
+# o stderr de um executavel nativo vira NativeCommandError e, com
+# $ErrorActionPreference = "Stop", cai no catch ate quando o docker responde.
+# Perguntar a versao do servidor: so o daemon no ar sabe responder.
+$versaoDocker = (docker info --format "{{.ServerVersion}}" 2>$null | Select-Object -Last 1)
+if (-not $versaoDocker -or $versaoDocker -match "error|cannot find") {
+    Write-Host "    O Docker está instalado mas não está rodando. Abra o Docker Desktop, espere ficar pronto e rode de novo." -ForegroundColor Red
+    exit 1
+}
+Ok "Docker em execução (servidor $versaoDocker)"
 
 # ---------------------------------------------------------------- 2. backend
 Passo "Ambiente Python em backend\.venv"
@@ -138,13 +142,11 @@ if (Test-Path $env_) {
     $motorSegredo = & $venvPython -c "import secrets; print(secrets.token_urlsafe(32))"
     $trabalho = Join-Path $backend "data\trabalho"
     New-Item -ItemType Directory -Force $trabalho | Out-Null
-    $bancoUrl = if ($docker) { "postgresql+psycopg://cat:cat@localhost:55432/cat" }
-                else { "sqlite:///./data/cat.db" }
     @"
 # Ambiente do Sistema CAT nesta máquina. NAO versionar este arquivo.
 # Gerado por scripts\instalar.ps1 em $(Get-Date -Format "dd/MM/yyyy HH:mm").
 
-CAT_BANCO_URL=$bancoUrl
+CAT_BANCO_URL=postgresql+psycopg://cat:cat@localhost:55432/cat
 
 # Segredo do token, gerado aqui. Trocar invalida as sessoes abertas.
 CAT_JWT_SEGREDO=$segredo
@@ -168,18 +170,16 @@ CAT_THREADS_ANALITICAS=4
 }
 
 # ---------------------------------------------------------------- 4. banco
-if ($docker) {
-    Passo "Postgres em Docker (porta 55432)"
-    Rodar "subir o Postgres" { docker compose -f (Join-Path $raiz "docker\docker-compose.yml") up -d }
-    $tentativas = 0
-    do {
-        Start-Sleep -Seconds 2
-        $saude = docker inspect --format "{{.State.Health.Status}}" docker-banco-1 2>$null
-        $tentativas++
-    } while ($saude -ne "healthy" -and $tentativas -lt 30)
-    if ($saude -ne "healthy") { throw "O Postgres não ficou saudável em 60 s. Veja: docker compose -f docker\docker-compose.yml logs" }
-    Ok "Postgres no ar"
-}
+Passo "Postgres em Docker (porta 55432)"
+Rodar "subir o Postgres" { docker compose -f (Join-Path $raiz "docker\docker-compose.yml") up -d }
+$tentativas = 0
+do {
+    Start-Sleep -Seconds 2
+    $saude = docker inspect --format "{{.State.Health.Status}}" docker-banco-1 2>$null
+    $tentativas++
+} while ($saude -ne "healthy" -and $tentativas -lt 30)
+if ($saude -ne "healthy") { throw "O Postgres não ficou saudável em 60 s. Veja: docker compose -f docker\docker-compose.yml logs" }
+Ok "Postgres no ar"
 
 # ---------------------------------------------------------------- 5. API em C#
 # antes das migrações: é por ela que os gestores iniciais nascem

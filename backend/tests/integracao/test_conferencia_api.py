@@ -13,17 +13,12 @@ from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
 from cat.config import obter_config
-from cat.dominio.acesso.usuario import Cargo, Papel
-from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
-from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
-from tests.integracao.sessao import cabecalhos_de
 from tests.integracao.cadastro import (
+    criar_usuario,
     conferir, criar_empresa, criar_lote, criar_projeto, execucoes, iniciar, planilha, tem_base,
     ultima_situacao,
 )
-
-SENHA = "Sistema2026cat"
 
 # raiz própria deste módulo: a bateria compartilha um banco só
 CNPJ = "88991122000138"
@@ -58,19 +53,12 @@ def cliente():
                           connect_args={"check_same_thread": False})
     Base.metadata.create_all(motor)
     s = sessionmaker(bind=motor, expire_on_commit=False)()
-    repo = UsuarioRepositorioSql(s)
-    repo.criar(usuario="conf_analista", email="conf@bms.local",
-               nome_exibicao="Analista da Conferência",
-               senha_hash=SenhasArgon2(obter_config().senha_pimenta).gerar(SENHA),
-               papel=Papel.DEV, cargo=Cargo.ANALISTA)
+    criar_usuario(s, usuario="conf_analista", email="conf@bms.local",
+                     nome_exibicao="Analista da Conferência",
+                     papel="dev", cargo="analista")
     s.close()
     with TestClient(app) as c:
         yield c
-
-
-@pytest.fixture(scope="module")
-def cabecalhos(cliente):
-    return cabecalhos_de("conf_analista", SENHA)
 
 
 @pytest.fixture(scope="module")
@@ -86,7 +74,7 @@ def base(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
-def projeto_id(cliente, cabecalhos, base):
+def projeto_id(cliente, base):
     empresa = criar_empresa(raiz=RAIZ, cnpj=CNPJ, razao="EMPRESA DA CONFERENCIA",
                             ie="9030138187", por="conf_analista")
     return criar_projeto(empresa_id=empresa, nome="Conferência de teste",
@@ -94,7 +82,7 @@ def projeto_id(cliente, cabecalhos, base):
 
 
 class TestSemBase:
-    def test_recusa_quando_nao_ha_efd(self, cliente, cabecalhos, projeto_id):
+    def test_recusa_quando_nao_ha_efd(self, cliente, projeto_id):
         r = iniciar(cliente, "conferencia", projeto_id, "conf_analista")
         assert r.status_code == 422
         assert "EFD ICMS/IPI" in r.json()["detail"]
@@ -102,13 +90,13 @@ class TestSemBase:
 
 class TestFluxo:
     @pytest.fixture(autouse=True)
-    def _importar(self, cliente, cabecalhos, projeto_id, base):
+    def _importar(self, cliente, projeto_id, base):
         # o lote precisa existir antes: é dele que a conferência tira os caminhos
         if not tem_base(projeto_id):
             criar_lote(projeto_id=projeto_id, pasta=base)
 
     def test_conferencia_roda_e_grava_o_resumo(
-        self, cliente, cabecalhos, projeto_id
+        self, cliente, projeto_id
     ):
         d = conferir(cliente, projeto_id, "conf_analista")
         assert d["situacao"] == "concluida", d.get("erro")
@@ -118,11 +106,11 @@ class TestFluxo:
         assert resumo["sem_documento"] == 1
         assert resumo["nao_escrituradas"] == 1    # o XML que não está na EFD
 
-    def test_a_ultima_conferencia_fica_concluida(self, cliente, cabecalhos, projeto_id):
+    def test_a_ultima_conferencia_fica_concluida(self, cliente, projeto_id):
         # é disto que a etapa do projeto depende; a etapa em si é calculada no C#
         assert ultima_situacao(projeto_id, "conferencia") == "concluida"
 
-    def test_baixa_as_tres_planilhas(self, cliente, cabecalhos, projeto_id):
+    def test_baixa_as_tres_planilhas(self, cliente, projeto_id):
         execucao_id = execucoes(projeto_id, "conferencia")[0]["id"]
         for qual in ("a-cobrar", "nao-escrituradas", "conferidas"):
             r = planilha(cliente, "conferencia", execucao_id, qual)
@@ -132,7 +120,7 @@ class TestFluxo:
             assert r.content[:2] == b"PK"        # xlsx é um zip
 
     def test_filtro_por_modelo_muda_o_arquivo(
-        self, cliente, cabecalhos, projeto_id
+        self, cliente, projeto_id
     ):
         execucao_id = execucoes(projeto_id, "conferencia")[0]["id"]
         inteira = planilha(cliente, "conferencia", execucao_id, "a-cobrar")
@@ -141,7 +129,7 @@ class TestFluxo:
         # nada é modelo 59 nesta base: a planilha filtrada é menor
         assert len(so_cupom.content) < len(inteira.content)
 
-    def test_baixa_as_mesmas_listas_em_csv(self, cliente, cabecalhos, projeto_id):
+    def test_baixa_as_mesmas_listas_em_csv(self, cliente, projeto_id):
         execucao_id = execucoes(projeto_id, "conferencia")[0]["id"]
         for qual in ("a-cobrar", "nao-escrituradas", "conferidas"):
             r = planilha(cliente, "conferencia", execucao_id, qual, formato="csv")
@@ -152,7 +140,7 @@ class TestFluxo:
             assert r.headers["content-disposition"].endswith('.csv"')
 
     def test_o_csv_nao_recebe_o_xlsx_do_cache(
-        self, cliente, cabecalhos, projeto_id
+        self, cliente, projeto_id
     ):
         """O cache é por nome de arquivo. Se o formato não entrasse no nome,
         o xlsx já gerado responderia ao pedido de csv."""
@@ -162,13 +150,13 @@ class TestFluxo:
         assert xlsx.content[:2] == b"PK"              # xlsx é um zip
         assert csv_.content[:2] != b"PK"
 
-    def test_formato_desconhecido_da_404(self, cliente, cabecalhos, projeto_id):
+    def test_formato_desconhecido_da_404(self, cliente, projeto_id):
         execucao_id = execucoes(projeto_id, "conferencia")[0]["id"]
         r = planilha(cliente, "conferencia", execucao_id, "a-cobrar", formato="ods")
         assert r.status_code == 404
         assert "xlsx ou csv" in r.json()["detail"]
 
-    def test_planilha_desconhecida_da_404(self, cliente, cabecalhos, projeto_id):
+    def test_planilha_desconhecida_da_404(self, cliente, projeto_id):
         execucao_id = execucoes(projeto_id, "conferencia")[0]["id"]
         r = planilha(cliente, "conferencia", execucao_id, "qualquer")
         assert r.status_code == 404

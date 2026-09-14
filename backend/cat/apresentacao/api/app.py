@@ -1,4 +1,10 @@
-"""Aplicação FastAPI."""
+"""O motor: FastAPI só com o canal interno.
+
+A tela fala com a API em C# (api/), e a API fala com o motor por
+127.0.0.1 com o segredo CAT_MOTOR_SEGREDO (routers/interno_router.py). Desde a
+fatia 7 (docs/MIGRACAO_CSHARP.md) não há rota pública aqui, nem documentação
+interativa: quem descreve a API é o C#.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +13,6 @@ import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from cat.config import obter_config
@@ -23,27 +28,20 @@ async def ciclo_de_vida(app: FastAPI):
     cfg = obter_config()
     configurar(cfg.log_nivel)
     conferir_migracoes()
-    if cfg.segredo_e_padrao:
+    if not cfg.motor_segredo:
         log.error(
-            "CAT_JWT_SEGREDO está com o valor padrão. Qualquer um pode forjar "
-            "um token. Definir a variável antes de expor o serviço.",
-            extra={"acao": "definir CAT_JWT_SEGREDO"},
-        )
-    if cfg.sem_pimenta:
-        log.warning(
-            "CAT_SENHA_PIMENTA não definida. As senhas seguem protegidas por "
-            "Argon2id com sal, mas um vazamento do banco não teria a barreira "
-            "extra do segredo de servidor.",
-            extra={"acao": "definir CAT_SENHA_PIMENTA"},
+            "CAT_MOTOR_SEGREDO não definido. O canal interno fica fechado e a "
+            "API em C# não consegue pedir nada ao motor.",
+            extra={"acao": "definir CAT_MOTOR_SEGREDO"},
         )
     # A pasta de trabalho vai no log de subida de propósito. Um servidor
     # antigo sobreviveu a um reinício e continuou servindo com a configuração
     # velha, e a única pista era uma execução gravando no disco errado. Se o
     # processo diz onde vai escrever no momento em que sobe, isso se pega
     # na hora — e não depois de encher um disco.
-    log.info("API no ar", extra={"banco": cfg.banco_url.split("://")[0],
-                                 "origens": cfg.lista_origens,
-                                 "pasta_de_trabalho": cfg.raiz_de_trabalho,
+    log.info("motor no ar", extra={"banco": cfg.banco_url.split("://")[0],
+                                   "versao": versao(),
+                                   "pasta_de_trabalho": cfg.raiz_de_trabalho,
                                  "memoria_analitica": cfg.memoria_analitica,
                                  "threads_analiticas": cfg.threads_analiticas})
     if cfg.fila_automatica:
@@ -52,24 +50,19 @@ async def ciclo_de_vida(app: FastAPI):
     yield
     if cfg.fila_automatica:
         fila.parar()
-    log.info("API encerrada")
+    log.info("motor encerrado")
 
 
 app = FastAPI(
-    title="Sistema CAT",
-    description="Apuração das obrigações da CAT. BMS Consultoria Tributária.",
-    # de uma fonte só: o pyproject.toml. Escrita à mão aqui, parou em 0.3.0
-    # enquanto as etiquetas do git iam a v0.15.2 — e /api/saude mentia.
+    title="Sistema CAT — motor",
+    # de uma fonte só: o arquivo VERSAO na raiz. Escrita à mão aqui, parou em
+    # 0.3.0 enquanto as etiquetas do git iam a v0.15.2 — e a saúde mentia.
     version=versao(),
     lifespan=ciclo_de_vida,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=obter_config().lista_origens,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # sem /docs, /redoc e /openapi.json: nada aqui é para ser descoberto
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 
@@ -105,31 +98,9 @@ async def registrar_requisicao(request: Request, chamar):
         return resposta
 
 
-@app.get("/api/saude", tags=["infra"])
-def saude() -> dict[str, object]:
-    """Vivo, e com QUAL configuração — só o que não é segredo.
-
-    Serve para conferir de fora o que o processo que responde realmente
-    enxerga. Sem isso, um servidor antigo que sobreviveu a um reinício é
-    indistinguível do novo: os dois respondem "ok".
-    """
-    cfg = obter_config()
-    return {
-        "status": "ok",
-        "versao": app.version,
-        "pasta_de_trabalho": cfg.raiz_de_trabalho,
-        "memoria_analitica": cfg.memoria_analitica,
-        "threads_analiticas": cfg.threads_analiticas,
-    }
-
-
 from cat.apresentacao.api.routers import interno_router  # noqa: E402
 
-# O login (/api/auth), a gestão de usuários (/api/usuarios), empresas, frentes,
-# projetos, a exclusão de trabalho, o histórico (linha do tempo, comentário,
-# status e sucessão), os lotes, a análise da remessa, as execuções e as planilhas
-# moram na API em C# desde 13/09/2026 — o que leem ou escrevem em disco chega
-# aqui pelo canal interno, e a fila de execuções roda em workers/fila.py; os
-# comandos semear e emergencia em api/src/Cat.Ferramentas. O motor atende o
-# que lê disco e o canal interno com a API.
+# Toda rota pública mora na API em C# desde 13/09/2026, e os comandos semear e
+# emergencia em api/src/Cat.Ferramentas. O que lê ou escreve disco chega aqui
+# pelo canal interno; a fila de execuções roda em workers/fila.py.
 app.include_router(interno_router.router)

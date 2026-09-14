@@ -78,7 +78,7 @@ public sealed partial class ConfigCat
             // primeiro, e o motor escuta só em IPv4 — cada chamada pagaria a
             // tentativa frustrada antes de acertar.
             MotorUrl = new Uri(Valor("CAT_MOTOR_URL", "http://127.0.0.1:8020")),
-            Versao = LerVersao(Path.Combine(raiz, "pyproject.toml")),
+            Versao = LerVersao(Path.Combine(raiz, "..", "VERSAO")),
             // os padrões são os do config.py: só existem para o dev subir
             BancoUrl = Valor("CAT_BANCO_URL", "postgresql+psycopg://cat:cat@localhost:55432/cat"),
             JwtSegredo = Valor("CAT_JWT_SEGREDO", SegredoPadrao),
@@ -90,15 +90,16 @@ public sealed partial class ConfigCat
     }
 
     /// <summary>
-    /// A versão vem do <c>pyproject.toml</c>, a fonte única do projeto hoje.
-    /// Escrever o número aqui repetiria o defeito de quando a API dizia 0.3.0
-    /// com as etiquetas do git em v0.15.2.
+    /// A versão vem do arquivo <c>VERSAO</c> na raiz do repositório, lido
+    /// também pelo motor: dois programas, um número. Escrever o número aqui
+    /// repetiria o defeito de quando a API dizia 0.3.0 com as etiquetas do git
+    /// em v0.15.2.
     /// </summary>
-    public static string LerVersao(string pyproject)
+    public static string LerVersao(string arquivo)
     {
-        if (!File.Exists(pyproject))
+        if (!File.Exists(arquivo))
             return "desconhecida";
-        var achado = LinhaDeVersao().Match(File.ReadAllText(pyproject));
+        var achado = NumeroDeVersao().Match(File.ReadAllText(arquivo));
         return achado.Success ? achado.Groups[1].Value : "desconhecida";
     }
 
@@ -123,6 +124,8 @@ public sealed partial class ConfigCat
             $"{AppContext.BaseDirectory}. Defina CAT_RAIZ_BACKEND.");
     }
 
-    [GeneratedRegex("""^version\s*=\s*"([^"]+)"\s*$""", RegexOptions.Multiline)]
-    private static partial Regex LinhaDeVersao();
+    // o número sozinho no arquivo: "0.35.0"; qualquer outra coisa é não saber.
+    // O BOM que o Windows grava o File.ReadAllText já descarta.
+    [GeneratedRegex("""\A\s*(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)\s*\z""")]
+    private static partial Regex NumeroDeVersao();
 }

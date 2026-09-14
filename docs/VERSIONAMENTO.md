@@ -85,13 +85,20 @@ a público se houver decisão explícita e limpeza prévia do conteúdo sensíve
 
 ## 4. Onde a versão vive
 
-**Em um lugar só: `backend/pyproject.toml`, campo `version`.** A API lê daí
-(`cat/versao.py`) e expõe em `/api/saude`. A etiqueta do git repete o número,
-com o prefixo `v`.
+**Em um lugar só: o arquivo `VERSAO`, na raiz do repositório** — uma linha,
+só o número. A API em C# (`ConfigCat`) e o motor (`cat/versao.py`) leem dele, e
+o `/api/saude` mostra os dois: número diferente nos dois lados é processo que
+não foi reiniciado depois do pull. A etiqueta do git repete o número, com o
+prefixo `v`.
+
+O `version` do `backend/pyproject.toml` fica parado em `0.0.0` e **não é
+lido**: o setuptools exige um número ali e não aceita buscá-lo fora de
+`backend/`. Foi a fonte até a v0.34.0; saiu na fatia 7 da migração, quando
+passaram a ser dois programas.
 
 A ordem de um release é sempre a mesma, e a ordem importa:
 
-1. bump do `version` no `pyproject.toml`
+1. bump do número no `VERSAO`
 2. commit (com `docs/DECISOES.md` em dia)
 3. `git tag -a v<version>` no mesmo commit
 4. `git push --follow-tags`
@@ -100,5 +107,5 @@ A ordem de um release é sempre a mesma, e a ordem importa:
 `pyproject.toml` — e os dois pararam em 0.3.0 enquanto as etiquetas chegavam a
 v0.15.2. O `/api/saude`, que existe para dizer *o que está rodando*, dizia
 outra coisa. Um teste (`tests/unidade/test_versao.py`) falha quando a etiqueta
-mais recente está **à frente** do `pyproject` — que é exatamente como o drift
+mais recente está **à frente** do `VERSAO` — que é exatamente como o drift
 aconteceu. O contrário é normal: é o commit de bump, antes de etiquetar.

@@ -147,61 +147,16 @@ public sealed class VetoresDoPythonTestes
 }
 
 /// <summary>
-/// O cruzamento ao vivo: o C# gera, o Python confere. Os vetores provam só uma
-/// direção; esta prova a outra, com o código Python de verdade.
+/// O cruzamento ao vivo com o código do motor, no que os dois lados ainda
+/// compartilham: o dígito do CNPJ e a tabela de tipos de arquivo.
+///
+/// Senha e token cruzavam aqui até a fatia 7. O motor não confere senha nem lê
+/// token desde então — o código Python deles foi apagado —, e o que prova que
+/// quem já tinha senha continua entrando são os vetores gravados pelo Python,
+/// em <see cref="VetoresDoPythonTestes"/>.
 /// </summary>
 public sealed class CruzamentoComOPythonTestes
 {
-    private const string Pimenta = "pimenta-de-teste-nao-e-segredo";
-    private const string Segredo = "segredo-de-teste-com-mais-de-trinta-e-dois-bytes-nao-e-segredo";
-
-    [Theory]
-    [InlineData("Senha-De-Teste-2026")]
-    [InlineData("Açúcar com Ção e émoji 🎉 9X")]
-    public async Task Resumo_gerado_no_csharp_confere_no_python(string senha)
-    {
-        var resumo = new SenhasArgon2(Pimenta).Gerar(senha);
-
-        var saida = await Python("""
-            import json, sys
-            from cat.infraestrutura.auth.senha import SenhasArgon2
-            e = json.load(sys.stdin)
-            s = SenhasArgon2(e["pimenta"])
-            print(json.dumps({"confere": s.conferir(e["senha"], e["resumo"]),
-                              "errada": s.conferir(e["senha"] + "x", e["resumo"]),
-                              "regravar": s.precisa_regravar(e["resumo"])}))
-            """, new { pimenta = Pimenta, senha, resumo });
-
-        Assert.True(saida.GetProperty("confere").GetBoolean());
-        Assert.False(saida.GetProperty("errada").GetBoolean());
-        // se o Python quisesse regravar, cada login alternaria o resumo entre os dois lados
-        Assert.False(saida.GetProperty("regravar").GetBoolean());
-    }
-
-    [Fact]
-    public async Task Token_emitido_no_csharp_e_aceito_pelo_python()
-    {
-        var (token, _) = new TokensJwt(Segredo, 480, TimeProvider.System).Emitir(new Usuario
-        {
-            Id = 42, NomeDeUsuario = "revisor.dois", Email = "r@bms.local", NomeExibicao = "R",
-            Papel = Papel.Revisor, Empresas = [5, 8],
-        });
-
-        var saida = await Python("""
-            import json, sys
-            from cat.infraestrutura.auth.token import TokensJwt
-            e = json.load(sys.stdin)
-            c = TokensJwt(e["segredo"], "HS256", 480).ler(e["token"])
-            print(json.dumps({"id": c.usuario_id, "usuario": c.usuario, "papel": c.papel.value,
-                              "empresas": list(c.empresas)}))
-            """, new { segredo = Segredo, token });
-
-        Assert.Equal(42, saida.GetProperty("id").GetInt32());
-        Assert.Equal("revisor.dois", saida.GetProperty("usuario").GetString());
-        Assert.Equal("revisor", saida.GetProperty("papel").GetString());
-        Assert.Equal([5, 8], saida.GetProperty("empresas").EnumerateArray().Select(x => x.GetInt32()));
-    }
-
     [Fact]
     public async Task Digito_do_cnpj_calculado_no_csharp_confere_no_python_inclusive_alfanumerico()
     {

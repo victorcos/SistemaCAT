@@ -18,6 +18,13 @@ zipfile, nem FastAPI. Recebe estruturas simples e devolve resultado.
 
 ## 2. As camadas
 
+São dois programas desde a migração de 13 e 14/09/2026 (`MIGRACAO_CSHARP.md`):
+a **API em C#** (`api/`), com as mesmas camadas em projetos separados, atende
+a tela — login, usuários, empresas, trabalhos, histórico, lotes, execuções,
+download; e o **motor Python** (`backend/`), sem rota pública, faz o que lê
+arquivo fiscal ou atravessa volume, pedido pela API pelo canal interno. O
+desenho abaixo é o do motor.
+
 ```
 backend/cat/
 ├── dominio/          regra fiscal pura, sem framework, sem I/O
@@ -35,13 +42,15 @@ backend/cat/
 │   ├── sped/         indexador por offset e extrator
 │   ├── xml/          leitor de NF-e, cabeçalho e item
 │   ├── ia/           agente, fila de julgamento, cache
-│   ├── auth/         JWT, senha, repositório de usuário
 │   └── repositorios/ Postgres
 ├── apresentacao/
-│   ├── api/          FastAPI, uma rota fina que só chama caso de uso
-│   └── cli/
-└── workers/          Celery, processos longos
+│   └── api/          FastAPI só com o canal interno (/interno), pedido pela API em C#
+└── workers/          a fila de execuções (fila.py), uma rodada por vez
 ```
+
+Senha, token e usuário moram só em C# (`api/src/Cat.Infraestrutura/Auth`); o
+motor não confere quem pede — confia no segredo do canal, e quem decide se a
+pessoa pode é a API, antes de chamar.
 
 O front vive em `frontend/`, em React com TypeScript, e conversa **só por API**.
 Nunca importa nada do backend.

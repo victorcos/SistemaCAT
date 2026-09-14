@@ -13,17 +13,11 @@ from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
 from cat.config import obter_config
-from cat.dominio.acesso.usuario import Cargo, Papel
-from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.dominio.lote import TipoDeArquivo
-from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
-from tests.integracao.sessao import cabecalhos_de
 from tests.integracao.cadastro import (
-    SEGREDO, criar_empresa, criar_lote, criar_projeto, quantas_empresas, tem_base,
+    SEGREDO, criar_usuario, criar_empresa, criar_lote, criar_projeto, quantas_empresas, tem_base,
 )
-
-SENHA = "Sistema2026cat"
 
 # Raiz própria deste módulo. A bateria de integração compartilha um banco
 # só, e a raiz 50948371 já é usada por test_auth_api — cadastrar de novo
@@ -48,24 +42,16 @@ def cliente():
                           connect_args={"check_same_thread": False})
     Base.metadata.create_all(motor)
     s = sessionmaker(bind=motor, expire_on_commit=False)()
-    repo = UsuarioRepositorioSql(s)
-    senhas = SenhasArgon2(obter_config().senha_pimenta)
-    repo.criar(usuario="lote_analista", email="lote.analista@bms.local",
-               nome_exibicao="Analista do Lote",
-               senha_hash=senhas.gerar(SENHA), papel=Papel.DEV,
-               cargo=Cargo.ANALISTA)
+    criar_usuario(s, usuario="lote_analista", email="lote.analista@bms.local",
+                     nome_exibicao="Analista do Lote",
+                     papel="dev", cargo="analista")
     s.close()
     with TestClient(app) as c:
         yield c
 
 
 @pytest.fixture(scope="module")
-def cabecalhos(cliente):
-    return cabecalhos_de("lote_analista", SENHA)
-
-
-@pytest.fixture(scope="module")
-def projeto_id(cliente, cabecalhos):
+def projeto_id(cliente):
     empresa = criar_empresa(raiz="77665544", cnpj="77665544000105",
                             razao="EMPRESA DO LOTE LTDA", ie="407048962113",
                             por="lote_analista")

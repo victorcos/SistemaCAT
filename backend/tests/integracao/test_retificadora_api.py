@@ -13,18 +13,11 @@ from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
 from cat.config import obter_config
-from cat.dominio.acesso.usuario import Cargo, Papel
 from cat.dominio.comum.cnpj import Cnpj
-from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
-from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
-from tests.integracao.sessao import cabecalhos_de
 from tests.integracao.cadastro import (
-    SEGREDO, conferir, criar_empresa, criar_lote, criar_projeto, tipos_nos_lotes,
+    SEGREDO, criar_usuario, conferir, criar_empresa, criar_lote, criar_projeto, tipos_nos_lotes,
 )
-
-SENHA = "Sistema2026cat"
-
 
 def _cnpj_valido(raiz: str, ordem: str = "0001") -> str:
     """Um CNPJ com dígito válido para esta raiz. A bateria compartilha um banco
@@ -77,19 +70,12 @@ def cliente():
                           connect_args={"check_same_thread": False})
     Base.metadata.create_all(motor)
     s = sessionmaker(bind=motor, expire_on_commit=False)()
-    UsuarioRepositorioSql(s).criar(
-        usuario="retif_analista", email="retif@bms.local",
-        nome_exibicao="Analista da Retificação",
-        senha_hash=SenhasArgon2(obter_config().senha_pimenta).gerar(SENHA),
-        papel=Papel.DEV, cargo=Cargo.ANALISTA)
+    criar_usuario(s, usuario="retif_analista", email="retif@bms.local",
+                     nome_exibicao="Analista da Retificação",
+                     papel="dev", cargo="analista")
     s.close()
     with TestClient(app) as c:
         yield c
-
-
-@pytest.fixture(scope="module")
-def cabecalhos(cliente):
-    return cabecalhos_de("retif_analista", SENHA)
 
 
 @pytest.fixture(scope="module")
@@ -103,7 +89,7 @@ def base(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
-def projeto_id(cliente, cabecalhos):
+def projeto_id(cliente):
     empresa = criar_empresa(raiz=RAIZ, cnpj=CNPJ, razao="EMPRESA RETIF",
                             ie="9030138187", por="retif_analista")
     return criar_projeto(empresa_id=empresa, nome="Retificadora de teste",
@@ -125,7 +111,7 @@ class TestImportacao:
 
 
 class TestConferencia:
-    def test_le_a_retificadora_e_nao_a_original(self, cliente, cabecalhos, projeto_id):
+    def test_le_a_retificadora_e_nao_a_original(self, cliente, projeto_id):
         d = conferir(cliente, projeto_id, "retif_analista")
         assert d["situacao"] == "concluida", d.get("erro")
 

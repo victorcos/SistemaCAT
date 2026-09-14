@@ -15,7 +15,7 @@
 | 4 | Histórico | **entregue em 13/09/2026, v0.32.0** — linha do tempo, comentário, status e sucessão só em C#; registrar evento de etapa e barrar trabalho parado seguem no motor |
 | 5 | Lotes | **entregue em 13/09/2026, v0.33.0** — inspecionar, registrar, listar e remover lote e a análise da remessa em C#; leitura de disco pelo canal interno. **Falta rodada com base real** (pasta de rede, milhares de arquivos, remessa acima de 1 GB) |
 | 6 | Execuções | **entregue em 13/09/2026, v0.34.0** — pedir, acompanhar e baixar planilhas de conferência e movimentos em C#; a thread da rota virou a fila do motor. **Falta rodada com base real** (conferência de base grande, planilha de milhões de linhas) |
-| 7 | Desligamento | próxima |
+| 7 | Desligamento | **entregue em 14/09/2026, v0.35.0** — sem repasse: o C# não leva nada ao motor, e rota desconhecida responde 404 aqui; o motor ficou só com `/interno` (a saúde também), sem documentação pública; senha, token e usuário apagados do Python; versão no arquivo `VERSAO`; Postgres obrigatório na instalação |
 
 ---
 
@@ -32,8 +32,8 @@
                  │  projetos, histórico, lotes,  │
                  │  execuções, download          │
                  └───────┬──────────────┬───────┘
-     chamada interna     │              │  grava execução pendente,
-     (localhost, rápida) │              │  lê progresso
+     canal interno       │              │  lê progresso
+     (127.0.0.1+segredo) │              │
                  ┌───────▼──────┐  ┌────▼─────────────────┐
                  │ motor Python │  │      Postgres        │
                  │ :8020 interno│◄─┤  execucao = a fila   │
@@ -42,9 +42,10 @@
                    quebra, leitura, parquet, DuckDB, planilhas
 ```
 
-**Durante a migração** o C# repassa ao Python toda rota que ainda não foi
-portada (proxy reverso). O front aponta para o C# desde a primeira fatia e não
-percebe a troca.
+**Durante a migração** o C# repassou ao Python toda rota que ainda não tinha
+sido portada (proxy reverso, YARP). O front apontou para o C# desde a primeira
+fatia e não percebeu a troca. **Desde a fatia 7 não há repasse:** rota que o C#
+não conhece responde 404 com `detail`, e o motor só tem o canal interno.
 
 ---
 
@@ -77,7 +78,7 @@ formato em que ele sai.
 | Banco | EF Core + Npgsql, **sem migrações** | mapeia as tabelas do Alembic |
 | Senha | Argon2id em formato PHC + bcrypt legado | biblioteca escolhida pelo teste de compatibilidade, não por preferência |
 | Token | JwtBearer, HS256 | mesmo segredo, mesmas reivindicações |
-| Proxy | YARP | cada rota migrada sai da tabela de repasse |
+| Proxy | ~~YARP~~ | serviu da fatia 0 à 6; saiu na 7, com a última rota portada |
 | Log | JSON por linha, mesmo formato do `cat/log.py` | ARQUITETURA §12 vale igual |
 | Testes | xUnit; Postgres real no Docker | não SQLite: o Postgres é o de produção |
 
@@ -147,12 +148,14 @@ Senha, token e chave saem como `***`.
 | Inspecionar pasta, analisar remessa | ~~rota Python lê o disco~~ | **feito (fatia 5):** `POST /interno/lotes/inspecionar` (o motor busca a raiz do CNPJ e o que já foi importado pelo id do trabalho) e `POST /interno/remessas/analisar` (o multipart segue em fluxo, sem limite de tamanho). O C# aplica as regras de registro e grava |
 | Gerar planilha | ~~rota Python gera e serve~~ | **feito (fatia 6):** o C# pede por `POST /interno/planilhas`; o motor gera (ou reaproveita, se o parquet não mudou) e devolve o caminho; o C# serve o arquivo em fluxo e só de dentro da pasta de trabalho |
 | Excluir trabalho | ~~rota Python apaga banco e pasta~~ | **feito (fatia 3):** o C# confere a senha e apaga o banco; as pastas vão ao motor por `POST /interno/pastas/apagar`, que só apaga dentro da pasta de trabalho |
+| Saúde do motor | ~~`/api/saude` pública no motor~~ | **feito (fatia 7):** `GET /interno/saude`, com o segredo; o `/api/saude` do C# mostra o que o motor respondeu, ou `http 403` se o segredo não confere |
 
 O motor só aceita conexão de `localhost` e exige um segredo interno em
 cabeçalho (`X-Cat-Motor-Segredo`, valor em `CAT_MOTOR_SEGREDO` no `backend/.env`).
 Não recebe token de usuário: quem decide se a pessoa pode é o C#, antes de
 chamar. Sem o segredo configurado, o canal fica **fechado** (503), não aberto.
-As rotas `/interno` não entram no repasse público nem no `/openapi.json`.
+O motor não publica `/docs`, `/redoc` nem `/openapi.json`, e um teste falha se
+aparecer nele rota fora de `/interno`.
 
 ---
 
@@ -196,12 +199,23 @@ fatia 2, para a regra de senha provisória não existir em dois lugares. Moram e
 
 ---
 
-## 7. Pendente de decisão
+## 7. Decidido na fatia 7 (14/09/2026)
 
-- **Fonte única da versão.** Hoje é o `backend/pyproject.toml`. Com dois
-  programas, sugestão: um arquivo `VERSAO` na raiz, lido pelos dois.
-- **Nome das pastas no fim.** Sugestão: `api/` para o C# e, na fatia 7,
-  `backend/` vira `motor/`.
-- **SQLite.** A instalação sem Docker já não funciona (migração
-  `62fe3d195ce5`). Com o C# testando só em Postgres, a pergunta é consertar
-  ou declarar o Docker obrigatório.
+- **Fonte única da versão:** o arquivo `VERSAO` na raiz, lido pela API e pelo
+  motor. O `version` do `pyproject.toml` fica em `0.0.0` e não é lido
+  (`VERSIONAMENTO.md` §4).
+- **Nome das pastas:** `backend/` **fica**. Renomear para `motor/` moveria a
+  `.venv` (que quebra), o `.env` e a pasta de trabalho com os dados reais, e as
+  execuções gravadas guardam o caminho absoluto da pasta — planilha antiga daria
+  410, e excluir trabalho recusaria apagar pasta "fora" da pasta de trabalho.
+- **SQLite:** a instalação exige Docker e Postgres. O SQLite ficou só na
+  bateria de testes do motor, que cria o esquema sem o Alembic.
+
+## 8. O que ficou para depois da migração
+
+- **Rodada com base real** das fatias 5 e 6 (pasta de rede, milhares de
+  arquivos, remessa acima de 1 GB, conferência de base grande, planilha de
+  milhões de linhas), antes de subir para a `main`.
+- **O motor ainda escreve eventos** de lote e etapa na linha do tempo
+  (`historico_do_projeto.registrar_de_etapa`), no mesmo formato do C#. É escrita
+  de quem roda a etapa, não regra de tela, e fica onde está.

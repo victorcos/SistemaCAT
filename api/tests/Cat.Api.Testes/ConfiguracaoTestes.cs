@@ -31,9 +31,13 @@ public sealed class ArquivoEnvTestes
 
 public sealed class ConfigCatTestes : IDisposable
 {
-    private readonly string _backend = Directory.CreateTempSubdirectory("cat-config-").FullName;
+    // repositório de mentira: VERSAO na raiz, backend/ dentro dela
+    private readonly string _raiz = Directory.CreateTempSubdirectory("cat-config-").FullName;
+    private readonly string _backend;
 
-    public void Dispose() => Directory.Delete(_backend, recursive: true);
+    public ConfigCatTestes() => Directory.CreateDirectory(_backend = Path.Combine(_raiz, "backend"));
+
+    public void Dispose() => Directory.Delete(_raiz, recursive: true);
 
     private ConfigCat Carregar(Dictionary<string, string?> ambiente)
     {
@@ -64,18 +68,28 @@ public sealed class ConfigCatTestes : IDisposable
         Assert.Equal(Path.Combine(_backend, "data", "trabalho"), config.PastaDeTrabalho);
     }
 
-    [Fact]
-    public void Versao_vem_do_pyproject()
+    [Theory]
+    [InlineData("1.2.3\n", "1.2.3")]
+    [InlineData("\uFEFF1.2.3\r\n", "1.2.3")]     // gravado pelo Windows
+    [InlineData("0.35.0-rc.1", "0.35.0-rc.1")]
+    public void Versao_vem_do_arquivo_VERSAO_na_raiz(string conteudo, string esperada)
     {
-        File.WriteAllText(Path.Combine(_backend, "pyproject.toml"),
-            "[project]\nname = \"sistema-cat\"\n# comentario com version = \"0.0.0\"\nversion = \"1.2.3\"\n");
+        File.WriteAllText(Path.Combine(_raiz, "VERSAO"), conteudo);
+        // o pyproject deixou de ser a fonte: um número velho nele não conta
+        File.WriteAllText(Path.Combine(_backend, "pyproject.toml"), "version = \"0.0.1\"\n");
 
-        Assert.Equal("1.2.3", Carregar(new()).Versao);
+        Assert.Equal(esperada, Carregar(new()).Versao);
     }
 
-    [Fact]
-    public void Sem_pyproject_a_versao_diz_que_nao_sabe_em_vez_de_inventar()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("version = \"1.2.3\"")]
+    [InlineData("1.2.3\n4.5.6\n")]
+    public void Sem_VERSAO_legivel_a_versao_diz_que_nao_sabe_em_vez_de_inventar(string? conteudo)
     {
+        if (conteudo is not null)
+            File.WriteAllText(Path.Combine(_raiz, "VERSAO"), conteudo);
+
         Assert.Equal("desconhecida", Carregar(new()).Versao);
     }
 }

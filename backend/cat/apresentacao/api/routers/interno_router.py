@@ -4,8 +4,8 @@ A API em C# decide se a pessoa pode; o motor faz o que é de disco. Este canal
 existe para isso (docs/MIGRACAO_CSHARP.md §4) e tem três portas fechadas:
 
 1. o motor só escuta em 127.0.0.1 (scripts/subir.ps1);
-2. o repasse público do C# leva só /api, /docs e /openapi.json — /interno nunca
-   chega aqui vindo da tela (e, desde a fatia 5, nada de /api chega mais);
+2. a API em C# não repassa nada ao motor desde a fatia 7 — /interno nunca
+   chega aqui vindo da tela, e o motor não tem outra rota;
 3. toda chamada traz o segredo compartilhado CAT_MOTOR_SEGREDO. Sem ele
    configurado, o canal fica fechado para todo mundo, em vez de aberto.
 
@@ -47,6 +47,7 @@ from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
 from cat.infraestrutura.repositorios.banco import obter_sessao
 from cat.infraestrutura.repositorios.modelos import ExecucaoDB
 from cat.log import contexto, obter_log
+from cat.versao import versao
 
 log = obter_log(__name__)
 router = APIRouter(prefix="/interno", tags=["interno"], include_in_schema=False)
@@ -66,6 +67,24 @@ def exigir_segredo(
     ):
         log.warning("canal interno recusou chamada sem o segredo certo")
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Segredo do canal interno não confere.")
+
+
+@router.get("/saude", dependencies=[Depends(exigir_segredo)])
+def saude() -> dict[str, object]:
+    """Vivo, e com QUAL configuração — só o que não é segredo.
+
+    A API em C# mostra isto dentro do próprio /api/saude. Sem isso, um motor
+    antigo que sobreviveu a um reinício é indistinguível do novo: os dois
+    respondem "ok", e só a versão e a pasta de trabalho os separam.
+    """
+    cfg = obter_config()
+    return {
+        "status": "ok",
+        "versao": versao(),
+        "pasta_de_trabalho": cfg.raiz_de_trabalho,
+        "memoria_analitica": cfg.memoria_analitica,
+        "threads_analiticas": cfg.threads_analiticas,
+    }
 
 
 class PedidoApagarPastas(BaseModel):

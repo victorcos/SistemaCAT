@@ -13,17 +13,12 @@ from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
 from cat.config import obter_config
-from cat.dominio.acesso.usuario import Cargo, Papel
-from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
-from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
-from tests.integracao.sessao import cabecalhos_de
 from tests.integracao.cadastro import (
+    criar_usuario,
     conferir, criar_empresa, criar_lote, criar_projeto, execucao, execucoes, iniciar, planilha,
     rodar_fila, ultima_situacao,
 )
-
-SENHA = "Sistema2026cat"
 
 # raiz própria deste módulo: a bateria compartilha um banco só
 CNPJ = "77889900000166"
@@ -57,19 +52,12 @@ def cliente():
                           connect_args={"check_same_thread": False})
     Base.metadata.create_all(motor)
     s = sessionmaker(bind=motor, expire_on_commit=False)()
-    UsuarioRepositorioSql(s).criar(
-        usuario="mov_analista", email="mov@bms.local",
-        nome_exibicao="Analista dos Movimentos",
-        senha_hash=SenhasArgon2(obter_config().senha_pimenta).gerar(SENHA),
-        papel=Papel.DEV, cargo=Cargo.ANALISTA)
+    criar_usuario(s, usuario="mov_analista", email="mov@bms.local",
+                     nome_exibicao="Analista dos Movimentos",
+                     papel="dev", cargo="analista")
     s.close()
     with TestClient(app) as c:
         yield c
-
-
-@pytest.fixture(scope="module")
-def cabecalhos(cliente):
-    return cabecalhos_de("mov_analista", SENHA)
 
 
 @pytest.fixture(scope="module")
@@ -84,7 +72,7 @@ def base(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
-def projeto_id(cliente, cabecalhos, base):
+def projeto_id(cliente, base):
     empresa = criar_empresa(raiz=RAIZ, cnpj=CNPJ, razao="EMPRESA DOS MOVIMENTOS",
                             ie="123456789012", por="mov_analista")
     projeto = criar_projeto(empresa_id=empresa, nome="Movimentos de teste",
@@ -94,7 +82,7 @@ def projeto_id(cliente, cabecalhos, base):
 
 
 class TestOrdemDasEtapas:
-    def test_recusa_sem_conferencia(self, cliente, cabecalhos, projeto_id):
+    def test_recusa_sem_conferencia(self, cliente, projeto_id):
         r = iniciar(cliente, "movimentos", projeto_id, "mov_analista")
         assert r.status_code == 422
         assert "conferência" in r.json()["detail"].lower()
@@ -104,11 +92,11 @@ class TestOrdemDasEtapas:
 
 class TestFluxo:
     @pytest.fixture(scope="class", autouse=True)
-    def _conferido(self, cliente, cabecalhos, projeto_id):
+    def _conferido(self, cliente, projeto_id):
         assert conferir(cliente, projeto_id, "mov_analista")["situacao"] == "concluida"
 
     @pytest.fixture(scope="class")
-    def execucao(self, cliente, cabecalhos, projeto_id):
+    def execucao(self, cliente, projeto_id):
         r = iniciar(cliente, "movimentos", projeto_id, "mov_analista")
         assert r.status_code == 202, r.text
         rodar_fila()
@@ -131,7 +119,7 @@ class TestFluxo:
         assert any("1 movimento(s) são de documentos ainda pendentes" in a
                    for a in r["avisos"])
 
-    def test_a_etapa_do_projeto_conclui(self, cliente, cabecalhos, projeto_id, execucao):
+    def test_a_etapa_do_projeto_conclui(self, cliente, projeto_id, execucao):
         assert ultima_situacao(projeto_id, "movimentos") == "concluida"
 
     def test_planilha_de_outra_etapa_nao_existe_por_esta_rota(self, cliente, projeto_id, execucao):
@@ -140,13 +128,13 @@ class TestFluxo:
         r = planilha(cliente, "movimentos", conferencia["id"], "movimentos")
         assert r.status_code == 410
 
-    def test_baixa_as_quatro_planilhas(self, cliente, cabecalhos, execucao):
+    def test_baixa_as_quatro_planilhas(self, cliente, execucao):
         for qual in ("movimentos", "itens", "inventario", "analitico"):
             r = planilha(cliente, "movimentos", execucao["id"], qual)
             assert r.status_code == 200, (qual, r.text)
             assert r.content[:2] == b"PK"
 
-    def test_baixa_as_quatro_em_csv(self, cliente, cabecalhos, execucao):
+    def test_baixa_as_quatro_em_csv(self, cliente, execucao):
         """As quatro listas da movimentação também saem em csv.
 
         A do analítico é a que mais pede: numa base real desta casa deu 37,9
@@ -158,14 +146,14 @@ class TestFluxo:
             assert r.content[:3] == b"\xef\xbb\xbf"
             assert r.headers["content-disposition"].endswith('.csv"')
 
-    def test_filtro_por_classificacao_muda_o_arquivo(self, cliente, cabecalhos, execucao):
+    def test_filtro_por_classificacao_muda_o_arquivo(self, cliente, execucao):
         inteira = planilha(cliente, "movimentos", execucao["id"], "movimentos")
         so_pendentes = planilha(cliente, "movimentos", execucao["id"], "movimentos", classificacoes="pendente")
         assert so_pendentes.status_code == 200
         assert "-pendente" in so_pendentes.headers["content-disposition"]
         assert len(so_pendentes.content) < len(inteira.content)
 
-    def test_segunda_rodada_ao_mesmo_tempo_e_recusada(self, cliente, cabecalhos,
+    def test_segunda_rodada_ao_mesmo_tempo_e_recusada(self, cliente,
                                                        projeto_id, execucao, monkeypatch):
         # sem rodar a fila, a primeira fica "na fila" e a segunda bate em 409
         r1 = iniciar(cliente, "movimentos", projeto_id, "mov_analista")
