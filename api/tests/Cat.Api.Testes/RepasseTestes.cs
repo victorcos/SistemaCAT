@@ -43,7 +43,7 @@ public sealed class MotorFalso : IAsyncLifetime
             });
         });
         // o FastAPI recusando uma regra: o repasse não pode reescrever isto
-        _app.MapPost("/api/projetos/{id}/conferencias", () => Results.Json(
+        _app.MapPost("/api/rota-do-motor", () => Results.Json(
             new { detail = "Já existe uma conferência em andamento neste trabalho." }, statusCode: 409));
 
         await _app.StartAsync();
@@ -171,7 +171,9 @@ public sealed class RepasseTestes(MotorFalso motor) : IClassFixture<MotorFalso>,
     [Fact]
     public async Task Recusa_do_motor_passa_intacta()
     {
-        var resposta = await Cliente().PostAsync("/api/projetos/7/conferencias", null);
+        // desde a fatia 6 nenhuma rota de /api é do motor; o repasse segue
+        // valendo para o que não foi portado, e é isso que se prova aqui
+        var resposta = await Cliente().PostAsync("/api/rota-do-motor", null);
 
         Assert.Equal(HttpStatusCode.Conflict, resposta.StatusCode);
         var corpo = await resposta.Content.ReadFromJsonAsync<JsonElement>();
@@ -182,7 +184,7 @@ public sealed class RepasseTestes(MotorFalso motor) : IClassFixture<MotorFalso>,
     public async Task Motor_fora_do_ar_vira_detail_que_o_front_sabe_mostrar()
     {
         // uma rota que ainda é do motor
-        var resposta = await Cliente(PortaFechada()).GetAsync("/api/conferencias/1");
+        var resposta = await Cliente(PortaFechada()).GetAsync("/api/rota-do-motor");
 
         Assert.Equal(HttpStatusCode.BadGateway, resposta.StatusCode);
         var corpo = await resposta.Content.ReadFromJsonAsync<JsonElement>();

@@ -18,7 +18,7 @@ from cat.dominio.acesso.usuario import Cargo, Papel
 from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
-from tests.integracao.cadastro import criar_empresa, criar_projeto, definir_status
+from tests.integracao.cadastro import criar_empresa, criar_projeto, definir_status, iniciar
 from tests.integracao.sessao import cabecalhos_de
 
 SENHA = "Sistema2026cat"
@@ -53,8 +53,8 @@ def projeto_id(cliente):
 
 
 def conferir(cliente, projeto_id):
-    return cliente.post(f"/api/projetos/{projeto_id}/conferencias",
-                        headers=cabecalhos_de("hist_gestor", SENHA))
+    # a API em C# pede a execução por este canal; a recusa por status é do motor
+    return iniciar(cliente, "conferencia", projeto_id, "hist_gestor")
 
 
 class TestTrabalhoParado:

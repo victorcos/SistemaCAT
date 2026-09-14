@@ -12,14 +12,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
-from cat.apresentacao.api.routers import conferencia_router, movimentos_router
 from cat.config import obter_config
 from cat.dominio.acesso.usuario import Cargo, Papel
 from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
-from tests.integracao.cadastro import criar_empresa, criar_lote, criar_projeto, ultima_situacao
+from tests.integracao.cadastro import (
+    conferir, criar_empresa, criar_lote, criar_projeto, execucao, execucoes, iniciar, planilha,
+    rodar_fila, ultima_situacao,
+)
 
 SENHA = "Sistema2026cat"
 
@@ -91,20 +93,9 @@ def projeto_id(cliente, cabecalhos, base):
     return projeto
 
 
-@pytest.fixture(scope="module", autouse=True)
-def rodar_na_hora():
-    with pytest.MonkeyPatch.context() as mp:
-        na_hora = lambda funcao, *a, **k: funcao(*a, **k)  # noqa: E731
-        mp.setattr(conferencia_router, "disparar", na_hora)
-        mp.setattr(movimentos_router, "disparar", na_hora)
-        yield
-
-
-
-
 class TestOrdemDasEtapas:
     def test_recusa_sem_conferencia(self, cliente, cabecalhos, projeto_id):
-        r = cliente.post(f"/api/projetos/{projeto_id}/movimentos", headers=cabecalhos)
+        r = iniciar(cliente, "movimentos", projeto_id, "mov_analista")
         assert r.status_code == 422
         assert "conferência" in r.json()["detail"].lower()
         # recusada, não chegou a nascer rodada — a etapa segue bloqueada no C#
@@ -114,16 +105,14 @@ class TestOrdemDasEtapas:
 class TestFluxo:
     @pytest.fixture(scope="class", autouse=True)
     def _conferido(self, cliente, cabecalhos, projeto_id):
-        r = cliente.post(f"/api/projetos/{projeto_id}/conferencias", headers=cabecalhos)
-        assert r.status_code == 202, r.text
-        assert cliente.get(f"/api/conferencias/{r.json()['id']}",
-                           headers=cabecalhos).json()["situacao"] == "concluida"
+        assert conferir(cliente, projeto_id, "mov_analista")["situacao"] == "concluida"
 
     @pytest.fixture(scope="class")
     def execucao(self, cliente, cabecalhos, projeto_id):
-        r = cliente.post(f"/api/projetos/{projeto_id}/movimentos", headers=cabecalhos)
+        r = iniciar(cliente, "movimentos", projeto_id, "mov_analista")
         assert r.status_code == 202, r.text
-        d = cliente.get(f"/api/movimentos/{r.json()['id']}", headers=cabecalhos).json()
+        rodar_fila()
+        d = execucao(r.json()["id"])
         assert d["situacao"] == "concluida", d.get("erro")
         return d
 
@@ -145,20 +134,15 @@ class TestFluxo:
     def test_a_etapa_do_projeto_conclui(self, cliente, cabecalhos, projeto_id, execucao):
         assert ultima_situacao(projeto_id, "movimentos") == "concluida"
 
-    def test_lista_e_detalha(self, cliente, cabecalhos, projeto_id, execucao):
-        lista = cliente.get(f"/api/projetos/{projeto_id}/movimentos",
-                            headers=cabecalhos).json()
-        assert [e["id"] for e in lista] == [execucao["id"]]
-        # uma execução de outra etapa não aparece por esta rota
-        conferencia = cliente.get(f"/api/projetos/{projeto_id}/conferencias",
-                                  headers=cabecalhos).json()[0]
-        assert cliente.get(f"/api/movimentos/{conferencia['id']}",
-                           headers=cabecalhos).status_code == 404
+    def test_planilha_de_outra_etapa_nao_existe_por_esta_rota(self, cliente, projeto_id, execucao):
+        # uma execução de conferência pedida pela lista de movimentos
+        conferencia = execucoes(projeto_id, "conferencia")[0]
+        r = planilha(cliente, "movimentos", conferencia["id"], "movimentos")
+        assert r.status_code == 410
 
     def test_baixa_as_quatro_planilhas(self, cliente, cabecalhos, execucao):
         for qual in ("movimentos", "itens", "inventario", "analitico"):
-            r = cliente.get(f"/api/movimentos/{execucao['id']}/planilhas/{qual}",
-                            headers=cabecalhos)
+            r = planilha(cliente, "movimentos", execucao["id"], qual)
             assert r.status_code == 200, (qual, r.text)
             assert r.content[:2] == b"PK"
 
@@ -168,29 +152,25 @@ class TestFluxo:
         A do analítico é a que mais pede: numa base real desta casa deu 37,9
         milhões de documentos, e o xlsx precisaria quebrar em 43 abas."""
         for qual in ("movimentos", "itens", "inventario", "analitico"):
-            r = cliente.get(
-                f"/api/movimentos/{execucao['id']}/planilhas/{qual}?formato=csv",
-                headers=cabecalhos)
+            r = planilha(cliente, "movimentos", execucao["id"], qual, formato="csv")
             assert r.status_code == 200, (qual, r.text)
             assert r.headers["content-type"].startswith("text/csv")
             assert r.content[:3] == b"\xef\xbb\xbf"
             assert r.headers["content-disposition"].endswith('.csv"')
 
     def test_filtro_por_classificacao_muda_o_arquivo(self, cliente, cabecalhos, execucao):
-        inteira = cliente.get(f"/api/movimentos/{execucao['id']}/planilhas/movimentos",
-                              headers=cabecalhos)
-        so_pendentes = cliente.get(
-            f"/api/movimentos/{execucao['id']}/planilhas/movimentos?classificacoes=pendente",
-            headers=cabecalhos)
+        inteira = planilha(cliente, "movimentos", execucao["id"], "movimentos")
+        so_pendentes = planilha(cliente, "movimentos", execucao["id"], "movimentos", classificacoes="pendente")
         assert so_pendentes.status_code == 200
         assert "-pendente" in so_pendentes.headers["content-disposition"]
         assert len(so_pendentes.content) < len(inteira.content)
 
     def test_segunda_rodada_ao_mesmo_tempo_e_recusada(self, cliente, cabecalhos,
                                                        projeto_id, execucao, monkeypatch):
-        # sem rodar na hora, a primeira fica "na fila" e a segunda bate em 409
-        monkeypatch.setattr(movimentos_router, "disparar", lambda *a, **k: None)
-        r1 = cliente.post(f"/api/projetos/{projeto_id}/movimentos", headers=cabecalhos)
+        # sem rodar a fila, a primeira fica "na fila" e a segunda bate em 409
+        r1 = iniciar(cliente, "movimentos", projeto_id, "mov_analista")
         assert r1.status_code == 202
-        r2 = cliente.post(f"/api/projetos/{projeto_id}/movimentos", headers=cabecalhos)
+        r2 = iniciar(cliente, "movimentos", projeto_id, "mov_analista")
         assert r2.status_code == 409
+        assert "em andamento" in r2.json()["detail"]
+        rodar_fila()

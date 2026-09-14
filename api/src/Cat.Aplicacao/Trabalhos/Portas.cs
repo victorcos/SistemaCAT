@@ -75,4 +75,13 @@ public interface IMotor
     /// <summary>A remessa enviada pela tela, repassada em fluxo: SPED de empresa grande passa de um GB.</summary>
     Task<System.Text.Json.Nodes.JsonObject> AnalisarRemessa(Stream corpo, string tipoDoConteudo, long? tamanho,
         CancellationToken cancelar);
+
+    /// <summary>O motor confere se há o que fazer, cria a execução na fila e devolve o identificador.</summary>
+    /// <exception cref="MotorRecusou">já em andamento (409), trabalho parado ou nada a fazer (422)</exception>
+    Task<int> PedirExecucao(string etapa, int projetoId, int usuarioId, CancellationToken cancelar);
+
+    /// <summary>Gera (ou reaproveita) a planilha a partir dos parquets e diz onde está.</summary>
+    /// <exception cref="MotorRecusou">planilha ou formato desconhecido (404), não terminou (409), material apagado (410)</exception>
+    Task<PlanilhaPronta> GerarPlanilha(int execucaoId, string etapa, string qual, string? modelos, string? classificacoes,
+        string formato, CancellationToken cancelar);
 }

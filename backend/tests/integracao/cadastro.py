@@ -168,3 +168,76 @@ def ultima_situacao(projeto_id: int, etapa: str) -> str | None:
         return s.scalar(select(ExecucaoDB.situacao).where(
             ExecucaoDB.projeto_id == projeto_id, ExecucaoDB.etapa == etapa,
         ).order_by(ExecucaoDB.id.desc()).limit(1))
+
+
+# ---------------------------------------------------------------------------
+# Execuções e planilhas pelo canal interno
+#
+# As rotas de conferência e movimentos moram na API em C# desde 13/09/2026. O
+# motor põe a execução na fila (/interno/execucoes), o trabalhador roda
+# (workers/fila.py), e a planilha sai por /interno/planilhas. Estes auxiliares
+# fazem o que a API faz, na hora, para os testes não dependerem de tempo.
+# ---------------------------------------------------------------------------
+def iniciar(cliente, etapa: str, projeto_id: int, por: str):
+    return cliente.post("/interno/execucoes", headers=SEGREDO, json={
+        "etapa": etapa, "projeto_id": projeto_id, "usuario_id": _id_de(por)})
+
+
+def rodar_fila() -> list[int]:
+    from workers import fila  # noqa: PLC0415
+    return fila.processar_pendentes()
+
+
+def conferir(cliente, projeto_id: int, por: str) -> dict:
+    """Pede a conferência, roda a fila e devolve a execução como a tela a veria."""
+    r = iniciar(cliente, "conferencia", projeto_id, por)
+    assert r.status_code == 202, r.text
+    rodar_fila()
+    return execucao(r.json()["id"])
+
+
+def execucao(execucao_id: int) -> dict:
+    from cat.apresentacao.api.routers.interno_router import execucao_dto  # noqa: PLC0415
+    with Sessao() as s:
+        return execucao_dto(s.get(ExecucaoDB, execucao_id)).model_dump()
+
+
+def execucoes(projeto_id: int, etapa: str) -> list[dict]:
+    from cat.apresentacao.api.routers.interno_router import execucao_dto  # noqa: PLC0415
+    with Sessao() as s:
+        return [execucao_dto(e).model_dump() for e in s.scalars(
+            select(ExecucaoDB).where(ExecucaoDB.projeto_id == projeto_id, ExecucaoDB.etapa == etapa)
+            .order_by(ExecucaoDB.id.desc()))]
+
+
+class Planilha:
+    """A resposta que a API em C# dá: o arquivo, com tipo e nome no cabeçalho."""
+
+    def __init__(self, resposta):
+        self.status_code = resposta.status_code
+        self._resposta = resposta
+        self.headers: dict[str, str] = {}
+        self.content = b""
+        if resposta.status_code == 200:
+            pronta = resposta.json()
+            with open(pronta["caminho"], "rb") as f:
+                self.content = f.read()
+            self.headers = {"content-type": pronta["tipo"],
+                            "content-disposition": f'attachment; filename="{pronta["nome"]}"'}
+
+    @property
+    def text(self) -> str:
+        return self._resposta.text
+
+    def json(self):
+        return self._resposta.json()
+
+
+def planilha(cliente, etapa: str, execucao_id: int, qual: str, **consulta) -> Planilha:
+    return Planilha(cliente.post("/interno/planilhas", headers=SEGREDO, json={
+        "execucao_id": execucao_id, "etapa": etapa, "qual": qual, **consulta}))
+
+
+def _id_de(nome: str) -> int:
+    with Sessao() as s:
+        return _usuario(s, nome).id

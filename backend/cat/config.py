@@ -31,6 +31,10 @@ class Config(BaseSettings):
     # Vazio fecha o canal para todo mundo, em vez de abri-lo.
     motor_segredo: str = ""
 
+    # O trabalhador da fila de execuções (workers/fila.py) sobe com o motor.
+    # Os testes desligam e esvaziam a fila na hora, para não depender de tempo.
+    fila_automatica: bool = True
+
     log_nivel: str = "INFO"
     origens_permitidas: str = "http://localhost:5173"
 

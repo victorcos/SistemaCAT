@@ -25,14 +25,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
-from cat.apresentacao.api.routers import conferencia_router
 from cat.config import obter_config
 from cat.dominio.acesso.usuario import Cargo, Papel
 from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
-from tests.integracao.cadastro import criar_empresa, criar_lote, criar_projeto, tipos_nos_lotes
+from tests.integracao.cadastro import (
+    conferir, criar_empresa, criar_lote, criar_projeto, planilha, tipos_nos_lotes,
+)
 
 SENHA = "Sistema2026cat"
 
@@ -166,21 +167,6 @@ def empresa_id(cliente, cabecalhos):
                          ie="123456789012", por="cenarios_analista")
 
 
-@pytest.fixture(scope="module", autouse=True)
-def rodar_na_hora():
-    """A tarefa roda dentro da requisição, para o teste não depender de tempo.
-
-    Escopo de módulo, e não de função: as execuções são criadas em fixtures de
-    classe, que sobem antes de qualquer fixture de função — com o monkeypatch
-    de função, a conferência iria para a fila de verdade e o teste leria
-    "rodando".
-    """
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(conferencia_router, "disparar",
-                   lambda funcao, *a, **k: funcao(*a, **k))
-        yield
-
-
 def _projeto(cliente, cabecalhos, empresa_id, nome: str) -> int:
     return criar_projeto(empresa_id=empresa_id, nome=nome, por="cenarios_analista")
 
@@ -188,11 +174,7 @@ def _projeto(cliente, cabecalhos, empresa_id, nome: str) -> int:
 def _conferir(cliente, cabecalhos, projeto_id: int, pasta: str) -> dict:
     """Importa a pasta, roda a conferência e devolve a execução concluída."""
     criar_lote(projeto_id=projeto_id, pasta=pasta)
-    r = cliente.post(f"/api/projetos/{projeto_id}/conferencias",
-                     headers=cabecalhos)
-    assert r.status_code == 202, r.text
-    d = cliente.get(f"/api/conferencias/{r.json()['id']}",
-                    headers=cabecalhos).json()
+    d = conferir(cliente, projeto_id, "cenarios_analista")
     assert d["situacao"] == "concluida", d.get("erro")
     return d
 
@@ -203,9 +185,7 @@ def _planilha(cliente, cabecalhos, execucao_id: int, qual: str, **filtro) -> int
 
     import openpyxl  # noqa: PLC0415
 
-    params = "&".join(f"{k}={v}" for k, v in filtro.items())
-    r = cliente.get(f"/api/conferencias/{execucao_id}/planilhas/{qual}"
-                    + (f"?{params}" if params else ""), headers=cabecalhos)
+    r = planilha(cliente, "conferencia", execucao_id, qual, **filtro)
     assert r.status_code == 200, r.text
     livro = openpyxl.load_workbook(io.BytesIO(r.content), read_only=True)
     return sum(aba.max_row - 1 for aba in livro.worksheets)

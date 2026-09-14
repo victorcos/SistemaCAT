@@ -110,6 +110,79 @@ class TestRemessaPeloCanal:
         assert r.status_code == 403
 
 
+def test_execucoes_e_planilhas_nao_moram_mais_no_motor(cliente):
+    """Conferência, movimentos e os downloads: rota pública só no C#. O motor não tem mais nenhuma."""
+    for metodo, rota in [("POST", "/api/projetos/1/conferencias"), ("GET", "/api/projetos/1/conferencias"),
+                         ("GET", "/api/conferencias/1"), ("GET", "/api/conferencias/1/planilhas/a-cobrar"),
+                         ("POST", "/api/projetos/1/movimentos"), ("GET", "/api/projetos/1/movimentos"),
+                         ("GET", "/api/movimentos/1"), ("GET", "/api/movimentos/1/planilhas/movimentos")]:
+        assert cliente.request(metodo, rota).status_code in (404, 405), rota
+
+
+class TestFila:
+    """workers/fila.py: a tabela execucao é a fila, lida uma de cada vez."""
+
+    @pytest.fixture
+    def projeto_id(self, cliente):
+        from tests.integracao.cadastro import criar_empresa, criar_projeto  # noqa: PLC0415
+        empresa = criar_empresa(raiz="31415926", cnpj="31415926000126", razao="EMPRESA DA FILA", por="motor.ana")
+        return criar_projeto(empresa_id=empresa, nome=f"Fila {os.urandom(3).hex()}", por="motor.ana")
+
+    def _nova(self, projeto_id, etapa="conferencia", situacao="na_fila"):
+        from cat.infraestrutura.repositorios.banco import Sessao  # noqa: PLC0415
+        from cat.infraestrutura.repositorios.modelos import ExecucaoDB  # noqa: PLC0415
+        with Sessao() as s:
+            e = ExecucaoDB(projeto_id=projeto_id, etapa=etapa, situacao=situacao, passo="Na fila")
+            s.add(e)
+            s.commit()
+            return e.id
+
+    def _situacao(self, execucao_id):
+        from tests.integracao.cadastro import execucao  # noqa: PLC0415
+        return execucao(execucao_id)
+
+    def test_interrompida_por_reinicio_vira_falha_com_motivo(self, cliente, projeto_id):
+        from workers import fila  # noqa: PLC0415
+        orfa = self._nova(projeto_id, situacao="rodando")
+        assert fila.recuperar_interrompidas() >= 1
+        d = self._situacao(orfa)
+        assert d["situacao"] == "falhou"
+        assert "reiniciou" in d["erro"]
+        assert d["terminada_em"]
+
+    def test_pega_a_mais_antiga_e_uma_de_cada_vez(self, cliente, projeto_id, monkeypatch):
+        from workers import fila  # noqa: PLC0415
+        rodadas = []
+        monkeypatch.setitem(fila.EXECUTORES, "conferencia", rodadas.append)
+        fila.processar_pendentes()          # esvazia o que outros testes deixaram
+        rodadas.clear()
+        primeira, segunda = self._nova(projeto_id), self._nova(projeto_id)
+        assert fila.processar_uma() == primeira
+        assert rodadas == [primeira]
+        assert self._situacao(segunda)["situacao"] == "na_fila"
+        assert fila.processar_pendentes() == [segunda]
+        assert fila.processar_uma() is None
+
+    def test_etapa_que_o_motor_nao_conhece_falha_em_vez_de_ficar_parada(self, cliente, projeto_id):
+        from workers import fila  # noqa: PLC0415
+        fila.processar_pendentes()
+        desconhecida = self._nova(projeto_id, etapa="apuracao")
+        assert fila.processar_uma() == desconhecida
+        d = self._situacao(desconhecida)
+        assert d["situacao"] == "falhou"
+        assert "apuracao" in d["erro"]
+
+    def test_excecao_que_escapa_do_executor_marca_falha(self, cliente, projeto_id, monkeypatch):
+        from workers import fila  # noqa: PLC0415
+        fila.processar_pendentes()
+        def explode(_):
+            raise RuntimeError("disco sumiu")
+        monkeypatch.setitem(fila.EXECUTORES, "conferencia", explode)
+        quebrada = self._nova(projeto_id)
+        fila.processar_uma()
+        assert self._situacao(quebrada)["situacao"] == "falhou"
+
+
 class TestCanalInterno:
     """A API em C# pede, o motor apaga — só com o segredo, e só na pasta de trabalho."""
 

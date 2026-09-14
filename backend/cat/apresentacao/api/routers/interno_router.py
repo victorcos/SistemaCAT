@@ -9,8 +9,9 @@ existe para isso (docs/MIGRACAO_CSHARP.md §4) e tem três portas fechadas:
 3. toda chamada traz o segredo compartilhado CAT_MOTOR_SEGREDO. Sem ele
    configurado, o canal fica fechado para todo mundo, em vez de aberto.
 
-O que passa por aqui é o que lê ou apaga disco: apagar pasta de trabalho,
-inspecionar a pasta de um lote e analisar a remessa enviada. A regra de quem
+O que passa por aqui é o que lê ou escreve disco: apagar pasta de trabalho,
+inspecionar a pasta de um lote, analisar a remessa enviada, pôr uma execução na
+fila e gerar planilha. A regra de quem
 pode, o registro no banco e a resposta à tela ficam no C#.
 
 **Apagar pasta só dentro da pasta de trabalho.** O Python apagava o caminho que
@@ -29,9 +30,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from cat.aplicacao.casos_de_uso import conferir_documentos, extrair_movimentos, planilhas
 from cat.aplicacao.casos_de_uso.analisar_remessa import RemessaAnalisada, analisar
+from cat.aplicacao.casos_de_uso.historico_do_projeto import TrabalhoParado
 from cat.aplicacao.casos_de_uso.inspecionar_lote import (
     PastaInvalida,
     ProjetoInexistente,
@@ -41,6 +45,7 @@ from cat.config import obter_config
 from cat.dominio.comum.cnpj import Cnpj
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
 from cat.infraestrutura.repositorios.banco import obter_sessao
+from cat.infraestrutura.repositorios.modelos import ExecucaoDB
 from cat.log import contexto, obter_log
 
 log = obter_log(__name__)
@@ -261,3 +266,120 @@ def _remessa_dto(r: RemessaAnalisada) -> RemessaDto:
             if matriz else None
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# Execução: preparar e pôr na fila
+# ---------------------------------------------------------------------------
+PREPARADORES = {
+    conferir_documentos.ETAPA: (conferir_documentos.preparar, conferir_documentos.NadaParaConferir,
+                                "Já existe uma conferência em andamento neste trabalho."),
+    extrair_movimentos.ETAPA: (extrair_movimentos.preparar, extrair_movimentos.NadaParaExtrair,
+                               "Já existe uma extração de movimentos em andamento neste trabalho."),
+}
+
+SITUACOES_EM_CURSO = ("na_fila", "rodando")
+
+
+class PedidoDeExecucao(BaseModel):
+    etapa: str
+    projeto_id: int
+    usuario_id: int
+
+
+class ExecucaoDto(BaseModel):
+    id: int
+    projeto_id: int
+    etapa: str
+    situacao: str
+    passo: str | None = None
+    fracao: float = 0.0
+    arquivos_totais: int = 0
+    arquivos_lidos: int = 0
+    bytes_lidos: int = 0
+    documentos: int = 0
+    erro: str | None = None
+    iniciada_em: str
+    terminada_em: str | None = None
+    resumo: dict | None = None
+
+
+def execucao_dto(e: ExecucaoDB) -> ExecucaoDto:
+    return ExecucaoDto(
+        id=e.id, projeto_id=e.projeto_id, etapa=e.etapa, situacao=e.situacao,
+        passo=e.passo, fracao=e.fracao, arquivos_totais=e.arquivos_totais,
+        arquivos_lidos=e.arquivos_lidos, bytes_lidos=e.bytes_lidos,
+        documentos=e.documentos, erro=e.erro,
+        iniciada_em=e.iniciada_em.isoformat(),
+        terminada_em=e.terminada_em.isoformat() if e.terminada_em else None,
+        resumo=e.resumo,
+    )
+
+
+@router.post("/execucoes", response_model=ExecucaoDto, status_code=status.HTTP_202_ACCEPTED,
+             dependencies=[Depends(exigir_segredo)])
+def pedir_execucao(
+    pedido: PedidoDeExecucao,
+    sessao: Annotated[Session, Depends(obter_sessao)],
+) -> ExecucaoDto:
+    """Confere se há o que fazer, cria a execução na fila e registra no histórico.
+
+    As regras de preparar ficam no motor porque são as mesmas da leitura: quais
+    EFD valem (a retificadora substitui a original), se há documento para
+    confrontar, se a conferência já concluiu. Quem roda é o trabalhador da fila.
+    """
+    if pedido.etapa not in PREPARADORES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Etapa desconhecida: {pedido.etapa}.")
+    preparar, nada_a_fazer, ja_em_curso = PREPARADORES[pedido.etapa]
+
+    # duas rodadas ao mesmo tempo no mesmo trabalho disputariam a mesma rede e
+    # terminariam as duas mais devagar; e a segunda sobrescreveria a primeira
+    em_curso = sessao.scalar(select(ExecucaoDB).where(
+        ExecucaoDB.projeto_id == pedido.projeto_id, ExecucaoDB.etapa == pedido.etapa,
+        ExecucaoDB.situacao.in_(SITUACOES_EM_CURSO)))
+    if em_curso is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, ja_em_curso)
+
+    with contexto(etapa=pedido.etapa, usuario_id=pedido.usuario_id, projeto_id=pedido.projeto_id):
+        try:
+            execucao = preparar(pedido.projeto_id, pedido.usuario_id, sessao)
+        except (TrabalhoParado, nada_a_fazer) as erro:
+            log.warning("execução recusada", extra={"motivo": str(erro)})
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)) from erro
+        log.info("execução na fila", extra={"execucao_id": execucao.id, "arquivos": execucao.arquivos_totais})
+        return execucao_dto(execucao)
+
+
+# ---------------------------------------------------------------------------
+# Planilha: gerar a partir dos parquets e dizer onde está
+# ---------------------------------------------------------------------------
+class PedidoDePlanilha(BaseModel):
+    execucao_id: int
+    # a etapa pela qual a tela pediu: é dela a lista de planilhas e a mensagem
+    etapa: str
+    qual: str
+    modelos: str | None = None
+    classificacoes: str | None = None
+    formato: str = "xlsx"
+
+
+class PlanilhaDto(BaseModel):
+    caminho: str
+    nome: str
+    tipo: str
+
+
+@router.post("/planilhas", response_model=PlanilhaDto, dependencies=[Depends(exigir_segredo)])
+def gerar_planilha(
+    pedido: PedidoDePlanilha,
+    sessao: Annotated[Session, Depends(obter_sessao)],
+) -> PlanilhaDto:
+    execucao = sessao.get(ExecucaoDB, pedido.execucao_id)
+    if execucao is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Execução não encontrada.")
+    try:
+        pronta = planilhas.gerar(execucao, pedido.etapa, pedido.qual, pedido.modelos,
+                                 pedido.classificacoes, pedido.formato)
+    except planilhas.PlanilhaRecusada as erro:
+        raise HTTPException(erro.status, str(erro)) from erro
+    return PlanilhaDto(caminho=pronta.caminho, nome=pronta.nome, tipo=pronta.tipo)

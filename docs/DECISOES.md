@@ -5,6 +5,50 @@
 
 ---
 
+## 2026-09-13 — Conferência e movimentos pedidos em C#, rodando na fila do motor
+
+**O que entrou.** Pedir a conferência e os movimentos, listar as rodadas de um
+trabalho, acompanhar uma e baixar as planilhas, tudo em C#. Do Python saíram
+`conferencia_router.py`, `movimentos_router.py` e `infraestrutura/tarefas.py`.
+Das rotas públicas o motor agora só tem `/api/saude`; o resto dele é o canal
+interno.
+
+**A thread da rota virou fila.** Antes, a rota Python abria uma thread no
+próprio processo e a rodada vivia nela. Com a rota em C#, isso não se sustenta:
+o pedido passa a gravar a execução `na_fila`, e `workers/fila.py`, que sobe junto
+com o motor, pega uma por vez (`FOR UPDATE SKIP LOCKED`). Duas consequências
+escolhidas: rodadas de trabalhos diferentes esperam a vez em vez de disputar
+memória e DuckDB ao mesmo tempo; e a rodada que estava `rodando` quando o motor
+caiu vira `falhou` ao subir, com o motivo escrito e o evento no histórico — antes
+ficava "rodando" para sempre e travava a etapa.
+
+**Quem cria a execução é o motor, e não o C# — diferente do plano.** O plano
+dizia que o C# gravaria a execução pendente. Mas saber se há o que fazer
+depende do que foi lido (há lote que a CAT lê? a conferência terminou e deixou
+parquet?), e isso é do motor. O C# confere acesso e capacidade e chama
+`POST /interno/execucoes`; o motor confere as condições, grava a fila e
+responde o id. As recusas (409 já em curso, 422 trabalho parado ou nada a fazer)
+chegam à tela com o texto dele.
+
+**Planilha: o motor escreve, o C# entrega.** `POST /interno/planilhas` gera a
+planilha dos parquets (ou reaproveita a do disco, se o parquet não mudou desde
+então) e devolve o caminho. O C# serve o arquivo em fluxo, com suporte a
+retomada, e só se o caminho estiver dentro da pasta de trabalho — um caminho de
+fora vira 502 no log, não um arquivo servido. O prazo da chamada é de 60 min: a
+planilha de dezenas de milhões de linhas é escrita inteira antes do primeiro
+byte sair.
+
+**Ensaiado de ponta a ponta com a pilha no ar**, base simulada (EFD com duas
+notas, um XML): movimentos antes da conferência recusado com o texto certo;
+conferência e movimentos pedidos pelo C#, rodados pelo trabalhador e concluídos;
+as três planilhas da conferência baixadas em xlsx e em csv (com BOM), a de
+movimentos só dos pendentes (filtro no nome do arquivo) e a de itens de novo
+depois do reinício; formato desconhecido recusado; trabalho pausado recusado; uma rodada deixada em `rodando`
+virou `falhou` ao reiniciar; o motor direto responde 404 às rotas antigas.
+**Falta a rodada com base real no escritório** antes de ir para a `main`.
+
+---
+
 ## 2026-09-13 — Lotes e remessa em C#, e o limite de 30 MB que a fundação tinha criado
 
 **O que entrou.** Inspecionar a pasta de um lote, registrar, listar, remover, e

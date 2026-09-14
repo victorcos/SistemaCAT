@@ -12,7 +12,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
-from cat.apresentacao.api.routers import conferencia_router
 from cat.config import obter_config
 from cat.dominio.acesso.usuario import Cargo, Papel
 from cat.dominio.comum.cnpj import Cnpj
@@ -20,7 +19,9 @@ from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
-from tests.integracao.cadastro import SEGREDO, criar_empresa, criar_lote, criar_projeto, tipos_nos_lotes
+from tests.integracao.cadastro import (
+    SEGREDO, conferir, criar_empresa, criar_lote, criar_projeto, tipos_nos_lotes,
+)
 
 SENHA = "Sistema2026cat"
 
@@ -109,12 +110,6 @@ def projeto_id(cliente, cabecalhos):
                          fim="2021-06-01", por="retif_analista")
 
 
-@pytest.fixture(autouse=True)
-def rodar_na_hora(monkeypatch):
-    monkeypatch.setattr(conferencia_router, "disparar",
-                        lambda funcao, *a, **k: funcao(*a, **k))
-
-
 class TestImportacao:
     def test_a_inspecao_da_pasta_avisa(self, cliente, projeto_id, base):
         r = cliente.post("/interno/lotes/inspecionar", headers=SEGREDO,
@@ -131,9 +126,7 @@ class TestImportacao:
 
 class TestConferencia:
     def test_le_a_retificadora_e_nao_a_original(self, cliente, cabecalhos, projeto_id):
-        r = cliente.post(f"/api/projetos/{projeto_id}/conferencias", headers=cabecalhos)
-        assert r.status_code == 202, r.text
-        d = cliente.get(f"/api/conferencias/{r.json()['id']}", headers=cabecalhos).json()
+        d = conferir(cliente, projeto_id, "retif_analista")
         assert d["situacao"] == "concluida", d.get("erro")
 
         # retificadora (A, B) + junho (C) = 3 documentos; com a original seriam 4

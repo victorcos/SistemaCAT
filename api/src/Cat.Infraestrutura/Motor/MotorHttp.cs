@@ -24,6 +24,9 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
     public static readonly TimeSpan PrazoApagar = TimeSpan.FromMinutes(5);
     public static readonly TimeSpan PrazoInspecionar = TimeSpan.FromMinutes(30);
     public static readonly TimeSpan PrazoRemessa = TimeSpan.FromMinutes(60);
+    public static readonly TimeSpan PrazoPedirExecucao = TimeSpan.FromMinutes(2);
+    // a planilha de dezenas de milhões de linhas é escrita antes de o primeiro byte sair
+    public static readonly TimeSpan PrazoPlanilha = TimeSpan.FromMinutes(60);
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
@@ -57,6 +60,27 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
         return JsonNode.Parse(json.GetRawText())!.AsObject();
     }
 
+    public async Task<int> PedirExecucao(string etapa, int projetoId, int usuarioId, CancellationToken cancelar)
+    {
+        var json = await Chamar("interno/execucoes", JsonContent.Create(new Dictionary<string, object>
+        {
+            ["etapa"] = etapa, ["projeto_id"] = projetoId, ["usuario_id"] = usuarioId,
+        }), PrazoPedirExecucao, cancelar);
+        return json.GetProperty("id").GetInt32();
+    }
+
+    public async Task<PlanilhaPronta> GerarPlanilha(int execucaoId, string etapa, string qual, string? modelos,
+        string? classificacoes, string formato, CancellationToken cancelar)
+    {
+        var json = await Chamar("interno/planilhas", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["execucao_id"] = execucaoId, ["etapa"] = etapa, ["qual"] = qual,
+            ["modelos"] = modelos, ["classificacoes"] = classificacoes, ["formato"] = formato,
+        }), PrazoPlanilha, cancelar);
+        return new PlanilhaPronta(json.GetProperty("caminho").GetString()!, json.GetProperty("nome").GetString()!,
+            json.GetProperty("tipo").GetString()!);
+    }
+
     private async Task<JsonElement> Chamar(string rota, HttpContent conteudo, TimeSpan prazo, CancellationToken cancelar)
     {
         if (string.IsNullOrEmpty(config.MotorSegredo))
@@ -84,10 +108,11 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
             if (resposta.IsSuccessStatusCode)
                 return JsonDocument.Parse(texto).RootElement.Clone();
 
-            // recusa com motivo (pasta que não existe, trabalho que não existe, remessa
-            // sem SPED) segue para a tela com o texto do motor; o resto é falha do canal
+            // recusa com motivo (pasta que não existe, remessa sem SPED, rodada já em
+            // andamento, planilha apagada do disco) segue para a tela com o texto do
+            // motor; o resto é falha do canal
             var codigo = (int)resposta.StatusCode;
-            if (codigo is 404 or 422 && Detalhe(texto) is { } detalhe)
+            if (codigo is 404 or 409 or 410 or 422 && Detalhe(texto) is { } detalhe)
                 throw new MotorRecusou(codigo, detalhe);
             log.Erro("motor recusou chamada do canal interno", new { rota, status = codigo, corpo = texto });
             throw new MotorIndisponivel($"HTTP {codigo}");

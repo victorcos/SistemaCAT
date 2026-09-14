@@ -46,7 +46,12 @@ async def ciclo_de_vida(app: FastAPI):
                                  "pasta_de_trabalho": cfg.raiz_de_trabalho,
                                  "memoria_analitica": cfg.memoria_analitica,
                                  "threads_analiticas": cfg.threads_analiticas})
+    if cfg.fila_automatica:
+        from workers import fila  # noqa: PLC0415
+        fila.iniciar_em_segundo_plano()
     yield
+    if cfg.fila_automatica:
+        fila.parar()
     log.info("API encerrada")
 
 
@@ -118,17 +123,13 @@ def saude() -> dict[str, object]:
     }
 
 
-from cat.apresentacao.api.routers import (  # noqa: E402
-    conferencia_router, interno_router, movimentos_router,
-)
+from cat.apresentacao.api.routers import interno_router  # noqa: E402
 
 # O login (/api/auth), a gestão de usuários (/api/usuarios), empresas, frentes,
 # projetos, a exclusão de trabalho, o histórico (linha do tempo, comentário,
-# status e sucessão), os lotes e a análise da remessa moram na API em C# desde
-# 13/09/2026 — o que eles leem de disco chega aqui pelo canal interno; os
+# status e sucessão), os lotes, a análise da remessa, as execuções e as planilhas
+# moram na API em C# desde 13/09/2026 — o que leem ou escrevem em disco chega
+# aqui pelo canal interno, e a fila de execuções roda em workers/fila.py; os
 # comandos semear e emergencia em api/src/Cat.Ferramentas. O motor atende o
 # que lê disco e o canal interno com a API.
 app.include_router(interno_router.router)
-# O motor só valida o token nas rotas que ainda atende (seguranca.py).
-app.include_router(conferencia_router.router)
-app.include_router(movimentos_router.router)

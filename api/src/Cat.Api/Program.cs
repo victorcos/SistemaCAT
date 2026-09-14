@@ -64,6 +64,8 @@ builder.Services.AddScoped<IRepositorioDeHistorico, HistoricoRepositorio>();
 builder.Services.AddScoped<HistoricoDoProjeto>();
 builder.Services.AddScoped<IRepositorioDeLotes, LoteRepositorio>();
 builder.Services.AddScoped<Lotes>();
+builder.Services.AddScoped<IRepositorioDeExecucoes, ExecucaoRepositorio>();
+builder.Services.AddScoped<Execucoes>();
 // canal interno com o motor: apagar pasta de trabalho grande leva tempo
 // sem prazo no cliente: cada chamada ao motor tem o seu, porque inspecionar
 // milhares de arquivos na rede leva minutos e apagar uma pasta, segundos
@@ -125,6 +127,7 @@ app.MapearUsuarios();
 app.MapearTrabalhos();
 app.MapearHistorico();
 app.MapearLotes();
+app.MapearExecucoes();
 app.MapReverseProxy(repasse =>
 {
     repasse.Use(RepasseAoMotor.TraduzirFalha);

@@ -166,6 +166,18 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
             e.Property(x => x.Etapa).HasColumnName("etapa");
             e.Property(x => x.Situacao).HasColumnName("situacao");
             e.Property(x => x.PastaDeTrabalho).HasColumnName("pasta_de_trabalho");
+            e.Property(x => x.Passo).HasColumnName("passo");
+            e.Property(x => x.Fracao).HasColumnName("fracao");
+            e.Property(x => x.ArquivosTotais).HasColumnName("arquivos_totais");
+            e.Property(x => x.ArquivosLidos).HasColumnName("arquivos_lidos");
+            e.Property(x => x.BytesLidos).HasColumnName("bytes_lidos");
+            e.Property(x => x.Documentos).HasColumnName("documentos");
+            // coluna json do SQLAlchemy: o resumo sai como o motor gravou
+            e.Property(x => x.Resumo).HasColumnName("resumo").HasColumnType("json");
+            e.Property(x => x.Erro).HasColumnName("erro");
+            e.Property(x => x.IniciadaEm).HasColumnName("iniciada_em");
+            e.Property(x => x.TerminadaEm).HasColumnName("terminada_em");
+            e.Property(x => x.CriadaPor).HasColumnName("criada_por");
         });
     }
 }
@@ -298,4 +310,15 @@ public sealed class ExecucaoLinha
     public string Etapa { get; set; } = "";
     public string Situacao { get; set; } = "";
     public string? PastaDeTrabalho { get; set; }
+    public string? Passo { get; set; }
+    public double Fracao { get; set; }
+    public int ArquivosTotais { get; set; }
+    public int ArquivosLidos { get; set; }
+    public long BytesLidos { get; set; }
+    public long Documentos { get; set; }
+    public string? Resumo { get; set; }
+    public string? Erro { get; set; }
+    public DateTime IniciadaEm { get; set; }
+    public DateTime? TerminadaEm { get; set; }
+    public int? CriadaPor { get; set; }
 }

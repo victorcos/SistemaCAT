@@ -12,14 +12,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
-from cat.apresentacao.api.routers import conferencia_router
 from cat.config import obter_config
 from cat.dominio.acesso.usuario import Cargo, Papel
 from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
-from tests.integracao.cadastro import criar_empresa, criar_lote, criar_projeto, tem_base, ultima_situacao
+from tests.integracao.cadastro import (
+    conferir, criar_empresa, criar_lote, criar_projeto, execucoes, iniciar, planilha, tem_base,
+    ultima_situacao,
+)
 
 SENHA = "Sistema2026cat"
 
@@ -91,17 +93,9 @@ def projeto_id(cliente, cabecalhos, base):
                          por="conf_analista")
 
 
-@pytest.fixture(autouse=True)
-def rodar_na_hora(monkeypatch):
-    """A tarefa roda dentro da requisição, para o teste não depender de tempo."""
-    monkeypatch.setattr(conferencia_router, "disparar",
-                        lambda funcao, *a, **k: funcao(*a, **k))
-
-
 class TestSemBase:
     def test_recusa_quando_nao_ha_efd(self, cliente, cabecalhos, projeto_id):
-        r = cliente.post(f"/api/projetos/{projeto_id}/conferencias",
-                         headers=cabecalhos)
+        r = iniciar(cliente, "conferencia", projeto_id, "conf_analista")
         assert r.status_code == 422
         assert "EFD ICMS/IPI" in r.json()["detail"]
 
@@ -116,13 +110,7 @@ class TestFluxo:
     def test_conferencia_roda_e_grava_o_resumo(
         self, cliente, cabecalhos, projeto_id
     ):
-        r = cliente.post(f"/api/projetos/{projeto_id}/conferencias",
-                         headers=cabecalhos)
-        assert r.status_code == 202, r.text
-        execucao_id = r.json()["id"]
-
-        d = cliente.get(f"/api/conferencias/{execucao_id}",
-                        headers=cabecalhos).json()
+        d = conferir(cliente, projeto_id, "conf_analista")
         assert d["situacao"] == "concluida", d.get("erro")
         resumo = d["resumo"]
         assert resumo["escriturados"] == 2
@@ -135,12 +123,9 @@ class TestFluxo:
         assert ultima_situacao(projeto_id, "conferencia") == "concluida"
 
     def test_baixa_as_tres_planilhas(self, cliente, cabecalhos, projeto_id):
-        execucao_id = cliente.get(f"/api/projetos/{projeto_id}/conferencias",
-                                  headers=cabecalhos).json()[0]["id"]
+        execucao_id = execucoes(projeto_id, "conferencia")[0]["id"]
         for qual in ("a-cobrar", "nao-escrituradas", "conferidas"):
-            r = cliente.get(
-                f"/api/conferencias/{execucao_id}/planilhas/{qual}",
-                headers=cabecalhos)
+            r = planilha(cliente, "conferencia", execucao_id, qual)
             assert r.status_code == 200, r.text
             assert r.headers["content-type"].startswith(
                 "application/vnd.openxmlformats")
@@ -149,25 +134,17 @@ class TestFluxo:
     def test_filtro_por_modelo_muda_o_arquivo(
         self, cliente, cabecalhos, projeto_id
     ):
-        execucao_id = cliente.get(f"/api/projetos/{projeto_id}/conferencias",
-                                  headers=cabecalhos).json()[0]["id"]
-        inteira = cliente.get(
-            f"/api/conferencias/{execucao_id}/planilhas/a-cobrar",
-            headers=cabecalhos)
-        so_cupom = cliente.get(
-            f"/api/conferencias/{execucao_id}/planilhas/a-cobrar?modelos=59",
-            headers=cabecalhos)
+        execucao_id = execucoes(projeto_id, "conferencia")[0]["id"]
+        inteira = planilha(cliente, "conferencia", execucao_id, "a-cobrar")
+        so_cupom = planilha(cliente, "conferencia", execucao_id, "a-cobrar", modelos="59")
         assert so_cupom.status_code == 200
         # nada é modelo 59 nesta base: a planilha filtrada é menor
         assert len(so_cupom.content) < len(inteira.content)
 
     def test_baixa_as_mesmas_listas_em_csv(self, cliente, cabecalhos, projeto_id):
-        execucao_id = cliente.get(f"/api/projetos/{projeto_id}/conferencias",
-                                  headers=cabecalhos).json()[0]["id"]
+        execucao_id = execucoes(projeto_id, "conferencia")[0]["id"]
         for qual in ("a-cobrar", "nao-escrituradas", "conferidas"):
-            r = cliente.get(
-                f"/api/conferencias/{execucao_id}/planilhas/{qual}?formato=csv",
-                headers=cabecalhos)
+            r = planilha(cliente, "conferencia", execucao_id, qual, formato="csv")
             assert r.status_code == 200, r.text
             assert r.headers["content-type"].startswith("text/csv")
             assert r.content[:3] == b"\xef\xbb\xbf"     # BOM, para o Excel
@@ -179,36 +156,28 @@ class TestFluxo:
     ):
         """O cache é por nome de arquivo. Se o formato não entrasse no nome,
         o xlsx já gerado responderia ao pedido de csv."""
-        execucao_id = cliente.get(f"/api/projetos/{projeto_id}/conferencias",
-                                  headers=cabecalhos).json()[0]["id"]
-        base = f"/api/conferencias/{execucao_id}/planilhas/a-cobrar"
-        planilha = cliente.get(base, headers=cabecalhos)
-        csv_ = cliente.get(f"{base}?formato=csv", headers=cabecalhos)
-        assert planilha.content[:2] == b"PK"          # xlsx é um zip
+        execucao_id = execucoes(projeto_id, "conferencia")[0]["id"]
+        xlsx = planilha(cliente, "conferencia", execucao_id, "a-cobrar")
+        csv_ = planilha(cliente, "conferencia", execucao_id, "a-cobrar", formato="csv")
+        assert xlsx.content[:2] == b"PK"              # xlsx é um zip
         assert csv_.content[:2] != b"PK"
 
     def test_formato_desconhecido_da_404(self, cliente, cabecalhos, projeto_id):
-        execucao_id = cliente.get(f"/api/projetos/{projeto_id}/conferencias",
-                                  headers=cabecalhos).json()[0]["id"]
-        r = cliente.get(
-            f"/api/conferencias/{execucao_id}/planilhas/a-cobrar?formato=ods",
-            headers=cabecalhos)
+        execucao_id = execucoes(projeto_id, "conferencia")[0]["id"]
+        r = planilha(cliente, "conferencia", execucao_id, "a-cobrar", formato="ods")
         assert r.status_code == 404
         assert "xlsx ou csv" in r.json()["detail"]
 
     def test_planilha_desconhecida_da_404(self, cliente, cabecalhos, projeto_id):
-        execucao_id = cliente.get(f"/api/projetos/{projeto_id}/conferencias",
-                                  headers=cabecalhos).json()[0]["id"]
-        r = cliente.get(f"/api/conferencias/{execucao_id}/planilhas/qualquer",
-                        headers=cabecalhos)
+        execucao_id = execucoes(projeto_id, "conferencia")[0]["id"]
+        r = planilha(cliente, "conferencia", execucao_id, "qualquer")
         assert r.status_code == 404
 
 
-class TestAcesso:
-    def test_sem_token_nao_entra(self, cliente, projeto_id):
-        assert cliente.post(
-            f"/api/projetos/{projeto_id}/conferencias").status_code == 401
+class TestRecusasDoMotor:
+    def test_execucao_inexistente_na_planilha(self, cliente):
+        assert planilha(cliente, "conferencia", 999999, "a-cobrar").status_code == 404
 
-    def test_trabalho_inexistente(self, cliente, cabecalhos):
-        assert cliente.post("/api/projetos/999999/conferencias",
-                            headers=cabecalhos).status_code == 404
+    def test_etapa_desconhecida(self, cliente, projeto_id):
+        r = iniciar(cliente, "apuracao", projeto_id, "conf_analista")
+        assert r.status_code == 422
