@@ -5,6 +5,50 @@
 
 ---
 
+## 2026-09-14 — O razão foi confrontado com a Ficha 3 de um cliente, e fecha
+
+**O que se fez.** O razão da Ficha 3 foi rodado contra a Ficha 3 **já
+calculada** da IRMAOS BOA, uma filial e um mês, reconstruindo cada ficha a
+partir dos mesmos movimentos e comparando linha a linha.
+
+| | |
+|---|---|
+| Itens conferidos | 10.741 |
+| Itens sem divergência | 10.741, ou 100% |
+| Linhas comparadas | 550.862 |
+| Saldo em quantidade batendo | 100,0000% |
+| Ressarcimento batendo | 100,0000% |
+| Ressarcimento do sistema | R$ 3.049,73 |
+| Ressarcimento do arquivo | R$ 3.049,73 |
+| Diferença | R$ 0,00 |
+
+É a primeira vez que o cálculo deste sistema é medido contra um resultado
+produzido por outra ferramenta, sobre dado real, sem nenhum ajuste.
+
+**Onde estão as referências.** `Z:\GRUPO PLURIX\Implementação
+. Baixa de
+Estoque\Trabalho ST (RVC)` tem quatro empresas. A **BOA** traz a Ficha 3
+completa, 35 colunas, de janeiro de 2021 a dezembro de 2025, com todos os
+enquadramentos. O **SUPERPAO** traz um book consolidado de 1.255.373 linhas,
+mas só de CFOP 5.927, isto é, só o enquadramento 2.
+
+**O book do Superpão confirmou a fórmula do suportado.** Em 100% de 1.242.621
+linhas, `ENT_VLR_SUPORTADO` é igual a ICMS mais ST mais FECOP, que é
+exatamente o que `cat42/suportado.py` calcula. E o ressarcimento é igual ao
+unitário da entrada vezes a quantidade saída, em 100% das 782.693 linhas com
+unitário.
+
+**Duas armadilhas que a conferência cobrou.** A primeira: CFOP `0001` não é
+CFOP, é a linha de abertura de estoque gerada do registro 1050 — tratá-la como
+entrada normal infla a base em mais de dez vezes. A segunda: a Ficha 3 traz
+**devolução com quantidade negativa**, embora o manual exija que no arquivo
+digital ela vá sem sinal. O razão recusa quantidade negativa de propósito e
+exige a marca `devolucao`, que é o que evita espalhar sinal por toda a regra de
+cálculo. Cem itens do arquivo só apuraram depois que o leitor passou a traduzir
+o sinal em marca.
+
+---
+
 ## 2026-09-14 — O enquadramento sai do modelo do documento, não de chute
 
 **Decisão.** O enquadramento legal da saída ganhou módulo próprio,

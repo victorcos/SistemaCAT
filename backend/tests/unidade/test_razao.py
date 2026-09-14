@@ -239,6 +239,68 @@ class TestItemSemStEmEstoque:
         assert l[-1].icms_suportado == D(0)
 
 
+class TestFichaComoElaVemDoCliente:
+    """A sequência que a Ficha 3 de um cliente real traz, do começo ao fim.
+
+    Confrontado em 14/09/2026 contra a Ficha 3 já calculada da IRMAOS BOA, uma
+    filial e um mês: 10.741 itens, 550.862 linhas, saldo e ressarcimento
+    batendo em 100% delas e diferença de R$ 0,00 no total. Este teste guarda o
+    formato daquela conferência para que ela não precise ser refeita à mão.
+    """
+
+    def test_abertura_baixa_entrada_e_saidas(self):
+        """O padrão mais comum: estoque aberto, baixa que consome tudo,
+        entrada nova e vendas em seguida."""
+        razao = RazaoDoItem("970310", SaldoInicial(Decimal("72"), Decimal("180.00")))
+        # baixa de estoque: enquadramento 2, confronta com o ICMS da ENTRADA
+        razao.lancar(Movimento(
+            data=date(2021, 1, 5), especie=Especie.SAIDA, quantidade=Decimal("72"),
+            enquadramento=EnquadramentoLegal.FATO_GERADOR_NAO_REALIZADO,
+            icms_efetivo=Decimal("80.00"), cfop="5927", ordem_na_fonte=0))
+        razao.lancar(Movimento(
+            data=date(2021, 1, 10), especie=Especie.ENTRADA,
+            quantidade=Decimal("60"), icms_suportado=Decimal("150.00"),
+            cfop="1409", ordem_na_fonte=1))
+        for i in range(3):
+            razao.lancar(Movimento(
+                data=date(2021, 1, 15 + i), especie=Especie.SAIDA,
+                quantidade=Decimal("1"),
+                enquadramento=EnquadramentoLegal.CONSUMIDOR_FINAL,
+                icms_efetivo=Decimal("2.50"), cfop="5405", ordem_na_fonte=2 + i))
+
+        linhas = razao.apurar()
+        assert len(linhas) == 5
+
+        # a baixa consome o estoque inteiro e o ressarcimento é a diferença
+        # positiva entre o suportado que saiu e o ICMS efetivo da entrada
+        assert linhas[0].saldo_quantidade == Decimal("0")
+        assert linhas[0].ressarcimento == Decimal("100.00")   # 180,00 - 80,00
+
+        # a entrada repõe o estoque e o custo médio passa a ser o dela
+        assert linhas[1].saldo_quantidade == Decimal("60")
+        assert linhas[1].saldo_unitario == Decimal("2.5")
+
+        # cada venda baixa uma unidade pelo unitário do saldo anterior
+        for i, linha in enumerate(linhas[2:], 1):
+            assert linha.saldo_quantidade == Decimal(60 - i)
+            # 2,50 de suportado contra 2,50 de ICMS efetivo: nada a ressarcir
+            assert linha.ressarcimento == Decimal("0")
+
+    def test_estoque_zerado_nao_deixa_valor_residual(self):
+        """Depois da baixa total, o saldo em valor tem de ser zero também.
+
+        Sobrar centavo de arredondamento ali contamina o custo médio de toda a
+        ficha seguinte."""
+        razao = RazaoDoItem("1", SaldoInicial(Decimal("3"), Decimal("10.00")))
+        razao.lancar(Movimento(
+            data=date(2021, 1, 5), especie=Especie.SAIDA, quantidade=Decimal("3"),
+            enquadramento=EnquadramentoLegal.FATO_GERADOR_NAO_REALIZADO,
+            icms_efetivo=Decimal("0"), cfop="5927"))
+        linha = razao.apurar()[0]
+        assert linha.saldo_quantidade == Decimal("0")
+        assert linha.saldo_valor == Decimal("0")
+
+
 class TestResumo:
     def test_totais(self):
         l = razao(
