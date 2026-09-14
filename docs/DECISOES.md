@@ -5,6 +5,36 @@
 
 ---
 
+## 2026-09-14 — O rascunho da planilha sai do disco do Windows
+
+**Decisão.** O xlsxwriter passa a escrever o rascunho na pasta do arquivo que
+está sendo gerado, e não na pasta temporária do sistema.
+
+**Por quê.** Com `constant_memory`, cada linha vai para disco na hora — é o
+que permite montar planilha maior que a memória. O preço é o volume do
+rascunho: a lista de movimentos de uma base real tem 8.769.348 linhas, e o XML
+intermediário disso passa de 7 GB.
+
+A pasta temporária do sistema fica no C:, que nesta casa é o disco menor.
+Medido enquanto um download acontecia: o C: caía 0,16 GB por minuto e encheria
+em 74 minutos, antes de a planilha ficar pronta. O download não ia terminar, e
+o disco de sistema ia junto.
+
+O DuckDB já fazia certo desde o começo — `temp_directory` aponta para a pasta
+do destino. O xlsxwriter era o único que ainda usava o TEMP do sistema.
+
+**Por que não a pasta que o usuário escolheu.** Duas razões. O servidor nunca
+fica sabendo dela: o "salvar como" é do navegador, e o caminho não viaja na
+requisição. E quando esse destino é pasta de rede, escrever rascunho lá seria
+repetir um defeito que este projeto já pagou para aprender — gravação em rede
+que atrasa e se perde. Gera-se local, entrega-se depois.
+
+**De quebra.** O arquivo de teste tinha `class TestCsv` duplicada, cópia byte a
+byte, de um script de edição que rodou duas vezes. A segunda definição anulava
+a primeira em silêncio: sete testes pareciam existir e nunca rodavam. Removida.
+
+---
+
 ## 2026-09-14 — Fim da migração: sem repasse, motor sem rota pública, versão em VERSAO
 
 **O que saiu.** O repasse YARP do C# ao motor: rota que a API não conhece

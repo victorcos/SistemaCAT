@@ -330,97 +330,53 @@ class TestNotaEmDuasFiliaisComDocumento:
         con.close()
 
 
-class TestCsv:
-    """A outra saída da mesma lista.
+class TestOndeFicaORascunho:
+    """O XML que o xlsxwriter despeja enquanto monta a planilha.
 
-    O que precisa valer: mesmo conteúdo do xlsx, e um arquivo que o Excel em
-    português e o DuckDB leiam sem tratamento.
+    Com `constant_memory` cada linha vai para disco na hora. Para 8,7 milhões
+    de linhas isso deu 7 a 9 GB de rascunho, e na pasta temporária do sistema
+    — que nesta casa fica no C:, o menor disco da máquina — o download enchia
+    o disco antes de terminar. O rascunho passa a cair ao lado do destino.
     """
 
-    def _ler(self, caminho: str) -> list[list[str]]:
-        # utf-8-sig porque o arquivo tem BOM; sem ele o Excel lê como ANSI e
-        # todo acento vira lixo
-        with open(caminho, encoding="utf-8-sig", newline="") as f:
-            return list(csv.reader(f, delimiter=";"))
-
-    def test_tem_as_mesmas_linhas_que_o_xlsx(self, confronto, tmp_path):
-        _, destino = confronto
-        origem = f"{destino}/sem_documento.parquet"
-        no_xlsx = gerar_sem_documento(origem, str(tmp_path / "p.xlsx"))
-        no_csv = gerar_sem_documento(origem, str(tmp_path / "p.csv"),
-                                     formato="csv")
-        assert no_csv == no_xlsx == 3
-        # cabeçalho + as três linhas
-        assert len(self._ler(str(tmp_path / "p.csv"))) == 4
-
-    def test_o_filtro_vale_igual_nos_dois_formatos(self, confronto, tmp_path):
-        """Filtro divergente daria dois totais para a mesma cobrança."""
-        _, destino = confronto
-        origem = f"{destino}/sem_documento.parquet"
-        so = frozenset({"a_cobrar"})
-        assert gerar_sem_documento(origem, str(tmp_path / "f.csv"),
-                                   classificacoes=so, formato="csv") == 1
-        assert gerar_sem_documento(origem, str(tmp_path / "f.xlsx"),
-                                   classificacoes=so) == 1
-
-    def test_tem_bom_e_ponto_e_virgula(self, confronto, tmp_path):
-        """Sem BOM o Excel come o acento; com vírgula de separador, todo
-        valor com centavo quebraria a coluna."""
-        _, destino = confronto
-        alvo = str(tmp_path / "p.csv")
-        gerar_sem_documento(f"{destino}/sem_documento.parquet", alvo,
-                            formato="csv")
-        with open(alvo, "rb") as f:
-            comeco = f.read(200)
-        assert comeco[:3] == b"\xef\xbb\xbf"
-        assert b";" in comeco
-
-    def test_a_chave_sai_com_os_44_digitos(self, confronto, tmp_path):
-        """O CSV não finge tipo para agradar o Excel.
-
-        É o defeito que este projeto diagnosticou num relatório de cliente:
-        44 dígitos abertos no Excel viram "4,12105E+43" e não voltam. Quem
-        precisa do Excel baixa o xlsx, que é imune.
-        """
-        _, destino = confronto
-        alvo = str(tmp_path / "p.csv")
-        gerar_sem_documento(f"{destino}/sem_documento.parquet", alvo,
-                            formato="csv")
-        cabecalho, *linhas = self._ler(alvo)
-        onde = cabecalho.index("Chave de acesso")
-        chaves = [l[onde] for l in linhas if l[onde]]
-        assert chaves
-        for chave in chaves:
-            assert len(chave) == 44 and chave.isdigit(), chave
-
-    def test_numero_com_virgula_decimal_e_data_no_formato_daqui(
-        self, confronto, tmp_path
+    def test_nao_escreve_na_pasta_temporaria_do_sistema(
+        self, confronto, tmp_path, monkeypatch
     ):
-        _, destino = confronto
-        alvo = str(tmp_path / "p.csv")
-        gerar_sem_documento(f"{destino}/sem_documento.parquet", alvo,
-                            formato="csv")
-        cabecalho, *linhas = self._ler(alvo)
-        valor = linhas[0][cabecalho.index("Valor do documento")]
-        assert "," in valor and "." not in valor
-        emissao = linhas[0][cabecalho.index("Emissão")]
-        assert re.fullmatch(r"\d{2}/\d{2}/\d{4}", emissao), emissao
+        """Se voltar a usar o TEMP do sistema, este teste denuncia."""
+        proibida = tmp_path / "temp_do_sistema"
+        proibida.mkdir()
+        for variavel in ("TMPDIR", "TEMP", "TMP"):
+            monkeypatch.setenv(variavel, str(proibida))
 
-    def test_rotulo_traduzido_igual_ao_xlsx(self, confronto, tmp_path):
-        """A tradução mora no gerador, não no formato."""
         _, destino = confronto
-        alvo = str(tmp_path / "p.csv")
-        gerar_sem_documento(f"{destino}/sem_documento.parquet", alvo,
-                            formato="csv")
-        cabecalho, *linhas = self._ler(alvo)
-        operacoes = {l[cabecalho.index("Operação")] for l in linhas}
-        assert operacoes <= {"Entrada", "Saída"}, operacoes
+        saida = tmp_path / "planilha" / "p.xlsx"
+        saida.parent.mkdir()
+        gerar_sem_documento(f"{destino}/sem_documento.parquet", str(saida))
 
-    def test_formato_desconhecido_e_recusado(self, confronto, tmp_path):
+        assert saida.is_file()
+        assert list(proibida.iterdir()) == [], "escreveu rascunho no TEMP do sistema"
+
+    def test_a_pasta_do_destino_e_criada_se_faltar(self, confronto, tmp_path):
+        """O destino pode apontar para pasta que ainda não existe."""
         _, destino = confronto
-        with pytest.raises(ValueError, match="formato desconhecido"):
-            gerar_sem_documento(f"{destino}/sem_documento.parquet",
-                                str(tmp_path / "p.ods"), formato="ods")
+        saida = tmp_path / "que" / "nao" / "existe" / "p.xlsx"
+        linhas = gerar_sem_documento(f"{destino}/sem_documento.parquet", str(saida))
+        assert linhas == 3
+        assert saida.is_file()
+
+    def test_o_csv_nao_precisa_de_rascunho(self, confronto, tmp_path, monkeypatch):
+        """CSV escreve direto no destino: é por isso que ele não custa disco
+        de rascunho, e é a saída certa para lista grande."""
+        proibida = tmp_path / "temp_do_sistema"
+        proibida.mkdir()
+        for variavel in ("TMPDIR", "TEMP", "TMP"):
+            monkeypatch.setenv(variavel, str(proibida))
+        _, destino = confronto
+        saida = tmp_path / "p.csv"
+        gerar_sem_documento(f"{destino}/sem_documento.parquet", str(saida),
+                            formato="csv")
+        assert saida.is_file()
+        assert list(proibida.iterdir()) == []
 
 
 class TestCsv:

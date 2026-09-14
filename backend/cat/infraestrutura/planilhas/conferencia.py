@@ -239,12 +239,37 @@ def _gerar_csv(parquet: str, destino: str, colunas: tuple[Coluna, ...],
     return escritas
 
 
+def _pasta_de_rascunho(destino: str) -> str:
+    """Onde o xlsxwriter despeja o XML enquanto monta a planilha.
+
+    A pasta do próprio destino, criada se faltar. Não é a pasta temporária do
+    sistema de propósito: ela costuma estar no disco do Windows, que é o menor
+    da máquina, e o rascunho de uma lista grande não cabe lá.
+
+    Também não é a pasta que o usuário escolheu no "salvar como": o servidor
+    nunca fica sabendo dela, e, quando é pasta de rede, escrever rascunho lá
+    seria pedir o defeito que este projeto já conhece — gravação que atrasa e
+    se perde. Gera-se local, entrega-se depois.
+    """
+    pasta = os.path.dirname(os.path.abspath(destino))
+    os.makedirs(pasta, exist_ok=True)
+    return pasta
+
+
 def _gerar_xlsx(parquet: str, destino: str, colunas: tuple[Coluna, ...],
                 titulo_da_aba: str, modelos: frozenset[str] | None = None,
                 classificacoes: frozenset[str] | None = None) -> int:
     livro = xlsxwriter.Workbook(destino, {
         "constant_memory": True,        # não segura a planilha em memória
         "default_date_format": "dd/mm/yyyy",
+        # o rascunho fica ao lado do arquivo que está sendo escrito, e não na
+        # pasta temporária do sistema. Com `constant_memory` o xlsxwriter
+        # despeja cada linha em disco: são 7 a 9 GB de XML para uma lista de
+        # 8,7 milhões de linhas. No C: desta casa isso enchia o disco antes de
+        # a planilha ficar pronta, e derrubava a máquina junto. Aqui o rascunho
+        # cai na pasta de trabalho, que é onde o volume foi dimensionado — a
+        # mesma escolha que o DuckDB já faz com `temp_directory`.
+        "tmpdir": _pasta_de_rascunho(destino),
     })
     cabecalho = livro.add_format({
         "bold": True, "bg_color": "#021D44", "font_color": "#FFFFFF",
