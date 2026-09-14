@@ -5,6 +5,49 @@
 
 ---
 
+## 2026-09-14 — O relatório do cliente entra como fonte 2, e destrava a etapa 4
+
+**Decisão.** A apuração do ICMS suportado passa a cruzar a EFD com o relatório
+gerencial de entradas do cliente, por `(chave de acesso, código do item)`.
+
+**O resultado, medido na base real de 2021, 8.761.002 itens de entrada:**
+
+| | Antes | Depois |
+|---|---|---|
+| Cobertura por item | 0,92% | **68,79%** |
+| ICMS suportado | R$ 1.482.436,74 | **R$ 337.688.895,48** |
+| Apoiado em documento | 100% | 100% |
+| CST 60 apurado | 0,00% | **93,04%** |
+
+O CST 60, que é 42% das entradas e vinha zerado na EFD, passou a R$
+133.301.191,53 apurados. Era exatamente o buraco que a etapa existia para
+fechar.
+
+**O que ainda não apura não é o mesmo buraco.** Dos 2.734.465 itens restantes,
+**75,6% são CST 40**, isento ou não tributado, que não tem imposto suportado a
+apurar por definição. O resto real são 249.918 itens de CST 60 sem informação,
+cerca de 2,9% das entradas.
+
+**A junção é por chave e código, nunca só pela chave.** Uma nota tem muitos
+itens, e casar só por nota daria o imposto de um item a outro. Na base, 99,99%
+dos itens de entrada da EFD têm chave de 44 dígitos e 99,83% das linhas do
+relatório também, então a junção não perde quase nada.
+
+**Quem soma é o domínio do gerencial.** `MovimentoGerencial.imposto_suportado`
+já escolhe entre XML, ERP e retido anteriormente, e já sabe que no retido
+anterior não se soma o ICMS da operação, porque a mercadoria veio tributada.
+Refazer essa conta na infraestrutura daria duas verdades.
+
+**Um defeito que custou treze minutos.** O esquema do parquet guardava duas
+casas decimais, e o relatório traz ICMS com quatro ("2,3341" numa linha real).
+O pyarrow recusa a gravação inteira com "Rescaling Decimal value would cause
+data loss", e a primeira extração morreu depois de ler 8,7 GB. O esquema passou
+a seis casas, e há teste que grava um valor de quatro casas e confere que ele
+sobrevive. O teste também passou a usar o esquema do próprio módulo: a cópia
+com duas casas que ele tinha antes escondia justamente esse defeito.
+
+---
+
 ## 2026-09-14 — Etapa 4 começa pelo ICMS suportado, e ele é uma cascata
 
 **Decisão.** O ICMS suportado na entrada ganhou módulo próprio de domínio,
