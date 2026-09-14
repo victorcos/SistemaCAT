@@ -5,6 +5,55 @@
 
 ---
 
+## 2026-09-14 — O enquadramento sai do modelo do documento, não de chute
+
+**Decisão.** O enquadramento legal da saída ganhou módulo próprio,
+`cat42/enquadramento.py`, e ele separa o que é regra do que é suposição. O que
+não dá para saber devolve `None`, e a linha entra contada como indefinida.
+
+**Por que isso importa.** O enquadramento decide em qual coluna da Ficha 3 o
+valor cai, de 15 a 19, e contra o quê ele é confrontado: o ICMS efetivo da
+saída ou o da entrada. Errar aqui não dá número errado num item, dá apuração
+inteira errada — e do jeito que passa despercebido.
+
+**O manual fixa pouco:** baixa de estoque em CFOP 5.927 é enquadramento 2,
+saída para outro estado é 4, isenção ou não incidência é 3. O CFOP resolve mais
+um caso, a transferência, que segue para revenda e por isso é "demais saídas".
+
+**O que sobrava era quase tudo.** Numa base real, 91.007.428 linhas de saída,
+os CFOP 5.102 e 5.405 somam 98% do movimento, e o enquadramento deles depende
+de **quem comprou**: consumidor final cai no 1, contribuinte que revende cai no
+0. O CFOP não distingue os dois.
+
+**A saída não foi chutar, foi olhar o modelo do documento.** NFC-e (65) e CF-e
+SAT (59) existem para documentar venda a consumidor final. Não é suposição
+sobre o comprador: é o que o modelo é. Na base medida, 66,1% das linhas são
+NFC-e e 32,3% são CF-e SAT. O modelo 55, que de fato serve aos dois casos, é
+1,6%, e quase todo ele é transferência, que o CFOP já resolve.
+
+**O resultado, medido sobre as 91.007.428 linhas:**
+
+| Enquadramento | Linhas | Valor |
+|---|---|---|
+| 1, consumidor final | 73,4% | R$ 2.285.542.618,46 |
+| 3, isenção ou não incidência | 25,2% | R$ 1.348.901.257,58 |
+| 0, demais saídas | 0,8% | R$ 1.313.218.175,20 |
+| 4, outro estado | 0,4% | R$ 649.844.435,07 |
+| **Indefinido** | **0,19%** | R$ 223.444.140,40 |
+| 2, fato gerador não realizado | 507 linhas | R$ 2.497.064,16 |
+
+Sobrou 0,19% indefinido, e ele aparece na conta em vez de virar um
+enquadramento escolhido no escuro.
+
+**Uma armadilha que virou teste.** CST 60 não é isenção. Mercadoria com ST já
+retida é justamente o caso do ressarcimento, e classificá-la como isenta
+jogaria a apuração inteira na coluna errada, em silêncio. E nenhum CFOP pode
+estar em devolução e em transferência ao mesmo tempo: se estivesse, a ordem
+das regras decidiria o resultado, que é como se esconde um erro de
+classificação.
+
+---
+
 ## 2026-09-14 — O relatório do cliente entra como fonte 2, e destrava a etapa 4
 
 **Decisão.** A apuração do ICMS suportado passa a cruzar a EFD com o relatório
