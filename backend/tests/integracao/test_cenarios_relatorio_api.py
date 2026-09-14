@@ -32,7 +32,7 @@ from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
-from tests.integracao.cadastro import criar_empresa, criar_projeto
+from tests.integracao.cadastro import criar_empresa, criar_lote, criar_projeto, tipos_nos_lotes
 
 SENHA = "Sistema2026cat"
 
@@ -187,9 +187,7 @@ def _projeto(cliente, cabecalhos, empresa_id, nome: str) -> int:
 
 def _conferir(cliente, cabecalhos, projeto_id: int, pasta: str) -> dict:
     """Importa a pasta, roda a conferência e devolve a execução concluída."""
-    r = cliente.post(f"/api/projetos/{projeto_id}/lotes", headers=cabecalhos,
-                     json={"pasta": pasta, "observacao": None})
-    assert r.status_code == 201, r.text
+    criar_lote(projeto_id=projeto_id, pasta=pasta)
     r = cliente.post(f"/api/projetos/{projeto_id}/conferencias",
                      headers=cabecalhos)
     assert r.status_code == 202, r.text
@@ -438,9 +436,7 @@ class TestCenarioPior:
     def test_o_inventario_ficou_no_lote_mas_fora_da_conferencia(
         self, cliente, cabecalhos, execucao
     ):
-        lotes = cliente.get(f"/api/projetos/{execucao['projeto_id']}/lotes",
-                            headers=cabecalhos).json()
-        tipos = {c["tipo"]: c["quantidade"] for c in lotes[0]["contagens"]}
+        tipos = tipos_nos_lotes(execucao["projeto_id"])
         assert tipos.get("gerencial_inventario") == 1
         assert tipos.get("gerencial_movimento") == 2
         # 1 EFD + 2 movimentos lidos; o inventário não entra na conta

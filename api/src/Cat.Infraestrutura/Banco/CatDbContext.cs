@@ -129,6 +129,14 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.ProjetoId).HasColumnName("projeto_id");
             e.Property(x => x.ArquivosUteis).HasColumnName("arquivos_uteis");
+            e.Property(x => x.Pasta).HasColumnName("pasta");
+            e.Property(x => x.TotalArquivos).HasColumnName("total_arquivos");
+            e.Property(x => x.BytesTotais).HasColumnName("bytes_totais");
+            e.Property(x => x.CompetenciaIni).HasColumnName("competencia_ini");
+            e.Property(x => x.CompetenciaFim).HasColumnName("competencia_fim");
+            e.Property(x => x.Observacao).HasColumnName("observacao");
+            e.Property(x => x.CriadoEm).HasColumnName("criado_em");
+            e.Property(x => x.CriadoPor).HasColumnName("criado_por");
         });
 
         modelo.Entity<ArquivoDoLoteLinha>(e =>
@@ -137,6 +145,16 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.LoteId).HasColumnName("lote_id");
+            e.Property(x => x.Caminho).HasColumnName("caminho");
+            e.Property(x => x.Nome).HasColumnName("nome");
+            e.Property(x => x.Tamanho).HasColumnName("tamanho");
+            e.Property(x => x.Tipo).HasColumnName("tipo");
+            e.Property(x => x.Cnpj).HasColumnName("cnpj");
+            e.Property(x => x.Competencia).HasColumnName("competencia");
+            e.Property(x => x.Uf).HasColumnName("uf");
+            e.Property(x => x.Detalhe).HasColumnName("detalhe");
+            e.Property(x => x.Retificadora).HasColumnName("retificadora");
+            e.Property(x => x.HashConteudo).HasColumnName("hash_conteudo");
         });
 
         modelo.Entity<ExecucaoLinha>(e =>
@@ -243,12 +261,34 @@ public sealed class LoteLinha
     public int Id { get; set; }
     public int ProjetoId { get; set; }
     public int ArquivosUteis { get; set; }
+    public string Pasta { get; set; } = "";
+    public int TotalArquivos { get; set; }
+    public long BytesTotais { get; set; }
+    public DateOnly? CompetenciaIni { get; set; }
+    public DateOnly? CompetenciaFim { get; set; }
+    public string? Observacao { get; set; }
+    public DateTime CriadoEm { get; set; }
+    public int? CriadoPor { get; set; }
 }
 
+/// <summary>
+/// Um arquivo do lote, já identificado. O conteúdo não é copiado: guarda-se o
+/// caminho, e o suficiente para a etapa seguinte saber o que abrir.
+/// </summary>
 public sealed class ArquivoDoLoteLinha
 {
     public int Id { get; set; }
     public int LoteId { get; set; }
+    public string Caminho { get; set; } = "";
+    public string Nome { get; set; } = "";
+    public long Tamanho { get; set; }
+    public string Tipo { get; set; } = "";
+    public string? Cnpj { get; set; }
+    public DateOnly? Competencia { get; set; }
+    public string? Uf { get; set; }
+    public string? Detalhe { get; set; }
+    public bool Retificadora { get; set; }
+    public string? HashConteudo { get; set; }
 }
 
 public sealed class ExecucaoLinha

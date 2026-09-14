@@ -17,6 +17,9 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from cat.config import obter_config
 from cat.dominio.lote import ArquivoDoLote, ResumoDoLote, TipoDeArquivo
 from cat.infraestrutura.arquivos.classificador import (
@@ -25,6 +28,7 @@ from cat.infraestrutura.arquivos.classificador import (
     hash_de,
     percorrer_pasta,
 )
+from cat.infraestrutura.repositorios.modelos import ArquivoDoLoteDB, LoteDB, ProjetoDB
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -243,3 +247,38 @@ def _e_de_outra_empresa(item: ArquivoDoLote, cnpj_raiz: str) -> bool:
     if not pontas:
         return False
     return all(c[:8] != cnpj_raiz for c in pontas)
+
+
+class ProjetoInexistente(LookupError):
+    """O trabalho pedido não existe."""
+
+
+def existentes_do_projeto(projeto_id: int, sessao: Session) -> tuple[ArquivoExistente, ...]:
+    """O que já está no trabalho, para a importação nova detectar cópia."""
+    linhas = sessao.execute(
+        select(ArquivoDoLoteDB.caminho, ArquivoDoLoteDB.tamanho,
+               ArquivoDoLoteDB.tipo, ArquivoDoLoteDB.cnpj,
+               ArquivoDoLoteDB.competencia, ArquivoDoLoteDB.retificadora,
+               ArquivoDoLoteDB.hash_conteudo)
+        .join(LoteDB, LoteDB.id == ArquivoDoLoteDB.lote_id)
+        .where(LoteDB.projeto_id == projeto_id)
+    ).all()
+    return tuple(ArquivoExistente(*linha) for linha in linhas)
+
+
+def inspecionar_do_projeto(
+    projeto_id: int, pasta: str, sessao: Session
+) -> tuple[ResumoDoLote, set[str]]:
+    """Inspeciona a pasta para um trabalho que existe.
+
+    Devolve o resumo e os caminhos que já estão no trabalho. É a entrada que o
+    canal interno usa: a API em C# manda só o trabalho e a pasta, e o motor
+    busca aqui a raiz do CNPJ e o que já foi importado — inclusive os hashes,
+    que decidem o que é cópia.
+    """
+    projeto = sessao.get(ProjetoDB, projeto_id)
+    if projeto is None:
+        raise ProjetoInexistente(projeto_id)
+    existentes = existentes_do_projeto(projeto_id, sessao)
+    resumo = inspecionar_pasta(pasta, projeto.empresa.cnpj_raiz, existentes=existentes)
+    return resumo, {e.caminho for e in existentes}

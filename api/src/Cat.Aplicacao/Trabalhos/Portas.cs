@@ -67,4 +67,12 @@ public sealed class MotorIndisponivel(string motivo, Exception? causa = null)
 public interface IMotor
 {
     Task<PastasApagadas> ApagarPastas(IReadOnlyList<string> pastas, CancellationToken cancelar);
+
+    /// <summary>O que a pasta tem para este trabalho. O motor busca a raiz do CNPJ e o que já foi importado.</summary>
+    /// <exception cref="MotorRecusou">pasta inexistente ou fora das permitidas (422), trabalho inexistente (404)</exception>
+    Task<LoteInspecionado> InspecionarLote(int projetoId, string pasta, CancellationToken cancelar);
+
+    /// <summary>A remessa enviada pela tela, repassada em fluxo: SPED de empresa grande passa de um GB.</summary>
+    Task<System.Text.Json.Nodes.JsonObject> AnalisarRemessa(Stream corpo, string tipoDoConteudo, long? tamanho,
+        CancellationToken cancelar);
 }

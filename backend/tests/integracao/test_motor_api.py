@@ -78,6 +78,38 @@ def test_historico_nao_mora_mais_no_motor(cliente):
         assert cliente.request(metodo, rota).status_code in (404, 405), rota
 
 
+def test_lotes_e_remessa_nao_moram_mais_no_motor(cliente):
+    """Registrar, listar e remover lote, e a análise da remessa: rota pública só no C#."""
+    for metodo, rota in [("POST", "/api/projetos/1/lotes/inspecionar"), ("POST", "/api/projetos/1/lotes"),
+                         ("GET", "/api/projetos/1/lotes"), ("DELETE", "/api/projetos/1/lotes/1"),
+                         ("POST", "/api/importacoes/analisar")]:
+        assert cliente.request(metodo, rota).status_code in (404, 405), rota
+
+
+class TestRemessaPeloCanal:
+    SEGREDO = {"X-Cat-Motor-Segredo": "segredo-do-canal-so-de-teste"}
+    SPED = ("|0000|018|0|01052021|31052021|EMPRESA DA REMESSA|11222333000181||SP"
+            "|9030138187|3550308||||\r\n").encode("latin-1")
+
+    def test_analisa_e_devolve_a_matriz_sem_dizer_se_esta_cadastrada(self, cliente):
+        r = cliente.post("/interno/remessas/analisar", headers=self.SEGREDO,
+                         files={"arquivo": ("efd.txt", self.SPED, "text/plain")})
+        assert r.status_code == 200, r.text
+        corpo = r.json()
+        assert corpo["cnpj_raiz"] == "11222333"
+        assert corpo["matriz"]["cnpj_formatado"] == "11.222.333/0001-81"
+        # se a empresa já existe, quem diz é a API: ela tem o banco da tela
+        assert "ja_cadastrada" not in corpo
+
+    def test_sem_sped_e_recusada_e_sem_segredo_nao_entra(self, cliente):
+        r = cliente.post("/interno/remessas/analisar", headers=self.SEGREDO,
+                         files={"arquivo": ("nada.txt", b"conteudo qualquer", "text/plain")})
+        assert r.status_code == 422
+        r = cliente.post("/interno/remessas/analisar",
+                         files={"arquivo": ("efd.txt", self.SPED, "text/plain")})
+        assert r.status_code == 403
+
+
 class TestCanalInterno:
     """A API em C# pede, o motor apaga — só com o segredo, e só na pasta de trabalho."""
 

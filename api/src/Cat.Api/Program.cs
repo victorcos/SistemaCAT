@@ -62,8 +62,12 @@ builder.Services.AddScoped<Trabalhos>();
 builder.Services.AddScoped<ExcluirTrabalho>();
 builder.Services.AddScoped<IRepositorioDeHistorico, HistoricoRepositorio>();
 builder.Services.AddScoped<HistoricoDoProjeto>();
+builder.Services.AddScoped<IRepositorioDeLotes, LoteRepositorio>();
+builder.Services.AddScoped<Lotes>();
 // canal interno com o motor: apagar pasta de trabalho grande leva tempo
-builder.Services.AddHttpClient<IMotor, MotorHttp>(c => c.Timeout = TimeSpan.FromMinutes(5));
+// sem prazo no cliente: cada chamada ao motor tem o seu, porque inspecionar
+// milhares de arquivos na rede leva minutos e apagar uma pasta, segundos
+builder.Services.AddHttpClient<IMotor, MotorHttp>(c => c.Timeout = Timeout.InfiniteTimeSpan);
 
 builder.Services.AddCors();
 builder.Services.AddOptions<CorsOptions>().Configure<ConfigCat>((opcoes, config) =>
@@ -120,6 +124,7 @@ app.MapearAuth();
 app.MapearUsuarios();
 app.MapearTrabalhos();
 app.MapearHistorico();
+app.MapearLotes();
 app.MapReverseProxy(repasse =>
 {
     repasse.Use(RepasseAoMotor.TraduzirFalha);

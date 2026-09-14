@@ -182,7 +182,7 @@ public sealed class RepasseTestes(MotorFalso motor) : IClassFixture<MotorFalso>,
     public async Task Motor_fora_do_ar_vira_detail_que_o_front_sabe_mostrar()
     {
         // uma rota que ainda é do motor
-        var resposta = await Cliente(PortaFechada()).GetAsync("/api/projetos/1/lotes");
+        var resposta = await Cliente(PortaFechada()).GetAsync("/api/conferencias/1");
 
         Assert.Equal(HttpStatusCode.BadGateway, resposta.StatusCode);
         var corpo = await resposta.Content.ReadFromJsonAsync<JsonElement>();

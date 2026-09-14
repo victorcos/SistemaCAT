@@ -1,8 +1,9 @@
-"""Cópia de arquivo entre lotes, pela API.
+"""Cópia de arquivo entre lotes, pelo canal interno do motor.
 
-Importa uma pasta com um SPED; depois tenta importar outra pasta com uma cópia
-byte a byte dele sob outro nome. A conferência da pasta tem de apontar a cópia,
-e a importação tem de recusar — não há nada novo para entrar.
+Registra um lote com um SPED; depois inspeciona outra pasta com uma cópia byte
+a byte dele sob outro nome. A inspeção tem de apontar a cópia e deixá-la fora
+da lista. Recusar a importação de uma pasta só de cópias é regra da API em C#
+(api/tests/Cat.Api.Testes/LotesTestes.cs), que decide a partir desta resposta.
 """
 
 import pytest
@@ -18,7 +19,9 @@ from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
-from tests.integracao.cadastro import criar_empresa, criar_projeto
+from tests.integracao.cadastro import (
+    SEGREDO, criar_empresa, criar_lote, criar_projeto, hashes_nos_lotes,
+)
 
 SENHA = "Sistema2026cat"
 
@@ -85,42 +88,31 @@ def projeto_id(cliente, cabecalhos):
                          fim="2021-06-01", por="copia_analista")
 
 
-class TestCopiaEntreLotes:
-    def test_o_primeiro_lote_entra_e_grava_sem_hash(
-        self, cliente, cabecalhos, projeto_id, pastas
-    ):
-        a, _, _ = pastas
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes", headers=cabecalhos,
-                         json={"pasta": a, "observacao": None})
-        assert r.status_code == 201, r.text
-        assert r.json()["total_arquivos"] == 1
+def inspecionar(cliente, projeto_id, pasta):
+    r = cliente.post("/interno/lotes/inspecionar", headers=SEGREDO,
+                     json={"projeto_id": projeto_id, "pasta": pasta})
+    assert r.status_code == 200, r.text
+    return r.json()
 
-    def test_a_copia_e_apontada_na_conferencia_da_pasta(
-        self, cliente, cabecalhos, projeto_id, pastas
-    ):
+
+class TestCopiaEntreLotes:
+    def test_o_primeiro_lote_entra_e_grava_sem_hash(self, cliente, projeto_id, pastas):
+        # sem candidato a cópia, ninguém é hashado: ler 100 GB inteiros a cada
+        # importação não se justifica
+        a, _, _ = pastas
+        criar_lote(projeto_id=projeto_id, pasta=a)
+        assert hashes_nos_lotes(projeto_id) == [None]
+
+    def test_a_copia_e_apontada_e_fica_fora_da_lista(self, cliente, projeto_id, pastas):
         _, b, _ = pastas
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes/inspecionar",
-                         headers=cabecalhos, json={"pasta": b})
-        assert r.status_code == 200, r.text
-        corpo = r.json()
+        corpo = inspecionar(cliente, projeto_id, b)
         assert corpo["copias"] == 1
-        assert corpo["total_arquivos"] == 0
+        assert corpo["arquivos"] == []
         assert any("já está no trabalho" in a for a in corpo["avisos"])
 
-    def test_a_copia_nao_entra(self, cliente, cabecalhos, projeto_id, pastas):
-        _, b, _ = pastas
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes", headers=cabecalhos,
-                         json={"pasta": b, "observacao": None})
-        # nada novo para entrar, e a mensagem diz o motivo certo: cópia, e não
-        # "nada alimenta a CAT" — que é o que a checagem genérica diria
-        assert r.status_code == 409, r.text
-        assert "cópias exatas" in r.json()["detail"]
-
-    def test_conteudo_novo_continua_entrando(
-        self, cliente, cabecalhos, projeto_id, pastas
-    ):
+    def test_conteudo_novo_continua_entrando(self, cliente, projeto_id, pastas):
         _, _, c = pastas
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes", headers=cabecalhos,
-                         json={"pasta": c, "observacao": None})
-        assert r.status_code == 201, r.text
-        assert r.json()["total_arquivos"] == 1
+        corpo = inspecionar(cliente, projeto_id, c)
+        assert corpo["copias"] == 0
+        assert [a["ja_no_trabalho"] for a in corpo["arquivos"]] == [False]
+        assert corpo["serve"] is True

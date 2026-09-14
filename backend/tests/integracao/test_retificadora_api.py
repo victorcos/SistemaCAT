@@ -20,7 +20,7 @@ from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
-from tests.integracao.cadastro import criar_empresa, criar_projeto
+from tests.integracao.cadastro import SEGREDO, criar_empresa, criar_lote, criar_projeto, tipos_nos_lotes
 
 SENHA = "Sistema2026cat"
 
@@ -116,19 +116,17 @@ def rodar_na_hora(monkeypatch):
 
 
 class TestImportacao:
-    def test_a_conferencia_da_pasta_avisa(self, cliente, cabecalhos, projeto_id, base):
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes/inspecionar",
-                         headers=cabecalhos, json={"pasta": base})
+    def test_a_inspecao_da_pasta_avisa(self, cliente, projeto_id, base):
+        r = cliente.post("/interno/lotes/inspecionar", headers=SEGREDO,
+                         json={"projeto_id": projeto_id, "pasta": base})
         assert r.status_code == 200, r.text
-        assert r.json()["total_arquivos"] == 4      # as três EFD entram, mais o XML
+        assert len(r.json()["arquivos"]) == 4       # as três EFD entram, mais o XML
+        assert sum(a["retificadora"] for a in r.json()["arquivos"]) == 1
         assert any("retificadora" in a for a in r.json()["avisos"])
 
-    def test_as_tres_efd_entram_no_lote(self, cliente, cabecalhos, projeto_id, base):
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes", headers=cabecalhos,
-                         json={"pasta": base, "observacao": None})
-        assert r.status_code == 201, r.text
-        efd = next(c for c in r.json()["contagens"] if c["tipo"] == "sped_icms_ipi")
-        assert efd["quantidade"] == 3
+    def test_as_tres_efd_entram_no_lote(self, cliente, projeto_id, base):
+        criar_lote(projeto_id=projeto_id, pasta=base)
+        assert tipos_nos_lotes(projeto_id)["sped_icms_ipi"] == 3
 
 
 class TestConferencia:

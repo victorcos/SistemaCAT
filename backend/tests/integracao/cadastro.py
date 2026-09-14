@@ -21,12 +21,16 @@ from datetime import date, datetime, timezone
 from sqlalchemy import func, select
 
 from cat.aplicacao.casos_de_uso.historico_do_projeto import registrar
+from cat.aplicacao.casos_de_uso.inspecionar_lote import inspecionar_do_projeto
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import (
-    AlocacaoDB, EmpresaDB, EstabelecimentoDB, EventoDoProjetoDB, ExecucaoDB,
-    LoteDB, ProjetoDB, UsuarioDB,
+    AlocacaoDB, ArquivoDoLoteDB, EmpresaDB, EstabelecimentoDB, EventoDoProjetoDB,
+    ExecucaoDB, LoteDB, ProjetoDB, UsuarioDB,
 )
+
+# o segredo que tests/conftest.py define para o canal interno
+SEGREDO = {"X-Cat-Motor-Segredo": "segredo-do-canal-so-de-teste"}
 
 
 def _usuario(s, nome: str) -> UsuarioDB:
@@ -74,6 +78,49 @@ def criar_projeto(*, empresa_id: int, nome: str, por: str,
                          "competencia_ini": ini, "competencia_fim": fim},
                   por=autor)
         return p.id
+
+
+def criar_lote(*, projeto_id: int, pasta: str) -> int:
+    """Registra o lote como a API em C# registra: inspeciona pelo motor e grava
+    o que é novo. É preparação para os testes de conferência e movimentos, que
+    precisam de lote no banco; a regra de registrar tem teste no C#."""
+    with Sessao() as s:
+        resumo, ja = inspecionar_do_projeto(projeto_id, pasta, s)
+        novos = [a for a in resumo.arquivos if a.caminho not in ja]
+        assert novos, "nada novo para registrar nesta pasta"
+        competencias = sorted({a.competencia for a in novos if a.competencia and a.alimenta_a_cat})
+        lote = LoteDB(projeto_id=projeto_id, pasta=resumo.pasta, total_arquivos=len(novos),
+                      arquivos_uteis=sum(1 for a in novos if a.alimenta_a_cat),
+                      bytes_totais=sum(a.tamanho for a in novos),
+                      competencia_ini=competencias[0] if competencias else None,
+                      competencia_fim=competencias[-1] if competencias else None)
+        s.add(lote)
+        s.flush()
+        s.add_all([ArquivoDoLoteDB(lote_id=lote.id, caminho=a.caminho, nome=a.nome,
+                                   tamanho=a.tamanho, tipo=a.tipo.value, cnpj=a.cnpj,
+                                   competencia=a.competencia, uf=a.uf or None,
+                                   detalhe=a.detalhe or None, retificadora=a.retificadora,
+                                   hash_conteudo=a.hash_conteudo)
+                   for a in novos])
+        s.commit()
+        return lote.id
+
+
+def tipos_nos_lotes(projeto_id: int) -> dict[str, int]:
+    with Sessao() as s:
+        return dict(s.execute(
+            select(ArquivoDoLoteDB.tipo, func.count())
+            .join(LoteDB, LoteDB.id == ArquivoDoLoteDB.lote_id)
+            .where(LoteDB.projeto_id == projeto_id)
+            .group_by(ArquivoDoLoteDB.tipo)).all())
+
+
+def hashes_nos_lotes(projeto_id: int) -> list[str | None]:
+    with Sessao() as s:
+        return list(s.scalars(
+            select(ArquivoDoLoteDB.hash_conteudo)
+            .join(LoteDB, LoteDB.id == ArquivoDoLoteDB.lote_id)
+            .where(LoteDB.projeto_id == projeto_id)))
 
 
 def definir_status(projeto_id: int, status: str) -> None:

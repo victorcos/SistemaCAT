@@ -5,6 +5,64 @@
 
 ---
 
+## 2026-09-13 — Lotes e remessa em C#, e o limite de 30 MB que a fundação tinha criado
+
+**O que entrou.** Inspecionar a pasta de um lote, registrar, listar, remover, e
+a análise da remessa do cadastro. O motor ficou só com o que lê disco, pelo
+canal interno: `POST /interno/lotes/inspecionar` e `POST /interno/remessas/analisar`.
+Do Python saíram `lote_router.py`, `importacao_router.py` e `excluir_trabalho.py`;
+depois desta fatia, das rotas públicas o motor só atende conferência e
+movimentos.
+
+**Onde passa a linha.** Reconhecer arquivo, detectar cópia por hash, separar o
+que é de outra empresa e escrever os avisos (cópia, retificadora, não baixado)
+é leitura, e fica no motor — ele recebe só o id do trabalho e a pasta, e busca
+sozinho a raiz do CNPJ e o que já foi importado, com os hashes. A API em C#
+decide quem pode e aplica as regras de registrar: pasta só de cópias é 409 com
+a mensagem de cópia (e não a genérica), pasta sem nada que a CAT leia é 422,
+arquivo já no trabalho não entra de novo, e o período do lote é o do que a CAT
+lê. Grava o lote, os arquivos e o evento no histórico.
+
+**A tabela de tipos de arquivo existe dos dois lados, conferida.** O motor
+reconhece o tipo; a tela precisa de rótulo, grupo e se alimenta a CAT, também
+na listagem, que não passa pelo motor. A tabela em C# é conferida contra o enum
+do Python de verdade: um tipo que alimentasse a CAT num lado e não no outro
+faria a tela dizer que a base serve quando não serve.
+
+**Um defeito meu, da fundação (v0.28.0).** O Kestrel recusa corpo acima de
+30 MB por padrão, e a tela sobe a remessa do cadastro — "SPED de empresa grande
+passa de um GB", diz o próprio código dela. Desde a fundação, uma remessa acima
+de 30 MB era cortada no C#, e o repasse relatava **502, "o motor não
+respondeu"**: a falha aparecia no lugar errado. Confirmado antes de corrigir:
+1 MB passava, 40 MB dava 502. Agora a rota da remessa desliga o limite só para
+ela e repassa o multipart em fluxo, sem montar o arquivo em memória; e o
+repasse genérico responde 413 com texto claro quando é tamanho, em vez de culpar
+o motor.
+
+**Cada chamada ao motor tem o seu prazo**: apagar pasta, 5 minutos;
+inspecionar, 30 (milhares de arquivos na rede); remessa, 60. Recusa com motivo do
+motor (pasta que não existe, remessa sem SPED) chega à tela com o texto dele.
+
+**Verificado com o motor real e base simulada**, com conta, empresa, trabalho
+e pastas temporários apagados ao final: inspeção pelo C# achando utilidade,
+outra empresa, cópia e retificadora com os três avisos; registro com
+retificadora e hash gravados; recusas de pasta repetida (409), só cópia (409) e
+inexistente (422, texto do motor); listar, remover e os dois eventos no
+histórico; e **uma remessa real de 40 MB subindo pelo C# até o motor, com 200**.
+
+**Falta a rodada com base real**, combinada para o escritório: pasta de rede em
+`Z:`, milhares de arquivos (a maior medida tem 7.036), remessa acima de 1 GB. O
+que ela prova e a simulação não: o prazo de 30 minutos da inspeção, a memória
+do motor com a remessa grande (o motor ainda lê o arquivo inteiro, como antes),
+e a gravação de milhares de arquivos de uma vez.
+
+Baterias: C# 236 (91 de domínio, 23 de compatibilidade, 122 de API — com uma
+remessa de 40 MB contra um motor falso); Python 420 (eram 427: saíram os de
+registrar, listar e remover lote e o arquivo de remoção de lote; entraram os do
+canal interno de lote e remessa).
+
+---
+
 ## 2026-09-13 — Histórico em C#, com a linha do tempo escrita pelos dois lados
 
 **O que entrou.** As seis rotas do histórico: ler a linha do tempo (paginada

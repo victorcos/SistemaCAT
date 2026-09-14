@@ -19,7 +19,7 @@ from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
-from tests.integracao.cadastro import criar_empresa, criar_projeto, ultima_situacao
+from tests.integracao.cadastro import criar_empresa, criar_lote, criar_projeto, tem_base, ultima_situacao
 
 SENHA = "Sistema2026cat"
 
@@ -110,8 +110,8 @@ class TestFluxo:
     @pytest.fixture(autouse=True)
     def _importar(self, cliente, cabecalhos, projeto_id, base):
         # o lote precisa existir antes: é dele que a conferência tira os caminhos
-        cliente.post(f"/api/projetos/{projeto_id}/lotes", headers=cabecalhos,
-                     json={"pasta": base, "observacao": None})
+        if not tem_base(projeto_id):
+            criar_lote(projeto_id=projeto_id, pasta=base)
 
     def test_conferencia_roda_e_grava_o_resumo(
         self, cliente, cabecalhos, projeto_id

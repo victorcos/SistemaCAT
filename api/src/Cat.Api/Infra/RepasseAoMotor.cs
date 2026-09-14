@@ -75,6 +75,20 @@ public sealed class RepasseAoMotor(ConfigCat config) : IProxyConfigProvider
 
         if (http.Response.HasStarted)
             return;
+
+        // Corpo cortado pelo limite de tamanho não é o motor fora do ar. Relatar
+        // como se fosse mandou procurar o defeito no lugar errado (fatia 5).
+        if (falha.Exception is Microsoft.AspNetCore.Http.BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge }
+            || falha.Exception?.InnerException is Microsoft.AspNetCore.Http.BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge })
+        {
+            http.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+            await http.Response.WriteAsJsonAsync(new Dictionary<string, string>
+            {
+                ["detail"] = "O envio passa do tamanho que esta rota aceita.",
+            });
+            return;
+        }
+
         var expirou = falha.Error is ForwarderError.RequestTimedOut;
         http.Response.StatusCode = expirou
             ? StatusCodes.Status504GatewayTimeout

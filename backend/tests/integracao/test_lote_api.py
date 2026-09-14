@@ -1,8 +1,9 @@
-"""Lote de arquivos pela API, ponta a ponta.
+"""Inspeção da pasta de um lote, pelo canal interno do motor.
 
-O que este módulo prova é a segregação que motivou a tela: importar base num
-trabalho que já existe **não** passa pelo cadastro, não cria empresa e não cria
-projeto. E o mesmo arquivo não entra duas vezes.
+Identificar o que há numa pasta é trabalho de disco, e fica no motor: o que
+serve à CAT, de que competência, o que é de outra empresa e o que já está no
+trabalho. Registrar o lote, listar e remover moram na API em C# desde
+13/09/2026 (api/tests/Cat.Api.Testes/LotesTestes.cs), que chama esta rota.
 """
 
 import pytest
@@ -15,9 +16,12 @@ from cat.config import obter_config
 from cat.dominio.acesso.usuario import Cargo, Papel
 from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
+from cat.dominio.lote import TipoDeArquivo
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
-from tests.integracao.cadastro import criar_empresa, criar_projeto, quantas_empresas, tem_base
+from tests.integracao.cadastro import (
+    SEGREDO, criar_empresa, criar_lote, criar_projeto, quantas_empresas, tem_base,
+)
 
 SENHA = "Sistema2026cat"
 
@@ -88,105 +92,59 @@ def pasta_com_base(tmp_path_factory):
     return str(pasta)
 
 
+def inspecionar(cliente, projeto_id, pasta):
+    return cliente.post("/interno/lotes/inspecionar", headers=SEGREDO,
+                        json={"projeto_id": projeto_id, "pasta": pasta})
+
+
+def uteis(corpo) -> int:
+    return sum(1 for a in corpo["arquivos"] if TipoDeArquivo(a["tipo"]).alimenta_a_cat)
+
+
 class TestConferirAntesDeGravar:
-    def test_diz_o_que_ha_sem_criar_nada(
-        self, cliente, cabecalhos, projeto_id, pasta_com_base
-    ):
+    def test_diz_o_que_ha_sem_criar_nada(self, cliente, projeto_id, pasta_com_base):
         antes = quantas_empresas()
 
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes/inspecionar",
-                         headers=cabecalhos, json={"pasta": pasta_com_base})
+        r = inspecionar(cliente, projeto_id, pasta_com_base)
         assert r.status_code == 200, r.text
         corpo = r.json()
 
-        assert corpo["total_arquivos"] == 2       # o intruso não conta
-        assert corpo["arquivos_uteis"] == 1       # só a EFD ICMS/IPI
+        assert len(corpo["arquivos"]) == 2        # o intruso não conta
+        assert uteis(corpo) == 1                  # só a EFD ICMS/IPI
         assert corpo["de_outra_empresa"] == 1
         assert corpo["serve"] is True
-        assert corpo["competencia_ini"] == "2025-01-01"
+        assert corpo["competencias"][0] == "2025-01-01"
+        assert not any(a["ja_no_trabalho"] for a in corpo["arquivos"])
 
-        # conferir não cria empresa: é o que separa esta tela do cadastro
+        # inspecionar não cria empresa nem lote: é o que separa esta tela do cadastro
         assert quantas_empresas() == antes
-        assert cliente.get(f"/api/projetos/{projeto_id}/lotes",
-                           headers=cabecalhos).json() == []
+        assert not tem_base(projeto_id)
 
-    def test_avisa_o_que_ficou_de_fora(
-        self, cliente, cabecalhos, projeto_id, pasta_com_base
-    ):
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes/inspecionar",
-                         headers=cabecalhos, json={"pasta": pasta_com_base})
-        avisos = " ".join(r.json()["avisos"])
+    def test_avisa_o_que_ficou_de_fora(self, cliente, projeto_id, pasta_com_base):
+        avisos = " ".join(inspecionar(cliente, projeto_id, pasta_com_base).json()["avisos"])
         assert "outra empresa" in avisos
 
-    def test_pasta_inexistente_explica(self, cliente, cabecalhos, projeto_id):
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes/inspecionar",
-                         headers=cabecalhos,
-                         json={"pasta": "Z:/pasta/que/nao/existe"})
+    def test_pasta_inexistente_explica(self, cliente, projeto_id):
+        r = inspecionar(cliente, projeto_id, "Z:/pasta/que/nao/existe")
         assert r.status_code == 422
         assert "não existe" in r.json()["detail"]
 
-    def test_trabalho_inexistente_da_404(self, cliente, cabecalhos, tmp_path):
-        r = cliente.post("/api/projetos/999999/lotes/inspecionar",
-                         headers=cabecalhos, json={"pasta": str(tmp_path)})
-        assert r.status_code == 404
+    def test_trabalho_inexistente_da_404(self, cliente, tmp_path):
+        assert inspecionar(cliente, 999999, str(tmp_path)).status_code == 404
+
+    def test_sem_o_segredo_nao_inspeciona(self, cliente, projeto_id, pasta_com_base):
+        r = cliente.post("/interno/lotes/inspecionar",
+                         json={"projeto_id": projeto_id, "pasta": pasta_com_base})
+        assert r.status_code == 403
 
 
-class TestRegistrar:
-    def test_registra_e_aparece_na_lista(
-        self, cliente, cabecalhos, projeto_id, pasta_com_base
+class TestDepoisDeRegistrado:
+    def test_a_inspecao_marca_o_que_ja_esta_no_trabalho(
+        self, cliente, projeto_id, pasta_com_base
     ):
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes", headers=cabecalhos,
-                         json={"pasta": pasta_com_base,
-                               "observacao": "primeira remessa da empresa"})
-        assert r.status_code == 201, r.text
-        lote = r.json()
-        assert lote["total_arquivos"] == 2
-        assert lote["arquivos_uteis"] == 1
-        assert lote["observacao"] == "primeira remessa da empresa"
-        assert any(c["tipo"] == "sped_icms_ipi" for c in lote["contagens"])
-
-        lista = cliente.get(f"/api/projetos/{projeto_id}/lotes",
-                            headers=cabecalhos).json()
-        assert [l["id"] for l in lista] == [lote["id"]]
-
-    def test_o_lote_grava_a_base_de_que_a_etapa_de_importar_depende(
-        self, cliente, cabecalhos, projeto_id
-    ):
-        # a etapa "importar" é calculada no C# a partir disto: lote com arquivo útil
+        # é por esta marca que a API não registra o mesmo SPED duas vezes
+        criar_lote(projeto_id=projeto_id, pasta=pasta_com_base)
+        corpo = inspecionar(cliente, projeto_id, pasta_com_base).json()
+        assert len(corpo["arquivos"]) == 2
+        assert all(a["ja_no_trabalho"] for a in corpo["arquivos"])
         assert tem_base(projeto_id)
-
-    def test_a_mesma_pasta_nao_entra_duas_vezes(
-        self, cliente, cabecalhos, projeto_id, pasta_com_base
-    ):
-        # o mesmo SPED contado duas vezes dobraria movimento na apuração
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes", headers=cabecalhos,
-                         json={"pasta": pasta_com_base, "observacao": None})
-        assert r.status_code == 409
-        assert "já estão neste trabalho" in r.json()["detail"]
-
-    def test_conferir_avisa_o_que_ja_entrou(
-        self, cliente, cabecalhos, projeto_id, pasta_com_base
-    ):
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes/inspecionar",
-                         headers=cabecalhos, json={"pasta": pasta_com_base})
-        assert r.json()["ja_no_trabalho"] == 2
-
-    def test_pasta_sem_nada_util_e_recusada(
-        self, cliente, cabecalhos, projeto_id, tmp_path
-    ):
-        # período diferente do que os outros testes já importaram: com o
-        # mesmo conteúdo, o sistema a barraria como cópia (409) antes de
-        # chegar à recusa por "nada alimenta a CAT" que este teste prova
-        escrever(tmp_path, "so_contribuicoes.txt",
-                 CONTRIBUICOES.replace("01062021|30062021", "01072021|31072021"))
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes", headers=cabecalhos,
-                         json={"pasta": str(tmp_path), "observacao": None})
-        assert r.status_code == 422
-        assert "alimenta a CAT 42" in r.json()["detail"]
-
-
-class TestAcesso:
-    def test_sem_token_nao_entra(self, cliente, projeto_id, tmp_path):
-        r = cliente.post(f"/api/projetos/{projeto_id}/lotes/inspecionar",
-                         json={"pasta": str(tmp_path)})
-        assert r.status_code == 401

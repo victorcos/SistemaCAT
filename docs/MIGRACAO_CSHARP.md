@@ -13,8 +13,9 @@
 | 2 | Usuários e acesso | **entregue em 13/09/2026, v0.30.0** — as 12 rotas de `/api/usuarios`, `semear` e `emergencia` só em C# |
 | 3 | Empresas e projetos | **entregue em 13/09/2026, v0.31.0** — empresas, frentes, projetos, etapas e exclusão só em C#; canal interno com o motor no ar |
 | 4 | Histórico | **entregue em 13/09/2026, v0.32.0** — linha do tempo, comentário, status e sucessão só em C#; registrar evento de etapa e barrar trabalho parado seguem no motor |
-| 5 | Lotes | próxima |
-| 6–7 | — | não iniciadas |
+| 5 | Lotes | **entregue em 13/09/2026, v0.33.0** — inspecionar, registrar, listar e remover lote e a análise da remessa em C#; leitura de disco pelo canal interno. **Falta rodada com base real** (pasta de rede, milhares de arquivos, remessa acima de 1 GB) |
+| 6 | Execuções | próxima |
+| 7 | — | não iniciada |
 
 ---
 
@@ -143,7 +144,7 @@ Senha, token e chave saem como `***`.
 |---|---|---|
 | Conferência, movimentos | a rota dispara uma thread no mesmo processo | o C# grava `execucao` pendente; o worker do motor pega com `FOR UPDATE SKIP LOCKED`, uma por vez |
 | Acompanhar execução | rota Python lê `execucao` | o C# lê a mesma tabela |
-| Inspecionar pasta, analisar remessa | rota Python lê o disco | o C# chama o motor em `localhost:8020` e devolve o resumo |
+| Inspecionar pasta, analisar remessa | ~~rota Python lê o disco~~ | **feito (fatia 5):** `POST /interno/lotes/inspecionar` (o motor busca a raiz do CNPJ e o que já foi importado pelo id do trabalho) e `POST /interno/remessas/analisar` (o multipart segue em fluxo, sem limite de tamanho). O C# aplica as regras de registro e grava |
 | Gerar planilha | rota Python gera e serve | o C# pede ao motor, que gera e devolve o caminho; o C# serve o arquivo em fluxo |
 | Excluir trabalho | ~~rota Python apaga banco e pasta~~ | **feito (fatia 3):** o C# confere a senha e apaga o banco; as pastas vão ao motor por `POST /interno/pastas/apagar`, que só apaga dentro da pasta de trabalho |
 

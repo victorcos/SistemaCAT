@@ -19,7 +19,7 @@ from cat.infraestrutura.auth.senha import SenhasArgon2
 from cat.infraestrutura.repositorios.modelos import Base
 from cat.infraestrutura.repositorios.usuario_repositorio import UsuarioRepositorioSql
 from tests.integracao.sessao import cabecalhos_de
-from tests.integracao.cadastro import criar_empresa, criar_projeto, ultima_situacao
+from tests.integracao.cadastro import criar_empresa, criar_lote, criar_projeto, ultima_situacao
 
 SENHA = "Sistema2026cat"
 
@@ -87,9 +87,7 @@ def projeto_id(cliente, cabecalhos, base):
                             ie="123456789012", por="mov_analista")
     projeto = criar_projeto(empresa_id=empresa, nome="Movimentos de teste",
                             por="mov_analista")
-    r = cliente.post(f"/api/projetos/{projeto}/lotes", headers=cabecalhos,
-                     json={"pasta": base, "observacao": None})
-    assert r.status_code == 201, r.text
+    criar_lote(projeto_id=projeto, pasta=base)
     return projeto
 
 
