@@ -38,6 +38,23 @@ O critério é um só por enquanto — estoque negativo. Quando o relatório de
 saídas completo e as perdas chegarem, a quantidade de fichas retiradas é a
 medida de quanto ainda falta.
 
+**O piloto com a regra (execução 46, 14 min 14 s).**
+
+| | |
+|---|---|
+| Fichas | 497.700, das quais 4.037 retiradas (413.782 linhas) |
+| Ressarcimento nas válidas | R$ 66.681,16 |
+| Complemento nas válidas | R$ 1.534.323,19 |
+| Enquadramento 1: suportado baixado × confronto | R$ 1.253.522,55 × R$ 2.721.164,58 |
+| Enquadramento 4 (confronto pendente) | R$ 5.439.997,11 baixados |
+| Demais saídas | R$ 10.032.822,07 baixados |
+
+O complemento maior que o ressarcimento **não é conclusão fiscal**: a abertura
+entra sem ICMS suportado (o inventário do cliente não traz o imposto), o custo
+médio sai baixo, e o confronto — que é real, alíquota × valor de venda — passa
+dele. É o próximo buraco a fechar, junto com o confronto dos enquadramentos 2
+e 4 e as saídas que faltam.
+
 ---
 
 ## 2026-09-15 — Unidade de conversão: a ficha é na unidade do inventário

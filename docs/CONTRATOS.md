@@ -244,7 +244,7 @@ Resumo **sem** `versao` é de antes desta forma: a tela pede para rodar de novo.
 | `GET` | `/api/projetos/{id}/razao` | as rodadas, mais recente primeiro |
 | `GET` | `/api/razao/{execucao}` | uma rodada, com o resumo |
 | `POST` | `/api/razao/{execucao}/cancelar` | como na etapa 4 |
-| `GET` | `/api/razao/{execucao}/fichas` | lista de fichas, válidas primeiro e maior ressarcimento: `busca`, `so=validas|retiradas|negativas|sem_aliquota|indefinidas|divergentes|suspeita_unidade|sem_fator`, `pagina`, `por_pagina` |\|sem_aliquota\|indefinidas`, `pagina`, `por_pagina` |
+| `GET` | `/api/razao/{execucao}/fichas` | lista de fichas, válidas primeiro e maior ressarcimento: `busca`, `so` (validas, retiradas, negativas, sem_aliquota, indefinidas, divergentes, suspeita_unidade, sem_fator), `pagina`, `por_pagina` |
 | `GET` | `/api/razao/{execucao}/ficha` | linhas de uma ficha: `cnpj`, `codigo` (obrigatórios), `pagina`, `por_pagina` |
 | `GET` | `/api/razao/{execucao}/planilhas/ficha3` | a Ficha 3 inteira (CSV recomendado) |
 | `GET` | `/api/razao/{execucao}/planilhas/fichas` | o resumo por ficha |
