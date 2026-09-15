@@ -101,6 +101,11 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
           Necessidade.IMPORTANTE, ("cnpj cpf", "cnpj", "cpf cnpj", "cnpj fornecedor")),
     Campo("uf_participante", "UF do participante", "operação interestadual muda a regra",
           Necessidade.OPCIONAL, ("uf", "uf mvto", "estado")),
+    Campo("unidade", "Unidade (loja)", "diz de qual estabelecimento é a linha — o razão é por loja",
+          Necessidade.OPCIONAL, ("unidade", "loja", "filial", "cod loja")),
+    Campo("tipo_documento", "Tipo do documento",
+          "venda de PDV é cupom, e cupom é consumidor final por definição",
+          Necessidade.OPCIONAL, ("descricao tipo dcto", "tipo documento", "tipo dcto")),
 
     # ---------- item ----------
     Campo("codigo_item", "Código do item", "é a chave da ficha: uma por mercadoria",

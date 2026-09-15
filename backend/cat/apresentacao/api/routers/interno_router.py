@@ -37,7 +37,9 @@ from cat.aplicacao.casos_de_uso import (
     apurar_suportado,
     conferir_documentos,
     extrair_movimentos,
+    montar_razao,
     planilhas,
+    rodada,
 )
 from cat.aplicacao.casos_de_uso.analisar_remessa import RemessaAnalisada, analisar
 from cat.aplicacao.casos_de_uso.historico_do_projeto import TrabalhoParado
@@ -48,6 +50,7 @@ from cat.aplicacao.casos_de_uso.inspecionar_lote import (
 )
 from cat.config import obter_config
 from cat.dominio.comum.cnpj import Cnpj
+from cat.infraestrutura.analitico import razao as analitico_razao
 from cat.infraestrutura.analitico import suportado as analitico_suportado
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
 from cat.infraestrutura.repositorios.banco import obter_sessao
@@ -303,6 +306,8 @@ PREPARADORES = {
                                "Já existe uma extração de movimentos em andamento neste trabalho."),
     apurar_suportado.ETAPA: (apurar_suportado.preparar, apurar_suportado.NadaParaApurar,
                              "Já existe uma apuração do ICMS suportado em andamento neste trabalho."),
+    montar_razao.ETAPA: (montar_razao.preparar, montar_razao.NadaParaMontar,
+                         "Já existe uma montagem do razão em andamento neste trabalho."),
 }
 
 # "cancelando" ainda está em curso: a rodada só para no próximo ponto seguro, e
@@ -395,8 +400,8 @@ def cancelar_execucao(
     Quem pode cancelar é decisão da API em C# — a mesma de quem pode iniciar.
     """
     try:
-        execucao = apurar_suportado.cancelar(execucao_id, pedido.usuario_id, sessao)
-    except apurar_suportado.CancelamentoRecusado as erro:
+        execucao = rodada.cancelar(execucao_id, pedido.usuario_id, sessao)
+    except rodada.CancelamentoRecusado as erro:
         log.warning("cancelamento recusado",
                     extra={"execucao_id": execucao_id, "motivo": str(erro)})
         raise HTTPException(erro.status, str(erro)) from erro
@@ -437,6 +442,61 @@ def linhas_do_suportado(
                                 "Os arquivos desta apuração não estão mais em disco. Rode de novo.") from None
         except ValueError as erro:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)) from erro
+
+
+# ---------------------------------------------------------------------------
+# Razão: a lista de fichas e as linhas de uma ficha
+# ---------------------------------------------------------------------------
+class PedidoDeFichas(BaseModel):
+    execucao_id: int
+    busca: str | None = Field(default=None, max_length=100)
+    so: str | None = None
+    pagina: int = Field(default=1, ge=1)
+    por_pagina: int = Field(default=analitico_razao.POR_PAGINA_PADRAO, ge=1)
+
+
+class PedidoDeFicha(BaseModel):
+    execucao_id: int
+    cnpj: str = Field(min_length=1, max_length=20)
+    codigo: str = Field(min_length=1, max_length=60)
+    pagina: int = Field(default=1, ge=1)
+    por_pagina: int = Field(default=analitico_razao.POR_PAGINA_PADRAO, ge=1)
+
+
+def _razao_concluido(execucao_id: int, sessao: Session) -> ExecucaoDB:
+    execucao = sessao.get(ExecucaoDB, execucao_id)
+    if execucao is None or execucao.etapa != montar_razao.ETAPA:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Razão não encontrado.")
+    if execucao.situacao != "concluida":
+        raise HTTPException(status.HTTP_409_CONFLICT, "A montagem do razão ainda não terminou.")
+    return execucao
+
+
+def _traduzir_leitura(funcao):
+    try:
+        return funcao()
+    except FileNotFoundError:
+        raise HTTPException(status.HTTP_410_GONE,
+                            "Os arquivos deste razão não estão mais em disco. Rode de novo.") from None
+    except ValueError as erro:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)) from erro
+
+
+@router.post("/razao/fichas", dependencies=[Depends(exigir_segredo)])
+def fichas_do_razao(pedido: PedidoDeFichas, sessao: Annotated[Session, Depends(obter_sessao)]) -> dict:
+    execucao = _razao_concluido(pedido.execucao_id, sessao)
+    with contexto(etapa=montar_razao.ETAPA, execucao_id=execucao.id):
+        return _traduzir_leitura(lambda: analitico_razao.lista_de_fichas(
+            execucao.pasta_de_trabalho or "", pedido.busca, pedido.so, pedido.pagina, pedido.por_pagina))
+
+
+@router.post("/razao/ficha", dependencies=[Depends(exigir_segredo)])
+def linhas_do_razao(pedido: PedidoDeFicha, sessao: Annotated[Session, Depends(obter_sessao)]) -> dict:
+    execucao = _razao_concluido(pedido.execucao_id, sessao)
+    with contexto(etapa=montar_razao.ETAPA, execucao_id=execucao.id):
+        return _traduzir_leitura(lambda: analitico_razao.linhas_da_ficha(
+            execucao.pasta_de_trabalho or "", pedido.cnpj, pedido.codigo, pedido.pagina,
+            pedido.por_pagina))
 
 
 # ---------------------------------------------------------------------------

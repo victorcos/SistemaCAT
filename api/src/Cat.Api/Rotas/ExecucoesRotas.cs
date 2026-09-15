@@ -21,6 +21,32 @@ public static class ExecucoesRotas
         Etapa(api, Execucoes.Conferencia, "conferencias", detalheExigeEtapa: false, "conferir documentos");
         Etapa(api, Execucoes.Movimentos, "movimentos", detalheExigeEtapa: true, "extrair movimentos");
         Etapa(api, Execucoes.Suportado, "suportado", detalheExigeEtapa: true, "apurar o ICMS suportado");
+        Etapa(api, Execucoes.Razao, "razao", detalheExigeEtapa: true, "montar o razão");
+
+        api.MapGet("/razao/{execucaoId:int}/fichas", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                {
+                    var q = http.Request.Query;
+                    var pedido = new PedidoDeFichas(
+                        q["busca"].FirstOrDefault() is { Length: > 0 } b ? b : null,
+                        q["so"].FirstOrDefault() is { Length: > 0 } s ? s : null,
+                        Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 50));
+                    return Results.Json(await caso.FichasDoRazao(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
+                }))
+            .ExigirUsuario();
+
+        api.MapGet("/razao/{execucaoId:int}/ficha", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                {
+                    var q = http.Request.Query;
+                    var cnpj = q["cnpj"].FirstOrDefault() ?? "";
+                    var codigo = q["codigo"].FirstOrDefault() ?? "";
+                    if (cnpj.Length == 0 || codigo.Length == 0)
+                        return CorpoJson.Recusar("Informe o estabelecimento e a mercadoria da ficha.", StatusCodes.Status422UnprocessableEntity);
+                    var pedido = new PedidoDeFicha(cnpj, codigo, Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 50));
+                    return Results.Json(await caso.LinhasDoRazao(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
+                }))
+            .ExigirUsuario();
 
         // o analítico pagina no servidor: numa base real são 8,7 milhões de itens
         api.MapGet("/suportado/{execucaoId:int}/linhas", async (int execucaoId, HttpContext http, Execucoes caso) =>
@@ -99,6 +125,9 @@ public static class ExecucoesRotas
         }
         return Results.File(caminho, pronta.Tipo, pronta.Nome, enableRangeProcessing: true);
     }
+
+    private static int Inteiro(Microsoft.Extensions.Primitives.StringValues valor, int padrao) =>
+        int.TryParse(valor, out var n) && n > 0 ? n : padrao;
 
     private static ExecucaoDto Dto(ExecucaoLida e) => new(
         e.Id, e.ProjetoId, e.Etapa, e.Situacao, e.Passo, e.Fracao, e.ArquivosTotais, e.ArquivosLidos, e.BytesLidos,

@@ -68,6 +68,8 @@ class MovimentoGerencial:
     cpf_participante: str | None = None
     uf_participante: str = ""
     cst_icms: str = ""
+    unidade: str = ""
+    tipo_documento: str = ""
 
     bc_icms: Decimal = ZERO
     valor_icms: Decimal = ZERO
@@ -83,6 +85,13 @@ class MovimentoGerencial:
     @property
     def e_entrada(self) -> bool:
         return self.cfop[:1] in _ENTRADA
+
+    @property
+    def e_venda_de_pdv(self) -> bool:
+        """Venda de ponto de venda é cupom — NFC-e ou CF-e SAT —, e cupom existe
+        para documentar venda a consumidor final. Não é suposição sobre quem
+        comprou: é o que o documento é, a mesma regra do modelo 65 e 59."""
+        return "pdv" in self.tipo_documento.lower()
 
     @property
     def origem_do_st(self) -> OrigemDoSt:
@@ -163,6 +172,8 @@ class MovimentoGerencial:
             cpf_participante=cpf,
             uf_participante=v.texto(dados.get("uf_participante")).upper(),
             cst_icms=v.texto(dados.get("cst_icms")),
+            unidade=v.texto(dados.get("unidade")),
+            tipo_documento=v.texto(dados.get("tipo_documento")),
             bc_icms=v.decimal(dados.get("bc_icms"), campo="bc_icms"),
             valor_icms=v.decimal(dados.get("valor_icms"), campo="valor_icms"),
             bc_st=v.decimal(dados.get("bc_st"), campo="bc_st"),

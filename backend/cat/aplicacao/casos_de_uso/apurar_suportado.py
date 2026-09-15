@@ -55,8 +55,18 @@ from cat.infraestrutura.analitico.suportado import (
     fatias_por_fonte,
     quebras,
 )
+from cat.aplicacao.casos_de_uso.rodada import (
+    CancelamentoRecusado,  # noqa: F401 — quem já importava daqui
+    Diario,
+    Freio,
+    cancelar,  # noqa: F401
+    duracao as _duracao,
+    milhar as _milhar,
+    nome_de as _nome,
+    pct as _pct,
+)
 from cat.infraestrutura.repositorios.banco import Sessao
-from cat.infraestrutura.repositorios.modelos import ExecucaoDB, ProjetoDB, UsuarioDB
+from cat.infraestrutura.repositorios.modelos import ExecucaoDB, ProjetoDB
 from cat.log import contexto, obter_log
 
 log = obter_log(__name__)
@@ -67,7 +77,6 @@ ETAPA = "st_suportado"
 # pedir que se rode de novo, em vez de mostrar cartão vazio como se fosse zero
 VERSAO_DO_RESUMO = 2
 
-SEGUNDOS_ENTRE_AVISOS = 2.0
 # a leitura dos relatórios é a metade lenta; a cascata, a outra
 FRACAO_DOS_RELATORIOS = 0.40
 FRACAO_DA_CASCATA = 0.85
@@ -142,7 +151,7 @@ def executar(execucao_id: int) -> None:
             return
 
         destino = pasta_da_execucao(execucao_id)
-        diario = _Diario(execucao, sessao)
+        diario = Diario(execucao, sessao, VERSAO_DO_RESUMO)
         with contexto(etapa=ETAPA, execucao_id=execucao_id,
                       projeto_id=execucao.projeto_id):
             try:
@@ -179,7 +188,7 @@ def executar(execucao_id: int) -> None:
                 )
 
 
-def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: _Diario) -> None:
+def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) -> None:
     os.makedirs(destino, exist_ok=True)
     # o pedido de cancelar pode chegar entre a fila reivindicar e a rodada
     # começar; regravar "rodando" por cima dele o apagaria
@@ -204,7 +213,7 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: _Diario)
     sessao.commit()
 
     inicio = time.time()
-    parar = _Freio(execucao.id)
+    parar = Freio(execucao.id)
 
     # 1. o imposto que o cliente informou
     def relatorio_lido(n: int, total: int) -> None:
@@ -272,14 +281,15 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: _Diario)
                     "valor": str(resumo.valor_total)})
 
 
-def _anotar_retido(diario: _Diario, r: RetidoExtraido) -> None:
+def _anotar_retido(diario: Diario, r: RetidoExtraido) -> None:
     diario.base["relatorios"] = vars(r)
     if not r.arquivos:
         diario.anotar("aviso", "Nenhum relatório do cliente no trabalho: o CST 60 "
                                "fica sem a fonte que costuma preenchê-lo.")
         return
-    diario.anotar("info", f"{r.arquivos} relatórios lidos · {_milhar(r.itens)} itens "
-                          "com imposto informado.")
+    diario.anotar("info", f"{r.arquivos} relatórios vistos · {_milhar(r.itens)} itens "
+                          "com imposto informado"
+                          + (f"; {r.so_de_saidas} só de saídas, deixados de lado." if r.so_de_saidas else "."))
     if r.recusados:
         diario.anotar("aviso", f"{r.recusados} relatórios ilegíveis ou de outra espécie "
                                "ficaram de fora.")
@@ -305,130 +315,3 @@ def serializar(resumo: ResumoDaApuracao, q: dict, retido: RetidoExtraido | None 
         "estabelecimentos": q["estabelecimentos"],
         "cst_sem_o_que_apurar": q["cst_sem_o_que_apurar"],
     }
-
-
-class _Diario:
-    """O resumo que a tela lê enquanto a rodada anda: andamento e log.
-
-    Vai ao banco de tempos em tempos, não a cada lote — gravar JSON a cada
-    duzentos mil itens seria o banco fazendo mais trabalho que a apuração.
-    """
-
-    def __init__(self, execucao: ExecucaoDB, sessao: Session) -> None:
-        self.execucao = execucao
-        self.sessao = sessao
-        self.base: dict = {"versao": VERSAO_DO_RESUMO, "log": []}
-        self.ultimo = 0.0
-
-    def anotar(self, nivel: str, texto: str) -> None:
-        self.base["log"].append({
-            "em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "nivel": nivel, "texto": texto,
-        })
-        self.salvar()
-
-    def salvar(self) -> None:
-        # dicionário novo: o SQLAlchemy só percebe a mudança de um JSON quando
-        # o objeto inteiro é trocado
-        self.execucao.resumo = {**self.base, "log": list(self.base["log"])}
-        try:
-            self.sessao.commit()
-        except Exception:                        # noqa: BLE001
-            # progresso é enfeite; perder um aviso não pode derrubar a apuração
-            self.sessao.rollback()
-            log.warning("não deu para gravar o andamento da apuração", exc_info=True)
-        self.ultimo = time.monotonic()
-
-    def salvar_de_vez_em_quando(self) -> None:
-        if time.monotonic() - self.ultimo >= SEGUNDOS_ENTRE_AVISOS:
-            self.salvar()
-
-
-class _Freio:
-    """Pergunta ao banco, de tempos em tempos, se alguém mandou parar.
-
-    Sessão própria e curta: a da rodada tem o objeto da execução em memória, e
-    um `refresh` nela desfaria o progresso ainda não gravado.
-    """
-
-    def __init__(self, execucao_id: int) -> None:
-        self.execucao_id = execucao_id
-        self.ultimo = 0.0
-        self.parar = False
-
-    def __call__(self) -> bool:
-        if self.parar:
-            return True
-        agora = time.monotonic()
-        if agora - self.ultimo < 1.0:
-            return False
-        self.ultimo = agora
-        try:
-            with Sessao() as s:
-                situacao = s.scalar(select(ExecucaoDB.situacao)
-                                    .where(ExecucaoDB.id == self.execucao_id))
-        except Exception:                        # noqa: BLE001
-            log.warning("não deu para conferir se a apuração foi cancelada", exc_info=True)
-            return False
-        self.parar = situacao == "cancelando"
-        return self.parar
-
-
-# ---------------------------------------------------------------------------
-# cancelar
-# ---------------------------------------------------------------------------
-class CancelamentoRecusado(ValueError):
-    def __init__(self, status: int, mensagem: str) -> None:
-        self.status = status
-        super().__init__(mensagem)
-
-
-# só as etapas cuja rodada confere o freio. Nas outras, gravar "cancelando"
-# deixaria a tela dizendo que vai parar uma rodada que vai até o fim
-ETAPAS_CANCELAVEIS = frozenset({ETAPA})
-
-
-def cancelar(execucao_id: int, usuario_id: int, sessao: Session) -> ExecucaoDB:
-    """Na fila, cancela na hora; rodando, pede para parar no próximo ponto seguro."""
-    execucao = sessao.get(ExecucaoDB, execucao_id)
-    if execucao is None:
-        raise CancelamentoRecusado(404, "Execução não encontrada.")
-    if execucao.etapa not in ETAPAS_CANCELAVEIS:
-        raise CancelamentoRecusado(422, "Esta etapa ainda não aceita cancelamento.")
-    if execucao.situacao not in ("na_fila", "rodando", "cancelando"):
-        raise CancelamentoRecusado(409, "Esta rodada já terminou.")
-
-    with contexto(etapa=execucao.etapa, execucao_id=execucao_id, usuario_id=usuario_id):
-        if execucao.situacao == "na_fila":
-            execucao.situacao = "cancelada"
-            execucao.passo = "Cancelada"
-            execucao.terminada_em = datetime.now(timezone.utc)
-        elif execucao.situacao == "rodando":
-            execucao.situacao = "cancelando"
-            execucao.passo = "Cancelando"
-        sessao.commit()
-        log.info("cancelamento pedido", extra={"situacao": execucao.situacao})
-    return execucao
-
-
-# ---------------------------------------------------------------------------
-# formatação do log da tela
-# ---------------------------------------------------------------------------
-def _nome(usuario_id: int | None, sessao: Session) -> str:
-    if usuario_id is None:
-        return ""
-    return sessao.scalar(select(UsuarioDB.nome_exibicao)
-                         .where(UsuarioDB.id == usuario_id)) or ""
-
-
-def _milhar(n: int) -> str:
-    return f"{n:,}".replace(",", ".")
-
-
-def _pct(f: float) -> str:
-    return f"{f * 100:.1f}%".replace(".", ",")
-
-
-def _duracao(segundos: float) -> str:
-    minutos, seg = divmod(int(segundos), 60)
-    return f"{minutos} min {seg:02d} s" if minutos else f"{seg} s"

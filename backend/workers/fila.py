@@ -29,7 +29,12 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from cat.aplicacao.casos_de_uso import apurar_suportado, conferir_documentos, extrair_movimentos
+from cat.aplicacao.casos_de_uso import (
+    apurar_suportado,
+    conferir_documentos,
+    extrair_movimentos,
+    montar_razao,
+)
 from cat.aplicacao.casos_de_uso.historico_do_projeto import registrar_de_etapa
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.repositorios.banco import Sessao
@@ -45,6 +50,7 @@ EXECUTORES = {
     conferir_documentos.ETAPA: conferir_documentos.executar,
     extrair_movimentos.ETAPA: extrair_movimentos.executar,
     apurar_suportado.ETAPA: apurar_suportado.executar,
+    montar_razao.ETAPA: montar_razao.executar,
 }
 
 MOTIVO_INTERRUPCAO = "Interrompida: o motor reiniciou durante a rodada. Rode de novo."

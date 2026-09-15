@@ -92,4 +92,11 @@ public interface IMotor
     /// <summary>Uma página do analítico da apuração do ICMS suportado.</summary>
     /// <exception cref="MotorRecusou">não é apuração (404), não terminou (409), material apagado (410), filtro inválido (422)</exception>
     Task<System.Text.Json.JsonElement> LinhasDoSuportado(int execucaoId, PedidoDeLinhas pedido, CancellationToken cancelar);
+
+    /// <summary>A lista de fichas do razão.</summary>
+    /// <exception cref="MotorRecusou">não é razão (404), não terminou (409), material apagado (410), recorte inválido (422)</exception>
+    Task<System.Text.Json.JsonElement> FichasDoRazao(int execucaoId, PedidoDeFichas pedido, CancellationToken cancelar);
+
+    /// <summary>As linhas de uma ficha do razão.</summary>
+    Task<System.Text.Json.JsonElement> LinhasDoRazao(int execucaoId, PedidoDeFicha pedido, CancellationToken cancelar);
 }

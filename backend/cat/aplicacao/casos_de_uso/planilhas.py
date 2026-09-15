@@ -10,7 +10,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from cat.aplicacao.casos_de_uso import apurar_suportado, conferir_documentos, extrair_movimentos
+from cat.aplicacao.casos_de_uso import (
+    apurar_suportado,
+    conferir_documentos,
+    extrair_movimentos,
+    montar_razao,
+)
 from cat.infraestrutura.analitico.confronto import (
     ARQUIVO_CONFERIDOS,
     ARQUIVO_NAO_ESCRITURADAS,
@@ -22,6 +27,7 @@ from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_MOVIMENTOS,
 )
 from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO
+from cat.infraestrutura.analitico.razao import ARQUIVO_FICHA3, ARQUIVO_FICHAS
 from cat.infraestrutura.analitico.suportado import ARQUIVO_SUPORTADO
 from cat.infraestrutura.planilhas.conferencia import (
     FORMATOS,
@@ -35,6 +41,7 @@ from cat.infraestrutura.planilhas.movimentacao import (
     gerar_itens,
     gerar_movimentos,
 )
+from cat.infraestrutura.planilhas.razao import gerar_ficha3, gerar_fichas
 from cat.infraestrutura.planilhas.suportado import gerar_suportado
 from cat.infraestrutura.repositorios.modelos import ExecucaoDB
 from cat.log import contexto, obter_log
@@ -64,12 +71,17 @@ PLANILHAS = {
     apurar_suportado.ETAPA: {
         "suportado": ("icms_suportado.xlsx", ARQUIVO_SUPORTADO, gerar_suportado),
     },
+    montar_razao.ETAPA: {
+        "ficha3": ("ficha3.xlsx", ARQUIVO_FICHA3, gerar_ficha3),
+        "fichas": ("fichas.xlsx", ARQUIVO_FICHAS, gerar_fichas),
+    },
 }
 
 NAO_TERMINOU = {
     conferir_documentos.ETAPA: "A conferência ainda não terminou.",
     extrair_movimentos.ETAPA: "A extração ainda não terminou.",
     apurar_suportado.ETAPA: "A apuração ainda não terminou.",
+    montar_razao.ETAPA: "A montagem do razão ainda não terminou.",
 }
 
 
@@ -112,7 +124,7 @@ def gerar(execucao: ExecucaoDB, etapa_da_rota: str, qual: str,
         # é de antes de esta lista existir: a pasta está lá, a lista não.
         if etapa_da_rota == extrair_movimentos.ETAPA:
             raise PlanilhaRecusada(410, "Os arquivos desta extração não estão mais em disco. Rode de novo.")
-        if etapa_da_rota == apurar_suportado.ETAPA:
+        if etapa_da_rota in (apurar_suportado.ETAPA, montar_razao.ETAPA):
             raise PlanilhaRecusada(410, "Os arquivos desta apuração não estão mais em disco. Rode de novo.")
         motivo = ("Esta conferência é de uma versão anterior e não tem esta lista."
                   if os.path.isdir(pasta) else "Os arquivos desta conferência não estão mais em disco.")

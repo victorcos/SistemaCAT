@@ -15,6 +15,11 @@ public sealed record PlanilhaPronta(string Caminho, string Nome, string Tipo);
 /// <param name="Escopo">"documento" (uma linha por nota, com os itens) ou "item".</param>
 public sealed record PedidoDeLinhas(string Escopo, string? Fonte, string? Busca, int Pagina, int PorPagina);
 
+/// <param name="So">recorte das fichas que pedem atenção: negativas, sem_aliquota, indefinidas</param>
+public sealed record PedidoDeFichas(string? Busca, string? So, int Pagina, int PorPagina);
+
+public sealed record PedidoDeFicha(string Cnpj, string Codigo, int Pagina, int PorPagina);
+
 public interface IRepositorioDeExecucoes
 {
     Task<ExecucaoLida?> Buscar(int id, CancellationToken cancelar);
@@ -42,13 +47,14 @@ public sealed class Execucoes(
     public const string Conferencia = "conferencia";
     public const string Movimentos = "movimentos";
     public const string Suportado = "st_suportado";
+    public const string Razao = "razao";
 
     /// <summary>
     /// As etapas que concluem com uma rodada do motor. Uma lista só: o roteiro
     /// do trabalho e a consulta que o alimenta liam cada uma a sua, e a etapa
     /// nova que entrasse numa e não na outra ficaria para sempre "pendente".
     /// </summary>
-    public static readonly IReadOnlyList<string> DeProcessamento = [Conferencia, Movimentos, Suportado];
+    public static readonly IReadOnlyList<string> DeProcessamento = [Conferencia, Movimentos, Suportado, Razao];
 
     /// <summary>Ainda não terminou: inclui o pedido de parar que a rodada não atendeu ainda.</summary>
     public static bool EmCurso(string situacao) => situacao is "na_fila" or "rodando" or "cancelando";
@@ -106,6 +112,20 @@ public sealed class Execucoes(
     {
         var e = await Detalhar(execucaoId, Suportado, usuario, cancelar);
         return await motor.LinhasDoSuportado(e.Id, pedido, cancelar);
+    }
+
+    /// <summary>A lista de fichas do razão, maior ressarcimento primeiro.</summary>
+    public async Task<JsonElement> FichasDoRazao(int execucaoId, PedidoDeFichas pedido, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, Razao, usuario, cancelar);
+        return await motor.FichasDoRazao(e.Id, pedido, cancelar);
+    }
+
+    /// <summary>Uma página das linhas da Ficha 3 de uma mercadoria num estabelecimento.</summary>
+    public async Task<JsonElement> LinhasDoRazao(int execucaoId, PedidoDeFicha pedido, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, Razao, usuario, cancelar);
+        return await motor.LinhasDoRazao(e.Id, pedido, cancelar);
     }
 
     public async Task<PlanilhaPronta> Planilha(int execucaoId, string etapaDaRota, string? etapaExigida, string qual,

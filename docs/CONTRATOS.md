@@ -235,3 +235,31 @@ cobertura do mês), `estabelecimentos`, `cst_sem_o_que_apurar`, `iniciada_por`,
 vai como texto, porque Decimal não é JSON.
 
 Resumo **sem** `versao` é de antes desta forma: a tela pede para rodar de novo.
+
+## 8. Razão dos itens (etapa 5)
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `POST` | `/api/projetos/{id}/razao` | põe a montagem na fila (202). 422 sem movimentação ou apuração do suportado concluídas, ou com apuração que não gravou data e CFOP |
+| `GET` | `/api/projetos/{id}/razao` | as rodadas, mais recente primeiro |
+| `GET` | `/api/razao/{execucao}` | uma rodada, com o resumo |
+| `POST` | `/api/razao/{execucao}/cancelar` | como na etapa 4 |
+| `GET` | `/api/razao/{execucao}/fichas` | lista de fichas, maior ressarcimento primeiro: `busca`, `so=negativas\|sem_aliquota\|indefinidas`, `pagina`, `por_pagina` |
+| `GET` | `/api/razao/{execucao}/ficha` | linhas de uma ficha: `cnpj`, `codigo` (obrigatórios), `pagina`, `por_pagina` |
+| `GET` | `/api/razao/{execucao}/planilhas/ficha3` | a Ficha 3 inteira (CSV recomendado) |
+| `GET` | `/api/razao/{execucao}/planilhas/fichas` | o resumo por ficha |
+
+O resumo (`versao: 1`) traz `periodo_inicio`, `periodo_fim`, `abertura_em`,
+`codigos_com_st`, `fichas`, `estabelecimentos`, `linhas`, `ressarcimento`,
+`complemento`, `por_enquadramento` (`codigo` 1, 2, 3, 4, 0 ou `indefinido`, com
+linhas, quantidade, suportado baixado, confronto, ressarcimento e complemento),
+`por_competencia`, `saidas_por_origem` (`efd`, `relatorio`), `pendencias` e
+`relatorios` (`arquivos`, `so_de_entradas`, `recusados`, `linhas`). Enquanto
+roda, `andamento` com `linhas`, `total` e `fichas`.
+
+Cada linha da ficha: `numero`, `data`, `especie` (`entrada`/`saida`),
+`devolucao`, `cfop`, `documento`, `origem`, `enquadramento` (nulo em entrada,
+devolução e indefinido), `enquadramento_indefinido`, `quantidade` (com sinal),
+`icms_suportado`, `valor_unitario_usado`, `icms_efetivo` (valor de confronto,
+nulo quando não se apura), `saldo_quantidade`, `saldo_unitario`, `saldo_valor`,
+`ressarcimento`, `complemento`.

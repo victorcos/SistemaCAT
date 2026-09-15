@@ -26,6 +26,7 @@ public sealed class MotorDeExecucoesFalso : IAsyncLifetime
     public Func<JsonElement, IResult> AoPedirPlanilha { get; set; } = _ => Results.StatusCode(500);
     public Func<int, JsonElement, Task<IResult>> AoCancelar { get; set; } = (_, _) => Task.FromResult(Results.StatusCode(500));
     public Func<JsonElement, IResult> AoPedirLinhas { get; set; } = _ => Results.StatusCode(500);
+    public Func<string, JsonElement, IResult> AoPedirRazao { get; set; } = (_, _) => Results.StatusCode(500);
 
     public async Task InitializeAsync()
     {
@@ -64,6 +65,15 @@ public sealed class MotorDeExecucoesFalso : IAsyncLifetime
             Pedidos.Enqueue(pedido);
             return AoPedirLinhas(pedido);
         });
+        foreach (var rota in new[] { "fichas", "ficha" })
+            _app.MapPost($"/interno/razao/{rota}", async (HttpContext http) =>
+            {
+                if (http.Request.Headers["X-Cat-Motor-Segredo"] != Segredo)
+                    return Results.StatusCode(403);
+                var pedido = await http.Request.ReadFromJsonAsync<JsonElement>();
+                Pedidos.Enqueue(pedido);
+                return AoPedirRazao(rota, pedido);
+            });
         await _app.StartAsync();
         Endereco = new Uri(_app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First());
     }
@@ -155,6 +165,7 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
     [InlineData("conferencias", "conferencia")]
     [InlineData("movimentos", "movimentos")]
     [InlineData("suportado", "st_suportado")]
+    [InlineData("razao", "razao")]
     public async Task Pedir_repassa_ao_motor_e_devolve_a_execucao_da_fila(string segmento, string etapa)
     {
         var (quem, _, c) = await Pessoa("dev");
@@ -420,5 +431,44 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, r.StatusCode);
         Assert.Equal("Escopo desconhecido: tudo. Vale documento ou item.", await Detalhe(r));
+    }
+
+    // ------------------------------------------------------------------ razão
+    [Fact]
+    public async Task Fichas_do_razao_repassam_busca_recorte_e_pagina()
+    {
+        var (_, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var id = await Execucao(projeto, "razao");
+        motor.AoPedirRazao = (rota, _) => Results.Json(new { rota, total = 1, linhas = new[] { new { codigo = "X" } } });
+
+        var r = await c.GetAsync($"/api/razao/{id}/fichas?busca=cola&so=negativas&pagina=3&por_pagina=20");
+
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal("fichas", (await Json(r)).GetProperty("rota").GetString());
+        var pedido = motor.Pedidos.Last(x => x.TryGetProperty("so", out _));
+        Assert.Equal((id, "cola", "negativas", 3, 20),
+            (pedido.GetProperty("execucao_id").GetInt32(), pedido.GetProperty("busca").GetString(),
+             pedido.GetProperty("so").GetString(), pedido.GetProperty("pagina").GetInt32(), pedido.GetProperty("por_pagina").GetInt32()));
+    }
+
+    [Fact]
+    public async Task Linhas_da_ficha_exigem_estabelecimento_e_mercadoria()
+    {
+        var (_, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var id = await Execucao(projeto, "razao");
+        var suportado = await Execucao(projeto, "st_suportado");
+        motor.AoPedirRazao = (rota, p) => Results.Json(new { rota, cnpj = p.GetProperty("cnpj").GetString(), total = 0, linhas = Array.Empty<object>() });
+
+        var r = await c.GetAsync($"/api/razao/{id}/ficha?cnpj=11111111000191&codigo=X");
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal("11111111000191", (await Json(r)).GetProperty("cnpj").GetString());
+
+        var sem = await c.GetAsync($"/api/razao/{id}/ficha?codigo=X");
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, sem.StatusCode);
+        Assert.Equal("Informe o estabelecimento e a mercadoria da ficha.", await Detalhe(sem));
+        // pela rota do razão, só execução do razão
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/razao/{suportado}/fichas")).StatusCode);
     }
 }

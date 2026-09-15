@@ -172,7 +172,24 @@ class TestClassificar:
         assert m.especie is Especie.MOVIMENTO
         assert m.utilizavel
         assert m.tem_valores_do_xml
+        # unidade e tipo do documento só vêm no relatório de saídas das lojas
+        assert {c.chave for c in m.nao_encontrados} == {"unidade", "tipo_documento"}
+
+    def test_saida_de_loja_traz_unidade_e_tipo_do_documento(self):
+        """É o que diz de qual loja é o cupom e que ele é venda a consumidor."""
+        cabecalho = MOVIMENTO.split("|") + ["Unidade", "Descrição Tipo Dcto"]
+        m = classificar(cabecalho)
         assert not m.nao_encontrados
+        assert m.nomes_origem["unidade"] == "Unidade"
+        assert m.nomes_origem["tipo_documento"] == "Descrição Tipo Dcto"
+
+    def test_venda_de_pdv_e_consumidor_final_pelo_documento(self):
+        dados = {"codigo_item": "100137", "data": "02/01/21", "cfop": "5.405",
+                 "quantidade": "51", "unidade": "005",
+                 "tipo_documento": "Estoque / Venda De Produtos PDVs"}
+        m = MovimentoGerencial.de(dados, 2)
+        assert m.unidade == "005" and m.e_venda_de_pdv and not m.e_entrada
+        assert not MovimentoGerencial.de({**dados, "tipo_documento": "Transferência"}, 3).e_venda_de_pdv
 
     def test_inventario(self):
         m = classificar(INVENTARIO.split("|"))

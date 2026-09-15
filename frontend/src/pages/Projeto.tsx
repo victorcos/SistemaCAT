@@ -74,6 +74,14 @@ const DESTINOS: Record<
       padrao: "Apurar o ICMS suportado",
     },
   },
+  razao: {
+    rota: ROTAS.razao,
+    rotulos: {
+      concluida: "Ver as fichas e baixar a Ficha 3",
+      em_andamento: "Acompanhar a montagem",
+      padrao: "Montar o razão",
+    },
+  },
 };
 
 const TOM_DA_SITUACAO: Record<string, TomDeEtiqueta> = {

@@ -17,6 +17,7 @@ export const ROTAS = {
   conferencia: (id: number | string) => `/projetos/${id}/conferencia`,
   movimentos: (id: number | string) => `/projetos/${id}/movimentos`,
   suportado: (id: number | string) => `/projetos/${id}/suportado`,
+  razao: (id: number | string) => `/projetos/${id}/razao`,
   historico: (id: number | string) => `/projetos/${id}/historico`,
 } as const;
 

@@ -44,11 +44,8 @@ export interface QuebraPorCompetencia {
   cobertura: number;
 }
 
-export interface EntradaDoLog {
-  em: string;
-  nivel: "info" | "aviso" | "erro";
-  texto: string;
-}
+export type { EntradaDoLog } from "@/components/shared/Rodada";
+import type { EntradaDoLog } from "@/components/shared/Rodada";
 
 export interface AndamentoDoSuportado {
   itens: number;

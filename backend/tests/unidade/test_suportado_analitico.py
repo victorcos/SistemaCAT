@@ -42,6 +42,7 @@ def escrever_movimentos(pasta, linhas: list[dict]) -> None:
         ("cnpj", pa.string()), ("competencia", pa.date32()),
         ("chave", pa.string()), ("numero_documento", pa.string()),
         ("modelo", pa.string()), ("participante", pa.string()),
+        ("data", pa.date32()), ("cfop", pa.string()), ("numero_item", pa.int32()),
         ("codigo", pa.string()), ("descricao", pa.string()),
         ("cst_icms", pa.string()), ("operacao", pa.string()),
         ("quantidade", pa.decimal128(18, 5)),
@@ -79,6 +80,7 @@ def escrever_cadastro(pasta, linhas: list[tuple[str, str, str]]) -> None:
 def movimento(**kw) -> dict:
     base = {"cnpj": CNPJ, "competencia": date(2021, 5, 1), "chave": CHAVE_A,
             "numero_documento": "4411", "modelo": "55", "participante": "F168181",
+            "data": date(2021, 5, 3), "cfop": "1403", "numero_item": 1,
             "codigo": "117110", "descricao": "Alface crespa", "cst_icms": "060",
             "operacao": "entrada",
             "quantidade": d("1.00000"), "valor_icms": d("0.00"),
@@ -314,6 +316,17 @@ class TestExtrairRetido:
                 for x in pq.read_table(str(destino)).to_pylist()}
         assert lido == {(CHAVE_A, "117110"): d("4.75"), (CHAVE_B, "9"): d("2.00")}
         assert not (tmp_path / (ARQUIVO_RETIDO + ".partes")).exists()
+
+    def test_relatorio_so_de_saidas_nao_e_lido_inteiro(self, tmp_path, monkeypatch):
+        import cat.infraestrutura.analitico.suportado as mod
+        monkeypatch.setattr(mod, "AMOSTRA_PARA_ACHAR_ENTRADA", 2)
+        saidas = [(CHAVE_A, "1", "0")] * 3
+        caminho = relatorio(tmp_path, "saidas.txt", saidas).replace(".txt", ".txt")
+        # troca o CFOP de entrada por um de venda
+        texto = open(caminho, encoding="latin-1").read().replace("1.403", "5.405")
+        open(caminho, "w", encoding="latin-1", newline="").write(texto)
+        r = extrair_retido([caminho], str(tmp_path / ARQUIVO_RETIDO))
+        assert r.so_de_saidas == 1 and r.itens == 0
 
     def test_sem_nada_informado_grava_parquet_vazio(self, tmp_path):
         destino = tmp_path / ARQUIVO_RETIDO

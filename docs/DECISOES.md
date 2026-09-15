@@ -5,6 +5,67 @@
 
 ---
 
+## 2026-09-15 — Etapa 5: o razão dos itens, e de onde vem a saída
+
+**O obstáculo que decidiu o desenho.** O razão baixa da ficha cada saída de
+cada mercadoria. No Amigão, 36,5 milhões de documentos de saída (R$ 5,8
+bilhões) **não têm item na EFD**: NFC-e e CF-e SAT vão à escrituração só com o
+analítico por CST e CFOP. Com item, a EFD traz R$ 6 milhões de saída. Sem outra
+fonte não há ficha.
+
+**Decisões do Victor, em 15/09/2026.**
+
+1. **Saída: o relatório gerencial de saídas do cliente como base, e o XML
+   vencendo quando houver.** Na mesma nota, a EFD com item vence o relatório
+   (a linha do relatório com a chave de uma nota da EFD sai, contada). O XML
+   dos cupons, quando vier, entra como a fonte que vence as duas.
+2. **Entra no razão a mercadoria com saída CST 60** em qualquer loja do
+   período. É a vendida com o imposto já retido, que é a matéria da CAT 42.
+   Resolve de passagem a questão aberta da etapa 4: o "suportado" de item CST
+   00 e 20 — 54% do total — não vira ficha.
+3. **Construir já, com um piloto** sobre o que o download entregou.
+
+**O relatório de saídas diz loja e documento, não CNPJ nem modelo.** Duas
+colunas novas no leitor: `Unidade` e `Descrição Tipo Dcto`. A venda de PDV
+("Estoque / Venda De Produtos PDVs") é **cupom, logo consumidor final pelo
+tipo do documento** — a mesma regra do modelo 65 e 59, não suposição sobre
+quem comprou. O CNPJ da unidade sai de duas pistas que se confirmaram na
+amostra real: a chave da nota emitida pela loja e a coluna CNPJ/CPF da venda de
+PDV, que traz a própria loja ("005" → 11.517.841/0034-55 pelas duas). Linha que
+nenhuma pista alcança fica contada, não suposta.
+
+**O cálculo é o do domínio, linha a linha.** O mesmo `RazaoDoItem` conferido
+contra a Ficha 3 da BOA. O SQL junta, filtra e ordena; não calcula.
+
+| Parte | De onde | Estado no piloto |
+|---|---|---|
+| Entrada e suportado | apuração da etapa 4 (que passou a gravar data, CFOP e item) | completo |
+| Devolução de venda | entrada com CFOP de devolução, lançada como saída com a marca | completo |
+| Devolução de compra | saída com CFOP de devolução, lançada como entrada com a marca | completo |
+| Saída com item | EFD | completo |
+| Saída de cupom | relatório de saídas | só CD 003 PR e lojas MS, jan–mar/2021 |
+| Enquadramento | PDV → 1; modelo; CFOP; o resto indefinido | completo |
+| Confronto nos enquadramentos 1 e 3 | alíquota interna do 0200 × valor da saída (leiaute, VL_CONFR) | completo |
+| Confronto nos enquadramentos 2 e 4 | ICMS da operação própria da entrada | **pendente**, contado |
+| Abertura | quantidade do bloco H do dia anterior ao período | **sem valor**: o inventário do cliente traz as colunas de imposto vazias; item 3.3.8 ainda não derivado |
+
+**O que a tela diz antes do número.** Fichas fora de SP (a CAT 42 é paulista,
+e o piloto é PR e MS), abertura sem ICMS suportado, confronto pendente, saída
+sem alíquota, estoque negativo, enquadramento indefinido e loja sem CNPJ
+aparecem como lista de pendências acima do total. É a regra da etapa 4: o
+número nunca aparece sem o que falta para ele valer.
+
+**Duas economias de leitura.** Relatório que não mostra saída nas primeiras
+5.000 linhas é de entradas e o razão não o lê inteiro; o simétrico vale na
+etapa 4 para relatório só de saídas. Sem isso, cada etapa leria os 20 GB de
+entradas e os 21 GB de saídas por inteiro.
+
+**A mecânica de rodada virou módulo** (`casos_de_uso/rodada.py`): diário,
+freio, cancelar e formatação do log, usados pelas etapas 4 e 5. A lista de
+etapas canceláveis mora ali.
+
+---
+
 ## 2026-09-15 — A primeira rodada real da etapa 4, e o que ela mostrou
 
 **Rodou pela tela sobre o Amigão inteiro** (execução 11): 94 relatórios do

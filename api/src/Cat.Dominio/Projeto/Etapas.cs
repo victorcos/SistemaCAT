@@ -82,8 +82,10 @@ public static class Etapas
             "onde veio cada valor. Quando o ERP e o XML divergem, vale o XML.",
             Implementada: true),
         new("razao", "Montar o razão dos itens",
-            "A Ficha 3: uma ficha por mercadoria, custo médio ponderado móvel, " +
-            "entradas e devoluções antes das saídas no mesmo dia."),
+            "A Ficha 3: uma ficha por estabelecimento e mercadoria com ST, custo " +
+            "médio ponderado móvel, entradas e devoluções antes das saídas no mesmo " +
+            "dia. As saídas sem item na EFD vêm do relatório do cliente.",
+            Implementada: true),
         new("apuracao", "Apurar ressarcimento e complemento",
             "Confrontar o imposto suportado com o ICMS efetivo, por " +
             "enquadramento legal, e conferir o saldo final contra o inventário."),

@@ -82,6 +82,11 @@ ARQUIVO_DOCUMENTOS = "suportado_documentos.parquet"
 
 LINHAS_POR_LOTE = 200_000
 
+# quantas linhas de um relatório se olham antes de concluir que ele é só de
+# saídas — o relatório de saídas do Amigão tem 21 GB, e ler tudo para achar
+# zero entradas é tempo jogado fora
+AMOSTRA_PARA_ACHAR_ENTRADA = 5_000
+
 # o analítico pagina no servidor: numa base real são 8,7 milhões de itens, e
 # nenhuma tela aguenta receber isso
 POR_PAGINA_PADRAO = 50
@@ -104,6 +109,11 @@ ESQUEMA_SUPORTADO = pa.schema([
     ("numero_documento", pa.string()),
     ("modelo", pa.string()),
     ("participante", pa.string()),
+    # o razão da etapa 5 lê daqui: sem data não há posição na ficha, e sem
+    # CFOP não se sabe que a entrada é devolução de venda
+    ("data", pa.date32()),
+    ("cfop", pa.string()),
+    ("numero_item", pa.int32()),
     ("codigo", pa.string()),
     ("descricao", pa.string()),
     ("cst_icms", pa.string()),
@@ -139,6 +149,7 @@ class RetidoExtraido:
 
     arquivos: int = 0
     recusados: int = 0
+    so_de_saidas: int = 0
     linhas_de_entrada: int = 0
     sem_chave: int = 0
     itens: int = 0
@@ -207,7 +218,7 @@ def extrair_retido(
     partes = destino + ".partes"
     shutil.rmtree(partes, ignore_errors=True)
     os.makedirs(partes)
-    lidos = recusados = sem_chave = 0
+    lidos = recusados = sem_chave = so_de_saidas = 0
 
     try:
         for n, caminho in enumerate(relatorios, 1):
@@ -216,6 +227,9 @@ def extrair_retido(
                                           Leitura, Especie)
             if acumulado is None:
                 recusados += 1
+                continue
+            if acumulado == "so_de_saidas":
+                so_de_saidas += 1
                 continue
             por_item, l, s = acumulado
             lidos += l
@@ -227,6 +241,7 @@ def extrair_retido(
         shutil.rmtree(partes, ignore_errors=True)
 
     extraido = RetidoExtraido(arquivos=len(relatorios), recusados=recusados,
+                              so_de_saidas=so_de_saidas,
                               linhas_de_entrada=lidos, sem_chave=sem_chave,
                               itens=itens)
     log.info("imposto informado pelo cliente extraído", extra=vars(extraido))
@@ -234,11 +249,12 @@ def extrair_retido(
 
 
 def _ler_um_relatorio(caminho, n, total, avisar, Leitura, Especie):
-    """(imposto por item, linhas de entrada, sem chave) de um relatório, ou
-    None quando ele não serve — ilegível ou de outra espécie."""
+    """(imposto por item, linhas de entrada, sem chave) de um relatório; None
+    quando ele não serve — ilegível ou de outra espécie —, e "so_de_saidas"
+    quando as primeiras linhas não mostram entrada nenhuma."""
     nome = os.path.basename(caminho)
     acumulado: dict[tuple[str, str], Decimal] = {}
-    lidos = sem_chave = 0
+    lidos = sem_chave = vistas = 0
     try:
         leitura = Leitura(caminho)
         if leitura.especie is not Especie.MOVIMENTO:
@@ -246,7 +262,11 @@ def _ler_um_relatorio(caminho, n, total, avisar, Leitura, Especie):
                         extra={"arquivo": nome, "especie": leitura.especie.value})
             return None
         for m in leitura.movimentos():
+            vistas += 1
             if not m.e_entrada:
+                if lidos == 0 and vistas >= AMOSTRA_PARA_ACHAR_ENTRADA:
+                    log.info("relatório só de saídas, ignorado na apuração", extra={"arquivo": nome})
+                    return "so_de_saidas"
                 continue
             lidos += 1
             chave = (m.chave or "").strip()
@@ -370,7 +390,8 @@ def apurar(
         con.execute(f"""
             CREATE OR REPLACE VIEW entradas AS
             SELECT m.cnpj, m.competencia, m.chave, m.numero_documento, m.modelo,
-                   m.participante, m.codigo, m.descricao, m.cst_icms,
+                   m.participante, m.data, m.cfop, m.numero_item,
+                   m.codigo, m.descricao, m.cst_icms,
                    m.quantidade, m.valor_icms, m.valor_st, m.bc_st,
                    {'r.informado' if tem_retido else 'NULL'} AS informado,
                    {'i.aliq_icms' if tem_cadastro else 'NULL'} AS aliquota
@@ -537,8 +558,8 @@ class _Lote:
 
     def acrescentar(self, d: dict, i: int, r) -> None:
         for coluna in ("cnpj", "competencia", "chave", "numero_documento", "modelo",
-                       "participante", "codigo", "descricao", "cst_icms",
-                       "quantidade", "bc_st"):
+                       "participante", "data", "cfop", "numero_item", "codigo",
+                       "descricao", "cst_icms", "quantidade", "bc_st"):
             self.colunas[coluna].append(d[coluna][i])
         self.colunas["suportado"].append(r.valor)
         self.colunas["fonte"].append(CODIGO_DA_FONTE[r.fonte])
