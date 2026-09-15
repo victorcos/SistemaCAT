@@ -958,7 +958,8 @@ function PilulaDaFonte({ fonte, motivo, pequena }: { fonte: Fonte; motivo?: stri
   );
 }
 
-const truncarChave = (chave: string) => (chave.length > 22 ? `${chave.slice(0, 22)}…` : chave);
+const truncarChave = (chave: string) =>
+  !chave ? "Sem chave de acesso" : chave.length > 22 ? `${chave.slice(0, 22)}…` : chave;
 
 function Analitico({
   execucaoId,
@@ -1107,14 +1108,14 @@ function Analitico({
           {dados?.linhas.map((linha) =>
             porDocumento ? (
               <LinhaDeDocumento
-                key={linha.chave}
+                key={linha.documento}
                 d={linha as DocumentoDoAnalitico}
-                aberto={abertos.has(linha.chave)}
-                aoAlternar={() => alternar(linha.chave)}
+                aberto={abertos.has(linha.documento)}
+                aoAlternar={() => alternar(linha.documento)}
                 colunas={colunas}
               />
             ) : (
-              <LinhaDeItem key={`${linha.chave}-${(linha as ItemDoAnalitico).codigo}`} i={linha as ItemDoAnalitico} colunas={colunas} />
+              <LinhaDeItem key={`${linha.documento}-${(linha as ItemDoAnalitico).codigo}`} i={linha as ItemDoAnalitico} colunas={colunas} />
             ),
           )}
 
@@ -1203,7 +1204,10 @@ function LinhaDeDocumento({
           className={cn("text-texto-fraco transition-transform", aberto && "rotate-90")}
         />
         <span className="min-w-0">
-          <span className="block font-mono text-[13px] text-texto" title={d.chave}>
+          <span
+            className={cn("block font-mono text-[13px]", d.chave ? "text-texto" : "text-texto-fraco")}
+            title={d.chave || undefined}
+          >
             {truncarChave(d.chave)}
           </span>
           <span className="mt-0.5 block text-[11px] text-texto-fraco">

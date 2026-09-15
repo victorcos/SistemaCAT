@@ -281,6 +281,46 @@ class TestAndamentoECancelamento:
                            deve_parar=lambda: True)
 
 
+CABECALHO_MOVIMENTO = (
+    "Código|Descricao|Código Barras|Trib|Dt Emissão|Número Dcto|Ent|"
+    "Qtde;Unitária|Valor|BC ICMS|Valor ICMS|Valor BC ST;Informada|"
+    "Valor ST;Informada|Valor FCP ST|CNPJ/CPF|UF|CFOP;Mvto|CST;ICMS|"
+    "BC ICMS ST;XML|VR. ICMS ST;XML|ST integral|Chave DFe"
+)
+
+
+def relatorio(pasta, nome: str, linhas: list[tuple[str, str, str]]) -> str:
+    """Relatório gerencial de entradas com (chave, código, ST retido antes)."""
+    corpo = [CABECALHO_MOVIMENTO] + [
+        f"{codigo}|Item|789|0403|02/05/21|1|1|1|10|0|0|0|0|0|00176231110|SP|1.403|060|0|0|"
+        f"{st}|{chave}"
+        for chave, codigo, st in linhas
+    ]
+    caminho = pasta / nome
+    caminho.write_bytes(("\r\n".join(corpo) + "\r\n").encode("latin-1"))
+    return str(caminho)
+
+
+class TestExtrairRetido:
+    def test_soma_o_mesmo_item_entre_relatorios(self, tmp_path):
+        """O mês quebrado por praça põe o mesmo item em dois relatórios, e vale
+        o total — somado agora no DuckDB, e não num dicionário em memória."""
+        a = relatorio(tmp_path, "sp.txt", [(CHAVE_A, "117110", "1,25"), (CHAVE_B, "9", "2,00")])
+        b = relatorio(tmp_path, "pr.txt", [(CHAVE_A, "117110", "3,50")])
+        destino = tmp_path / ARQUIVO_RETIDO
+        r = extrair_retido([a, b], str(destino))
+        assert r.itens == 2 and r.arquivos == 2 and r.recusados == 0
+        lido = {(x["chave"], x["codigo"]): x["informado"]
+                for x in pq.read_table(str(destino)).to_pylist()}
+        assert lido == {(CHAVE_A, "117110"): d("4.75"), (CHAVE_B, "9"): d("2.00")}
+        assert not (tmp_path / (ARQUIVO_RETIDO + ".partes")).exists()
+
+    def test_sem_nada_informado_grava_parquet_vazio(self, tmp_path):
+        destino = tmp_path / ARQUIVO_RETIDO
+        assert extrair_retido([], str(destino)).itens == 0
+        assert pq.read_table(str(destino)).num_rows == 0
+
+
 class TestPendenciaNoParquet:
     def test_separa_sem_o_que_apurar_de_falta_dado(self, tmp_path):
         escrever_movimentos(tmp_path, [
@@ -381,6 +421,25 @@ class TestAnalitico:
             vistas += [d["chave"] for d in
                        linhas(str(tmp_path), escopo="documento", pagina=pagina, por_pagina=2)["linhas"]]
         assert vistas == sorted(chaves)
+
+    def test_nota_sem_chave_nao_vira_um_documento_so(self, tmp_path):
+        """Nota modelo 1 não tem chave. Agrupar pela chave vazia juntava todas
+        numa só: 904 itens de 667 notas na base real."""
+        escrever_movimentos(tmp_path, [
+            movimento(chave="", modelo="01", numero_documento="10", codigo="1"),
+            movimento(chave="", modelo="01", numero_documento="10", codigo="2"),
+            movimento(chave="", modelo="01", numero_documento="11", codigo="1"),
+            movimento(chave=CHAVE_A),
+        ])
+        apurar(str(tmp_path))
+        for com_indice in (True, False):
+            if not com_indice:
+                (tmp_path / ARQUIVO_DOCUMENTOS).unlink()
+            r = linhas(str(tmp_path), escopo="documento")
+            assert r["total"] == 3, com_indice
+            itens = {d["numero_documento"]: len(d["filhos"]) for d in r["linhas"] if not d["chave"]}
+            assert itens == {"10": 2, "11": 1}, com_indice
+            assert len({d["documento"] for d in r["linhas"]}) == 3
 
     def test_escopo_e_fonte_desconhecidos_sao_recusados(self, tmp_path):
         self._base(tmp_path)

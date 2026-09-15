@@ -96,6 +96,9 @@ export interface ExecucaoDoSuportado extends Omit<Execucao, "resumo"> {
 export type Escopo = "documento" | "item";
 
 export interface ItemDoAnalitico {
+  /** o que identifica a nota: a chave, ou estabelecimento+número quando não há chave */
+  documento: string;
+  /** vazia na nota sem chave de acesso (modelo 1) */
   chave: string;
   numero_documento: string | null;
   modelo: string;
@@ -111,6 +114,7 @@ export interface ItemDoAnalitico {
 }
 
 export interface DocumentoDoAnalitico {
+  documento: string;
   chave: string;
   numero_documento: string | null;
   modelo: string;

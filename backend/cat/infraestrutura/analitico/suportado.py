@@ -49,6 +49,7 @@ apagaria o que a movimentação produziu.
 from __future__ import annotations
 
 import os
+import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
@@ -193,50 +194,103 @@ def extrair_retido(
     `avisar` recebe (arquivos lidos, total). `deve_parar` é consultado entre um
     arquivo e outro: cada relatório é lido inteiro, então é ali o ponto seguro
     de parar sem deixar meio parquet no disco.
+
+    **Um arquivo por vez em memória.** Cada relatório vira uma parte em
+    parquet, e a soma entre relatórios é do DuckDB. Acumular tudo num
+    dicionário, como era, segurava 14,1 milhões de itens em Python na base real
+    do Amigão (94 relatórios, 20 GB) — gigabytes de memória numa máquina que
+    roda Docker, Excel e o resto ao lado.
     """
     from cat.dominio.gerencial.campos import Especie
     from cat.infraestrutura.arquivos.gerencial import Leitura
 
-    acumulado: dict[tuple[str, str], Decimal] = {}
+    partes = destino + ".partes"
+    shutil.rmtree(partes, ignore_errors=True)
+    os.makedirs(partes)
     lidos = recusados = sem_chave = 0
 
-    for n, caminho in enumerate(relatorios, 1):
-        _conferir(deve_parar)
-        nome = os.path.basename(caminho)
-        try:
-            leitura = Leitura(caminho)
-            if leitura.especie is not Especie.MOVIMENTO:
+    try:
+        for n, caminho in enumerate(relatorios, 1):
+            _conferir(deve_parar)
+            acumulado = _ler_um_relatorio(caminho, n, len(relatorios), avisar,
+                                          Leitura, Especie)
+            if acumulado is None:
                 recusados += 1
-                log.warning("relatório não é de movimento, ignorado na apuração",
-                            extra={"arquivo": nome, "especie": leitura.especie.value})
                 continue
-            for m in leitura.movimentos():
-                if not m.e_entrada:
-                    continue
-                lidos += 1
-                chave = (m.chave or "").strip()
-                if len(chave) != 44 or not chave.isdigit():
-                    sem_chave += 1
-                    continue
-                valor = m.imposto_suportado
-                if valor <= 0:
-                    continue
-                alvo = (chave, (m.codigo_item or "").strip())
-                acumulado[alvo] = acumulado.get(alvo, Decimal(0)) + valor
-        except (OSError, ValueError) as erro:
-            recusados += 1
-            log.warning("relatório ilegível na apuração do suportado",
-                        extra={"arquivo": nome, "motivo": str(erro)})
-        finally:
-            if avisar is not None:
-                avisar(n, len(relatorios))
+            por_item, l, s = acumulado
+            lidos += l
+            sem_chave += s
+            if por_item:
+                _gravar_retido(por_item, os.path.join(partes, f"{n:05d}.parquet"))
+        itens = _somar_partes(partes, destino)
+    finally:
+        shutil.rmtree(partes, ignore_errors=True)
 
-    _gravar_retido(acumulado, destino)
     extraido = RetidoExtraido(arquivos=len(relatorios), recusados=recusados,
                               linhas_de_entrada=lidos, sem_chave=sem_chave,
-                              itens=len(acumulado))
+                              itens=itens)
     log.info("imposto informado pelo cliente extraído", extra=vars(extraido))
     return extraido
+
+
+def _ler_um_relatorio(caminho, n, total, avisar, Leitura, Especie):
+    """(imposto por item, linhas de entrada, sem chave) de um relatório, ou
+    None quando ele não serve — ilegível ou de outra espécie."""
+    nome = os.path.basename(caminho)
+    acumulado: dict[tuple[str, str], Decimal] = {}
+    lidos = sem_chave = 0
+    try:
+        leitura = Leitura(caminho)
+        if leitura.especie is not Especie.MOVIMENTO:
+            log.warning("relatório não é de movimento, ignorado na apuração",
+                        extra={"arquivo": nome, "especie": leitura.especie.value})
+            return None
+        for m in leitura.movimentos():
+            if not m.e_entrada:
+                continue
+            lidos += 1
+            chave = (m.chave or "").strip()
+            if len(chave) != 44 or not chave.isdigit():
+                sem_chave += 1
+                continue
+            valor = m.imposto_suportado
+            if valor <= 0:
+                continue
+            alvo = (chave, (m.codigo_item or "").strip())
+            acumulado[alvo] = acumulado.get(alvo, Decimal(0)) + valor
+        return acumulado, lidos, sem_chave
+    except (OSError, ValueError) as erro:
+        log.warning("relatório ilegível na apuração do suportado",
+                    extra={"arquivo": nome, "motivo": str(erro)})
+        return None
+    finally:
+        if avisar is not None:
+            avisar(n, total)
+
+
+def _somar_partes(partes: str, destino: str) -> int:
+    """Soma o mesmo item entre relatórios e grava o parquet final.
+
+    O mesmo item aparece em mais de um relatório quando o cliente manda o mês
+    quebrado por praça, e o que vale é o total do item no documento — a mesma
+    soma que o dicionário fazia, agora fora da memória do Python.
+    """
+    if not any(n.endswith(".parquet") for n in os.listdir(partes)):
+        _gravar_retido({}, destino)
+        return 0
+    con = _leitura(partes)
+    try:
+        con.execute(f"""
+            COPY (
+                SELECT chave, codigo, CAST(sum(informado) AS DECIMAL(18, 6)) AS informado
+                FROM read_parquet('{_escapar(os.path.join(partes, "*.parquet"))}')
+                GROUP BY chave, codigo
+            ) TO '{_escapar(destino)}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        """)
+        return con.execute(
+            f"SELECT count(*) FROM read_parquet('{_escapar(destino)}')").fetchone()[0]
+    finally:
+        con.close()
 
 
 def contar_entradas(pasta_movimentos: str) -> int:
@@ -397,10 +451,22 @@ def _percorrer(con, saida: str, avisar: Aviso | None,
     return resumo
 
 
+# O que identifica um documento. A chave, quando há; sem ela — nota modelo 1,
+# que não tem chave de acesso —, estabelecimento, participante, modelo, número
+# e competência. Agrupar só pela chave juntava todas as notas sem chave num
+# "documento" só: 904 itens de 667 notas na base real do Amigão.
+_DOCUMENTO = """
+    CASE WHEN length(coalesce(chave, '')) = 44 THEN chave
+         ELSE 'sem-chave|' || coalesce(cnpj, '') || '|' || coalesce(participante, '')
+              || '|' || coalesce(modelo, '') || '|' || coalesce(numero_documento, '')
+              || '|' || coalesce(CAST(competencia AS VARCHAR), '')
+    END
+"""
+
 # as colunas de um documento, com o CST e a fonte que mais pesam: uma nota pode
 # misturar itens, e a tela mostra o principal
 _AGREGADO_DO_DOCUMENTO = """
-    chave, any_value(numero_documento) AS numero_documento,
+    documento, any_value(chave) AS chave, any_value(numero_documento) AS numero_documento,
     any_value(modelo) AS modelo,
     min(competencia) AS competencia,
     any_value(participante) AS participante,
@@ -420,22 +486,46 @@ def _indexar_documentos(con, saida: str, destino: str) -> None:
     intervalo de `ordem`, que o parquet acha pelas estatísticas do grupo de
     linhas sem ler o resto.
     """
-    fonte = f"read_parquet('{_escapar(saida)}')"
+    fonte = f"(SELECT *, {_DOCUMENTO} AS documento FROM read_parquet('{_escapar(saida)}'))"
     con.execute(f"""
         COPY (
             WITH juntos AS (
                 SELECT NULL::VARCHAR AS filtro_fonte, {_AGREGADO_DO_DOCUMENTO}
-                FROM {fonte} GROUP BY chave
+                FROM {fonte} GROUP BY documento
                 UNION ALL
                 SELECT fonte AS filtro_fonte, {_AGREGADO_DO_DOCUMENTO}
-                FROM {fonte} GROUP BY fonte, chave
+                FROM {fonte} GROUP BY fonte, documento
             )
             SELECT *, row_number() OVER (
-                       PARTITION BY filtro_fonte ORDER BY competencia, chave) AS ordem
+                       PARTITION BY filtro_fonte ORDER BY competencia, documento) AS ordem
             FROM juntos
             ORDER BY filtro_fonte NULLS FIRST, ordem
         ) TO '{_escapar(destino)}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 50000)
     """)
+
+
+def _indice_serve(indice: str) -> bool:
+    """Índice de antes da coluna `documento` agrupava nota sem chave numa só:
+    é ignorado, e a página sai calculada na hora, lenta mas certa."""
+    if not os.path.isfile(indice):
+        return False
+    if "documento" in pq.read_schema(indice).names:
+        return True
+    log.warning("índice por documento de versão anterior, ignorado",
+                extra={"indice": indice})
+    return False
+
+
+def reindexar(destino: str) -> None:
+    """Regrava o índice por documento de uma apuração já concluída."""
+    con = _abrir(destino)
+    try:
+        _indexar_documentos(con, os.path.join(destino, ARQUIVO_SUPORTADO),
+                            os.path.join(destino, ARQUIVO_DOCUMENTOS))
+    finally:
+        con.close()
+        _limpar(destino)
+    log.info("índice por documento regravado", extra={"destino": destino})
 
 
 class _Lote:
@@ -570,7 +660,8 @@ def linhas(
                        "OR codigo ILIKE ? OR descricao ILIKE ?)")
         parametros.extend([termo] * 5)
     onde = f"WHERE {' AND '.join(filtros)}" if filtros else ""
-    base = f"(SELECT * FROM read_parquet('{_escapar(saida)}') {onde})"
+    base = (f"(SELECT *, {_DOCUMENTO} AS documento "
+            f"FROM read_parquet('{_escapar(saida)}') {onde})")
     deslocamento = (pagina - 1) * por_pagina
 
     con = _leitura(destino)
@@ -578,10 +669,10 @@ def linhas(
         if escopo == "item":
             total = con.execute(f"SELECT count(*) FROM {base}", parametros).fetchone()[0]
             cursor = con.execute(f"""
-                SELECT chave, numero_documento, modelo, competencia, participante, codigo,
-                       descricao, cst_icms, fonte, bc_st, suportado, motivo
+                SELECT documento, chave, numero_documento, modelo, competencia, participante,
+                       codigo, descricao, cst_icms, fonte, bc_st, suportado, motivo
                 FROM {base}
-                ORDER BY competencia, chave, codigo
+                ORDER BY competencia, documento, codigo
                 LIMIT {por_pagina} OFFSET {deslocamento}
             """, parametros)
             nomes = [c[0] for c in cursor.description]
@@ -590,9 +681,9 @@ def linhas(
                     "total": total, "linhas": itens}
 
         indice = os.path.join(destino, ARQUIVO_DOCUMENTOS)
-        colunas = ("chave, numero_documento, modelo, competencia, participante, itens, "
-                   "bc_st, suportado, cst, fonte_valor, fonte_itens")
-        if os.path.isfile(indice) and not (busca and busca.strip()):
+        colunas = ("documento, chave, numero_documento, modelo, competencia, participante, "
+                   "itens, bc_st, suportado, cst, fonte_valor, fonte_itens")
+        if _indice_serve(indice) and not (busca and busca.strip()):
             # sem busca, a página sai pronta do índice
             parte = "filtro_fonte = ?" if fonte else "filtro_fonte IS NULL"
             recorte = [fonte] if fonte else []
@@ -605,42 +696,43 @@ def linhas(
             """, recorte).fetchall()
         else:
             total = con.execute(
-                f"SELECT count(DISTINCT chave) FROM {base}", parametros).fetchone()[0]
+                f"SELECT count(DISTINCT documento) FROM {base}", parametros).fetchone()[0]
             documentos = con.execute(f"""
                 SELECT {colunas} FROM (
-                    SELECT {_AGREGADO_DO_DOCUMENTO} FROM {base} GROUP BY chave
-                ) ORDER BY competencia, chave
+                    SELECT {_AGREGADO_DO_DOCUMENTO} FROM {base} GROUP BY documento
+                ) ORDER BY competencia, documento
                 LIMIT {por_pagina} OFFSET {deslocamento}
             """, parametros).fetchall()
-        chaves = [d[0] for d in documentos]
-        filhos: dict[str, list[dict]] = {c: [] for c in chaves}
-        if chaves:
-            marcadores = ", ".join("?" * len(chaves))
+        ids = [d[0] for d in documentos]
+        filhos: dict[str, list[dict]] = {c: [] for c in ids}
+        if ids:
+            marcadores = ", ".join("?" * len(ids))
             cursor = con.execute(f"""
-                SELECT chave, numero_documento, modelo, competencia, participante, codigo,
-                       descricao, cst_icms, fonte, bc_st, suportado, motivo
-                FROM {base} WHERE chave IN ({marcadores})
-                ORDER BY chave, codigo
-            """, parametros + chaves)
+                SELECT documento, chave, numero_documento, modelo, competencia, participante,
+                       codigo, descricao, cst_icms, fonte, bc_st, suportado, motivo
+                FROM {base} WHERE documento IN ({marcadores})
+                ORDER BY documento, codigo
+            """, parametros + ids)
             nomes = [c[0] for c in cursor.description]
             for r in cursor.fetchall():
                 linha = dict(zip(nomes, r))
-                filhos[linha["chave"]].append(_item(linha))
+                filhos[linha["documento"]].append(_item(linha))
     finally:
         con.close()
 
     saida_docs = []
-    for (chave, numero, modelo, comp, participante, n_itens, bc_st, suportado,
+    for (documento, chave, numero, modelo, comp, participante, n_itens, bc_st, suportado,
          cst, fonte_valor, fonte_itens) in documentos:
         principal = fonte_valor if (suportado or 0) > 0 else fonte_itens
         saida_docs.append({
-            "chave": chave, "numero_documento": numero, "modelo": modelo or "",
+            "documento": documento, "chave": chave or "",
+            "numero_documento": numero, "modelo": modelo or "",
             "competencia": comp.isoformat()[:7] if comp else "",
             "participante": participante, "cst": cst or "",
             "fonte": principal, "itens": n_itens,
             "bc_st": str(Decimal(str(bc_st or 0))),
             "suportado": str(Decimal(str(suportado or 0))),
-            "filhos": filhos.get(chave, []),
+            "filhos": filhos.get(documento, []),
         })
     return {"escopo": escopo, "pagina": pagina, "por_pagina": por_pagina,
             "total": total, "linhas": saida_docs}
@@ -649,7 +741,8 @@ def linhas(
 def _item(linha: dict) -> dict:
     comp = linha.get("competencia")
     return {
-        "chave": linha.get("chave"),
+        "documento": linha.get("documento"),
+        "chave": linha.get("chave") or "",
         "numero_documento": linha.get("numero_documento"),
         "modelo": linha.get("modelo") or "",
         "competencia": comp.isoformat()[:7] if comp else "",

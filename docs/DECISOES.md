@@ -5,6 +5,38 @@
 
 ---
 
+## 2026-09-15 — A primeira rodada real da etapa 4, e o que ela mostrou
+
+**Rodou pela tela sobre o Amigão inteiro** (execução 11): 94 relatórios do
+cliente, 20 GB, e os 8.761.002 itens de entrada de 2021, em 32 min 50 s. Os
+números batem com a medição feita por script: cobertura de 68,79%, R$
+337.688.895,48 apurados, fração documental de 100%, e CST 40 com 75,6% dos
+itens sem apuração.
+
+**Três defeitos que só a base real mostrou.**
+
+1. **Nota sem chave virava um documento só.** O analítico agrupava pela chave,
+   e as 667 notas modelo 1 (904 itens) caíam todas na chave vazia. O
+   documento passa a ser a chave quando há, e estabelecimento + participante
+   + modelo + número + competência quando não há. Índice gravado antes disso é
+   ignorado — a página sai calculada na hora — até ser regravado.
+2. **A leitura dos relatórios segurava tudo em memória.** Eram 14,1 milhões de
+   itens num dicionário do Python, ao longo de 26 minutos, numa máquina com 1
+   GB livre. Agora cada relatório vira uma parte em parquet e a soma entre
+   relatórios é do DuckDB: a memória fica no tamanho do maior relatório.
+3. **O banco não voltava sozinho.** O Docker Desktop reiniciou no meio da
+   rodada; os contêineres com política de reinício voltaram, o do CAT não, e a
+   API respondeu 500 a toda consulta da tela. O `docker-compose.yml` ganhou
+   `restart: unless-stopped`. A rodada em si sobreviveu: o progresso que não
+   gravou foi descartado sem derrubar nada, e ela concluiu quando o banco
+   voltou.
+
+**A questão aberta ficou maior.** Com todos os relatórios, a fonte 2 dá R$
+120,95 milhões a CST 00 e R$ 61,78 milhões a CST 20 — 54% dos R$ 337,7 milhões
+vêm de CST sem substituição. Continua sem decisão (ver a entrada abaixo).
+
+---
+
 ## 2026-09-15 — Etapa 4 ganha rodada, tela e cancelamento
 
 **O que entrou.** A apuração do ICMS suportado deixou de ser script e virou
