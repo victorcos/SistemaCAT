@@ -13,6 +13,7 @@ from cat.dominio.sped.itens import (
     LEITORES,
     PREFIXOS_DE_ITENS,
     ler_0200,
+    ler_0220,
     ler_c170,
     ler_c190,
     ler_c810,
@@ -50,6 +51,15 @@ class TestCadastro:
         assert i.cod_gen == "04"
         assert i.aliq_icms == Decimal("18")
         assert i.cest == "1702200"
+
+
+class TestConversao:
+    def test_0220_fator_multiplica_para_a_unidade_do_inventario(self):
+        c = ler_0220(campos("|0220|CX|12,000000|7891000100103|"))
+        assert c.unidade == "CX" and c.fator == Decimal("12")
+
+    def test_0220_esta_entre_os_registros_lidos(self):
+        assert b"|0220|" in PREFIXOS_DE_ITENS and "0220" in LEITORES
 
 
 class TestItemDeDocumento:

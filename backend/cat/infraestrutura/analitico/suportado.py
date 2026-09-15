@@ -406,6 +406,11 @@ def apurar(
         _conferir(deve_parar)
         if ao_indexar is not None:
             ao_indexar()
+        # conexão nova para o índice: na do percurso, que acabou de ler 8,7
+        # milhões de itens, ele levou 19 minutos no Amigão (15/09/2026); numa
+        # conexão limpa, 2
+        con.close()
+        con = _abrir(destino)
         _indexar_documentos(con, saida, os.path.join(destino, ARQUIVO_DOCUMENTOS))
     except ApuracaoCancelada:
         # meio parquet no disco seria lido depois como apuração inteira

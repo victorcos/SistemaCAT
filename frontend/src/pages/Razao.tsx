@@ -337,6 +337,10 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: Re
   type Tom = "atencao" | "neutro";
   const pendencias: { n: number; texto: string; tom: Tom }[] = pend
     ? [
+        { n: resumo.conferencia_inventario && "suspeita_unidade" in resumo.conferencia_inventario
+            ? resumo.conferencia_inventario.suspeita_unidade : 0,
+          texto: "comparações com o inventário com diferença do tamanho de um fator de embalagem — suspeita de unidade", tom: "atencao" as Tom },
+        { n: pend.linhas_unidade_sem_fator ?? 0, texto: "linhas com unidade diferente da do inventário e sem fator de conversão (0220): a quantidade ficou como veio", tom: "atencao" as Tom },
         { n: pend.fichas_fora_de_sp, texto: "fichas de estabelecimento fora de SP — a CAT 42 é paulista, elas não entram no pedido", tom: "atencao" as Tom },
         { n: pend.fichas_abertura_sem_valor, texto: "fichas abertas com quantidade e sem ICMS suportado: o inventário não traz o imposto, e o custo médio fica subestimado até o estoque girar", tom: "atencao" as Tom },
         { n: pend.confronto_pendente, texto: "saídas de enquadramento 2 ou 4: o confronto com o ICMS da entrada ainda não é apurado", tom: "atencao" as Tom },
@@ -401,6 +405,8 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: Re
         </section>
       )}
 
+      <Conferencia resumo={resumo} acao={par("conferencia", "Baixar a conferência")} />
+
       <PorEnquadramento resumo={resumo} acao={par("ficha3", "Baixar a Ficha 3", true)} />
 
       <PorCompetencia resumo={resumo} />
@@ -433,6 +439,57 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: Re
         </BotaoLink>
       </section>
     </div>
+  );
+}
+
+/** O juiz da unidade e da completude: o saldo da ficha fecha com o bloco H? */
+function Conferencia({ resumo, acao }: { resumo: ResumoDoRazao; acao: ReactNode }) {
+  const c = resumo.conferencia_inventario;
+  if (!c || !("com_estoque" in c)) return null;
+  const base = Math.max(1, c.com_estoque);
+  const fecham = c.batem + c.proximas;
+  const conv = resumo.conversao;
+  return (
+    <Cartao className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-baseline gap-3">
+        <h2 className="m-0 flex-1 text-base font-extrabold text-texto">Conferência com o inventário</h2>
+        <span className="text-xs text-texto-fraco">
+          {numero(c.datas)} datas de bloco H · {numero(c.com_estoque)} comparações com estoque
+        </span>
+        {acao}
+      </div>
+      <p className="m-0 max-w-[820px] text-xs leading-relaxed text-texto-suave">
+        O saldo de cada ficha em cada data de inventário contra o estoque que a empresa declarou. É o juiz da
+        unidade e da completude: entrada em caixa com venda em unidade, ou um tipo de saída que faltou, não
+        fecha aqui.
+      </p>
+      <div className="flex items-baseline gap-2.5">
+        <span className={cn("font-mono text-[34px] leading-none", fecham / base >= 0.9 ? "text-sucesso" : "text-atencao")}>
+          {((fecham / base) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%
+        </span>
+        <span className="text-[13px] text-texto-suave">fecham (exato ou até 2%)</span>
+      </div>
+      <BarraFina fracao={fecham / base} classe={fecham / base >= 0.9 ? "bg-sucesso" : "bg-atencao"} />
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">
+        {[
+          { rotulo: "Batem", valor: c.batem, classe: "text-sucesso" },
+          { rotulo: "Até 2%", valor: c.proximas, classe: "text-sucesso" },
+          { rotulo: "Divergem", valor: c.divergentes, classe: "text-atencao" },
+          { rotulo: "Suspeita de unidade", valor: c.suspeita_unidade, classe: "text-erro" },
+        ].map((x) => (
+          <div key={x.rotulo} className="rounded-[11px] border border-borda bg-superficie-vidro px-3.5 py-3">
+            <Rotulo>{x.rotulo}</Rotulo>
+            <p className={cn("m-0 mt-1.5 font-mono text-[17px]", x.valor ? x.classe : "text-texto-fraco")}>{numero(x.valor)}</p>
+          </div>
+        ))}
+      </div>
+      {conv && (
+        <p className="m-0 text-xs text-texto-fraco">
+          Conversão de unidade: {numero(conv.linhas_convertidas)} linhas convertidas pelo 0220 ·{" "}
+          {numero(conv.linhas_sem_fator)} com unidade diferente e sem fator, mantidas como vieram.
+        </p>
+      )}
+    </Cartao>
   );
 }
 
@@ -593,6 +650,9 @@ function Fichas({ execucaoId, total, rodape }: { execucaoId: number; total: numb
             { chave: "negativas", rotulo: "Estoque negativo" },
             { chave: "sem_aliquota", rotulo: "Sem alíquota" },
             { chave: "indefinidas", rotulo: "Indefinidas" },
+            { chave: "divergentes", rotulo: "Divergem do inventário" },
+            { chave: "suspeita_unidade", rotulo: "Suspeita de unidade" },
+            { chave: "sem_fator", rotulo: "Sem fator" },
           ]}
         />
       </div>
@@ -660,6 +720,9 @@ function Fichas({ execucaoId, total, rodape }: { execucaoId: number; total: numb
                     {f.abertura_sem_valor && <Marca>abertura s/ ICMS</Marca>}
                     {f.saidas_sem_aliquota > 0 && <Marca>s/ alíquota</Marca>}
                     {f.saidas_indefinidas > 0 && <Marca>indefinida</Marca>}
+                    {f.suspeita_de_unidade && <Marca>suspeita de unidade</Marca>}
+                    {!f.suspeita_de_unidade && (f.inventarios_divergentes ?? 0) > 0 && <Marca>diverge do inventário</Marca>}
+                    {(f.linhas_sem_fator ?? 0) > 0 && <Marca>unidade s/ fator</Marca>}
                   </span>
                 </button>
                 {aberto && <LinhasDaFicha execucaoId={execucaoId} ficha={f} />}
@@ -719,6 +782,14 @@ function Paginacao({
   );
 }
 
+function conversaoDaLinha(l: LinhaDaFicha): string | undefined {
+  if (l.unidade_sem_fator) return `Veio em ${l.unidade_origem}, que não é a unidade do inventário, e a EFD não trouxe 0220: quantidade mantida.`;
+  const fator = Number(l.fator_conversao ?? 1);
+  if (fator === 1) return undefined;
+  const origem = Number(l.quantidade) / fator;
+  return `Veio ${origem.toLocaleString("pt-BR")} ${l.unidade_origem} × ${fator.toLocaleString("pt-BR")} (0220)`;
+}
+
 function LinhasDaFicha({ execucaoId, ficha }: { execucaoId: number; ficha: Ficha }) {
   const [pagina, setPagina] = useState(1);
   const [dados, setDados] = useState<Pagina<LinhaDaFicha> | null>(null);
@@ -771,7 +842,16 @@ function LinhasDaFicha({ execucaoId, ficha }: { execucaoId: number; ficha: Ficha
           <span className={cn("font-mono text-xs", l.enquadramento_indefinido ? "text-atencao" : "text-texto-suave")}>
             {l.enquadramento_indefinido ? "?" : (l.enquadramento ?? "—")}
           </span>
-          <span className="text-right font-mono text-xs text-texto">{qtd(l.quantidade)}</span>
+          <span className="text-right font-mono text-xs text-texto" title={conversaoDaLinha(l)}>
+            {qtd(l.quantidade)}
+            {l.unidade_sem_fator ? (
+              <span className="ml-1 text-[10px] text-atencao">{l.unidade_origem} s/ fator</span>
+            ) : Number(l.fator_conversao ?? 1) !== 1 ? (
+              <span className="ml-1 text-[10px] text-texto-fraco">
+                ×{Number(l.fator_conversao).toLocaleString("pt-BR")}
+              </span>
+            ) : null}
+          </span>
           <span className="text-right font-mono text-xs text-texto">{valor(l.icms_suportado)}</span>
           <span className="text-right font-mono text-xs text-texto-suave">{l.icms_efetivo === null ? "—" : valor(l.icms_efetivo)}</span>
           <span className={cn("text-right font-mono text-xs", Number(l.saldo_quantidade) < 0 ? "text-atencao" : "text-texto-suave")}>

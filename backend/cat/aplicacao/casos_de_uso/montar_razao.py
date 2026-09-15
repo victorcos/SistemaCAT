@@ -270,7 +270,17 @@ def _anotar_pendencias(diario: Diario, r) -> None:
         (r.fichas_negativas, "fichas que ficaram com estoque negativo — falta entrada ou abertura"),
         (r.fichas_abertura_sem_valor, "fichas abertas com quantidade e sem ICMS suportado: o inventário não traz o imposto"),
         (r.fichas_fora_de_sp, "fichas de estabelecimento fora de SP, que não entram na CAT 42"),
+        (r.linhas_unidade_sem_fator, "linhas com unidade diferente da do inventário e sem fator "
+                                     "de conversão (0220): quantidade mantida como veio"),
+        (r.conferencia.get("suspeita_unidade", 0), "comparações com o inventário com diferença do "
+                                                   "tamanho de um fator de embalagem — suspeita de unidade"),
     ]
     for n, texto in avisos:
         if n:
             diario.anotar("aviso", f"{milhar(n)} {texto}.")
+    c = r.conferencia
+    if c.get("com_estoque"):
+        fecham = c["batem"] + c["proximas"]
+        diario.anotar("info", f"Conferência com o inventário: {milhar(fecham)} de "
+                              f"{milhar(c['com_estoque'])} comparações fecham (até 2%), em "
+                              f"{c['datas']} datas de bloco H.")

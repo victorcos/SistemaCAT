@@ -18,7 +18,8 @@ de 119,82 GB). Saem cinco parquets por execução:
   documento fechar, quando já se sabe quantos itens ele teve;
 * ``itens_da_efd.parquet`` — cada 0200, por arquivo (o cadastro se repete a
   cada período; a consolidação escolhe o mais recente);
-* ``inventario.parquet`` — cada H010, com a data e o motivo do H005.
+* ``inventario.parquet`` — cada H010, com a data e o motivo do H005;
+* ``conversoes_da_efd.parquet`` — cada 0220, amarrado ao 0200 logo acima.
 
 A amarração filho→pai depende da ordem do arquivo, que o leiaute garante: o
 C170 vem logo abaixo do seu C100. Um C170 sem C100 antes é arquivo quebrado e
@@ -52,6 +53,7 @@ ARQUIVO_MOVIMENTOS_BRUTOS = "_movimentos_brutos.parquet"
 ARQUIVO_ANALITICO = "analitico.parquet"
 ARQUIVO_ITENS_DA_EFD = "itens_da_efd.parquet"
 ARQUIVO_INVENTARIO = "inventario.parquet"
+ARQUIVO_CONVERSOES_DA_EFD = "conversoes_da_efd.parquet"
 
 PREFIXOS = (b"|C100|", b"|C800|") + PREFIXOS_DE_ITENS
 
@@ -61,6 +63,7 @@ _Q5 = Decimal("0.00001")
 _Q2 = Decimal("0.01")
 _Q4 = Decimal("0.0001")
 _Q6 = Decimal("0.000001")
+_Q9 = Decimal("0.000000001")
 
 _DOCUMENTO = [
     ("cnpj", pa.string()),
@@ -135,6 +138,15 @@ ESQUEMA_ITENS = pa.schema([
     ("cest", pa.string()),
 ])
 
+ESQUEMA_CONVERSOES = pa.schema([
+    ("cnpj", pa.string()),
+    ("competencia", pa.date32()),
+    ("arquivo", pa.string()),
+    ("codigo", pa.string()),
+    ("unidade", pa.string()),
+    ("fator", pa.decimal128(24, 9)),
+])
+
 ESQUEMA_INVENTARIO = pa.schema([
     ("cnpj", pa.string()),
     ("competencia", pa.date32()),
@@ -161,6 +173,7 @@ class ProgressoDeItens(Progresso):
     analiticos: int = 0
     itens_cadastrados: int = 0
     em_estoque: int = 0
+    conversoes: int = 0
     documentos_com_item: int = 0
     orfaos: int = 0                    # C170/C190 sem C100 antes: arquivo quebrado
     arquivos_com_orfaos: list[str] = field(default_factory=list)
@@ -180,6 +193,8 @@ class _Contexto:
         # os analíticos esperam o documento fechar para sair com `tem_item`
         self.analiticos: list[dict] = []
         self.inventario: Inventario | None = None
+        # o 0220 não repete o código: é do 0200 logo acima
+        self.item_aberto: str | None = None
 
     def do_documento(self) -> dict:
         d = self.doc
@@ -209,6 +224,8 @@ def extrair_movimentos(caminhos: list[str], destino: str,
                            ESQUEMA_ITENS),
         "inventario": _Escritor(os.path.join(destino, ARQUIVO_INVENTARIO),
                                 ESQUEMA_INVENTARIO),
+        "conversoes": _Escritor(os.path.join(destino, ARQUIVO_CONVERSOES_DA_EFD),
+                                ESQUEMA_CONVERSOES),
     }
 
     for caminho in caminhos:
@@ -302,6 +319,7 @@ def _ler_arquivo(caminho: str, ctx: _Contexto, escritores: dict,
                 progresso.analiticos += 1
 
             elif registro == "0200":
+                ctx.item_aberto = lido.codigo
                 escritores["itens"].acrescentar({
                     **ctx.base,
                     "codigo": lido.codigo, "descricao": lido.descricao,
@@ -313,6 +331,15 @@ def _ler_arquivo(caminho: str, ctx: _Contexto, escritores: dict,
                     "cest": lido.cest,
                 })
                 progresso.itens_cadastrados += 1
+
+            elif registro == "0220":
+                if ctx.item_aberto is None or lido.fator <= 0:
+                    continue
+                escritores["conversoes"].acrescentar({
+                    **ctx.base, "codigo": ctx.item_aberto,
+                    "unidade": lido.unidade.upper(), "fator": lido.fator.quantize(_Q9),
+                })
+                progresso.conversoes += 1
 
             elif registro == "H005":
                 ctx.inventario = lido

@@ -154,7 +154,7 @@ class TestFluxo:
         assert [x["especie"] for x in l.json()["linhas"]] == ["entrada", "entrada", "saida"]
 
     def test_as_duas_planilhas(self, cliente, razao):
-        for qual in ("ficha3", "fichas"):
+        for qual in ("ficha3", "fichas", "conferencia"):
             r = planilha(cliente, "razao", razao["id"], qual)
             assert r.status_code == 200, (qual, r.text)
             assert r.content[:2] == b"PK"

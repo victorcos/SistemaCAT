@@ -19,6 +19,10 @@ quantidade por valor em milhões de linhas.
   saber quanto de CST 60 saiu em cada cupom sem abrir o XML.
 * **H005 / H010** — inventário: a data, o total e cada item em estoque. É o
   saldo de abertura da ficha.
+* **0220** — fator de conversão de unidade (filho do 0200): quantas unidades
+  de estoque há numa unidade da nota. A Ficha 3 é na unidade do inventário
+  (UNID_INV do 0200); nota em caixa e venda em unidade só se somam depois de
+  convertidas.
 """
 
 from __future__ import annotations
@@ -117,6 +121,22 @@ class ItemEmEstoque:
     ind_prop: str = ""           # 0 = próprio em poder da empresa
     participante: str = ""
     cod_cta: str = ""
+
+
+@dataclass(frozen=True)
+class ConversaoDeUnidade:
+    """|0220|UNID_CONV|FAT_CONV|COD_BARRA| — filho do 0200.
+
+    O Guia Prático da EFD: fator que **multiplica** a unidade a converter para
+    chegar à unidade de inventário. Caixa com 12 → fator 12.
+    """
+
+    unidade: str
+    fator: Decimal
+
+
+def ler_0220(campos: list[str]) -> ConversaoDeUnidade:
+    return ConversaoDeUnidade(unidade=_texto(campos, 2), fator=_decimal(_texto(campos, 3)))
 
 
 def ler_0200(campos: list[str]) -> ItemCadastrado:
@@ -241,10 +261,10 @@ def _inteiro(bruto: str) -> int:
 
 # só quem passa no prefixo é quebrado em campos (mesma regra do C100/C800)
 PREFIXOS_DE_ITENS = (
-    b"|0200|", b"|C170|", b"|C810|", b"|C190|", b"|C850|", b"|H005|", b"|H010|",
+    b"|0200|", b"|0220|", b"|C170|", b"|C810|", b"|C190|", b"|C850|", b"|H005|", b"|H010|",
 )
 
 LEITORES = {
-    "0200": ler_0200, "C170": ler_c170, "C810": ler_c810,
+    "0200": ler_0200, "0220": ler_0220, "C170": ler_c170, "C810": ler_c810,
     "C190": ler_c190, "C850": ler_c850, "H005": ler_h005, "H010": ler_h010,
 }

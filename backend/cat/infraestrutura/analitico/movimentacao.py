@@ -31,6 +31,7 @@ from cat.dominio.cat42.movimentacao import ResumoDaMovimentacao
 from cat.infraestrutura.analitico.confronto import _abrir, _escapar, _limpar
 from cat.infraestrutura.analitico.movimentos import (  # noqa: F401
     ARQUIVO_ANALITICO,
+    ARQUIVO_CONVERSOES_DA_EFD,
     ARQUIVO_DOCUMENTOS,
     ARQUIVO_INVENTARIO,
     ARQUIVO_ITENS_DA_EFD,
@@ -42,6 +43,7 @@ log = obter_log(__name__)
 
 ARQUIVO_ITENS = "itens.parquet"
 ARQUIVO_MOVIMENTOS = "movimentos.parquet"
+ARQUIVO_CONVERSOES = "conversoes.parquet"
 
 _MODELOS = {"01": "NF modelo 1/1-A", "55": "NF-e", "59": "CF-e-SAT", "65": "NFC-e",
             "57": "CT-e", "04": "NF de Produtor"}
@@ -67,6 +69,20 @@ def consolidar(destino: str, conferidos: str | None) -> ResumoDaMovimentacao:
                     ORDER BY competencia DESC NULLS LAST, arquivo DESC) = 1
             ) TO '{p(ARQUIVO_ITENS)}' (FORMAT PARQUET, COMPRESSION ZSTD)
         """)
+
+        # 1b. o fator de conversão (0220) mais recente por estabelecimento,
+        # código e unidade — o cadastro muda de período para período, e vale
+        # o último, como no 0200
+        if os.path.isfile(os.path.join(destino, ARQUIVO_CONVERSOES_DA_EFD)):
+            con.execute(f"""
+                COPY (
+                    SELECT cnpj, codigo, upper(trim(unidade)) AS unidade, fator, competencia
+                    FROM read_parquet('{p(ARQUIVO_CONVERSOES_DA_EFD)}')
+                    QUALIFY row_number() OVER (
+                        PARTITION BY cnpj, codigo, upper(trim(unidade))
+                        ORDER BY competencia DESC NULLS LAST, arquivo DESC) = 1
+                ) TO '{p(ARQUIVO_CONVERSOES)}' (FORMAT PARQUET, COMPRESSION ZSTD)
+            """)
 
         # 2. os movimentos com cadastro e com a marca da conferência.
         # A lista de conferidos é uma linha por chave; sem ela, ninguém é

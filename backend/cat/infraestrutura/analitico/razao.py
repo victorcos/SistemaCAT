@@ -27,6 +27,19 @@ CAT 42. Mercadoria de CST 00 ou 20 tem imposto próprio, não suportado, e fica
 de fora — decisão de 15/09/2026, depois de medir que ela respondia por 54% do
 "suportado" apurado.
 
+## Unidade: a ficha é na unidade do inventário
+
+A Ficha 3 é escriturada na unidade do 0200 (UNID_INV). O item de nota vem na
+unidade dela, e quando o rótulo difere o fator sai do 0220 da própria EFD.
+Sem 0220, a quantidade fica como veio e a linha é marcada — não se adivinha
+fator. No Amigão, que não entrega 0220, a quantidade da EFD já vem na unidade
+básica mesmo com rótulo CX ou FD: bateu com a "Qtde;Unitária" do relatório em
+100% dos itens de 05/2021. Converter pelo rótulo ali multiplicaria errado.
+
+O juiz final da unidade é o inventário: o saldo da ficha em cada data de
+bloco H é comparado com o que o bloco H diz. Diferença do tamanho de um fator
+de embalagem é marcada como suspeita de unidade.
+
 ## De qual loja é a saída do relatório
 
 O relatório diz a unidade ("005"), não o CNPJ. O CNPJ sai de duas pistas que
@@ -60,7 +73,11 @@ from cat.dominio.cat42.razao import (
     SaldoInicial,
 )
 from cat.infraestrutura.analitico.confronto import _abrir, _escapar, _limpar
-from cat.infraestrutura.analitico.movimentacao import ARQUIVO_ITENS, ARQUIVO_MOVIMENTOS
+from cat.infraestrutura.analitico.movimentacao import (
+    ARQUIVO_CONVERSOES,
+    ARQUIVO_ITENS,
+    ARQUIVO_MOVIMENTOS,
+)
 from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO
 from cat.infraestrutura.analitico.suportado import (
     ARQUIVO_SUPORTADO,
@@ -74,6 +91,7 @@ log = obter_log(__name__)
 ARQUIVO_SAIDAS_DO_RELATORIO = "saidas_do_relatorio.parquet"
 ARQUIVO_FICHA3 = "ficha3.parquet"
 ARQUIVO_FICHAS = "fichas.parquet"
+ARQUIVO_CONFERENCIA_INVENTARIO = "conferencia_inventario.parquet"
 
 LINHAS_POR_LOTE = 200_000
 POR_PAGINA_PADRAO = 50
@@ -118,6 +136,10 @@ ESQUEMA_FICHA3 = pa.schema([
     ("origem", pa.string()),
     ("enquadramento", pa.int8()),
     ("enquadramento_indefinido", pa.bool_()),
+    # a quantidade vai na unidade do inventário; estas três dizem como chegou lá
+    ("unidade_origem", pa.string()),
+    ("fator_conversao", pa.decimal128(24, 9)),
+    ("unidade_sem_fator", pa.bool_()),
     ("quantidade", pa.decimal128(24, 6)),
     ("icms_suportado", pa.decimal128(30, 15)),
     ("valor_unitario_usado", pa.decimal128(30, 15)),
@@ -146,7 +168,12 @@ ESQUEMA_FICHAS = pa.schema([
     ("ficou_negativo", pa.bool_()),
     ("saidas_sem_aliquota", pa.int32()),
     ("saidas_indefinidas", pa.int32()),
+    ("linhas_sem_fator", pa.int32()),
 ])
+
+# o que a conferência com o inventário acrescenta a cada ficha
+_COLUNAS_DA_CONFERENCIA = ("inventarios_conferidos", "inventarios_divergentes",
+                           "maior_diferenca_inventario", "suspeita_de_unidade")
 
 DeveParar = Callable[[], bool]
 
@@ -308,6 +335,10 @@ class ResumoDaMontagem:
     relatorio_sem_estabelecimento: int = 0
     relatorio_trocado_pela_efd: int = 0
     quantidade_negativa: int = 0
+    linhas_convertidas: int = 0
+    linhas_unidade_sem_fator: int = 0
+    abertura_sem_fator: int = 0
+    conferencia: dict = field(default_factory=dict)
 
 
 def contar_movimentos(fontes: Fontes, destino: str) -> int:
@@ -348,6 +379,7 @@ def montar(
         resumo.codigos_com_st = info["codigos"]
         resumo.relatorio_sem_estabelecimento = info["sem_estabelecimento"]
         resumo.relatorio_trocado_pela_efd = info["trocado_pela_efd"]
+        resumo.abertura_sem_fator = info["abertura_sem_fator"]
         aberturas = {(c, k): q for c, k, q in con.execute(
             "SELECT cnpj, codigo, quantidade FROM abertura").fetchall()}
         total = con.execute("SELECT count(*) FROM lancamentos").fetchone()[0]
@@ -358,10 +390,19 @@ def montar(
         """).to_arrow_reader(LINHAS_POR_LOTE)
         _percorrer(leitor, aberturas, ficha3, fichas, resumo, total,
                    uf_por_cnpj, descricoes or {}, avisar, deve_parar)
-        _descrever(con, fichas, os.path.join(fontes.movimentacao, ARQUIVO_ITENS))
+        # conexão nova para a conferência: a do percurso ainda segura o leitor
+        # (a lição do índice da etapa 4). O banco é em arquivo, as tabelas ficam
+        del leitor
+        con.close()
+        con = _abrir(destino)
+        resumo.conferencia = _conferir_inventario(
+            con, fontes, ficha3, fichas, os.path.join(destino, ARQUIVO_CONFERENCIA_INVENTARIO),
+            info["inicio"], info["fim"])
+        _completar_fichas(con, fichas, os.path.join(fontes.movimentacao, ARQUIVO_ITENS),
+                          os.path.join(destino, ARQUIVO_CONFERENCIA_INVENTARIO))
     except ApuracaoCancelada:
         con.close()
-        for arquivo in (ficha3, fichas):
+        for arquivo in (ficha3, fichas, os.path.join(destino, ARQUIVO_CONFERENCIA_INVENTARIO)):
             if os.path.isfile(arquivo):
                 os.remove(arquivo)
         raise
@@ -375,20 +416,131 @@ def montar(
     return resumo
 
 
-def _descrever(con, fichas: str, itens: str) -> None:
-    """Põe a descrição do 0200 em cada ficha. Em SQL, no fim: o cadastro inteiro
-    num dicionário do Python seriam milhões de entradas só para um rótulo."""
-    if not os.path.isfile(itens) or not os.path.isfile(fichas):
+def _completar_fichas(con, fichas: str, itens: str, conferencia: str) -> None:
+    """Põe em cada ficha a descrição do 0200 e o que a conferência com o
+    inventário achou. Em SQL, no fim: o cadastro inteiro num dicionário do
+    Python seriam milhões de entradas só para um rótulo."""
+    if not os.path.isfile(fichas):
         return
+    descricao = (f"LEFT JOIN read_parquet('{_escapar(itens)}') i ON i.cnpj = f.cnpj AND i.codigo = f.codigo"
+                 if os.path.isfile(itens) else "")
+    coluna_descricao = "coalesce(nullif(f.descricao, ''), i.descricao, '')" if descricao else "f.descricao"
+    if os.path.isfile(conferencia):
+        agregado = f"""(
+            SELECT cnpj, codigo,
+                   count(*) FILTER (saldo_ficha <> 0 OR inventario <> 0)::INTEGER AS inventarios_conferidos,
+                   count(*) FILTER (situacao IN ('divergente', 'suspeita_unidade'))::INTEGER AS inventarios_divergentes,
+                   max(abs(diferenca))::DECIMAL(24, 6) AS maior_diferenca_inventario,
+                   bool_or(situacao = 'suspeita_unidade') AS suspeita_de_unidade
+            FROM read_parquet('{_escapar(conferencia)}') GROUP BY cnpj, codigo)"""
+    else:
+        agregado = ("(SELECT NULL::VARCHAR AS cnpj, NULL::VARCHAR AS codigo, 0 AS inventarios_conferidos, "
+                    "0 AS inventarios_divergentes, NULL::DECIMAL(24, 6) AS maior_diferenca_inventario, "
+                    "false AS suspeita_de_unidade WHERE false)")
     provisorio = fichas + ".tmp"
     con.execute(f"""
         COPY (
-            SELECT f.* REPLACE (coalesce(nullif(f.descricao, ''), i.descricao, '') AS descricao)
+            SELECT f.* REPLACE ({coluna_descricao} AS descricao),
+                   coalesce(c.inventarios_conferidos, 0) AS inventarios_conferidos,
+                   coalesce(c.inventarios_divergentes, 0) AS inventarios_divergentes,
+                   coalesce(c.maior_diferenca_inventario, 0) AS maior_diferenca_inventario,
+                   coalesce(c.suspeita_de_unidade, false) AS suspeita_de_unidade
             FROM read_parquet('{_escapar(fichas)}') f
-            LEFT JOIN read_parquet('{_escapar(itens)}') i ON i.cnpj = f.cnpj AND i.codigo = f.codigo
+            {descricao}
+            LEFT JOIN {agregado} c ON c.cnpj = f.cnpj AND c.codigo = f.codigo
         ) TO '{_escapar(provisorio)}' (FORMAT PARQUET, COMPRESSION ZSTD)
     """)
     os.replace(provisorio, fichas)
+
+
+def _conferir_inventario(con, fontes: Fontes, ficha3: str, fichas: str, destino: str,
+                         inicio, fim) -> dict:
+    """O saldo de cada ficha em cada data de inventário do período, contra o bloco H.
+
+    É o juiz da unidade e da completude: se a entrada viesse em caixa e a
+    venda em unidade, ou se faltasse um tipo de saída, o saldo não fecharia com
+    o estoque que a própria empresa declarou. Item ausente do bloco H numa data
+    é estoque zero naquela data.
+    """
+    inventario = os.path.join(fontes.movimentacao, ARQUIVO_INVENTARIO)
+    if not os.path.isfile(inventario) or not os.path.isfile(ficha3):
+        return {}
+    con.execute(f"""
+        CREATE OR REPLACE TABLE inv_periodo AS
+        SELECT v.cnpj, v.codigo, v.data_inventario,
+               sum(v.quantidade * {_FATOR.format(t="v")}) AS inventario
+        FROM read_parquet('{_escapar(inventario)}') v
+        LEFT JOIN unid u ON u.cnpj = v.cnpj AND u.codigo = v.codigo
+        LEFT JOIN conv cv ON cv.cnpj = v.cnpj AND cv.codigo = v.codigo AND cv.unidade = upper(trim(v.unidade))
+        WHERE v.data_inventario BETWEEN DATE '{inicio}' AND DATE '{fim}'
+        GROUP BY 1, 2, 3
+    """)
+    con.execute(f"""
+        CREATE OR REPLACE TABLE alvo AS
+        SELECT f.cnpj, f.codigo, d.data_inventario, f.abertura_quantidade
+        FROM read_parquet('{_escapar(fichas)}') f
+        JOIN (SELECT DISTINCT cnpj, data_inventario FROM inv_periodo) d ON d.cnpj = f.cnpj
+    """)
+    con.execute(f"""
+        CREATE OR REPLACE TABLE saldo_dia AS
+        SELECT cnpj, codigo, data, arg_max(saldo_quantidade, numero) AS saldo
+        FROM read_parquet('{_escapar(ficha3)}') GROUP BY 1, 2, 3
+    """)
+    con.execute("""
+        CREATE OR REPLACE TABLE conf0 AS
+        SELECT a.cnpj, a.codigo, a.data_inventario, coalesce(s.saldo, a.abertura_quantidade) AS saldo_ficha
+        FROM alvo a ASOF LEFT JOIN saldo_dia s
+          ON s.cnpj = a.cnpj AND s.codigo = a.codigo AND a.data_inventario >= s.data
+    """)
+    con.execute(f"""
+        COPY (
+            SELECT c.cnpj, c.codigo, c.data_inventario, c.saldo_ficha,
+                   coalesce(i.inventario, 0) AS inventario,
+                   c.saldo_ficha - coalesce(i.inventario, 0) AS diferenca,
+                   CASE
+                     WHEN abs(c.saldo_ficha - coalesce(i.inventario, 0)) < 0.001 THEN 'bate'
+                     WHEN abs(c.saldo_ficha - coalesce(i.inventario, 0))
+                          <= greatest(1, 0.02 * abs(coalesce(i.inventario, 0))) THEN 'proxima'
+                     WHEN c.saldo_ficha > 0 AND i.inventario > 0
+                          AND {_RAZAO} >= 4
+                          AND abs({_RAZAO} - round({_RAZAO})) <= 0.02 * {_RAZAO} THEN 'suspeita_unidade'
+                     ELSE 'divergente'
+                   END AS situacao
+            FROM conf0 c
+            LEFT JOIN inv_periodo i
+              ON i.cnpj = c.cnpj AND i.codigo = c.codigo AND i.data_inventario = c.data_inventario
+        ) TO '{_escapar(destino)}' (FORMAT PARQUET, COMPRESSION ZSTD)
+    """)
+    linha = con.execute(f"""
+        SELECT count(DISTINCT data_inventario), count(*),
+               count(*) FILTER (saldo_ficha <> 0 OR inventario <> 0),
+               count(*) FILTER ((saldo_ficha <> 0 OR inventario <> 0) AND situacao = 'bate'),
+               count(*) FILTER ((saldo_ficha <> 0 OR inventario <> 0) AND situacao = 'proxima'),
+               count(*) FILTER (situacao = 'divergente'),
+               count(*) FILTER (situacao = 'suspeita_unidade'),
+               count(DISTINCT cnpj || '|' || codigo) FILTER (situacao IN ('divergente', 'suspeita_unidade')),
+               count(DISTINCT cnpj || '|' || codigo) FILTER (situacao = 'suspeita_unidade')
+        FROM read_parquet('{_escapar(destino)}')
+    """).fetchone()
+    chaves = ("datas", "comparacoes", "com_estoque", "batem", "proximas", "divergentes",
+              "suspeita_unidade", "fichas_divergentes", "fichas_suspeita_unidade")
+    return dict(zip(chaves, linha))
+
+
+# o fator da linha: 1 quando a unidade já é a do inventário (ou não se sabe
+# nenhuma das duas); o do 0220 quando há; 1, marcado, quando não há
+_FATOR = """
+    CASE WHEN nullif(trim({t}.unidade), '') IS NULL OR u.unidade IS NULL
+              OR upper(trim({t}.unidade)) = u.unidade THEN 1::DECIMAL(24, 9)
+         WHEN cv.fator > 0 THEN cv.fator
+         ELSE 1::DECIMAL(24, 9) END
+"""
+_SEM_FATOR = """
+    (nullif(trim({t}.unidade), '') IS NOT NULL AND u.unidade IS NOT NULL
+     AND upper(trim({t}.unidade)) <> u.unidade AND coalesce(cv.fator, 0) <= 0)
+"""
+_RAZAO = ("(greatest(c.saldo_ficha, i.inventario)::DOUBLE "
+          "/ least(c.saldo_ficha, i.inventario)::DOUBLE)")
 
 
 def _preparar(con, fontes: Fontes) -> dict:
@@ -396,6 +548,7 @@ def _preparar(con, fontes: Fontes) -> dict:
     mov = f"read_parquet('{_escapar(os.path.join(fontes.movimentacao, ARQUIVO_MOVIMENTOS))}')"
     sup = f"read_parquet('{_escapar(os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO))}')"
     itens = os.path.join(fontes.movimentacao, ARQUIVO_ITENS)
+    conversoes = os.path.join(fontes.movimentacao, ARQUIVO_CONVERSOES)
     inventario = os.path.join(fontes.movimentacao, ARQUIVO_INVENTARIO)
     rel = fontes.saidas_do_relatorio
     tem_rel = bool(rel and os.path.isfile(rel))
@@ -408,7 +561,7 @@ def _preparar(con, fontes: Fontes) -> dict:
     con.execute(f"CREATE OR REPLACE TABLE estabs AS SELECT DISTINCT cnpj FROM {mov}")
     con.execute(f"""
         CREATE OR REPLACE TABLE saidas_efd AS
-        SELECT cnpj, codigo, data, replace(cfop, '.', '') AS cfop, cst_icms, modelo,
+        SELECT cnpj, codigo, data, replace(cfop, '.', '') AS cfop, cst_icms, modelo, unidade,
                quantidade, valor, coalesce(valor_icms, 0) + coalesce(valor_st, 0) AS suportado,
                coalesce(nullif(chave, ''), numero_documento) AS documento, chave,
                false AS pdv, 'efd' AS origem
@@ -448,6 +601,8 @@ def _preparar(con, fontes: Fontes) -> dict:
             CREATE OR REPLACE TABLE saidas_rel AS
             SELECT cnpj, codigo, data, cfop, cst_icms,
                    CASE WHEN length(chave) = 44 THEN substr(chave, 21, 2) ELSE '' END AS modelo,
+                   -- a "Qtde;Unitária" do relatório já é a unidade básica
+                   NULL::VARCHAR AS unidade,
                    quantidade, valor, suportado,
                    coalesce(nullif(chave, ''), 'relatorio|' || unidade || '|' || numero_documento) AS documento,
                    chave, pdv, 'relatorio' AS origem
@@ -465,15 +620,33 @@ def _preparar(con, fontes: Fontes) -> dict:
         SELECT DISTINCT codigo FROM {saidas} WHERE right(coalesce(cst_icms, ''), 2) = '60'
     """)
     codigos = con.execute("SELECT count(*) FROM codigos").fetchone()[0]
-    aliquota = (f"LEFT JOIN read_parquet('{_escapar(itens)}') i ON i.cnpj = l.cnpj AND i.codigo = l.codigo"
-                if os.path.isfile(itens) else "")
-    coluna_aliquota = "i.aliq_icms" if aliquota else "NULL"
+    if os.path.isfile(itens):
+        con.execute(f"""CREATE OR REPLACE TABLE unid AS
+            SELECT cnpj, codigo, nullif(upper(trim(unidade)), '') AS unidade, aliq_icms
+            FROM read_parquet('{_escapar(itens)}')""")
+    else:
+        con.execute("CREATE OR REPLACE TABLE unid (cnpj VARCHAR, codigo VARCHAR, unidade VARCHAR, aliq_icms DECIMAL(9, 4))")
+    if os.path.isfile(conversoes):
+        con.execute(f"""CREATE OR REPLACE TABLE conv AS
+            SELECT cnpj, codigo, upper(trim(unidade)) AS unidade, fator
+            FROM read_parquet('{_escapar(conversoes)}')""")
+    else:
+        con.execute("CREATE OR REPLACE TABLE conv (cnpj VARCHAR, codigo VARCHAR, unidade VARCHAR, fator DECIMAL(24, 9))")
+    # a unidade de cada entrada está na movimentação, não na apuração
+    con.execute(f"""
+        CREATE OR REPLACE TABLE unidade_das_entradas AS
+        SELECT cnpj, chave, numero_documento, data, numero_item, codigo, any_value(unidade) AS unidade
+        FROM {mov} WHERE operacao = 'entrada'
+        GROUP BY cnpj, chave, numero_documento, data, numero_item, codigo
+    """)
 
     con.execute(f"""
         CREATE OR REPLACE TABLE lancamentos AS
-        SELECT l.*, {coluna_aliquota} AS aliquota
+        SELECT l.*, u.aliq_icms AS aliquota, u.unidade AS unidade_estoque,
+               {_FATOR.format(t="l")} AS fator, {_SEM_FATOR.format(t="l")} AS sem_fator
         FROM (
             SELECT s.cnpj, s.codigo, s.data, replace(s.cfop, '.', '') AS cfop, s.cst_icms, s.modelo,
+                   ue.unidade,
                    s.quantidade, NULL::DECIMAL(20, 6) AS valor, s.suportado,
                    coalesce(nullif(s.chave, ''), s.numero_documento) AS documento,
                    false AS pdv, 'efd' AS origem,
@@ -481,15 +654,19 @@ def _preparar(con, fontes: Fontes) -> dict:
                    replace(s.cfop, '.', '') IN ({lista(_DEVOLUCAO_DE_VENDA)}) AS devolucao,
                    1 AS prioridade
             FROM {sup} s
+            LEFT JOIN unidade_das_entradas ue
+              ON ue.cnpj = s.cnpj AND ue.chave = s.chave AND ue.numero_documento = s.numero_documento
+             AND ue.data = s.data AND ue.numero_item = s.numero_item AND ue.codigo = s.codigo
             UNION ALL
-            SELECT s.cnpj, s.codigo, s.data, s.cfop, s.cst_icms, s.modelo,
+            SELECT s.cnpj, s.codigo, s.data, s.cfop, s.cst_icms, s.modelo, s.unidade,
                    s.quantidade, s.valor, s.suportado, s.documento, s.pdv, s.origem,
                    CASE WHEN s.cfop IN ({lista(_DEVOLUCAO_DE_COMPRA)}) THEN 'entrada' ELSE 'saida' END,
                    s.cfop IN ({lista(_DEVOLUCAO_DE_COMPRA)}),
                    2
             FROM {saidas} s
         ) l
-        {aliquota}
+        LEFT JOIN unid u ON u.cnpj = l.cnpj AND u.codigo = l.codigo
+        LEFT JOIN conv cv ON cv.cnpj = l.cnpj AND cv.codigo = l.codigo AND cv.unidade = upper(trim(l.unidade))
         WHERE l.codigo IN (SELECT codigo FROM codigos)
           AND l.cnpj IN (SELECT cnpj FROM estabs)
           AND l.data BETWEEN DATE '{inicio}' AND DATE '{fim}'
@@ -504,17 +681,23 @@ def _preparar(con, fontes: Fontes) -> dict:
     if abertura_em is not None:
         con.execute(f"""
             CREATE OR REPLACE TABLE abertura AS
-            SELECT cnpj, codigo, sum(quantidade) AS quantidade
-            FROM read_parquet('{_escapar(inventario)}')
-            WHERE data_inventario = DATE '{abertura_em}'
-              AND codigo IN (SELECT codigo FROM codigos) AND cnpj IN (SELECT cnpj FROM estabs)
-            GROUP BY cnpj, codigo HAVING sum(quantidade) <> 0
+            SELECT v.cnpj, v.codigo, sum(v.quantidade * {_FATOR.format(t="v")}) AS quantidade,
+                   bool_or({_SEM_FATOR.format(t="v")}) AS sem_fator
+            FROM read_parquet('{_escapar(inventario)}') v
+            LEFT JOIN unid u ON u.cnpj = v.cnpj AND u.codigo = v.codigo
+            LEFT JOIN conv cv ON cv.cnpj = v.cnpj AND cv.codigo = v.codigo AND cv.unidade = upper(trim(v.unidade))
+            WHERE v.data_inventario = DATE '{abertura_em}'
+              AND v.codigo IN (SELECT codigo FROM codigos) AND v.cnpj IN (SELECT cnpj FROM estabs)
+            GROUP BY v.cnpj, v.codigo HAVING sum(v.quantidade) <> 0
         """)
     else:
-        con.execute("CREATE OR REPLACE TABLE abertura (cnpj VARCHAR, codigo VARCHAR, quantidade DECIMAL(20, 5))")
+        con.execute("CREATE OR REPLACE TABLE abertura (cnpj VARCHAR, codigo VARCHAR, "
+                    "quantidade DECIMAL(38, 9), sem_fator BOOLEAN)")
+    abertura_sem_fator = con.execute("SELECT count(*) FROM abertura WHERE sem_fator").fetchone()[0]
 
     return {"inicio": inicio, "fim": fim, "abertura_em": abertura_em, "codigos": codigos,
-            "sem_estabelecimento": sem_estab, "trocado_pela_efd": trocado}
+            "sem_estabelecimento": sem_estab, "trocado_pela_efd": trocado,
+            "abertura_sem_fator": abertura_sem_fator}
 
 
 # ---------------------------------------------------------------------------
@@ -555,7 +738,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
     estabelecimentos: set[str] = set()
     atual: tuple[str, str] | None = None
     movimentos: list[Movimento] = []
-    extras: list[tuple[bool, int]] = []   # (indefinido, faltou alíquota) por movimento
+    extras: list[tuple] = []   # (indefinido, faltou alíquota, conversão) por movimento
     andamento = Andamento(total=total)
     vistos: set[tuple[str, str]] = set()
 
@@ -568,12 +751,15 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         indice = {id(m): x for m, x in zip(movimentos, extras)}
         entradas = saidas = ressarc = compl = Decimal(0)
         negativo = False
-        sem_aliq = indef = 0
+        sem_aliq = indef = sem_fator = 0
         for ln in linhas:
             m = ln.movimento
-            indefinido, faltou = indice[id(m)]
+            indefinido, faltou, conversao = indice[id(m)]
             competencia = m.data.isoformat()[:7]
-            _acrescentar(lote, cnpj, codigo, ln, indefinido)
+            _acrescentar(lote, cnpj, codigo, ln, indefinido, conversao)
+            sem_fator += conversao[2]
+            resumo.linhas_convertidas += conversao[1] != 1
+            resumo.linhas_unidade_sem_fator += conversao[2]
             if m.especie.e_entrada:
                 entradas += ln.quantidade
             else:
@@ -619,7 +805,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                        ("saldo_valor", (ultima.saldo_valor if ultima else Decimal(0)).quantize(_Q15)),
                        ("ressarcimento", ressarc.quantize(_Q15)), ("complemento", compl.quantize(_Q15)),
                        ("ficou_negativo", negativo), ("saidas_sem_aliquota", sem_aliq),
-                       ("saidas_indefinidas", indef)):
+                       ("saidas_indefinidas", indef), ("linhas_sem_fator", sem_fator)):
             lote_fichas[k].append(val)
         resumo.fichas += 1
         resumo.linhas += len(linhas)
@@ -648,12 +834,12 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                     if atual is not None:
                         fechar(atual)
                     atual, movimentos, extras = chave, [], []
-                m, indefinido, faltou, pendente = _movimento(linha, len(movimentos), resumo)
+                m, indefinido, faltou, pendente, conversao = _movimento(linha, len(movimentos), resumo)
                 if m is None:
                     continue
                 resumo.confronto_pendente += pendente
                 movimentos.append(m)
-                extras.append((indefinido, faltou))
+                extras.append((indefinido, faltou, conversao))
                 andamento.linhas += 1
             if avisar is not None:
                 andamento.fichas = resumo.fichas
@@ -676,13 +862,17 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
 
 def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem):
     """Converte um lançamento em `Movimento`. Devolve (movimento, indefinido,
-    faltou alíquota, confronto pendente)."""
+    faltou alíquota, confronto pendente, (unidade de origem, fator, sem fator))."""
     especie = Especie.ENTRADA if linha["especie"] == "entrada" else Especie.SAIDA
     quantidade = Decimal(linha["quantidade"] or 0)
     if quantidade < 0:
         # o domínio recusa sinal: devolução é marca, não quantidade negativa
         resumo.quantidade_negativa += 1
         quantidade = -quantidade
+    fator = Decimal(linha["fator"] or 1)
+    conversao = (linha["unidade"] or "", fator, bool(linha["sem_fator"]))
+    # a ficha é na unidade do inventário
+    quantidade = quantidade * fator
     enq, indefinido, faltou, pendente, efetivo = EnquadramentoLegal.DEMAIS_SAIDAS, False, False, False, None
     if especie is Especie.SAIDA and not linha["devolucao"]:
         classificado, indefinido = _enquadrar(linha)
@@ -706,11 +896,11 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem):
     except MovimentoInvalido as erro:
         log.warning("lançamento recusado pelo razão", extra={"motivo": str(erro),
                                                             "codigo": linha["codigo"]})
-        return None, False, False, False
-    return m, indefinido, faltou, pendente
+        return None, False, False, False, conversao
+    return m, indefinido, faltou, pendente, conversao
 
 
-def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool) -> None:
+def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conversao: tuple) -> None:
     m = ln.movimento
     lote["cnpj"].append(cnpj)
     lote["codigo"].append(codigo)
@@ -724,6 +914,9 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool) -> No
     saida_propria = not m.especie.e_entrada and not m.devolucao
     lote["enquadramento"].append(None if (indefinido or not saida_propria) else int(m.enquadramento))
     lote["enquadramento_indefinido"].append(indefinido)
+    lote["unidade_origem"].append(conversao[0])
+    lote["fator_conversao"].append(Decimal(conversao[1]).quantize(Decimal("0.000000001")))
+    lote["unidade_sem_fator"].append(conversao[2])
     lote["quantidade"].append(ln.quantidade.quantize(_Q6))
     lote["icms_suportado"].append(ln.icms_suportado.quantize(_Q15))
     lote["valor_unitario_usado"].append(ln.valor_unitario_usado.quantize(_Q15))
@@ -741,9 +934,13 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool) -> No
 def lista_de_fichas(destino: str, busca: str | None = None, so: str | None = None,
                     pagina: int = 1, por_pagina: int = POR_PAGINA_PADRAO) -> dict:
     """As fichas, maior ressarcimento primeiro. `so` recorta as que pedem atenção:
-    `negativas`, `sem_aliquota`, `indefinidas`."""
+    `negativas`, `sem_aliquota`, `indefinidas`, `divergentes` (do inventário),
+    `suspeita_unidade` e `sem_fator`."""
     recortes = {"negativas": "ficou_negativo", "sem_aliquota": "saidas_sem_aliquota > 0",
-                "indefinidas": "saidas_indefinidas > 0"}
+                "indefinidas": "saidas_indefinidas > 0",
+                "divergentes": "inventarios_divergentes > 0",
+                "suspeita_unidade": "suspeita_de_unidade",
+                "sem_fator": "linhas_sem_fator > 0"}
     if so and so not in recortes:
         raise ValueError(f"Recorte desconhecido: {so}.")
     pagina = max(1, int(pagina))
@@ -850,5 +1047,12 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
             "relatorio_sem_estabelecimento": resumo.relatorio_sem_estabelecimento,
             "relatorio_trocado_pela_efd": resumo.relatorio_trocado_pela_efd,
             "quantidade_negativa": resumo.quantidade_negativa,
+            "linhas_unidade_sem_fator": resumo.linhas_unidade_sem_fator,
+            "abertura_sem_fator": resumo.abertura_sem_fator,
         },
+        "conversao": {
+            "linhas_convertidas": resumo.linhas_convertidas,
+            "linhas_sem_fator": resumo.linhas_unidade_sem_fator,
+        },
+        "conferencia_inventario": resumo.conferencia,
     }

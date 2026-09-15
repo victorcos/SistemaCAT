@@ -27,7 +27,11 @@ from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_MOVIMENTOS,
 )
 from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO
-from cat.infraestrutura.analitico.razao import ARQUIVO_FICHA3, ARQUIVO_FICHAS
+from cat.infraestrutura.analitico.razao import (
+    ARQUIVO_CONFERENCIA_INVENTARIO,
+    ARQUIVO_FICHA3,
+    ARQUIVO_FICHAS,
+)
 from cat.infraestrutura.analitico.suportado import ARQUIVO_SUPORTADO
 from cat.infraestrutura.planilhas.conferencia import (
     FORMATOS,
@@ -41,7 +45,7 @@ from cat.infraestrutura.planilhas.movimentacao import (
     gerar_itens,
     gerar_movimentos,
 )
-from cat.infraestrutura.planilhas.razao import gerar_ficha3, gerar_fichas
+from cat.infraestrutura.planilhas.razao import gerar_conferencia, gerar_ficha3, gerar_fichas
 from cat.infraestrutura.planilhas.suportado import gerar_suportado
 from cat.infraestrutura.repositorios.modelos import ExecucaoDB
 from cat.log import contexto, obter_log
@@ -74,6 +78,7 @@ PLANILHAS = {
     montar_razao.ETAPA: {
         "ficha3": ("ficha3.xlsx", ARQUIVO_FICHA3, gerar_ficha3),
         "fichas": ("fichas.xlsx", ARQUIVO_FICHAS, gerar_fichas),
+        "conferencia": ("conferencia_inventario.xlsx", ARQUIVO_CONFERENCIA_INVENTARIO, gerar_conferencia),
     },
 }
 

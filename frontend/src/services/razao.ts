@@ -31,6 +31,21 @@ export interface PendenciasDoRazao {
   relatorio_sem_estabelecimento: number;
   relatorio_trocado_pela_efd: number;
   quantidade_negativa: number;
+  linhas_unidade_sem_fator?: number;
+  abertura_sem_fator?: number;
+}
+
+/** O saldo da ficha em cada data de bloco H contra o que a empresa declarou. */
+export interface ConferenciaComInventario {
+  datas: number;
+  comparacoes: number;
+  com_estoque: number;
+  batem: number;
+  proximas: number;
+  divergentes: number;
+  suspeita_unidade: number;
+  fichas_divergentes: number;
+  fichas_suspeita_unidade: number;
 }
 
 export interface ResumoDoRazao {
@@ -48,6 +63,8 @@ export interface ResumoDoRazao {
   por_competencia?: { competencia: string; linhas: number; ressarcimento: string; complemento: string }[];
   saidas_por_origem?: Record<string, number>;
   pendencias?: PendenciasDoRazao;
+  conversao?: { linhas_convertidas: number; linhas_sem_fator: number };
+  conferencia_inventario?: ConferenciaComInventario | Record<string, never>;
   relatorios?: { arquivos: number; so_de_entradas: number; recusados: number; linhas: number };
   iniciada_por?: string;
   segundos?: number;
@@ -76,6 +93,11 @@ export interface Ficha {
   ficou_negativo: boolean;
   saidas_sem_aliquota: number;
   saidas_indefinidas: number;
+  linhas_sem_fator?: number;
+  inventarios_conferidos?: number;
+  inventarios_divergentes?: number;
+  maior_diferenca_inventario?: string;
+  suspeita_de_unidade?: boolean;
 }
 
 export interface LinhaDaFicha {
@@ -88,6 +110,10 @@ export interface LinhaDaFicha {
   origem: string;
   enquadramento: number | null;
   enquadramento_indefinido: boolean;
+  /** a quantidade vai na unidade do inventário; estas dizem como chegou lá */
+  unidade_origem?: string;
+  fator_conversao?: string;
+  unidade_sem_fator?: boolean;
   quantidade: string;
   icms_suportado: string;
   valor_unitario_usado: string;
@@ -106,8 +132,15 @@ export interface Pagina<T> {
   linhas: T[];
 }
 
-export type Recorte = "todas" | "negativas" | "sem_aliquota" | "indefinidas";
-export type PlanilhaDoRazao = "ficha3" | "fichas";
+export type Recorte =
+  | "todas"
+  | "negativas"
+  | "sem_aliquota"
+  | "indefinidas"
+  | "divergentes"
+  | "suspeita_unidade"
+  | "sem_fator";
+export type PlanilhaDoRazao = "ficha3" | "fichas" | "conferencia";
 
 export const VERSAO_DO_RESUMO_DO_RAZAO = 1;
 
@@ -144,7 +177,11 @@ export function linhasDaFicha(
   return chamar<Pagina<LinhaDaFicha>>(`/razao/${execucaoId}/ficha?${p}`, { signal: sinal });
 }
 
-const NOME: Record<PlanilhaDoRazao, string> = { ficha3: "ficha3", fichas: "fichas_do_razao" };
+const NOME: Record<PlanilhaDoRazao, string> = {
+  ficha3: "ficha3",
+  fichas: "fichas_do_razao",
+  conferencia: "conferencia_com_inventario",
+};
 
 export function baixarPlanilhaDoRazao(
   execucaoId: number,

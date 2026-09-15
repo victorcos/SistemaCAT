@@ -14,6 +14,7 @@ vinda do relatório (a EFD vence); e a venda de uma loja que nenhuma pista diz
 de quem é.
 """
 
+import os
 from datetime import date
 from decimal import Decimal
 
@@ -21,9 +22,14 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from cat.infraestrutura.analitico.movimentacao import ARQUIVO_ITENS, ARQUIVO_MOVIMENTOS
+from cat.infraestrutura.analitico.movimentacao import (
+    ARQUIVO_CONVERSOES,
+    ARQUIVO_ITENS,
+    ARQUIVO_MOVIMENTOS,
+)
 from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO
 from cat.infraestrutura.analitico.razao import (
+    ARQUIVO_CONFERENCIA_INVENTARIO,
     ARQUIVO_FICHA3,
     ARQUIVO_FICHAS,
     ESQUEMA_SAIDA_DO_RELATORIO,
@@ -59,6 +65,7 @@ def fontes(tmp_path):
     gravar(mov / ARQUIVO_MOVIMENTOS, [
         ("cnpj", pa.string()), ("competencia", pa.date32()), ("operacao", pa.string()),
         ("codigo", pa.string()), ("data", pa.date32()), ("cfop", pa.string()),
+        ("unidade", pa.string()), ("numero_item", pa.int32()),
         ("cst_icms", pa.string()), ("modelo", pa.string()), ("quantidade", pa.decimal128(20, 5)),
         ("valor", pa.decimal128(18, 2)), ("valor_icms", pa.decimal128(18, 2)),
         ("valor_st", pa.decimal128(18, 2)), ("chave", pa.string()), ("numero_documento", pa.string()),
@@ -66,39 +73,46 @@ def fontes(tmp_path):
         # entrada: aparece também aqui, mas o razão lê a da apuração
         {"cnpj": A, "competencia": date(2021, 1, 1), "operacao": "entrada", "codigo": "X",
          "data": date(2021, 1, 5), "cfop": "1403", "cst_icms": "060", "modelo": "55",
+         "unidade": "UN", "numero_item": 1,
          "quantidade": d(10), "valor": d(100), "valor_icms": d(0), "valor_st": d(0),
          "chave": "4" * 44, "numero_documento": "1"},
         {"cnpj": A, "competencia": date(2021, 1, 1), "operacao": "saida", "codigo": "X",
          "data": date(2021, 1, 6), "cfop": "5152", "cst_icms": "060", "modelo": "55",
+         "unidade": "UN", "numero_item": 1,
          "quantidade": d(2), "valor": d(30), "valor_icms": d(0), "valor_st": d(0),
          "chave": CHAVE_TRANSF, "numero_documento": "11"},
         {"cnpj": B, "competencia": date(2021, 1, 1), "operacao": "saida", "codigo": "Y",
          "data": date(2021, 1, 6), "cfop": "5102", "cst_icms": "000", "modelo": "55",
+         "unidade": "UN", "numero_item": 1,
          "quantidade": d(1), "valor": d(10), "valor_icms": d(1.8), "valor_st": d(0),
          "chave": "5" * 44, "numero_documento": "12"},
     ])
     gravar(mov / ARQUIVO_ITENS, [
         ("cnpj", pa.string()), ("codigo", pa.string()), ("descricao", pa.string()),
-        ("aliq_icms", pa.decimal128(9, 4)),
-    ], [{"cnpj": A, "codigo": "X", "descricao": "Refrigerante cola 2L", "aliq_icms": d(18)}])
+        ("unidade", pa.string()), ("aliq_icms", pa.decimal128(9, 4)),
+    ], [{"cnpj": A, "codigo": "X", "descricao": "Refrigerante cola 2L", "unidade": "UN",
+         "aliq_icms": d(18)}])
     gravar(mov / ARQUIVO_INVENTARIO, [
         ("cnpj", pa.string()), ("codigo", pa.string()), ("data_inventario", pa.date32()),
-        ("quantidade", pa.decimal128(20, 5)),
+        ("unidade", pa.string()), ("quantidade", pa.decimal128(20, 5)),
     ], [
-        {"cnpj": A, "codigo": "X", "data_inventario": date(2020, 12, 31), "quantidade": d(10)},
-        {"cnpj": A, "codigo": "X", "data_inventario": date(2020, 11, 30), "quantidade": d(99)},
+        {"cnpj": A, "codigo": "X", "data_inventario": date(2020, 12, 31), "unidade": "UN", "quantidade": d(10)},
+        {"cnpj": A, "codigo": "X", "data_inventario": date(2020, 11, 30), "unidade": "UN", "quantidade": d(99)},
+        # o estoque que a empresa declarou no fim do mês: bate com a ficha
+        {"cnpj": A, "codigo": "X", "data_inventario": date(2021, 1, 31), "unidade": "UN", "quantidade": d(14)},
     ])
     gravar(apu / ARQUIVO_SUPORTADO, [
         ("cnpj", pa.string()), ("codigo", pa.string()), ("data", pa.date32()), ("cfop", pa.string()),
         ("cst_icms", pa.string()), ("modelo", pa.string()), ("quantidade", pa.decimal128(18, 5)),
         ("suportado", pa.decimal128(18, 6)), ("chave", pa.string()), ("numero_documento", pa.string()),
+        ("numero_item", pa.int32()),
     ], [
         {"cnpj": A, "codigo": "X", "data": date(2021, 1, 5), "cfop": "1403", "cst_icms": "060",
          "modelo": "55", "quantidade": d(10), "suportado": d(20), "chave": "4" * 44,
-         "numero_documento": "1"},
+         "numero_documento": "1", "numero_item": 1},
         {"cnpj": A, "codigo": "X", "data": date(2021, 1, 7), "cfop": "1411", "cst_icms": "060",
          "modelo": "55", "quantidade": d(1), "suportado": d(0), "chave": "6" * 44,
-         "numero_documento": "2"},
+         "numero_documento": "2", "numero_item": 1},
     ])
     rel = tmp_path / "saidas_do_relatorio.parquet"
     base = {"numero_documento": "", "cst_icms": "060", "suportado": d(0), "valor": d(0)}
@@ -177,9 +191,91 @@ class TestAsFontes:
         assert r.saidas_por_origem == {"efd": 1}
 
 
+def trocar_unidade_da_entrada(fontes, unidade: str) -> None:
+    """A entrada de 05/01 passa a vir noutra unidade na nota."""
+    caminho = os.path.join(fontes.movimentacao, ARQUIVO_MOVIMENTOS)
+    t = pq.read_table(caminho).to_pylist()
+    for linha in t:
+        if linha["operacao"] == "entrada":
+            linha["unidade"] = unidade
+    pq.write_table(pa.Table.from_pylist(t, schema=pq.read_schema(caminho)), caminho)
+
+
+class TestUnidade:
+    def test_entrada_em_caixa_vira_unidade_pelo_0220(self, fontes, tmp_path):
+        """10 caixas de 2 são 20 unidades: a ficha é na unidade do inventário.
+
+            abertura 10 + entrada 20 = 30 un, R$ 20      -> unit 0,6667
+            transferência 2 -> 28; PDV 5 baixa 3,3333; confronto 3,60
+            -> ressarcimento 0 e complemento 0,2667 (enquadramento 1)
+        """
+        trocar_unidade_da_entrada(fontes, "CX")
+        gravar(os.path.join(fontes.movimentacao, ARQUIVO_CONVERSOES), [
+            ("cnpj", pa.string()), ("codigo", pa.string()), ("unidade", pa.string()),
+            ("fator", pa.decimal128(24, 9)),
+        ], [{"cnpj": A, "codigo": "X", "unidade": "CX", "fator": d(2)}])
+        destino = tmp_path / "convertido"
+        destino.mkdir()
+        r = montar(fontes, str(destino))
+        entrada = next(l for l in ficha(destino) if l["especie"] == "entrada")
+        assert entrada["quantidade"] == d(20) and entrada["fator_conversao"] == d(2)
+        assert entrada["unidade_origem"] == "CX" and not entrada["unidade_sem_fator"]
+        assert r.linhas_convertidas == 1 and r.linhas_unidade_sem_fator == 0
+        assert r.ressarcimento == 0 and round(r.complemento, 4) == d("0.2667")
+
+    def test_unidade_diferente_sem_0220_fica_como_veio_e_marcada(self, fontes, tmp_path):
+        """Não se adivinha fator: sem 0220, a quantidade não muda e a linha diz."""
+        trocar_unidade_da_entrada(fontes, "FD")
+        destino = tmp_path / "sem_fator"
+        destino.mkdir()
+        r = montar(fontes, str(destino))
+        entrada = next(l for l in ficha(destino) if l["especie"] == "entrada")
+        assert entrada["quantidade"] == d(10) and entrada["unidade_sem_fator"]
+        assert r.linhas_unidade_sem_fator == 1
+        assert serializar(r)["pendencias"]["linhas_unidade_sem_fator"] == 1
+        assert lista_de_fichas(str(destino), so="sem_fator")["total"] == 1
+
+
+class TestConferenciaComInventario:
+    def test_saldo_que_bate_com_o_bloco_h(self, montado):
+        destino, r = montado
+        c = r.conferencia
+        assert c["datas"] == 1 and c["com_estoque"] == 1 and c["batem"] == 1
+        linha = pq.read_table(str(destino / ARQUIVO_CONFERENCIA_INVENTARIO)).to_pylist()[0]
+        assert linha["situacao"] == "bate" and linha["saldo_ficha"] == d(14)
+        f = lista_de_fichas(str(destino))["linhas"][0]
+        assert f["inventarios_conferidos"] == 1 and f["inventarios_divergentes"] == 0
+
+    def test_diferenca_do_tamanho_de_um_fator_e_suspeita_de_unidade(self, fontes, tmp_path):
+        """A empresa declarou 168 (14 x 12): a ficha contou em caixa o que o
+        estoque conta em unidade, ou o contrário."""
+        caminho = os.path.join(fontes.movimentacao, ARQUIVO_INVENTARIO)
+        t = pq.read_table(caminho).to_pylist()
+        for linha in t:
+            if linha["data_inventario"] == date(2021, 1, 31):
+                linha["quantidade"] = d(168)
+        pq.write_table(pa.Table.from_pylist(t, schema=pq.read_schema(caminho)), caminho)
+        destino = tmp_path / "suspeita"
+        destino.mkdir()
+        r = montar(fontes, str(destino))
+        assert r.conferencia["suspeita_unidade"] == 1 and r.conferencia["fichas_suspeita_unidade"] == 1
+        assert lista_de_fichas(str(destino), so="suspeita_unidade")["total"] == 1
+
+    def test_item_fora_do_bloco_h_e_estoque_zero(self, fontes, tmp_path):
+        caminho = os.path.join(fontes.movimentacao, ARQUIVO_INVENTARIO)
+        t = [l for l in pq.read_table(caminho).to_pylist() if l["data_inventario"] != date(2021, 1, 31)]
+        # outro item no inventário do fim do mês: a data existe para a loja A
+        t.append({"cnpj": A, "codigo": "Z", "data_inventario": date(2021, 1, 31), "unidade": "UN",
+                  "quantidade": d(1)})
+        pq.write_table(pa.Table.from_pylist(t, schema=pq.read_schema(caminho)), caminho)
+        destino = tmp_path / "fora"
+        destino.mkdir()
+        r = montar(fontes, str(destino))
+        assert r.conferencia["divergentes"] == 1
+
+
 class TestPendencias:
     def test_sem_aliquota_nao_inventa_ressarcimento(self, fontes, tmp_path):
-        import os
         os.remove(os.path.join(fontes.movimentacao, ARQUIVO_ITENS))
         destino = tmp_path / "sem_aliq"
         destino.mkdir()

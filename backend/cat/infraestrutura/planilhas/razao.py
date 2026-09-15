@@ -21,7 +21,10 @@ COLUNAS_FICHA3 = (
     Coluna("origem", "Origem", "texto", 11),
     Coluna("enquadramento", "Enquadramento legal", "numero_inteiro", 12),
     Coluna("enquadramento_indefinido", "Enquadramento indefinido", "texto", 12),
-    Coluna("quantidade", "Quantidade", "quantidade", 14),
+    Coluna("unidade_origem", "Unidade na nota", "texto", 9),
+    Coluna("fator_conversao", "Fator (0220)", "quantidade", 10),
+    Coluna("unidade_sem_fator", "Unidade sem fator", "texto", 10),
+    Coluna("quantidade", "Quantidade (unidade do inventário)", "quantidade", 14),
     Coluna("icms_suportado", "ICMS suportado", "numero", 16),
     Coluna("valor_unitario_usado", "Unitário do saldo anterior", "quantidade", 16),
     Coluna("icms_efetivo", "Valor de confronto", "numero", 16),
@@ -49,6 +52,21 @@ COLUNAS_FICHAS = (
     Coluna("ficou_negativo", "Estoque ficou negativo", "texto", 12),
     Coluna("saidas_sem_aliquota", "Saídas sem alíquota", "numero_inteiro", 10),
     Coluna("saidas_indefinidas", "Saídas indefinidas", "numero_inteiro", 10),
+    Coluna("linhas_sem_fator", "Linhas com unidade sem fator", "numero_inteiro", 10),
+    Coluna("inventarios_conferidos", "Inventários conferidos", "numero_inteiro", 10),
+    Coluna("inventarios_divergentes", "Inventários divergentes", "numero_inteiro", 10),
+    Coluna("maior_diferenca_inventario", "Maior diferença com o inventário", "quantidade", 14),
+    Coluna("suspeita_de_unidade", "Suspeita de unidade", "texto", 10),
+)
+
+COLUNAS_CONFERENCIA = (
+    Coluna("cnpj", "CNPJ do estabelecimento", "texto", 20),
+    Coluna("codigo", "Código da mercadoria", "texto", 16),
+    Coluna("data_inventario", "Data do inventário", "data", 12),
+    Coluna("saldo_ficha", "Saldo da ficha", "quantidade", 14),
+    Coluna("inventario", "Inventário (bloco H)", "quantidade", 14),
+    Coluna("diferenca", "Diferença", "quantidade", 14),
+    Coluna("situacao", "Situação", "texto", 16),
 )
 
 
@@ -60,3 +78,8 @@ def gerar_ficha3(parquet: str, destino: str, modelos=None, classificacoes=None,
 def gerar_fichas(parquet: str, destino: str, modelos=None, classificacoes=None,
                  formato: str = "xlsx") -> int:
     return gerar(parquet, destino, COLUNAS_FICHAS, "Fichas", formato=formato)
+
+
+def gerar_conferencia(parquet: str, destino: str, modelos=None, classificacoes=None,
+                      formato: str = "xlsx") -> int:
+    return gerar(parquet, destino, COLUNAS_CONFERENCIA, "Conferência com inventário", formato=formato)

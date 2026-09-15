@@ -46,6 +46,8 @@ CABECALHO = (f"|0000|015|0|01052021|31052021|EMPRESA DE TESTE|{CNPJ}||PR"
 ITEM_A_V1 = "|0200|1000144|Iog Vidativa 160g|7898194090401||CX|00|04031000||04||18|1702200|"
 ITEM_A_V2 = "|0200|1000144|Iog Vidativa 160g Ameixa|7898194090401||CX|00|04031000||04||18|1702200|"
 ITEM_B = "|0200|537861|Abobora P/Doce Kg Frac|||KG|00|07099990||04||18||"
+CONV_A_FD = "|0220|FD|12|"
+CONV_A_FD_ANTIGO = "|0220|FD|6|"
 
 C100_ENTRADA = (f"|C100|0|1|F001|55|00|001|44623|{CHAVE_ENTRADA}"
                 "|01052021|01052021|200,00|2|0|0|200,00|9|0|0|0|0|0|0|0|0|0|0|0|0|")
@@ -83,14 +85,14 @@ def escrever(tmp_path, nome: str, linhas: list[str]) -> str:
 def efds(tmp_path) -> list[str]:
     """Maio/2021 com tudo; abril/2021 só com o cadastro antigo e o inventário."""
     maio = escrever(tmp_path, "efd_2021_05.txt", [
-        CABECALHO, ITEM_A_V2, ITEM_B,
+        CABECALHO, ITEM_A_V2, CONV_A_FD, ITEM_B,
         C100_ENTRADA, C170_1, C170_2, C170_SEM_CADASTRO, C190_ENTRADA, C190_ENTRADA_60,
         C100_SAIDA, C190_SAIDA_60, C190_SAIDA_00,
         C800, C850,
     ])
     abril = escrever(tmp_path, "efd_2021_04.txt", [
         CABECALHO.replace("01052021|31052021", "01042021|30042021"),
-        ITEM_A_V1, ITEM_B,
+        ITEM_A_V1, CONV_A_FD_ANTIGO, ITEM_B,
         H005, H010_A, H010_B,
     ])
     return [maio, abril]
@@ -215,6 +217,13 @@ class TestConsolidacao:
         assert por_chave[CHAVE_SAIDA] == [("000", Decimal("50.00"), False),
                                           ("060", Decimal("250.00"), False)]
         assert por_chave[CHAVE_CUPOM] == [("060", Decimal("36.20"), False)]
+
+    def test_vale_o_fator_de_conversao_mais_recente_e_amarrado_ao_item(self, consolidado):
+        """O 0220 não repete o código: é do 0200 logo acima. E, como o
+        cadastro, vale o do período mais recente."""
+        _, destino = consolidado
+        linhas = _linhas(f"{destino}/conversoes.parquet", "SELECT codigo, unidade, fator FROM r")
+        assert linhas == [("1000144", "FD", Decimal("12.000000000"))]
 
     def test_os_intermediarios_somem(self, consolidado):
         import os  # noqa: PLC0415

@@ -5,6 +5,47 @@
 
 ---
 
+## 2026-09-15 — Unidade de conversão: a ficha é na unidade do inventário
+
+**A regra.** A Ficha 3 é escriturada na unidade do 0200 (UNID_INV). O item de
+nota vem na unidade dele, e nota em caixa não se soma a venda em unidade. O
+fator é o do **registro 0220** da própria EFD, que o Guia Prático define como
+o que **multiplica** a unidade da nota para chegar à do inventário. A extração
+de movimentos passou a ler o 0220 (amarrado ao 0200 logo acima, que ele não
+repete), e o razão converte entrada, saída da EFD e inventário.
+
+**Sem 0220, não se adivinha fator.** Quando o rótulo da nota difere do cadastro
+e não há 0220, a quantidade fica como veio e a linha é marcada
+(`unidade_sem_fator`). É pendência visível, não conversão inventada.
+
+**O que o Amigão mostrou, e por que isso importa.**
+
+| Medida | Resultado |
+|---|---|
+| Registros 0220 na EFD | **nenhum** (uma filial: 17.745 itens no 0200, zero 0220) |
+| Entradas com rótulo diferente do cadastro | 56.986 de 8.761.002 (0,65%); UN→CX 31.799, CX→FD 14.446 |
+| Quantidade da EFD = "Qtde;Unitária" do relatório, 05/2021 | **100%**, em todos os pares de unidade — inclusive rótulo CX com 2.500 unidades |
+
+Ou seja: no Amigão a quantidade da EFD **já vem na unidade básica**, e o rótulo
+CX/FD é o nome da embalagem no ERP. Converter pelo rótulo teria multiplicado
+errado. A regra "sem 0220 fica como veio" é, aqui, também a certa.
+
+**O juiz da unidade é o inventário.** Ficha que soma caixa com unidade não
+fecha com o estoque declarado. O razão agora confere o saldo de cada ficha em
+cada data de bloco H do período: bate, até 2%, diverge, ou **suspeita de
+unidade** — quando a razão entre os dois é inteira e de 4 vezes ou mais. Item
+ausente do bloco H numa data é estoque zero.
+
+**Medido à mão antes de codar** (lojas MS, jan/2021, abertura + entradas −
+saídas do relatório contra o H010 de 31/01): 49,4% dos itens fecham exato e
+61,8% até 2%; só **1,6%** têm diferença com cara de fator. As maiores
+diferenças são entrada grande sem saída correspondente — movimento que falta
+(perdas do CFOP 5.927, que o cliente manda em relatório à parte;
+transferências; produção e desmontagem no açougue e na padaria), não
+conversão. A conferência passa a mostrar isso ficha a ficha.
+
+---
+
 ## 2026-09-15 — Etapa 5: o razão dos itens, e de onde vem a saída
 
 **O obstáculo que decidiu o desenho.** O razão baixa da ficha cada saída de
