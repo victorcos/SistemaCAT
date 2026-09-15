@@ -27,6 +27,8 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
     public static readonly TimeSpan PrazoPedirExecucao = TimeSpan.FromMinutes(2);
     // a planilha de dezenas de milhões de linhas é escrita antes de o primeiro byte sair
     public static readonly TimeSpan PrazoPlanilha = TimeSpan.FromMinutes(60);
+    // agrupar milhões de itens por documento a cada página leva segundos, não minutos
+    public static readonly TimeSpan PrazoLinhas = TimeSpan.FromMinutes(2);
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
@@ -80,6 +82,17 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
         return new PlanilhaPronta(json.GetProperty("caminho").GetString()!, json.GetProperty("nome").GetString()!,
             json.GetProperty("tipo").GetString()!);
     }
+
+    public async Task CancelarExecucao(int execucaoId, int usuarioId, CancellationToken cancelar) =>
+        await Chamar($"interno/execucoes/{execucaoId}/cancelar",
+            JsonContent.Create(new Dictionary<string, object> { ["usuario_id"] = usuarioId }), PrazoPedirExecucao, cancelar);
+
+    public async Task<JsonElement> LinhasDoSuportado(int execucaoId, PedidoDeLinhas pedido, CancellationToken cancelar) =>
+        await Chamar("interno/suportado/linhas", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["execucao_id"] = execucaoId, ["escopo"] = pedido.Escopo, ["fonte"] = pedido.Fonte,
+            ["busca"] = pedido.Busca, ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
+        }), PrazoLinhas, cancelar);
 
     private async Task<JsonElement> Chamar(string rota, HttpContent conteudo, TimeSpan prazo, CancellationToken cancelar)
     {

@@ -13,6 +13,7 @@ import pytest
 from cat.dominio.cat42.suportado import (
     EntradaParaApurar,
     Fonte,
+    Pendencia,
     ResumoDaApuracao,
     apurar,
 )
@@ -125,6 +126,54 @@ class TestCstComOrigem:
         tributação. Ignorá-lo é o que faz 060 e 560 caírem na mesma regra."""
         r = apurar(EntradaParaApurar(cst_icms=cst))
         assert "CST 60" in r.motivo, cst
+
+
+class TestPendencia:
+    """Não apurável não é sempre erro. A tela depende desta separação."""
+
+    def test_cst_40_nao_tem_o_que_apurar(self):
+        r = apurar(EntradaParaApurar(cst_icms="040"))
+        assert r.pendencia is Pendencia.SEM_O_QUE_APURAR
+        assert not r.pendencia.exige_providencia
+
+    def test_cst_60_sem_informacao_e_falta_de_dado(self):
+        r = apurar(EntradaParaApurar(cst_icms="060"))
+        assert r.pendencia is Pendencia.FALTA_DADO
+        assert r.pendencia.exige_providencia
+
+    def test_cst_90_sem_valor_e_falta_de_dado(self):
+        """Metade dos CST 90 da base real tinha imposto informado: sem valor,
+        é pendência, não item sem imposto."""
+        r = apurar(EntradaParaApurar(cst_icms="090"))
+        assert r.pendencia is Pendencia.FALTA_DADO
+
+    def test_retencao_sem_destaque_e_falta_de_dado(self):
+        assert apurar(EntradaParaApurar(cst_icms="070")).pendencia is Pendencia.FALTA_DADO
+
+    def test_sem_cst_e_falta_de_dado(self):
+        assert apurar(EntradaParaApurar()).pendencia is Pendencia.FALTA_DADO
+
+    @pytest.mark.parametrize("cst,esperada", [
+        ("500", Pendencia.SEM_O_QUE_APURAR),   # origem 5 + CST 00: sem ST
+        ("560", Pendencia.FALTA_DADO),         # origem 5 + CST 60
+        ("100", Pendencia.SEM_O_QUE_APURAR),   # origem 1 + CST 00
+        ("210", Pendencia.FALTA_DADO),         # origem 2 + CST 10
+    ])
+    def test_o_primeiro_digito_e_origem_nao_tributacao(self, cst, esperada):
+        """No EFD, "500" é origem 5 com CST 00, e não o CSOSN do Simples.
+        Uma versão anterior tratava "500" como retido — e nunca casava."""
+        assert apurar(EntradaParaApurar(cst_icms=cst)).pendencia is esperada
+
+    def test_apurado_nao_tem_pendencia(self):
+        r = apurar(EntradaParaApurar(cst_icms="060", retido_informado=d("1.00")))
+        assert r.pendencia is None
+
+    def test_o_resumo_conta_as_duas_pendencias_em_separado(self):
+        resumo = ResumoDaApuracao()
+        for cst in ("040", "040", "060", "090"):
+            resumo.somar(apurar(EntradaParaApurar(cst_icms=cst)))
+        assert resumo.por_pendencia[Pendencia.SEM_O_QUE_APURAR] == 2
+        assert resumo.por_pendencia[Pendencia.FALTA_DADO] == 2
 
 
 class TestResumo:

@@ -142,7 +142,21 @@ _ROTULO_CLASSIFICACAO = {
     "nao_conferido": "Sem conferência",
 }
 
+# a apuração do ICMS suportado: de onde veio o valor e, se não veio, por quê
+_ROTULO_FONTE = {
+    "documento": "Destacado na entrada",
+    "informado_pelo_fornecedor": "Informado pelo fornecedor",
+    "base_e_aliquota": "Reconstruído por base e alíquota",
+    "nao_apuravel": "Não apurável",
+}
+_ROTULO_PENDENCIA = {
+    "sem_o_que_apurar": "Sem o que apurar",
+    "falta_dado": "Falta dado",
+}
+
 _TRADUCOES = {
+    "fonte": _ROTULO_FONTE,
+    "pendencia": _ROTULO_PENDENCIA,
     "situacao": _ROTULO_SITUACAO,
     "origem": _ROTULO_ORIGEM,
     "operacao": _ROTULO_OPERACAO,
@@ -154,7 +168,8 @@ _TRADUCOES = {
 def gerar(parquet: str, destino: str, colunas: tuple[Coluna, ...],
           titulo_da_aba: str, modelos: frozenset[str] | None = None,
           classificacoes: frozenset[str] | None = None,
-          formato: str = "xlsx") -> int:
+          formato: str = "xlsx",
+          campo_da_classificacao: str = "classificacao") -> int:
     """Escreve a planilha a partir do parquet. Devolve quantas linhas gravou.
 
     `modelos` restringe por modelo de documento, e não é detalhe: numa base
@@ -169,13 +184,15 @@ def gerar(parquet: str, destino: str, colunas: tuple[Coluna, ...],
     if formato not in FORMATOS:
         raise ValueError(f"formato desconhecido: {formato}")
     if formato == "csv":
-        return _gerar_csv(parquet, destino, colunas, modelos, classificacoes)
+        return _gerar_csv(parquet, destino, colunas, modelos, classificacoes,
+                          campo_da_classificacao)
     return _gerar_xlsx(parquet, destino, colunas, titulo_da_aba,
-                       modelos, classificacoes)
+                       modelos, classificacoes, campo_da_classificacao)
 
 
 def _filtradas(parquet: str, modelos: frozenset[str] | None,
-               classificacoes: frozenset[str] | None) -> Iterator[dict]:
+               classificacoes: frozenset[str] | None,
+               campo: str = "classificacao") -> Iterator[dict]:
     """As linhas do parquet que passam no filtro, em lotes, sem segurar tudo.
 
     Fica separado porque é a parte que precisa ser idêntica nas duas saídas:
@@ -186,7 +203,7 @@ def _filtradas(parquet: str, modelos: frozenset[str] | None,
             if modelos is not None and r.get("modelo") not in modelos:
                 continue
             if (classificacoes is not None
-                    and r.get("classificacao") not in classificacoes):
+                    and r.get(campo) not in classificacoes):
                 continue
             yield r
 
@@ -213,7 +230,8 @@ def _texto_para_csv(valor, coluna: Coluna) -> str:
 
 def _gerar_csv(parquet: str, destino: str, colunas: tuple[Coluna, ...],
                modelos: frozenset[str] | None = None,
-               classificacoes: frozenset[str] | None = None) -> int:
+               classificacoes: frozenset[str] | None = None,
+               campo: str = "classificacao") -> int:
     """Uma linha por registro, sem limite e sem aba.
 
     `utf-8-sig` grava o BOM: sem ele o Excel lê o arquivo como ANSI e todo
@@ -225,7 +243,7 @@ def _gerar_csv(parquet: str, destino: str, colunas: tuple[Coluna, ...],
         escritor = csv.writer(f, delimiter=SEPARADOR_CSV,
                               quoting=csv.QUOTE_MINIMAL)
         escritor.writerow([c.titulo for c in colunas])
-        for r in _filtradas(parquet, modelos, classificacoes):
+        for r in _filtradas(parquet, modelos, classificacoes, campo):
             linha = []
             for coluna in colunas:
                 valor = r.get(coluna.campo)
@@ -258,7 +276,8 @@ def _pasta_de_rascunho(destino: str) -> str:
 
 def _gerar_xlsx(parquet: str, destino: str, colunas: tuple[Coluna, ...],
                 titulo_da_aba: str, modelos: frozenset[str] | None = None,
-                classificacoes: frozenset[str] | None = None) -> int:
+                classificacoes: frozenset[str] | None = None,
+                campo: str = "classificacao") -> int:
     livro = xlsxwriter.Workbook(destino, {
         "constant_memory": True,        # não segura a planilha em memória
         "default_date_format": "dd/mm/yyyy",
@@ -289,7 +308,7 @@ def _gerar_xlsx(parquet: str, destino: str, colunas: tuple[Coluna, ...],
     na_aba = 0
     abas = 1
 
-    for r in _filtradas(parquet, modelos, classificacoes):
+    for r in _filtradas(parquet, modelos, classificacoes, campo):
         if na_aba >= LIMITE_POR_ABA:
             abas += 1
             aba = _abrir_aba(livro, titulo_da_aba, abas, colunas, cabecalho)

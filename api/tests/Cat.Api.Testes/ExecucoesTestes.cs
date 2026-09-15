@@ -24,6 +24,8 @@ public sealed class MotorDeExecucoesFalso : IAsyncLifetime
     public ConcurrentQueue<JsonElement> Pedidos { get; } = new();
     public Func<JsonElement, Task<IResult>> AoPedirExecucao { get; set; } = _ => Task.FromResult(Results.StatusCode(500));
     public Func<JsonElement, IResult> AoPedirPlanilha { get; set; } = _ => Results.StatusCode(500);
+    public Func<int, JsonElement, Task<IResult>> AoCancelar { get; set; } = (_, _) => Task.FromResult(Results.StatusCode(500));
+    public Func<JsonElement, IResult> AoPedirLinhas { get; set; } = _ => Results.StatusCode(500);
 
     public async Task InitializeAsync()
     {
@@ -45,6 +47,22 @@ public sealed class MotorDeExecucoesFalso : IAsyncLifetime
             var pedido = await http.Request.ReadFromJsonAsync<JsonElement>();
             Pedidos.Enqueue(pedido);
             return AoPedirPlanilha(pedido);
+        });
+        _app.MapPost("/interno/execucoes/{id:int}/cancelar", async (int id, HttpContext http) =>
+        {
+            if (http.Request.Headers["X-Cat-Motor-Segredo"] != Segredo)
+                return Results.StatusCode(403);
+            var pedido = await http.Request.ReadFromJsonAsync<JsonElement>();
+            Pedidos.Enqueue(pedido);
+            return await AoCancelar(id, pedido);
+        });
+        _app.MapPost("/interno/suportado/linhas", async (HttpContext http) =>
+        {
+            if (http.Request.Headers["X-Cat-Motor-Segredo"] != Segredo)
+                return Results.StatusCode(403);
+            var pedido = await http.Request.ReadFromJsonAsync<JsonElement>();
+            Pedidos.Enqueue(pedido);
+            return AoPedirLinhas(pedido);
         });
         await _app.StartAsync();
         Endereco = new Uri(_app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First());
@@ -136,6 +154,7 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
     [Theory]
     [InlineData("conferencias", "conferencia")]
     [InlineData("movimentos", "movimentos")]
+    [InlineData("suportado", "st_suportado")]
     public async Task Pedir_repassa_ao_motor_e_devolve_a_execucao_da_fila(string segmento, string etapa)
     {
         var (quem, _, c) = await Pessoa("dev");
@@ -309,5 +328,97 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
 
         Assert.Equal(HttpStatusCode.BadGateway, r.StatusCode);
         Assert.DoesNotContain("CAT_", await r.Content.ReadAsStringAsync());
+    }
+
+    // ------------------------------------------------------------------ cancelar
+    [Fact]
+    public async Task Cancelar_repassa_quem_pediu_e_devolve_a_execucao_como_ficou()
+    {
+        var (quem, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var id = await Execucao(projeto, "st_suportado", "rodando", null);
+        motor.AoCancelar = async (execucao, _) =>
+        {
+            await banco.Comando($"UPDATE execucao SET situacao = 'cancelando' WHERE id = {execucao}");
+            return Results.Json(new { id = execucao });
+        };
+
+        var r = await c.PostAsync($"/api/suportado/{id}/cancelar", null);
+
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal("cancelando", (await Json(r)).GetProperty("situacao").GetString());
+        var pedido = motor.Pedidos.Last(x => x.TryGetProperty("usuario_id", out _) && !x.TryGetProperty("etapa", out _));
+        Assert.Equal(quem, pedido.GetProperty("usuario_id").GetInt32());
+    }
+
+    [Fact]
+    public async Task Cancelar_exige_permissao_e_a_rota_da_etapa_certa()
+    {
+        var (_, _, dono) = await Pessoa("dev");
+        var (empresa, projeto) = await Trabalho(dono);
+        var (_, _, leitor) = await Pessoa("leitura", [empresa]);
+        var id = await Execucao(projeto, "st_suportado", "rodando", null);
+        var movimentos = await Execucao(projeto, "movimentos", "rodando", null);
+        motor.AoCancelar = (_, _) => Task.FromResult(Results.Json(new { detail = "Esta rodada já terminou." }, statusCode: 409));
+
+        var doLeitor = await leitor.PostAsync($"/api/suportado/{id}/cancelar", null);
+        Assert.Equal(HttpStatusCode.Forbidden, doLeitor.StatusCode);
+        Assert.Equal("Você não tem permissão para apurar o ICMS suportado.", await Detalhe(doLeitor));
+        // pela rota do suportado, só execução do suportado
+        Assert.Equal(HttpStatusCode.NotFound, (await dono.PostAsync($"/api/suportado/{movimentos}/cancelar", null)).StatusCode);
+        var recusa = await dono.PostAsync($"/api/suportado/{id}/cancelar", null);
+        Assert.Equal(HttpStatusCode.Conflict, recusa.StatusCode);
+        Assert.Equal("Esta rodada já terminou.", await Detalhe(recusa));
+    }
+
+    // ------------------------------------------------------------------ analítico do suportado
+    [Fact]
+    public async Task Linhas_repassam_filtro_e_pagina_e_devolvem_o_que_o_motor_montou()
+    {
+        var (_, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var id = await Execucao(projeto, "st_suportado");
+        motor.AoPedirLinhas = p => Results.Json(new { escopo = p.GetProperty("escopo").GetString(), pagina = 2, por_pagina = 25, total = 1, linhas = new[] { new { chave = "4" } } });
+
+        var r = await c.GetAsync($"/api/suportado/{id}/linhas?escopo=item&fonte=nao_apuravel&busca=alface&pagina=2&por_pagina=25");
+
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        var d = await Json(r);
+        Assert.Equal("item", d.GetProperty("escopo").GetString());
+        Assert.Equal(1, d.GetProperty("total").GetInt32());
+        var pedido = motor.Pedidos.Last(x => x.TryGetProperty("escopo", out _));
+        Assert.Equal((id, "item", "nao_apuravel", "alface", 2, 25),
+            (pedido.GetProperty("execucao_id").GetInt32(), pedido.GetProperty("escopo").GetString(), pedido.GetProperty("fonte").GetString(),
+             pedido.GetProperty("busca").GetString(), pedido.GetProperty("pagina").GetInt32(), pedido.GetProperty("por_pagina").GetInt32()));
+    }
+
+    [Fact]
+    public async Task Linhas_sem_filtro_usam_o_padrao_e_de_outra_etapa_nao_existem()
+    {
+        var (_, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var id = await Execucao(projeto, "st_suportado");
+        var conferencia = await Execucao(projeto, "conferencia");
+        motor.AoPedirLinhas = _ => Results.Json(new { total = 0, linhas = Array.Empty<object>() });
+
+        Assert.Equal(HttpStatusCode.OK, (await c.GetAsync($"/api/suportado/{id}/linhas?pagina=abc")).StatusCode);
+        var pedido = motor.Pedidos.Last(x => x.TryGetProperty("escopo", out _));
+        Assert.Equal(("documento", 1, 50), (pedido.GetProperty("escopo").GetString(), pedido.GetProperty("pagina").GetInt32(), pedido.GetProperty("por_pagina").GetInt32()));
+        Assert.Equal(JsonValueKind.Null, pedido.GetProperty("fonte").ValueKind);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/suportado/{conferencia}/linhas")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Recusa_das_linhas_chega_com_o_texto_do_motor()
+    {
+        var (_, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var id = await Execucao(projeto, "st_suportado");
+        motor.AoPedirLinhas = _ => Results.Json(new { detail = "Escopo desconhecido: tudo. Vale documento ou item." }, statusCode: 422);
+
+        var r = await c.GetAsync($"/api/suportado/{id}/linhas?escopo=tudo");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, r.StatusCode);
+        Assert.Equal("Escopo desconhecido: tudo. Vale documento ou item.", await Detalhe(r));
     }
 }

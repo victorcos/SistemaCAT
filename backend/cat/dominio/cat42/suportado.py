@@ -50,13 +50,45 @@ from enum import Enum
 
 ZERO = Decimal(0)
 
+# Os conjuntos abaixo têm só os DOIS dígitos da tributação, porque é contra eles
+# que se compara (`EntradaParaApurar.cst` descarta o primeiro dígito, que é a
+# origem da mercadoria). Uma versão anterior trazia "500" e "201" aqui, que
+# nunca casavam com nada: no EFD, "500" é origem 5 com CST 00 — tributado sem
+# substituição —, e não o CSOSN do Simples Nacional.
+
 # CST cujo imposto já foi retido em operação anterior. O remetente não destaca,
 # e é por isso que o valor tem de vir de fora do documento.
-CST_JA_RETIDO = frozenset({"60", "060", "500"})
+CST_JA_RETIDO = frozenset({"60"})
 
 # CST em que o remetente é o substituto e destaca a retenção no documento.
-CST_COM_RETENCAO = frozenset({"10", "010", "30", "030", "70", "070", "201",
-                              "202", "203"})
+CST_COM_RETENCAO = frozenset({"10", "30", "70"})
+
+# CST 90, "outras", não diz se há substituição. Medido em 2021-05 na base do
+# Amigão: metade dos itens de CST 90 que casaram com o relatório do cliente
+# tinham imposto informado. Então CST 90 sem valor é dado que falta, não item
+# sem imposto — tratá-lo como "sem o que apurar" esconderia pendência real.
+CST_PODE_TER_ST = frozenset({"90"})
+
+
+class Pendencia(Enum):
+    """Por que um item ficou sem apuração. São duas coisas opostas.
+
+    A tela de apuração tem uma regra que não se negocia: "não apurável" não é
+    sempre erro. Numa base real, 75,6% dos itens sem apuração eram CST 40 —
+    isento, que por definição não tem imposto suportado. Pintar isso de alerta
+    treina quem confere a ignorar o alerta, e aí o que de fato falta passa
+    junto.
+    """
+
+    SEM_O_QUE_APURAR = "sem_o_que_apurar"
+    """O CST não é de substituição: não há imposto suportado a apurar."""
+
+    FALTA_DADO = "falta_dado"
+    """Deveria haver valor e não há. Exige providência."""
+
+    @property
+    def exige_providencia(self) -> bool:
+        return self is Pendencia.FALTA_DADO
 
 
 class Fonte(Enum):
@@ -129,6 +161,8 @@ class IcmsSuportado:
     valor: Decimal
     fonte: Fonte
     motivo: str = ""
+    # só quando não apurou: separa "não há o que apurar" de "falta dado"
+    pendencia: Pendencia | None = None
 
     @property
     def apurado(self) -> bool:
@@ -164,23 +198,37 @@ def apurar(entrada: EntradaParaApurar) -> IcmsSuportado:
             fonte=Fonte.BASE_E_ALIQUOTA,
         )
 
+    pendencia, motivo = _porque_nao(entrada)
     return IcmsSuportado(valor=ZERO, fonte=Fonte.NAO_APURAVEL,
-                         motivo=_porque_nao(entrada))
+                         motivo=motivo, pendencia=pendencia)
 
 
-def _porque_nao(entrada: EntradaParaApurar) -> str:
-    """A frase que a tela mostra. Dizer 'não apurável' sem dizer por quê
-    obriga quem confere a abrir o arquivo para descobrir sozinho."""
-    if entrada.cst in CST_JA_RETIDO:
-        return ("CST 60: o imposto foi retido antes e o remetente não destaca. "
+def _porque_nao(entrada: EntradaParaApurar) -> tuple[Pendencia, str]:
+    """A frase que a tela mostra, e de que lado da linha ela cai.
+
+    Dizer 'não apurável' sem dizer por quê obriga quem confere a abrir o
+    arquivo para descobrir sozinho. E dizer por quê sem separar o que falta do
+    que não existe faz o CST 40 parecer defeito.
+    """
+    cst = entrada.cst
+    if cst in CST_JA_RETIDO:
+        return (Pendencia.FALTA_DADO,
+                "CST 60: o imposto foi retido antes e o remetente não destaca. "
                 "Falta o retido informado na nota ou no relatório do cliente.")
-    if entrada.cst in CST_COM_RETENCAO:
-        return ("CST de retenção sem valor destacado — a nota deveria trazer "
+    if cst in CST_COM_RETENCAO:
+        return (Pendencia.FALTA_DADO,
+                "CST de retenção sem valor destacado — a nota deveria trazer "
                 "o imposto retido e não trouxe.")
-    if not entrada.cst:
-        return "Item sem CST: não dá para dizer sequer se é mercadoria de ST."
-    return (f"CST {entrada.cst} não é de substituição tributária: não há "
-            "imposto suportado a apurar neste item.")
+    if cst in CST_PODE_TER_ST:
+        return (Pendencia.FALTA_DADO,
+                "CST 90, outras operações: pode haver substituição, e nenhuma "
+                "fonte informou o imposto. Conferir o documento.")
+    if not cst:
+        return (Pendencia.FALTA_DADO,
+                "Item sem CST: não dá para dizer sequer se é mercadoria de ST.")
+    return (Pendencia.SEM_O_QUE_APURAR,
+            f"CST {cst} não é de substituição tributária: não há imposto "
+            "suportado a apurar neste item.")
 
 
 def _arredondar(v: Decimal) -> Decimal:
@@ -205,18 +253,23 @@ class ResumoDaApuracao:
     valor_total: Decimal = ZERO
     por_fonte: dict[Fonte, int] | None = None
     valor_por_fonte: dict[Fonte, Decimal] | None = None
+    por_pendencia: dict[Pendencia, int] | None = None
 
     def __post_init__(self) -> None:
         if self.por_fonte is None:
             self.por_fonte = {f: 0 for f in Fonte}
         if self.valor_por_fonte is None:
             self.valor_por_fonte = {f: ZERO for f in Fonte}
+        if self.por_pendencia is None:
+            self.por_pendencia = {p: 0 for p in Pendencia}
 
     def somar(self, resultado: IcmsSuportado) -> None:
         self.itens += 1
         self.valor_total += resultado.valor
         self.por_fonte[resultado.fonte] += 1
         self.valor_por_fonte[resultado.fonte] += resultado.valor
+        if resultado.pendencia is not None:
+            self.por_pendencia[resultado.pendencia] += 1
 
     @property
     def itens_apurados(self) -> int:

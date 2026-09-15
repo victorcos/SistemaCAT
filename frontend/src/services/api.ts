@@ -1,3 +1,4 @@
+import { foiAbortado } from "@/lib/download";
 import { ErroApi } from "@/types/erro";
 import { emitirSessaoExpirada, lerToken, limparToken } from "./sessao";
 
@@ -22,7 +23,10 @@ export async function chamar<T>(
   let resposta: Response;
   try {
     resposta = await fetch(`/api${caminho}`, { ...opcoes, headers: cabecalhos });
-  } catch {
+  } catch (e) {
+    // quem abortou foi a própria tela (busca nova, página nova, Cancelar):
+    // virar "sem conexão" seria acusar a rede de uma decisão de quem clicou
+    if (foiAbortado(e)) throw e;
     throw new ErroApi(
       "Não foi possível falar com o servidor. Verifique sua conexão.",
       0,

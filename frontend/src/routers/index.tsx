@@ -9,6 +9,7 @@ import Inicio from "@/pages/Inicio";
 import Login from "@/pages/Login";
 import Lote from "@/pages/Lote";
 import Movimentos from "@/pages/Movimentos";
+import Suportado from "@/pages/Suportado";
 import Projeto from "@/pages/Projeto";
 import TrocarSenha from "@/pages/TrocarSenha";
 import Usuarios from "@/pages/Usuarios";
@@ -74,6 +75,7 @@ export const roteador = createBrowserRouter([
               { path: "/projetos/:id/arquivos", element: <Lote /> },
               { path: "/projetos/:id/conferencia", element: <Conferencia /> },
               { path: "/projetos/:id/movimentos", element: <Movimentos /> },
+              { path: "/projetos/:id/suportado", element: <Suportado /> },
               { path: "/projetos/:id/historico", element: <Historico /> },
               {
                 element: <ExigePapel papeis={ADMINISTRA_USUARIOS} />,

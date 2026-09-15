@@ -12,6 +12,9 @@ public sealed record ExecucaoLida(
 
 public sealed record PlanilhaPronta(string Caminho, string Nome, string Tipo);
 
+/// <param name="Escopo">"documento" (uma linha por nota, com os itens) ou "item".</param>
+public sealed record PedidoDeLinhas(string Escopo, string? Fonte, string? Busca, int Pagina, int PorPagina);
+
 public interface IRepositorioDeExecucoes
 {
     Task<ExecucaoLida?> Buscar(int id, CancellationToken cancelar);
@@ -38,6 +41,17 @@ public sealed class Execucoes(
 {
     public const string Conferencia = "conferencia";
     public const string Movimentos = "movimentos";
+    public const string Suportado = "st_suportado";
+
+    /// <summary>
+    /// As etapas que concluem com uma rodada do motor. Uma lista só: o roteiro
+    /// do trabalho e a consulta que o alimenta liam cada uma a sua, e a etapa
+    /// nova que entrasse numa e não na outra ficaria para sempre "pendente".
+    /// </summary>
+    public static readonly IReadOnlyList<string> DeProcessamento = [Conferencia, Movimentos, Suportado];
+
+    /// <summary>Ainda não terminou: inclui o pedido de parar que a rodada não atendeu ainda.</summary>
+    public static bool EmCurso(string situacao) => situacao is "na_fila" or "rodando" or "cancelando";
 
     // quantas rodadas a tela lista: a última é a que importa, as outras são contexto
     public const int NaLista = 20;
@@ -73,6 +87,25 @@ public sealed class Execucoes(
         if (etapaExigida is not null && e.Etapa != etapaExigida)
             throw new ExecucaoNaoEncontrada();
         return e;
+    }
+
+    /// <summary>
+    /// Na fila, cancela na hora; rodando, o motor pede para parar no próximo
+    /// ponto seguro. Quem pode cancelar é quem pode iniciar.
+    /// </summary>
+    public async Task<ExecucaoLida> Cancelar(int execucaoId, string? etapaExigida, Usuario por, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, etapaExigida, por, cancelar);
+        await motor.CancelarExecucao(e.Id, por.Id, cancelar);
+        log.Info("cancelamento pedido ao motor", new { execucao_id = e.Id, etapa = e.Etapa, por_usuario_id = por.Id });
+        return await execucoes.Buscar(e.Id, cancelar) ?? throw new ExecucaoNaoEncontrada();
+    }
+
+    /// <summary>Uma página do analítico da apuração, montada pelo motor a partir do parquet.</summary>
+    public async Task<JsonElement> LinhasDoSuportado(int execucaoId, PedidoDeLinhas pedido, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, Suportado, usuario, cancelar);
+        return await motor.LinhasDoSuportado(e.Id, pedido, cancelar);
     }
 
     public async Task<PlanilhaPronta> Planilha(int execucaoId, string etapaDaRota, string? etapaExigida, string qual,

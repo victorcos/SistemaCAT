@@ -76,8 +76,11 @@ public static class Etapas
             "de abertura — cada movimento marcado pela conferência.",
             Implementada: true),
         new("st_suportado", "Apurar o ICMS suportado",
-            "Determinar o imposto suportado de cada entrada. Quando o SPED e o " +
-            "XML divergem, vale o XML — é o documento fiscal."),
+            "Determinar o imposto suportado de cada entrada pela cascata de " +
+            "quatro fontes — destacado na nota, informado pelo fornecedor, " +
+            "reconstruído por base e alíquota, ou não apurável — e marcar de " +
+            "onde veio cada valor. Quando o ERP e o XML divergem, vale o XML.",
+            Implementada: true),
         new("razao", "Montar o razão dos itens",
             "A Ficha 3: uma ficha por mercadoria, custo médio ponderado móvel, " +
             "entradas e devoluções antes das saídas no mesmo dia."),

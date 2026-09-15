@@ -25,6 +25,8 @@ export {
   FolderSearch as IconePasta,
   Upload as IconeEnviar,
   RefreshCw as IconeTentarDeNovo,
+  CircleStop as IconeParar,
+  ChartColumnBig as IconeApuracao,
 
   // navegação e controles
   House as IconeInicio,
@@ -32,6 +34,7 @@ export {
   Building2 as IconeEmpresa,
   Search as IconeBusca,
   ChevronDown as IconeAbrir,
+  ChevronRight as IconeExpandir,
   ChevronUp as IconeFechar2,
   ArrowLeft as IconeVoltar,
   X as IconeFechar,

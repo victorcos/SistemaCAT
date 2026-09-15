@@ -12,14 +12,19 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from cat.dominio.cat42.suportado import Fonte
+from cat.dominio.cat42.suportado import Fonte, Pendencia
 from cat.infraestrutura.analitico.movimentacao import ARQUIVO_ITENS, ARQUIVO_MOVIMENTOS
 from cat.infraestrutura.analitico.suportado import (
+    ARQUIVO_DOCUMENTOS,
     ARQUIVO_RETIDO,
     ARQUIVO_SUPORTADO,
     ESQUEMA_RETIDO,
+    ApuracaoCancelada,
     apurar,
+    extrair_retido,
     fatias_por_fonte,
+    linhas,
+    quebras,
 )
 
 CNPJ = "11517841000278"
@@ -35,7 +40,9 @@ def d(v: str) -> Decimal:
 def escrever_movimentos(pasta, linhas: list[dict]) -> None:
     esquema = pa.schema([
         ("cnpj", pa.string()), ("competencia", pa.date32()),
-        ("chave", pa.string()), ("codigo", pa.string()),
+        ("chave", pa.string()), ("numero_documento", pa.string()),
+        ("modelo", pa.string()), ("participante", pa.string()),
+        ("codigo", pa.string()), ("descricao", pa.string()),
         ("cst_icms", pa.string()), ("operacao", pa.string()),
         ("quantidade", pa.decimal128(18, 5)),
         ("valor_icms", pa.decimal128(18, 2)),
@@ -71,7 +78,9 @@ def escrever_cadastro(pasta, linhas: list[tuple[str, str, str]]) -> None:
 
 def movimento(**kw) -> dict:
     base = {"cnpj": CNPJ, "competencia": date(2021, 5, 1), "chave": CHAVE_A,
-            "codigo": "117110", "cst_icms": "060", "operacao": "entrada",
+            "numero_documento": "4411", "modelo": "55", "participante": "F168181",
+            "codigo": "117110", "descricao": "Alface crespa", "cst_icms": "060",
+            "operacao": "entrada",
             "quantidade": d("1.00000"), "valor_icms": d("0.00"),
             "valor_st": d("0.00"), "bc_st": d("0.00")}
     base.update(kw)
@@ -201,15 +210,20 @@ class TestReconstrucao:
 
 
 class TestResumoParaATela:
-    def test_as_fatias_so_trazem_fonte_que_ocorreu(self, tmp_path):
+    def test_a_cascata_vem_inteira_e_na_ordem_mesmo_com_fonte_zerada(self, tmp_path):
+        """A fonte reconstruída com zero é informação: é o que diz que nada foi
+        estimado. Esconder a fonte zerada apagaria isso."""
         escrever_movimentos(tmp_path, [
             movimento(cst_icms="010", valor_icms=d("18.00"), valor_st=d("9.00")),
             movimento(chave=CHAVE_B),
         ])
         escrever_retido(tmp_path, [(CHAVE_B, "117110", "5.00")])
         fatias = fatias_por_fonte(apurar(str(tmp_path)))
-        codigos = {f["codigo"] for f in fatias}
-        assert codigos == {"documento", "informado_pelo_fornecedor"}
+        assert [f["codigo"] for f in fatias] == [
+            "documento", "informado_pelo_fornecedor", "base_e_aliquota", "nao_apuravel"]
+        reconstruido = fatias[2]
+        assert reconstruido["itens"] == 0 and reconstruido["documental"] is False
+        assert fatias[3]["documental"] is None      # não apurável não é sim nem não
         assert all(f["rotulo"] for f in fatias)
 
     def test_cobertura_e_fracao_documental(self, tmp_path):
@@ -225,6 +239,155 @@ class TestResumoParaATela:
         assert round(resumo.cobertura, 4) == round(2 / 3, 4)
         assert resumo.valor_total == d("45.00")        # 27 + 18
         assert resumo.valor_documental == d("27.00")
+
+
+class TestPastasSeparadas:
+    """Movimentos são da etapa 3; resultado é desta. Na mesma pasta, rodar a
+    apuração de novo sobrescreveria material de outra etapa."""
+
+    def test_le_de_uma_pasta_e_grava_em_outra(self, tmp_path):
+        mov = tmp_path / "movimentos"
+        mov.mkdir()
+        apu = tmp_path / "apuracao"
+        apu.mkdir()
+        escrever_movimentos(mov, [movimento()])
+        escrever_retido(apu, [(CHAVE_A, "117110", "4.75")])
+        resumo = apurar(str(mov), str(apu))
+        assert resumo.valor_total == d("4.75")
+        assert (apu / ARQUIVO_SUPORTADO).is_file()
+        assert not (mov / ARQUIVO_SUPORTADO).exists()
+
+
+class TestAndamentoECancelamento:
+    def test_avisa_o_andamento(self, tmp_path):
+        escrever_movimentos(tmp_path, [
+            movimento(), movimento(chave=CHAVE_B, cnpj="99887766000105")])
+        vistos = []
+        apurar(str(tmp_path),
+               avisar=lambda a: vistos.append((a.itens, a.estabelecimentos)))
+        assert vistos and vistos[-1] == (2, 2)
+
+    def test_cancelar_para_e_nao_deixa_meio_resultado(self, tmp_path):
+        """Meio parquet no disco seria lido depois como apuração inteira."""
+        escrever_movimentos(tmp_path, [movimento()])
+        with pytest.raises(ApuracaoCancelada):
+            apurar(str(tmp_path), deve_parar=lambda: True)
+        assert not (tmp_path / ARQUIVO_SUPORTADO).exists()
+        assert not (tmp_path / ARQUIVO_DOCUMENTOS).exists()
+
+    def test_extrair_retido_respeita_o_cancelamento(self, tmp_path):
+        with pytest.raises(ApuracaoCancelada):
+            extrair_retido(["qualquer.txt"], str(tmp_path / "r.parquet"),
+                           deve_parar=lambda: True)
+
+
+class TestPendenciaNoParquet:
+    def test_separa_sem_o_que_apurar_de_falta_dado(self, tmp_path):
+        escrever_movimentos(tmp_path, [
+            movimento(chave=CHAVE_A, cst_icms="040"),
+            movimento(chave=CHAVE_B, cst_icms="060"),
+        ])
+        resumo = apurar(str(tmp_path))
+        assert resumo.por_pendencia[Pendencia.SEM_O_QUE_APURAR] == 1
+        assert resumo.por_pendencia[Pendencia.FALTA_DADO] == 1
+        pend = {l["cst_icms"]: l["pendencia"] for l in ler_saida(tmp_path)}
+        assert pend == {"040": "sem_o_que_apurar", "060": "falta_dado"}
+
+
+class TestQuebras:
+    def test_por_cst_por_competencia_e_estabelecimentos(self, tmp_path):
+        escrever_movimentos(tmp_path, [
+            movimento(chave=CHAVE_A, competencia=date(2021, 5, 1)),
+            movimento(chave=CHAVE_B, competencia=date(2021, 6, 1), cst_icms="040",
+                      cnpj="99887766000105"),
+        ])
+        escrever_retido(tmp_path, [(CHAVE_A, "117110", "4.75")])
+        apurar(str(tmp_path))
+        q = quebras(str(tmp_path))
+        assert q["estabelecimentos"] == 2
+        cst = {c["cst"]: c for c in q["por_cst"]}
+        assert cst["60"]["valor"] == d("4.75") and cst["60"]["apurados"] == 1
+        assert cst["40"]["apurados"] == 0
+        comp = {c["competencia"]: c for c in q["por_competencia"]}
+        assert comp["2021-05"]["cobertura"] == 1.0
+        assert comp["2021-06"]["cobertura"] == 0.0
+        assert q["cst_sem_o_que_apurar"] == {"cst": "40", "itens": 1}
+
+
+class TestAnalitico:
+    def _base(self, tmp_path):
+        escrever_movimentos(tmp_path, [
+            movimento(chave=CHAVE_A, codigo="1", descricao="Leite condensado"),
+            movimento(chave=CHAVE_A, codigo="2", descricao="Refrigerante"),
+            movimento(chave=CHAVE_B, codigo="3", cst_icms="040", participante="F999"),
+        ])
+        escrever_retido(tmp_path, [(CHAVE_A, "1", "5.00"), (CHAVE_A, "2", "3.00")])
+        apurar(str(tmp_path))
+
+    def test_por_item_e_uma_linha_por_item(self, tmp_path):
+        self._base(tmp_path)
+        r = linhas(str(tmp_path), escopo="item")
+        assert r["total"] == 3 and len(r["linhas"]) == 3
+
+    def test_por_documento_agrupa_e_traz_os_itens(self, tmp_path):
+        self._base(tmp_path)
+        r = linhas(str(tmp_path), escopo="documento")
+        assert r["total"] == 2
+        doc_a = next(x for x in r["linhas"] if x["chave"] == CHAVE_A)
+        assert doc_a["itens"] == 2 and len(doc_a["filhos"]) == 2
+        assert Decimal(doc_a["suportado"]) == d("8.00")
+        assert doc_a["fonte"] == "informado_pelo_fornecedor"
+
+    def test_filtrar_por_fonte_filtra_antes_de_agrupar(self, tmp_path):
+        self._base(tmp_path)
+        r = linhas(str(tmp_path), escopo="documento", fonte="nao_apuravel")
+        assert [x["chave"] for x in r["linhas"]] == [CHAVE_B]
+
+    def test_busca_por_descricao_participante_e_chave(self, tmp_path):
+        self._base(tmp_path)
+        assert linhas(str(tmp_path), escopo="item", busca="condensado")["total"] == 1
+        assert linhas(str(tmp_path), escopo="item", busca="F999")["total"] == 1
+        assert linhas(str(tmp_path), escopo="documento", busca=CHAVE_B[:20])["total"] == 1
+
+    def test_paginacao_no_servidor(self, tmp_path):
+        self._base(tmp_path)
+        p1 = linhas(str(tmp_path), escopo="item", pagina=1, por_pagina=2)
+        p2 = linhas(str(tmp_path), escopo="item", pagina=2, por_pagina=2)
+        assert len(p1["linhas"]) == 2 and len(p2["linhas"]) == 1
+        assert p1["total"] == p2["total"] == 3
+
+    def test_por_pagina_tem_teto(self, tmp_path):
+        self._base(tmp_path)
+        assert linhas(str(tmp_path), por_pagina=10_000)["por_pagina"] == 200
+
+    def test_o_indice_responde_igual_ao_calculo_na_hora(self, tmp_path):
+        """O índice é atalho, não outra verdade: sem ele, a mesma página."""
+        self._base(tmp_path)
+        assert (tmp_path / ARQUIVO_DOCUMENTOS).is_file()
+        pedidos = [dict(escopo="documento"), dict(escopo="documento", fonte="nao_apuravel"),
+                   dict(escopo="documento", fonte="informado_pelo_fornecedor",
+                        pagina=1, por_pagina=1)]
+        com_indice = [linhas(str(tmp_path), **p) for p in pedidos]
+        (tmp_path / ARQUIVO_DOCUMENTOS).unlink()
+        sem_indice = [linhas(str(tmp_path), **p) for p in pedidos]
+        assert com_indice == sem_indice
+
+    def test_paginacao_pelo_indice_nao_repete_nem_pula(self, tmp_path):
+        chaves = [str(n) * 44 for n in range(1, 8)]
+        escrever_movimentos(tmp_path, [movimento(chave=c) for c in chaves])
+        apurar(str(tmp_path))
+        vistas = []
+        for pagina in (1, 2, 3, 4):
+            vistas += [d["chave"] for d in
+                       linhas(str(tmp_path), escopo="documento", pagina=pagina, por_pagina=2)["linhas"]]
+        assert vistas == sorted(chaves)
+
+    def test_escopo_e_fonte_desconhecidos_sao_recusados(self, tmp_path):
+        self._base(tmp_path)
+        with pytest.raises(ValueError, match="Escopo"):
+            linhas(str(tmp_path), escopo="tudo")
+        with pytest.raises(ValueError, match="Fonte"):
+            linhas(str(tmp_path), fonte="chute")
 
 
 class TestOrdemDasEtapas:

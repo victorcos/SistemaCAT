@@ -246,7 +246,7 @@ public sealed class TrabalhosTestes(BancoDeTeste banco, MotorInternoFalso _motor
         Assert.Equal(nome.ToUpperInvariant(), p.GetProperty("criado_por").GetString());
         Assert.Equal(id, p.GetProperty("responsavel_id").GetInt32());
         Assert.Equal(0, p.GetProperty("etapas_feitas").GetInt32());
-        Assert.Equal(3, p.GetProperty("etapas_totais").GetInt32());
+        Assert.Equal(4, p.GetProperty("etapas_totais").GetInt32());
 
         // o evento "criado" no formato que o histórico em Python lê
         var projeto = p.GetProperty("id").GetInt32();
@@ -337,6 +337,15 @@ public sealed class TrabalhosTestes(BancoDeTeste banco, MotorInternoFalso _motor
         e = await Etapas();
         Assert.Equal("concluida", e["conferencia"]);
         Assert.Equal("pendente", e["movimentos"]);
+
+        // a apuração do suportado entra no roteiro; "cancelando" ainda é andamento
+        await banco.Comando($"INSERT INTO execucao (projeto_id, etapa, situacao, arquivos_totais, arquivos_lidos, bytes_lidos, documentos) VALUES ({projeto}, 'movimentos', 'concluida', 0, 0, 0, 0)");
+        await banco.Comando($"INSERT INTO execucao (projeto_id, etapa, situacao, arquivos_totais, arquivos_lidos, bytes_lidos, documentos) VALUES ({projeto}, 'st_suportado', 'cancelando', 0, 0, 0, 0)");
+        e = await Etapas();
+        Assert.Equal("em_andamento", e["st_suportado"]);
+        await banco.Comando($"UPDATE execucao SET situacao = 'concluida' WHERE projeto_id = {projeto} AND etapa = 'st_suportado'");
+        Assert.Equal("concluida", (await Etapas())["st_suportado"]);
+        await banco.Comando($"DELETE FROM execucao WHERE projeto_id = {projeto} AND etapa IN ('movimentos', 'st_suportado')");
 
         var cartao = (await Json(await c.GetAsync($"/api/projetos/{projeto}"))).GetProperty("projeto");
         Assert.Equal(2, cartao.GetProperty("etapas_feitas").GetInt32());

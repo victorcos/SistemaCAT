@@ -21,7 +21,10 @@ public class BancoDeTeste : IAsyncLifetime
     private static readonly string Servidor =
         Environment.GetEnvironmentVariable("CAT_TESTES_POSTGRES") ?? "Host=127.0.0.1;Port=55432;Username=cat;Password=cat";
 
-    public string Url => $"postgresql+psycopg://cat:cat@127.0.0.1:55432/{Nome}";
+    // do mesmo servidor da conexão acima: com a porta fixa aqui, CAT_TESTES_POSTGRES
+    // mudava para onde o C# olhava e não para onde o Alembic e a API gravavam
+    private static readonly NpgsqlConnectionStringBuilder Partes = new(Servidor);
+    public string Url => $"postgresql+psycopg://{Partes.Username}:{Partes.Password}@{Partes.Host}:{Partes.Port}/{Nome}";
     public string ResumoPadrao { get; } = new SenhasArgon2(Pimenta).Gerar(SenhaPadrao);
 
     public async Task InitializeAsync()

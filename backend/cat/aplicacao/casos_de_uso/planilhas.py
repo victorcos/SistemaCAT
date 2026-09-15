@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from cat.aplicacao.casos_de_uso import conferir_documentos, extrair_movimentos
+from cat.aplicacao.casos_de_uso import apurar_suportado, conferir_documentos, extrair_movimentos
 from cat.infraestrutura.analitico.confronto import (
     ARQUIVO_CONFERIDOS,
     ARQUIVO_NAO_ESCRITURADAS,
@@ -22,6 +22,7 @@ from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_MOVIMENTOS,
 )
 from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO
+from cat.infraestrutura.analitico.suportado import ARQUIVO_SUPORTADO
 from cat.infraestrutura.planilhas.conferencia import (
     FORMATOS,
     gerar_conferidas,
@@ -34,6 +35,7 @@ from cat.infraestrutura.planilhas.movimentacao import (
     gerar_itens,
     gerar_movimentos,
 )
+from cat.infraestrutura.planilhas.suportado import gerar_suportado
 from cat.infraestrutura.repositorios.modelos import ExecucaoDB
 from cat.log import contexto, obter_log
 
@@ -59,11 +61,15 @@ PLANILHAS = {
         "inventario": ("inventario.xlsx", ARQUIVO_INVENTARIO, gerar_inventario),
         "analitico": ("analitico.xlsx", ARQUIVO_ANALITICO, gerar_analitico),
     },
+    apurar_suportado.ETAPA: {
+        "suportado": ("icms_suportado.xlsx", ARQUIVO_SUPORTADO, gerar_suportado),
+    },
 }
 
 NAO_TERMINOU = {
     conferir_documentos.ETAPA: "A conferência ainda não terminou.",
     extrair_movimentos.ETAPA: "A extração ainda não terminou.",
+    apurar_suportado.ETAPA: "A apuração ainda não terminou.",
 }
 
 
@@ -106,6 +112,8 @@ def gerar(execucao: ExecucaoDB, etapa_da_rota: str, qual: str,
         # é de antes de esta lista existir: a pasta está lá, a lista não.
         if etapa_da_rota == extrair_movimentos.ETAPA:
             raise PlanilhaRecusada(410, "Os arquivos desta extração não estão mais em disco. Rode de novo.")
+        if etapa_da_rota == apurar_suportado.ETAPA:
+            raise PlanilhaRecusada(410, "Os arquivos desta apuração não estão mais em disco. Rode de novo.")
         motivo = ("Esta conferência é de uma versão anterior e não tem esta lista."
                   if os.path.isdir(pasta) else "Os arquivos desta conferência não estão mais em disco.")
         raise PlanilhaRecusada(410, f"{motivo} Rode a conferência de novo.")

@@ -5,6 +5,84 @@
 
 ---
 
+## 2026-09-15 — Etapa 4 ganha rodada, tela e cancelamento
+
+**O que entrou.** A apuração do ICMS suportado deixou de ser script e virou
+etapa: `st_suportado` na fila do motor, rotas na API em C#
+(`/api/projetos/{id}/suportado`) e a tela desenhada no handoff da etapa 4
+(`/projetos/{id}/suportado`). O roteiro do trabalho passa a mostrar a etapa 4
+como disponível.
+
+**Não apurável se divide em dois.** O domínio devolve, junto do "não
+apurável", uma `Pendencia`: `sem_o_que_apurar` (CST que não é de substituição
+— 40, 00, 20…) ou `falta_dado` (60, 10/30/70 sem destaque, 90, sem CST). A
+tela depende disso para não pintar isento de alerta. CST 90 sem valor cai em
+falta dado porque, medido em 2021-05, metade dos CST 90 que casaram com o
+relatório tinha imposto informado.
+
+Na mesma passada saiu um defeito antigo: os conjuntos de CST traziam "500" e
+"201", que nunca casavam — o domínio compara só os dois últimos dígitos, e no
+EFD "500" é origem 5 com CST 00, não CSOSN.
+
+**Leitura numa pasta, gravação em outra.** A apuração lê o
+`movimentos.parquet` da última extração concluída e grava na pasta da própria
+execução. Na mesma pasta, rodar a apuração de novo sobrescreveria material da
+etapa 3. Pelo mesmo motivo, contar e paginar usam DuckDB em memória (com teto e
+onde derramar), e não o banco em arquivo do confronto, que deixaria um
+`.duckdb` na pasta de outra etapa.
+
+**Cancelar é cooperativo.** A tela grava "cancelando"; a rodada confere isso
+entre um relatório e outro e entre um lote de 200 mil itens e outro, e para
+apagando o parquet parcial. Matar a linha de execução no meio da gravação
+deixaria um arquivo com cara de inteiro. Só as etapas que conferem o freio
+aceitam o pedido — nas outras o motor recusa com 422, em vez de a tela dizer
+que vai parar uma rodada que vai até o fim. Motor que reinicia com uma rodada
+"cancelando" a marca como cancelada, não como falha.
+
+**O que o handoff pedia e ficou diferente.**
+
+| Handoff | Implementado | Por quê |
+|---|---|---|
+| rota `/trabalhos/:id/apuracao` | `/projetos/:id/suportado` | "apuracao" é a chave da etapa 6 (ressarcimento e complemento); o resto do sistema usa `/projetos` |
+| exportação assíncrona com link no histórico | download direto, com o modal de confirmação | é o mecanismo das outras sete listas: salvar como, em fluxo, cancelável |
+| "uma aba por fonte" | uma aba, com a coluna Fonte; quebra em abas acima de 900 mil linhas | o filtro por fonte já dá a lista de uma fonte só |
+| nome do fornecedor | código do participante | o 0150 ainda não é extraído |
+| código da requisição na falha | número da execução | a rodada roda fora da requisição; o id da execução é o que acha a linha no log |
+| progresso por SSE | consulta a cada 2 s | é o que as etapas 2 e 3 fazem, e o resumo carrega andamento e log |
+
+**Resumo com versão.** O resumo grava `versao: 2`. Apuração sem esse campo é
+de antes da lista por fonte, e a tela diz "rode de novo" em vez de mostrar
+cartão zerado como se zero fosse o resultado.
+
+**Medido na base real (Amigão, 2021, movimentação da execução 9, com os três
+relatórios de entradas de 05/2021).**
+
+| | |
+|---|---|
+| Relatórios lidos (721 mil linhas de entrada) | 65 s, 510.443 itens com imposto informado |
+| Cascata sobre 8.761.002 itens | 134 s, 65 mil itens/s |
+| Índice por documento | 93 s, 28 MB |
+| Página do analítico por documento, sem busca | 0,1 a 0,6 s — **antes do índice, 17,7 s a primeira e 26,2 s a de número 5.000** |
+| Página com busca (agrupa na hora) | ≈ 5,7 s |
+| Cobertura de 05/2021 | 68,65% — os outros meses ficam perto de 1%, porque só havia o relatório de maio |
+
+O índice existe por causa da segunda linha de baixo para cima: agrupar 8,7
+milhões de itens a cada clique não é tela. Ele guarda o analítico inteiro e o
+de cada fonte já agrupados e numerados; a busca continua agrupando na hora,
+porque procura dentro dos itens. A página funda do escopo "por item" sem
+filtro (deslocamento de milhões) ainda ordena tudo — ≈ 10 s na página 100.000,
+que ninguém alcança clicando em "Próxima".
+
+**Questão aberta, anotada para decidir.** A fonte 2 dá valor também a item de
+CST 00 e 20 — o relatório informa o ICMS próprio da operação, e
+`imposto_suportado` o soma. Só com o relatório de maio foram R$ 8,39 milhões
+em CST 00 e R$ 4,06 milhões em CST 20 (carne resfriada, por exemplo). Item sem
+substituição não tem ICMS suportado para a Ficha 3; se isso deve ficar fora da
+apuração ou sair só no razão, pelo cadastro de mercadorias de ST, é decisão
+fiscal que não foi tomada aqui.
+
+---
+
 ## 2026-09-14 — O razão foi confrontado com a Ficha 3 de um cliente, e fecha
 
 **O que se fez.** O razão da Ficha 3 foi rodado contra a Ficha 3 **já

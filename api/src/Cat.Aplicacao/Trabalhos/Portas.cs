@@ -84,4 +84,12 @@ public interface IMotor
     /// <exception cref="MotorRecusou">planilha ou formato desconhecido (404), não terminou (409), material apagado (410)</exception>
     Task<PlanilhaPronta> GerarPlanilha(int execucaoId, string etapa, string qual, string? modelos, string? classificacoes,
         string formato, CancellationToken cancelar);
+
+    /// <summary>Pede para a rodada parar. Na fila, cancela na hora.</summary>
+    /// <exception cref="MotorRecusou">não existe (404), já terminou (409), etapa sem cancelamento (422)</exception>
+    Task CancelarExecucao(int execucaoId, int usuarioId, CancellationToken cancelar);
+
+    /// <summary>Uma página do analítico da apuração do ICMS suportado.</summary>
+    /// <exception cref="MotorRecusou">não é apuração (404), não terminou (409), material apagado (410), filtro inválido (422)</exception>
+    Task<System.Text.Json.JsonElement> LinhasDoSuportado(int execucaoId, PedidoDeLinhas pedido, CancellationToken cancelar);
 }

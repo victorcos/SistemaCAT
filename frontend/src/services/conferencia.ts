@@ -55,7 +55,8 @@ export interface Execucao {
   id: number;
   projeto_id: number;
   etapa: string;
-  situacao: "na_fila" | "rodando" | "concluida" | "falhou";
+  /** "cancelando" e "cancelada" só existem nas etapas que aceitam cancelar */
+  situacao: "na_fila" | "rodando" | "cancelando" | "concluida" | "falhou" | "cancelada";
   passo: string | null;
   fracao: number;
   arquivos_totais: number;
@@ -68,7 +69,8 @@ export interface Execucao {
   resumo: ResumoDaConferencia | null;
 }
 
-export const EM_CURSO = ["na_fila", "rodando"];
+/** Ainda não terminou: "cancelando" espera a rodada chegar ao ponto seguro. */
+export const EM_CURSO = ["na_fila", "rodando", "cancelando"];
 
 /** As três listas que a conferência exporta. */
 export type Planilha = "nao-escrituradas" | "a-cobrar" | "conferidas";

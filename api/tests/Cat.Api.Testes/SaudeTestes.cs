@@ -139,7 +139,7 @@ public sealed class SaudeTestes(MotorFalso motor) : IClassFixture<MotorFalso>, I
 
     [Theory]
     [InlineData("GET", "/api/rota-que-nao-existe")]
-    [InlineData("POST", "/api/conferencias/7/cancelar")]
+    [InlineData("POST", "/api/conferencias/7/pausar")]
     [InlineData("DELETE", "/api/eco/projetos/7?formato=csv")]
     public async Task Rota_desconhecida_responde_aqui_com_detail_e_nao_chega_ao_motor(string metodo, string caminho)
     {

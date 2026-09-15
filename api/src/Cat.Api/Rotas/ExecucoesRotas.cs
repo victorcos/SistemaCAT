@@ -7,7 +7,7 @@ using Cat.Infraestrutura.Configuracao;
 
 namespace Cat.Api.Rotas;
 
-/// <summary>Conferência e movimentos: pedir a rodada, acompanhar e baixar as planilhas.</summary>
+/// <summary>Conferência, movimentos e ICMS suportado: pedir a rodada, acompanhar, cancelar e baixar as planilhas.</summary>
 public static class ExecucoesRotas
 {
     public sealed record ExecucaoDto(
@@ -18,15 +18,32 @@ public static class ExecucoesRotas
     public static void MapearExecucoes(this IEndpointRouteBuilder rotas)
     {
         var api = rotas.MapGroup("/api").WithTags("execuções");
-        Etapa(api, Execucoes.Conferencia, "conferencias", detalheExigeEtapa: false);
-        Etapa(api, Execucoes.Movimentos, "movimentos", detalheExigeEtapa: true);
+        Etapa(api, Execucoes.Conferencia, "conferencias", detalheExigeEtapa: false, "conferir documentos");
+        Etapa(api, Execucoes.Movimentos, "movimentos", detalheExigeEtapa: true, "extrair movimentos");
+        Etapa(api, Execucoes.Suportado, "suportado", detalheExigeEtapa: true, "apurar o ICMS suportado");
+
+        // o analítico pagina no servidor: numa base real são 8,7 milhões de itens
+        api.MapGet("/suportado/{execucaoId:int}/linhas", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                {
+                    var q = http.Request.Query;
+                    var pedido = new PedidoDeLinhas(
+                        q["escopo"].FirstOrDefault() is { Length: > 0 } e ? e : "documento",
+                        q["fonte"].FirstOrDefault() is { Length: > 0 } f ? f : null,
+                        q["busca"].FirstOrDefault() is { Length: > 0 } b ? b : null,
+                        int.TryParse(q["pagina"], out var pagina) && pagina > 0 ? pagina : 1,
+                        int.TryParse(q["por_pagina"], out var porPagina) && porPagina > 0 ? porPagina : 50);
+                    return Results.Json(await caso.LinhasDoSuportado(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
+                }))
+            .ExigirUsuario();
     }
 
     /// <param name="detalheExigeEtapa">
     /// Pelo identificador, a rota de conferência mostra qualquer execução; a de
     /// movimentos só as de movimentos. É o contrato que a tela já usa.
     /// </param>
-    private static void Etapa(RouteGroupBuilder api, string etapa, string segmento, bool detalheExigeEtapa)
+    /// <param name="acao">Como a recusa por permissão fala: "Você não tem permissão para {acao}."</param>
+    private static void Etapa(RouteGroupBuilder api, string etapa, string segmento, bool detalheExigeEtapa, string acao)
     {
         var exigida = detalheExigeEtapa ? etapa : null;
 
@@ -34,7 +51,13 @@ public static class ExecucoesRotas
                 await Traduzir(async () => Results.Json(
                     Dto(await caso.Iniciar(etapa, projetoId, http.UsuarioAtual(), http.RequestAborted)),
                     statusCode: StatusCodes.Status202Accepted)))
-            .ExigirCapacidade(Capacidades.PodeEscrever, "pode_escrever", "conferir documentos");
+            .ExigirCapacidade(Capacidades.PodeEscrever, "pode_escrever", acao);
+
+        // quem pode iniciar pode parar; a etapa que não confere o pedido o motor recusa
+        api.MapPost($"/{segmento}/{{execucaoId:int}}/cancelar", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () => Results.Json(
+                    Dto(await caso.Cancelar(execucaoId, exigida, http.UsuarioAtual(), http.RequestAborted)))))
+            .ExigirCapacidade(Capacidades.PodeEscrever, "pode_escrever", acao);
 
         api.MapGet($"/projetos/{{projetoId:int}}/{segmento}", async (int projetoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () => Results.Json(

@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from cat.aplicacao.casos_de_uso import conferir_documentos, extrair_movimentos
+from cat.aplicacao.casos_de_uso import apurar_suportado, conferir_documentos, extrair_movimentos
 from cat.aplicacao.casos_de_uso.historico_do_projeto import registrar_de_etapa
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.repositorios.banco import Sessao
@@ -44,6 +44,7 @@ SEGUNDOS_ENTRE_OLHADAS = 2.0
 EXECUTORES = {
     conferir_documentos.ETAPA: conferir_documentos.executar,
     extrair_movimentos.ETAPA: extrair_movimentos.executar,
+    apurar_suportado.ETAPA: apurar_suportado.executar,
 }
 
 MOTIVO_INTERRUPCAO = "Interrompida: o motor reiniciou durante a rodada. Rode de novo."
@@ -100,11 +101,18 @@ def processar_pendentes() -> list[int]:
 
 def recuperar_interrompidas() -> int:
     with Sessao() as sessao:
-        orfas = list(sessao.scalars(select(ExecucaoDB).where(ExecucaoDB.situacao == "rodando")))
+        orfas = list(sessao.scalars(select(ExecucaoDB).where(
+            ExecucaoDB.situacao.in_(("rodando", "cancelando")))))
         for execucao in orfas:
-            execucao.situacao = "falhou"
-            execucao.erro = MOTIVO_INTERRUPCAO
-            execucao.passo = "Interrompida"
+            # quem pediu para cancelar já não queria o resultado: o reinício
+            # só completou o pedido, e chamar isso de falha confundiria a tela
+            if execucao.situacao == "cancelando":
+                execucao.situacao = "cancelada"
+                execucao.passo = "Cancelada"
+            else:
+                execucao.situacao = "falhou"
+                execucao.erro = MOTIVO_INTERRUPCAO
+                execucao.passo = "Interrompida"
             execucao.terminada_em = datetime.now(timezone.utc)
         sessao.commit()
         for execucao in orfas:
@@ -120,7 +128,7 @@ def recuperar_interrompidas() -> int:
 def _falhar(execucao_id: int, motivo: str) -> None:
     with Sessao() as sessao:
         execucao = sessao.get(ExecucaoDB, execucao_id)
-        if execucao is None or execucao.situacao in ("concluida", "falhou"):
+        if execucao is None or execucao.situacao in ("concluida", "falhou", "cancelada"):
             return
         execucao.situacao = "falhou"
         execucao.erro = motivo

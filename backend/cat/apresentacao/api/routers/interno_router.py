@@ -33,7 +33,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from cat.aplicacao.casos_de_uso import conferir_documentos, extrair_movimentos, planilhas
+from cat.aplicacao.casos_de_uso import (
+    apurar_suportado,
+    conferir_documentos,
+    extrair_movimentos,
+    planilhas,
+)
 from cat.aplicacao.casos_de_uso.analisar_remessa import RemessaAnalisada, analisar
 from cat.aplicacao.casos_de_uso.historico_do_projeto import TrabalhoParado
 from cat.aplicacao.casos_de_uso.inspecionar_lote import (
@@ -43,6 +48,7 @@ from cat.aplicacao.casos_de_uso.inspecionar_lote import (
 )
 from cat.config import obter_config
 from cat.dominio.comum.cnpj import Cnpj
+from cat.infraestrutura.analitico import suportado as analitico_suportado
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
 from cat.infraestrutura.repositorios.banco import obter_sessao
 from cat.infraestrutura.repositorios.modelos import ExecucaoDB
@@ -295,9 +301,13 @@ PREPARADORES = {
                                 "Já existe uma conferência em andamento neste trabalho."),
     extrair_movimentos.ETAPA: (extrair_movimentos.preparar, extrair_movimentos.NadaParaExtrair,
                                "Já existe uma extração de movimentos em andamento neste trabalho."),
+    apurar_suportado.ETAPA: (apurar_suportado.preparar, apurar_suportado.NadaParaApurar,
+                             "Já existe uma apuração do ICMS suportado em andamento neste trabalho."),
 }
 
-SITUACOES_EM_CURSO = ("na_fila", "rodando")
+# "cancelando" ainda está em curso: a rodada só para no próximo ponto seguro, e
+# uma segunda começando antes disso disputaria a mesma pasta
+SITUACOES_EM_CURSO = ("na_fila", "rodando", "cancelando")
 
 
 class PedidoDeExecucao(BaseModel):
@@ -367,6 +377,66 @@ def pedir_execucao(
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)) from erro
         log.info("execução na fila", extra={"execucao_id": execucao.id, "arquivos": execucao.arquivos_totais})
         return execucao_dto(execucao)
+
+
+class PedidoDeCancelamento(BaseModel):
+    usuario_id: int
+
+
+@router.post("/execucoes/{execucao_id}/cancelar", response_model=ExecucaoDto,
+             dependencies=[Depends(exigir_segredo)])
+def cancelar_execucao(
+    execucao_id: int,
+    pedido: PedidoDeCancelamento,
+    sessao: Annotated[Session, Depends(obter_sessao)],
+) -> ExecucaoDto:
+    """Na fila, cancela na hora; rodando, pede para parar no próximo ponto seguro.
+
+    Quem pode cancelar é decisão da API em C# — a mesma de quem pode iniciar.
+    """
+    try:
+        execucao = apurar_suportado.cancelar(execucao_id, pedido.usuario_id, sessao)
+    except apurar_suportado.CancelamentoRecusado as erro:
+        log.warning("cancelamento recusado",
+                    extra={"execucao_id": execucao_id, "motivo": str(erro)})
+        raise HTTPException(erro.status, str(erro)) from erro
+    return execucao_dto(execucao)
+
+
+# ---------------------------------------------------------------------------
+# Analítico da apuração: uma página por vez, montada aqui
+# ---------------------------------------------------------------------------
+class PedidoDeLinhas(BaseModel):
+    execucao_id: int
+    escopo: str = "documento"
+    fonte: str | None = None
+    busca: str | None = Field(default=None, max_length=100)
+    pagina: int = Field(default=1, ge=1)
+    por_pagina: int = Field(default=analitico_suportado.POR_PAGINA_PADRAO, ge=1)
+
+
+@router.post("/suportado/linhas", dependencies=[Depends(exigir_segredo)])
+def linhas_do_suportado(
+    pedido: PedidoDeLinhas,
+    sessao: Annotated[Session, Depends(obter_sessao)],
+) -> dict:
+    """O analítico sai daqui porque é leitura de parquet: 8,7 milhões de itens
+    numa base real, e a tela só pode receber uma página."""
+    execucao = sessao.get(ExecucaoDB, pedido.execucao_id)
+    if execucao is None or execucao.etapa != apurar_suportado.ETAPA:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Apuração não encontrada.")
+    if execucao.situacao != "concluida":
+        raise HTTPException(status.HTTP_409_CONFLICT, "A apuração ainda não terminou.")
+    with contexto(etapa=apurar_suportado.ETAPA, execucao_id=execucao.id):
+        try:
+            return analitico_suportado.linhas(
+                execucao.pasta_de_trabalho or "", pedido.escopo, pedido.fonte,
+                pedido.busca, pedido.pagina, pedido.por_pagina)
+        except FileNotFoundError:
+            raise HTTPException(status.HTTP_410_GONE,
+                                "Os arquivos desta apuração não estão mais em disco. Rode de novo.") from None
+        except ValueError as erro:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)) from erro
 
 
 # ---------------------------------------------------------------------------

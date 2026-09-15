@@ -142,13 +142,13 @@ public sealed class Trabalhos(
         string? emAndamento = null;
         if (p.TemBase)
             concluidas.Add("importar");
-        foreach (var etapa in new[] { "conferencia", "movimentos" })
+        foreach (var etapa in Execucoes.DeProcessamento)
         {
             if (!p.UltimaSituacaoPorEtapa.TryGetValue(etapa, out var situacao))
                 continue;
             if (situacao == "concluida")
                 concluidas.Add(etapa);
-            else if (situacao is "na_fila" or "rodando" && emAndamento is null)
+            else if (Execucoes.EmCurso(situacao) && emAndamento is null)
                 emAndamento = etapa;
         }
         return new ProjetoComEtapas(p, Etapas.Montar(concluidas, emAndamento));

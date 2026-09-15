@@ -66,6 +66,14 @@ const DESTINOS: Record<
       padrao: "Extrair movimentos",
     },
   },
+  st_suportado: {
+    rota: ROTAS.suportado,
+    rotulos: {
+      concluida: "Ver de onde veio cada real e baixar a planilha",
+      em_andamento: "Acompanhar a apuração",
+      padrao: "Apurar o ICMS suportado",
+    },
+  },
 };
 
 const TOM_DA_SITUACAO: Record<string, TomDeEtiqueta> = {

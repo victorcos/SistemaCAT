@@ -203,3 +203,35 @@ gestor não, porque é o escopo normal do papel.
 
 Essas rotas continuam existindo para **quem executa** — analista, revisor e
 leitura —, que é quem de fato tem recorte de carteira.
+
+## 7. Apuração do ICMS suportado (etapa 4)
+
+Mesmo desenho das etapas 2 e 3: pedir a rodada, acompanhar, baixar. Duas
+rotas a mais — cancelar e o analítico paginado.
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `POST` | `/api/projetos/{id}/suportado` | põe a rodada na fila (202). 422 sem movimentação concluída; 409 com outra em curso |
+| `GET` | `/api/projetos/{id}/suportado` | as rodadas, mais recente primeiro |
+| `GET` | `/api/suportado/{execucao}` | uma rodada, com o resumo |
+| `POST` | `/api/suportado/{execucao}/cancelar` | na fila cancela na hora; rodando vira `cancelando` e para no próximo ponto seguro. 409 se já terminou |
+| `GET` | `/api/suportado/{execucao}/linhas` | uma página do analítico: `escopo=documento\|item`, `fonte`, `busca`, `pagina`, `por_pagina` (teto 200) |
+| `GET` | `/api/suportado/{execucao}/planilhas/suportado` | a lista inteira; `classificacoes=<fonte>` filtra, `formato=csv` troca o formato |
+
+Situações da rodada: `na_fila`, `rodando`, `cancelando`, `concluida`,
+`falhou`, `cancelada`. **`cancelando` ainda é em curso** — o roteiro mostra a
+etapa em andamento e uma nova rodada é recusada até ela parar.
+
+Fontes, na ordem da cascata: `documento`, `informado_pelo_fornecedor`,
+`base_e_aliquota`, `nao_apuravel`. As duas primeiras são documentais.
+
+O resumo (`versao: 2`) traz `itens`, `apurados`, `cobertura`, `valor_total`,
+`valor_documental`, `fracao_documental`, `por_fonte` (sempre as quatro, na
+ordem, com `documental` nulo no não apurável), `por_pendencia`
+(`sem_o_que_apurar`, `falta_dado`), `por_cst`, `por_competencia` (com a
+cobertura do mês), `estabelecimentos`, `cst_sem_o_que_apurar`, `iniciada_por`,
+`relatorios` e `log` (`em`, `nivel`, `texto`). Enquanto roda, só `andamento`
+(`itens`, `apurados`, `estabelecimentos`, `total`) e `log`. Valor em dinheiro
+vai como texto, porque Decimal não é JSON.
+
+Resumo **sem** `versao` é de antes desta forma: a tela pede para rodar de novo.

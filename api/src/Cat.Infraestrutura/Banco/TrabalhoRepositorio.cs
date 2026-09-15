@@ -137,7 +137,7 @@ public sealed class TrabalhoRepositorio(CatDbContext banco) : IRepositorioDeTrab
             .ToDictionaryAsync(g => g.Key, g => g.Total, cancelar);
         // a última rodada de cada etapa, pela ordem de criação — é a que diz onde o trabalho está
         var execucoes = await banco.Execucoes.AsNoTracking()
-            .Where(x => ids.Contains(x.ProjetoId) && (x.Etapa == "conferencia" || x.Etapa == "movimentos"))
+            .Where(x => ids.Contains(x.ProjetoId) && Execucoes.DeProcessamento.Contains(x.Etapa))
             .Select(x => new { x.Id, x.ProjetoId, x.Etapa, x.Situacao })
             .ToListAsync(cancelar);
         var ultimas = execucoes
