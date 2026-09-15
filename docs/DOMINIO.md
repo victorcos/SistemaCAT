@@ -179,3 +179,8 @@ imposto não vem, o estoque de abertura ainda precisa da derivação do item
 
 **O que se lê de cada espécie** está em `cat/dominio/gerencial/campos.py`. A
 lista de campos é o contrato; o mapeamento até as colunas é que é flexível.
+
+---
+
+> O leiaute do arquivo digital (registros 0000 a 1200, campo a campo, com as
+> erratas do manual 1.50) está em [`LEIAUTE_ARQUIVO_DIGITAL.md`](LEIAUTE_ARQUIVO_DIGITAL.md).
