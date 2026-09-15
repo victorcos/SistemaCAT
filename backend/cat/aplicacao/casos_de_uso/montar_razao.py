@@ -66,7 +66,8 @@ from cat.log import contexto, obter_log
 log = obter_log(__name__)
 
 ETAPA = "razao"
-VERSAO_DO_RESUMO = 1
+# 2: fichas com estoque negativo saem do total (15/09/2026)
+VERSAO_DO_RESUMO = 2
 
 FRACAO_DOS_RELATORIOS = 0.40
 FRACAO_DA_MONTAGEM = 0.97
@@ -225,11 +226,12 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     _anotar_pendencias(diario, resumo)
     execucao.terminada_em = datetime.now(timezone.utc)
     diario.anotar("info", f"Concluída em {duracao(segundos)}: {milhar(resumo.fichas)} fichas, "
-                          f"{milhar(resumo.linhas)} linhas, {reais(resumo.ressarcimento)} de "
-                          "ressarcimento.")
+                          f"{milhar(resumo.fichas_retiradas)} retiradas do total; "
+                          f"{reais(resumo.ressarcimento)} de ressarcimento nas válidas.")
     registrar_de_etapa(
         sessao, execucao.projeto_id, TipoDeEvento.ETAPA_CONCLUIDA, ETAPA,
-        f"Razão montado · {milhar(resumo.fichas)} fichas, {reais(resumo.ressarcimento)} de ressarcimento",
+        f"Razão montado · {milhar(resumo.fichas - resumo.fichas_retiradas)} fichas válidas, "
+        f"{reais(resumo.ressarcimento)} de ressarcimento; {milhar(resumo.fichas_retiradas)} retiradas",
         dados={"execucao_id": execucao.id, "fichas": resumo.fichas, "linhas": resumo.linhas,
                "ressarcimento": str(resumo.ressarcimento), "segundos": segundos},
         autor_id=execucao.criada_por)
@@ -267,7 +269,8 @@ def _anotar_pendencias(diario: Diario, r) -> None:
         (r.saidas_sem_aliquota, "saídas sem alíquota interna no cadastro: sem confronto, sem ressarcimento"),
         (r.saidas_indefinidas, "saídas com enquadramento indefinido"),
         (r.confronto_pendente, "saídas de enquadramento 2 ou 4: o confronto com o ICMS da entrada ainda não é apurado"),
-        (r.fichas_negativas, "fichas que ficaram com estoque negativo — falta entrada ou abertura"),
+        (r.fichas_retiradas, "fichas retiradas do total até os dados chegarem: o estoque ficou "
+                             "negativo — falta entrada, abertura ou algum tipo de saída"),
         (r.fichas_abertura_sem_valor, "fichas abertas com quantidade e sem ICMS suportado: o inventário não traz o imposto"),
         (r.fichas_fora_de_sp, "fichas de estabelecimento fora de SP, que não entram na CAT 42"),
         (r.linhas_unidade_sem_fator, "linhas com unidade diferente da do inventário e sem fator "

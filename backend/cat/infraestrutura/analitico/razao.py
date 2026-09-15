@@ -40,6 +40,19 @@ O juiz final da unidade é o inventário: o saldo da ficha em cada data de
 bloco H é comparado com o que o bloco H diz. Diferença do tamanho de um fator
 de embalagem é marcada como suspeita de unidade.
 
+## Ficha com estoque negativo sai do total
+
+Estoque negativo é movimento que falta — perda que não veio, mês de relatório
+que falhou, produção. E nele o custo médio perde o sentido: com saldo perto de
+zero o unitário explode (R$ 1,8 milhão por unidade num item do CD do Amigão),
+e uma única baixa vira centenas de milhões. No piloto de 15/09/2026, 99,99% do
+ressarcimento vinha de 4.037 fichas assim.
+
+Decisão do Victor, 15/09/2026: essas fichas **saem do total até os dados
+chegarem**. Continuam gravadas e marcadas (`retirada`), para consulta e
+download, mas não somam ressarcimento, complemento, enquadramento nem
+competência.
+
 ## De qual loja é a saída do relatório
 
 O relatório diz a unidade ("005"), não o CNPJ. O CNPJ sai de duas pistas que
@@ -136,6 +149,8 @@ ESQUEMA_FICHA3 = pa.schema([
     ("origem", pa.string()),
     ("enquadramento", pa.int8()),
     ("enquadramento_indefinido", pa.bool_()),
+    # a ficha inteira ficou fora do total: estoque negativo em alguma linha
+    ("ficha_retirada", pa.bool_()),
     # a quantidade vai na unidade do inventário; estas três dizem como chegou lá
     ("unidade_origem", pa.string()),
     ("fator_conversao", pa.decimal128(24, 9)),
@@ -166,6 +181,8 @@ ESQUEMA_FICHAS = pa.schema([
     ("ressarcimento", pa.decimal128(30, 15)),
     ("complemento", pa.decimal128(30, 15)),
     ("ficou_negativo", pa.bool_()),
+    # fora do total até os dados chegarem; o ressarcimento dela não é confiável
+    ("retirada", pa.bool_()),
     ("saidas_sem_aliquota", pa.int32()),
     ("saidas_indefinidas", pa.int32()),
     ("linhas_sem_fator", pa.int32()),
@@ -335,6 +352,10 @@ class ResumoDaMontagem:
     relatorio_sem_estabelecimento: int = 0
     relatorio_trocado_pela_efd: int = 0
     quantidade_negativa: int = 0
+    fichas_retiradas: int = 0
+    linhas_retiradas: int = 0
+    ressarcimento_retirado: Decimal = Decimal(0)
+    complemento_retirado: Decimal = Decimal(0)
     linhas_convertidas: int = 0
     linhas_unidade_sem_fator: int = 0
     abertura_sem_fator: int = 0
@@ -750,13 +771,15 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         linhas = razao.apurar()
         indice = {id(m): x for m, x in zip(movimentos, extras)}
         entradas = saidas = ressarc = compl = Decimal(0)
-        negativo = False
+        # estoque negativo em qualquer linha tira a ficha do total
+        negativo = any(ln.saldo_quantidade < 0 for ln in linhas)
+        retirada = negativo
         sem_aliq = indef = sem_fator = 0
         for ln in linhas:
             m = ln.movimento
             indefinido, faltou, conversao = indice[id(m)]
             competencia = m.data.isoformat()[:7]
-            _acrescentar(lote, cnpj, codigo, ln, indefinido, conversao)
+            _acrescentar(lote, cnpj, codigo, ln, indefinido, conversao, retirada)
             sem_fator += conversao[2]
             resumo.linhas_convertidas += conversao[1] != 1
             resumo.linhas_unidade_sem_fator += conversao[2]
@@ -764,7 +787,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                 entradas += ln.quantidade
             else:
                 saidas += -ln.quantidade
-                if not m.devolucao:
+                if not m.devolucao and not retirada:
                     chave_enq = "indefinido" if indefinido else str(int(m.enquadramento))
                     e = resumo.por_enquadramento.setdefault(chave_enq, {
                         "linhas": 0, "quantidade": Decimal(0), "suportado": Decimal(0),
@@ -777,17 +800,16 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                     e["complemento"] += ln.complemento
                     origem = resumo.saidas_por_origem.setdefault(m.origem, 0)
                     resumo.saidas_por_origem[m.origem] = origem + 1
-            if ln.saldo_quantidade < 0:
-                negativo = True
             sem_aliq += faltou
             indef += indefinido
             ressarc += ln.ressarcimento
             compl += ln.complemento
-            c = resumo.por_competencia.setdefault(competencia, {
-                "linhas": 0, "ressarcimento": Decimal(0), "complemento": Decimal(0)})
-            c["linhas"] += 1
-            c["ressarcimento"] += ln.ressarcimento
-            c["complemento"] += ln.complemento
+            if not retirada:
+                c = resumo.por_competencia.setdefault(competencia, {
+                    "linhas": 0, "ressarcimento": Decimal(0), "complemento": Decimal(0)})
+                c["linhas"] += 1
+                c["ressarcimento"] += ln.ressarcimento
+                c["complemento"] += ln.complemento
             if len(lote["cnpj"]) >= LINHAS_POR_LOTE:
                 escritor.write_table(pa.Table.from_pydict(lote, schema=ESQUEMA_FICHA3))
                 for k in lote:
@@ -804,13 +826,20 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                        ("saldo_quantidade", (ultima.saldo_quantidade if ultima else qtd_abertura).quantize(_Q6)),
                        ("saldo_valor", (ultima.saldo_valor if ultima else Decimal(0)).quantize(_Q15)),
                        ("ressarcimento", ressarc.quantize(_Q15)), ("complemento", compl.quantize(_Q15)),
-                       ("ficou_negativo", negativo), ("saidas_sem_aliquota", sem_aliq),
+                       ("ficou_negativo", negativo), ("retirada", retirada),
+                       ("saidas_sem_aliquota", sem_aliq),
                        ("saidas_indefinidas", indef), ("linhas_sem_fator", sem_fator)):
             lote_fichas[k].append(val)
         resumo.fichas += 1
         resumo.linhas += len(linhas)
-        resumo.ressarcimento += ressarc
-        resumo.complemento += compl
+        if retirada:
+            resumo.fichas_retiradas += 1
+            resumo.linhas_retiradas += len(linhas)
+            resumo.ressarcimento_retirado += ressarc
+            resumo.complemento_retirado += compl
+        else:
+            resumo.ressarcimento += ressarc
+            resumo.complemento += compl
         resumo.saidas_sem_aliquota += sem_aliq
         resumo.saidas_indefinidas += indef
         resumo.fichas_negativas += negativo
@@ -900,7 +929,8 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem):
     return m, indefinido, faltou, pendente, conversao
 
 
-def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conversao: tuple) -> None:
+def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conversao: tuple,
+                 retirada: bool) -> None:
     m = ln.movimento
     lote["cnpj"].append(cnpj)
     lote["codigo"].append(codigo)
@@ -914,6 +944,7 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conve
     saida_propria = not m.especie.e_entrada and not m.devolucao
     lote["enquadramento"].append(None if (indefinido or not saida_propria) else int(m.enquadramento))
     lote["enquadramento_indefinido"].append(indefinido)
+    lote["ficha_retirada"].append(retirada)
     lote["unidade_origem"].append(conversao[0])
     lote["fator_conversao"].append(Decimal(conversao[1]).quantize(Decimal("0.000000001")))
     lote["unidade_sem_fator"].append(conversao[2])
@@ -934,9 +965,11 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conve
 def lista_de_fichas(destino: str, busca: str | None = None, so: str | None = None,
                     pagina: int = 1, por_pagina: int = POR_PAGINA_PADRAO) -> dict:
     """As fichas, maior ressarcimento primeiro. `so` recorta as que pedem atenção:
+    `validas` (as que entram no total), `retiradas`,
     `negativas`, `sem_aliquota`, `indefinidas`, `divergentes` (do inventário),
     `suspeita_unidade` e `sem_fator`."""
-    recortes = {"negativas": "ficou_negativo", "sem_aliquota": "saidas_sem_aliquota > 0",
+    recortes = {"validas": "NOT retirada", "retiradas": "retirada",
+                "negativas": "ficou_negativo", "sem_aliquota": "saidas_sem_aliquota > 0",
                 "indefinidas": "saidas_indefinidas > 0",
                 "divergentes": "inventarios_divergentes > 0",
                 "suspeita_unidade": "suspeita_de_unidade",
@@ -960,7 +993,7 @@ def lista_de_fichas(destino: str, busca: str | None = None, so: str | None = Non
     try:
         total = con.execute(f"SELECT count(*) FROM {base}", parametros).fetchone()[0]
         cursor = con.execute(f"""
-            SELECT * FROM {base} ORDER BY ressarcimento DESC, cnpj, codigo
+            SELECT * FROM {base} ORDER BY retirada, ressarcimento DESC, cnpj, codigo
             LIMIT {por_pagina} OFFSET {(pagina - 1) * por_pagina}
         """, parametros)
         nomes = [c[0] for c in cursor.description]
@@ -1023,6 +1056,13 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
         "linhas": resumo.linhas,
         "ressarcimento": texto(resumo.ressarcimento),
         "complemento": texto(resumo.complemento),
+        # fora do total até os dados chegarem: o valor delas não é confiável
+        "retiradas": {
+            "fichas": resumo.fichas_retiradas,
+            "linhas": resumo.linhas_retiradas,
+            "ressarcimento": texto(resumo.ressarcimento_retirado),
+            "complemento": texto(resumo.complemento_retirado),
+        },
         "por_enquadramento": [
             {"codigo": k, "rotulo": rotulos.get(k, k), "linhas": v["linhas"],
              "quantidade": texto(v["quantidade"]), "suportado": texto(v["suportado"]),

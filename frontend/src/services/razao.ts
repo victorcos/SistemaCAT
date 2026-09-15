@@ -59,6 +59,8 @@ export interface ResumoDoRazao {
   linhas?: number;
   ressarcimento?: string;
   complemento?: string;
+  /** fora do total até os dados chegarem: o valor delas não é confiável */
+  retiradas?: { fichas: number; linhas: number; ressarcimento: string; complemento: string };
   por_enquadramento?: PorEnquadramento[];
   por_competencia?: { competencia: string; linhas: number; ressarcimento: string; complemento: string }[];
   saidas_por_origem?: Record<string, number>;
@@ -91,6 +93,7 @@ export interface Ficha {
   ressarcimento: string;
   complemento: string;
   ficou_negativo: boolean;
+  retirada?: boolean;
   saidas_sem_aliquota: number;
   saidas_indefinidas: number;
   linhas_sem_fator?: number;
@@ -110,6 +113,7 @@ export interface LinhaDaFicha {
   origem: string;
   enquadramento: number | null;
   enquadramento_indefinido: boolean;
+  ficha_retirada?: boolean;
   /** a quantidade vai na unidade do inventário; estas dizem como chegou lá */
   unidade_origem?: string;
   fator_conversao?: string;
@@ -133,6 +137,8 @@ export interface Pagina<T> {
 }
 
 export type Recorte =
+  | "validas"
+  | "retiradas"
   | "todas"
   | "negativas"
   | "sem_aliquota"
@@ -142,7 +148,8 @@ export type Recorte =
   | "sem_fator";
 export type PlanilhaDoRazao = "ficha3" | "fichas" | "conferencia";
 
-export const VERSAO_DO_RESUMO_DO_RAZAO = 1;
+/** 2: fichas com estoque negativo saem do total */
+export const VERSAO_DO_RESUMO_DO_RAZAO = 2;
 
 export const iniciarRazao = (projetoId: number) =>
   chamar<ExecucaoDoRazao>(`/projetos/${projetoId}/razao`, { method: "POST" });

@@ -345,7 +345,7 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: Re
         { n: pend.fichas_abertura_sem_valor, texto: "fichas abertas com quantidade e sem ICMS suportado: o inventário não traz o imposto, e o custo médio fica subestimado até o estoque girar", tom: "atencao" as Tom },
         { n: pend.confronto_pendente, texto: "saídas de enquadramento 2 ou 4: o confronto com o ICMS da entrada ainda não é apurado", tom: "atencao" as Tom },
         { n: pend.saidas_sem_aliquota, texto: "saídas sem alíquota interna no cadastro: sem confronto, sem ressarcimento", tom: "atencao" as Tom },
-        { n: pend.fichas_negativas, texto: "fichas com estoque negativo — falta entrada, abertura ou relatório de algum mês", tom: "atencao" as Tom },
+        { n: resumo.retiradas?.fichas ?? pend.fichas_negativas, texto: "fichas retiradas do total até os dados chegarem: o estoque ficou negativo — falta entrada, abertura ou algum tipo de saída (perdas, meses do relatório, produção)", tom: "atencao" as Tom },
         { n: pend.saidas_indefinidas, texto: "saídas com enquadramento indefinido (nota modelo 55 sem dizer quem comprou)", tom: "atencao" as Tom },
         { n: pend.relatorio_sem_estabelecimento, texto: "linhas do relatório de saídas sem loja identificável ficaram de fora", tom: "atencao" as Tom },
         { n: pend.relatorio_trocado_pela_efd, texto: "linhas do relatório trocadas pela nota com item da EFD, que vence", tom: "neutro" as Tom },
@@ -363,7 +363,10 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: Re
           <Rotulo>Ressarcimento apurado</Rotulo>
           <p className="m-0 font-mono text-[32px] leading-none text-sucesso">{valor(resumo.ressarcimento)}</p>
           <p className="m-0 text-xs text-texto-fraco">
-            Diferença positiva entre o suportado baixado e o valor de confronto, saída a saída.
+            Diferença positiva entre o suportado baixado e o valor de confronto, saída a saída — só nas
+            fichas válidas.
+            {(resumo.retiradas?.fichas ?? 0) > 0 &&
+              ` ${numero(resumo.retiradas?.fichas ?? 0)} fichas com estoque negativo ficaram fora até os dados chegarem.`}
           </p>
         </Cartao>
         <Cartao className="flex flex-col gap-2">
@@ -374,8 +377,11 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: Re
           <p className="m-0 text-xs text-texto-fraco">Só existe no enquadramento 1, consumidor final.</p>
         </Cartao>
         <Cartao className="flex flex-col gap-2">
-          <Rotulo>Fichas</Rotulo>
-          <p className="m-0 font-mono text-[32px] leading-none text-texto">{numero(resumo.fichas ?? 0)}</p>
+          <Rotulo>Fichas válidas</Rotulo>
+          <p className="m-0 font-mono text-[32px] leading-none text-texto">
+            {numero((resumo.fichas ?? 0) - (resumo.retiradas?.fichas ?? 0))}
+            <span className="ml-2 text-sm text-texto-fraco">de {numero(resumo.fichas ?? 0)}</span>
+          </p>
           <p className="m-0 font-mono text-xs text-texto-fraco">
             {numero(resumo.codigos_com_st ?? 0)} mercadorias com saída CST 60 · {numero(resumo.estabelecimentos ?? 0)}{" "}
             estabelecimentos · {numero(resumo.linhas ?? 0)} linhas
@@ -593,7 +599,7 @@ function PorCompetencia({ resumo }: { resumo: ResumoDoRazao }) {
 function Fichas({ execucaoId, total, rodape }: { execucaoId: number; total: number; rodape: ReactNode }) {
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
-  const [recorte, setRecorte] = useState<Recorte>("todas");
+  const [recorte, setRecorte] = useState<Recorte>("validas");
   const [pagina, setPagina] = useState(1);
   const [aberta, setAberta] = useState<string | null>(null);
   const [dados, setDados] = useState<Pagina<Ficha> | null>(null);
@@ -646,13 +652,14 @@ function Fichas({ execucaoId, total, rodape }: { execucaoId: number; total: numb
           valor={recorte}
           aoMudar={setRecorte}
           opcoes={[
-            { chave: "todas", rotulo: "Todas" },
-            { chave: "negativas", rotulo: "Estoque negativo" },
+            { chave: "validas", rotulo: "Válidas" },
+            { chave: "retiradas", rotulo: "Retiradas" },
             { chave: "sem_aliquota", rotulo: "Sem alíquota" },
             { chave: "indefinidas", rotulo: "Indefinidas" },
             { chave: "divergentes", rotulo: "Divergem do inventário" },
             { chave: "suspeita_unidade", rotulo: "Suspeita de unidade" },
             { chave: "sem_fator", rotulo: "Sem fator" },
+            { chave: "todas", rotulo: "Todas" },
           ]}
         />
       </div>
@@ -712,11 +719,17 @@ function Fichas({ execucaoId, total, rodape }: { execucaoId: number; total: numb
                     {qtd(f.saldo_quantidade)}
                   </span>
                   <span className="text-right font-mono text-[13px] text-texto-suave">{valor(f.saldo_valor)}</span>
-                  <span className={cn("text-right font-mono text-[13px]", zero(f.ressarcimento) ? "text-texto-fraco" : "text-sucesso")}>
+                  <span
+                    className={cn(
+                      "text-right font-mono text-[13px]",
+                      f.retirada ? "text-texto-fraco line-through" : zero(f.ressarcimento) ? "text-texto-fraco" : "text-sucesso",
+                    )}
+                    title={f.retirada ? "Fora do total: com estoque negativo o custo médio não vale" : undefined}
+                  >
                     {valor(f.ressarcimento)}
                   </span>
                   <span className="flex flex-wrap gap-1">
-                    {f.ficou_negativo && <Marca>negativo</Marca>}
+                    {(f.retirada ?? f.ficou_negativo) && <Marca>retirada · estoque negativo</Marca>}
                     {f.abertura_sem_valor && <Marca>abertura s/ ICMS</Marca>}
                     {f.saidas_sem_aliquota > 0 && <Marca>s/ alíquota</Marca>}
                     {f.saidas_indefinidas > 0 && <Marca>indefinida</Marca>}

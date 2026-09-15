@@ -5,6 +5,41 @@
 
 ---
 
+## 2026-09-15 — Ficha com estoque negativo sai do total até os dados chegarem
+
+**O que o piloto mostrou.** Primeira montagem do razão sobre o Amigão
+(execução 45: lojas MS e CD 003 PR, saídas de jan–mar/2021): R$ 584,7 milhões
+de "ressarcimento" — mais que todo o ICMS suportado das entradas do ano. **99,99%
+vinham de 4.037 fichas cujo estoque ficou negativo.** Com saldo perto de zero
+o custo médio explode: uma mercadoria do CD chegou a R$ 1,8 milhão por
+unidade, e uma transferência de 312 unidades baixou R$ 570 milhões. A mediana
+do unitário nas saídas é R$ 0,28 e o percentil 99, R$ 6,45: a cauda domina.
+
+As fichas que nunca ficaram negativas somavam R$ 65.348,48 — ainda
+subestimado, porque a abertura entra sem ICMS.
+
+**Por que acontece.** Estoque negativo é movimento que falta: perdas do CFOP
+5.927 (relatório à parte), meses e lojas do relatório de saídas que falharam
+no download, produção e desmontagem. A regra do domínio foi conferida contra
+dados completos (BOA) e não tem o que fazer com saída que o estoque não
+explica.
+
+**Decisão do Victor.** Entre usar o custo das entradas mais recentes (item
+3.3.8 do manual), zerar o ressarcimento dessas linhas, ou tirar as fichas do
+total: **tirar as fichas do total até os dados chegarem.**
+
+- a ficha com estoque negativo em qualquer linha fica `retirada`;
+- não soma ressarcimento, complemento, enquadramento nem competência;
+- continua gravada e marcada, na lista e nas planilhas; o resumo diz quantas
+  e quanto elas mostrariam, separado do total;
+- a lista abre nas válidas, e as retiradas vão para o fim quando se pede todas.
+
+O critério é um só por enquanto — estoque negativo. Quando o relatório de
+saídas completo e as perdas chegarem, a quantidade de fichas retiradas é a
+medida de quanto ainda falta.
+
+---
+
 ## 2026-09-15 — Unidade de conversão: a ficha é na unidade do inventário
 
 **A regra.** A Ficha 3 é escriturada na unidade do 0200 (UNID_INV). O item de

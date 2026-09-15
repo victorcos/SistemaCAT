@@ -244,7 +244,7 @@ Resumo **sem** `versao` é de antes desta forma: a tela pede para rodar de novo.
 | `GET` | `/api/projetos/{id}/razao` | as rodadas, mais recente primeiro |
 | `GET` | `/api/razao/{execucao}` | uma rodada, com o resumo |
 | `POST` | `/api/razao/{execucao}/cancelar` | como na etapa 4 |
-| `GET` | `/api/razao/{execucao}/fichas` | lista de fichas, maior ressarcimento primeiro: `busca`, `so=negativas\|sem_aliquota\|indefinidas`, `pagina`, `por_pagina` |
+| `GET` | `/api/razao/{execucao}/fichas` | lista de fichas, válidas primeiro e maior ressarcimento: `busca`, `so=validas|retiradas|negativas|sem_aliquota|indefinidas|divergentes|suspeita_unidade|sem_fator`, `pagina`, `por_pagina` |\|sem_aliquota\|indefinidas`, `pagina`, `por_pagina` |
 | `GET` | `/api/razao/{execucao}/ficha` | linhas de uma ficha: `cnpj`, `codigo` (obrigatórios), `pagina`, `por_pagina` |
 | `GET` | `/api/razao/{execucao}/planilhas/ficha3` | a Ficha 3 inteira (CSV recomendado) |
 | `GET` | `/api/razao/{execucao}/planilhas/fichas` | o resumo por ficha |
@@ -254,7 +254,9 @@ O resumo (`versao: 1`) traz `periodo_inicio`, `periodo_fim`, `abertura_em`,
 `complemento`, `por_enquadramento` (`codigo` 1, 2, 3, 4, 0 ou `indefinido`, com
 linhas, quantidade, suportado baixado, confronto, ressarcimento e complemento),
 `por_competencia`, `saidas_por_origem` (`efd`, `relatorio`), `pendencias` e
-`relatorios` (`arquivos`, `so_de_entradas`, `recusados`, `linhas`). Enquanto
+`relatorios` (`arquivos`, `so_de_entradas`, `recusados`, `linhas`), `retiradas`
+(`fichas`, `linhas`, `ressarcimento`, `complemento` das fichas com estoque
+negativo, fora do total), `conversao` e `conferencia_inventario`. Enquanto
 roda, `andamento` com `linhas`, `total` e `fichas`.
 
 Cada linha da ficha: `numero`, `data`, `especie` (`entrada`/`saida`),

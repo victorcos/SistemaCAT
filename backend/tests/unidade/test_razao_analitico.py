@@ -274,6 +274,54 @@ class TestConferenciaComInventario:
         assert r.conferencia["divergentes"] == 1
 
 
+class TestFichaRetirada:
+    """Estoque negativo tira a ficha do total até os dados chegarem.
+
+    Mercadoria W na loja A, sem abertura:
+        05/01 entrada 1 un, R$ 5,00           -> saldo 1, unit 5
+        06/01 venda de PDV 5 un, R$ 100, 18%  -> saldo -4; baixa 25; confronto 18
+              -> ressarcimento 7,00 que NÃO entra no total
+    """
+
+    @pytest.fixture
+    def com_w(self, fontes, tmp_path):
+        def acrescentar(caminho, linha):
+            t = pq.read_table(caminho)
+            pq.write_table(pa.Table.from_pylist(t.to_pylist() + [linha], schema=t.schema), caminho)
+
+        acrescentar(os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO), {
+            "cnpj": A, "codigo": "W", "data": date(2021, 1, 5), "cfop": "1403", "cst_icms": "060",
+            "modelo": "55", "quantidade": d(1), "suportado": d(5), "chave": "7" * 44,
+            "numero_documento": "3", "numero_item": 1})
+        acrescentar(os.path.join(fontes.movimentacao, ARQUIVO_ITENS), {
+            "cnpj": A, "codigo": "W", "descricao": "Cerveja lata", "unidade": "UN", "aliq_icms": d(18)})
+        acrescentar(fontes.saidas_do_relatorio, {
+            "unidade": "005", "cnpj_participante": "", "chave": "", "numero_documento": "", "codigo": "W",
+            "data": date(2021, 1, 6), "cfop": "5405", "cst_icms": "060", "quantidade": d(5),
+            "valor": d(100), "suportado": d(0), "pdv": True})
+        destino = tmp_path / "com_w"
+        destino.mkdir()
+        return destino, montar(fontes, str(destino))
+
+    def test_a_ficha_negativa_nao_soma_no_total(self, com_w):
+        _, r = com_w
+        assert r.ressarcimento == d("1.4")                  # só a ficha X
+        assert r.fichas_retiradas == 1 and r.ressarcimento_retirado == d(7)
+        s = serializar(r)
+        assert s["retiradas"] == {"fichas": 1, "linhas": 2, "ressarcimento": "7.00", "complemento": "0.00"}
+        assert sum(d(e["ressarcimento"]) for e in s["por_enquadramento"]) == d("1.40")
+        assert sum(d(c["ressarcimento"]) for c in s["por_competencia"]) == d("1.40")
+
+    def test_a_ficha_retirada_fica_gravada_e_marcada(self, com_w):
+        destino, _ = com_w
+        linhas = [l for l in ficha(destino) if l["codigo"] == "W"]
+        assert len(linhas) == 2 and all(l["ficha_retirada"] for l in linhas)
+        assert lista_de_fichas(str(destino), so="retiradas")["linhas"][0]["codigo"] == "W"
+        assert [f["codigo"] for f in lista_de_fichas(str(destino), so="validas")["linhas"]] == ["X"]
+        # sem recorte, as retiradas vão para o fim mesmo com ressarcimento maior
+        assert [f["codigo"] for f in lista_de_fichas(str(destino))["linhas"]] == ["X", "W"]
+
+
 class TestPendencias:
     def test_sem_aliquota_nao_inventa_ressarcimento(self, fontes, tmp_path):
         os.remove(os.path.join(fontes.movimentacao, ARQUIVO_ITENS))
