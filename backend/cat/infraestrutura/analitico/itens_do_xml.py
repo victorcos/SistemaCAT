@@ -23,7 +23,9 @@ from decimal import ROUND_HALF_UP, Decimal
 import pyarrow as pa
 
 from cat.dominio.notafiscal.xml import DocumentoXml, XmlIlegivel, ler_documento_xml
+from cat.infraestrutura.analitico.canceladas import chaves_de_evento
 from cat.infraestrutura.analitico.extracao import Aviso, Progresso, _Escritor
+from cat.infraestrutura.arquivos.xml_compactado import contar_xml, conteudos_de_xml
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -81,6 +83,9 @@ class ProgressoDoXml(Progresso):
     ilegiveis: int = 0
     sem_item: int = 0
     exemplos_ilegiveis: list[str] = field(default_factory=list)
+    # (chave, arquivo) dos eventos de cancelamento achados no meio dos XML — o
+    # zip do portal traz os eventos junto com as notas
+    cancelamentos: list[tuple[str, str]] = field(default_factory=list)
 
 
 def _q(valor: Decimal, casas: Decimal) -> Decimal:
@@ -89,9 +94,10 @@ def _q(valor: Decimal, casas: Decimal) -> Decimal:
 
 def extrair_itens_do_xml(xmls: list[str], destino: str, avisar: Aviso | None = None,
                          progresso: ProgressoDoXml | None = None) -> ProgressoDoXml:
-    """Grava `itens_do_xml.parquet` em `destino` com o item de cada XML."""
-    return extrair_itens_de_conteudos(((c, None) for c in xmls), destino, avisar,
-                                      progresso or ProgressoDoXml(arquivos_totais=len(xmls)))
+    """Grava `itens_do_xml.parquet` em `destino` com o item de cada XML, solto ou em zip."""
+    progresso = progresso or ProgressoDoXml(arquivos_totais=contar_xml(xmls))
+    return extrair_itens_de_conteudos(conteudos_de_xml(xmls, recusados=progresso.recusados),
+                                      destino, avisar, progresso)
 
 
 def extrair_itens_de_conteudos(fontes: Iterable[tuple[str, bytes | None]], destino: str,
@@ -135,6 +141,7 @@ def _ler_um(caminho: str, conteudo: bytes | None, escritor: _Escritor, vistas: s
         return
     if doc is None:
         progresso.nao_sao_documento += 1
+        progresso.cancelamentos += [(chave, nome) for chave in chaves_de_evento(conteudo)]
         return
     if len(doc.chave) != 44 or not doc.chave.isdigit():
         _ilegivel(nome, ValueError(f"chave de acesso inválida: {doc.chave!r}"), progresso)

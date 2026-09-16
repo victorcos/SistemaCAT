@@ -38,13 +38,18 @@ class NadaParaPreValidar(ValueError):
 
 
 def fontes_do_projeto(projeto_id: int, sessao: Session) -> list[str]:
-    """O arquivo digital solto e os zips do lote — o que está dentro só se sabe abrindo."""
+    """O arquivo digital solto e os zips do lote — o que está dentro só se sabe abrindo.
+
+    O zip que tem XML de nota virou `xml_compactado` na v0.53.2, e pode ter o
+    arquivo digital junto: entra também.
+    """
     return list(sessao.scalars(
         select(ArquivoDoLoteDB.caminho)
         .join(LoteDB, LoteDB.id == ArquivoDoLoteDB.lote_id)
         .where(LoteDB.projeto_id == projeto_id,
                (ArquivoDoLoteDB.tipo == TipoDeArquivo.CAT42_ARQUIVO_DIGITAL.value)
-               | ((ArquivoDoLoteDB.tipo == TipoDeArquivo.COMPACTADO.value)
+               | ((ArquivoDoLoteDB.tipo.in_((TipoDeArquivo.COMPACTADO.value,
+                                             TipoDeArquivo.XML_COMPACTADO.value)))
                   & ArquivoDoLoteDB.nome.ilike("%.zip")))
         .order_by(ArquivoDoLoteDB.caminho).distinct()))
 

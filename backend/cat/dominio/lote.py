@@ -55,6 +55,8 @@ class TipoDeArquivo(str, Enum):
     XML_OUTRO = "xml_outro"
     # evento de cancelamento de NF-e (procEventoNFe 110111): tira a nota da movimentação
     XML_CANCELAMENTO = "xml_cancelamento"
+    # zip com XML de NF-e ou CF-e: as etapas leem os membros sem extrair
+    XML_COMPACTADO = "xml_compactado"
     GERENCIAL_MOVIMENTO = "gerencial_movimento"
     GERENCIAL_INVENTARIO = "gerencial_inventario"
     GERENCIAL_RESUMO = "gerencial_resumo"
@@ -77,6 +79,7 @@ class TipoDeArquivo(str, Enum):
             TipoDeArquivo.XML_NFE: "XML de NF-e ou CF-e",
             TipoDeArquivo.XML_OUTRO: "XML de outro documento",
             TipoDeArquivo.XML_CANCELAMENTO: "Evento de cancelamento de NF-e",
+            TipoDeArquivo.XML_COMPACTADO: "Zip de XML",
             TipoDeArquivo.GERENCIAL_MOVIMENTO: "Relatório de movimento",
             TipoDeArquivo.GERENCIAL_INVENTARIO: "Relatório de inventário",
             TipoDeArquivo.GERENCIAL_RESUMO: "Resumo por produto",
@@ -117,6 +120,7 @@ _ALIMENTAM = frozenset({
     TipoDeArquivo.GERENCIAL_MOVIMENTO,
     TipoDeArquivo.GERENCIAL_INVENTARIO,
     TipoDeArquivo.XML_CANCELAMENTO,
+    TipoDeArquivo.XML_COMPACTADO,
     TipoDeArquivo.LISTA_DE_CANCELADAS,
 })
 

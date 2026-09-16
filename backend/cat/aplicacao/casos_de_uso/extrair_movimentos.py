@@ -45,6 +45,7 @@ from cat.infraestrutura.analitico.canceladas import ler_chaves_canceladas
 from cat.infraestrutura.analitico.confronto import ARQUIVO_CONFERIDOS
 from cat.infraestrutura.analitico.itens_do_xml import ProgressoDoXml, extrair_itens_do_xml
 from cat.infraestrutura.analitico.movimentacao import consolidar
+from cat.infraestrutura.arquivos.xml_compactado import contar_xml
 from cat.infraestrutura.analitico.movimentos import (
     ProgressoDeItens,
     extrair_movimentos,
@@ -149,12 +150,15 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     sessao.commit()
 
     efd, substituidas = caminhos_de_efd_vigentes(execucao.projeto_id, sessao)
-    xmls = caminhos_do_projeto(execucao.projeto_id, (TipoDeArquivo.XML_NFE,), sessao)
-    execucao.arquivos_totais = len(efd) + len(xmls)
+    xmls = caminhos_do_projeto(
+        execucao.projeto_id, (TipoDeArquivo.XML_NFE, TipoDeArquivo.XML_COMPACTADO), sessao)
+    # o zip conta um por XML de dentro, que é o que a barra percorre
+    total_de_xml = contar_xml(xmls)
+    execucao.arquivos_totais = len(efd) + total_de_xml
     sessao.commit()
 
     inicio = time.time()
-    relogio = _Relogio(execucao, sessao, len(efd) + len(xmls))
+    relogio = _Relogio(execucao, sessao, len(efd) + total_de_xml)
     progresso = extrair_movimentos(efd, destino, avisar=relogio.marcar)
 
     # os XML contam arquivos na mesma barra; os documentos e bytes da EFD ficam
@@ -169,7 +173,7 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     sessao.commit()
     canceladas = caminhos_do_projeto(
         execucao.projeto_id, (TipoDeArquivo.XML_CANCELAMENTO, TipoDeArquivo.LISTA_DE_CANCELADAS), sessao)
-    ler_chaves_canceladas(canceladas, destino)
+    ler_chaves_canceladas(canceladas, destino, de_eventos=do_xml.cancelamentos)
 
     execucao.passo = "Consolidando"
     execucao.arquivos_lidos = execucao.arquivos_totais

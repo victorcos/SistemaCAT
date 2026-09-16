@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-09-16 — XML dentro de zip, sem extrair
+
+**O caso.** A Advertising entregou 357.948 XML em 26 zips — e 290 mil deles em
+60 zips dentro dos zips, gravados sem compressão, de até 201 MB. Até aqui o lote
+marcava tudo como `compactado` e nenhuma etapa lia. Extrair para ler foi medido
+na validação e custou mais que ler: o antivírus examina cada arquivo que nasce.
+
+**Como ficou.** O zip é um arquivo só no lote, tipo `xml_compactado`, quando
+algum dos primeiros 50 XML de dentro é NF-e/CF-e (reconhecida pelo `Id`, porque
+CT-e também tem `<infNFe>`) ou evento de cancelamento de NF-e. O CNPJ é o da
+primeira nota, e separa zip de outra empresa como no XML solto. As etapas 2 e 3
+leem os membros na memória, um por vez; o zip de dentro sem compressão é lido
+por posição dentro do de fora, e o comprimido vai para a memória até 256 MB.
+Zip de terceiro nível não é aberto. Membro ou zip quebrado vai para os
+recusados e a leitura segue.
+
+**Descartado:** um registro no lote por XML de dentro do zip. Daria competência
+e CNPJ por nota na tela do lote, mas multiplicaria as linhas do banco pelo
+número de notas (357 mil numa empresa) para uma informação que a conferência já
+dá.
+
+**Medido na Advertising:** classificar os 26 zips, 7,6 s; contar os XML, 3,2 s;
+a leitura da etapa 2, 33 s, com 119.730 chaves — as mesmas 119.729 da leitura
+completa feita antes, mais uma nota sem item. Dois zips cuja amostra caiu num
+evento ficaram sem CNPJ na primeira versão; agora a amostra prefere nota, e o
+evento de cancelamento de CT-e (também 110111, mas com `<chCTe>`) não conta.
+
+---
+
 ## 2026-09-16 — A contingência das notas não escrituradas
 
 **O que é.** Nota não escriturada não entra na ficha, mas o fisco que a achar

@@ -5,9 +5,9 @@ namespace Cat.Dominio.Testes;
 public sealed class TiposDeArquivoTestes
 {
     [Fact]
-    public void So_seis_tipos_alimentam_a_cat() =>
-        Assert.Equal(["sped_icms_ipi", "xml_nfe", "xml_cancelamento", "gerencial_movimento", "gerencial_inventario",
-                "lista_de_canceladas"],
+    public void So_sete_tipos_alimentam_a_cat() =>
+        Assert.Equal(["sped_icms_ipi", "xml_nfe", "xml_cancelamento", "xml_compactado", "gerencial_movimento",
+                "gerencial_inventario", "lista_de_canceladas"],
             TiposDeArquivo.Todos.Where(t => t.AlimentaACat).Select(t => t.Valor));
 
     [Theory]

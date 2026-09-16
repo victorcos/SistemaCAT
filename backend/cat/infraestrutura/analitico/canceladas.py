@@ -85,11 +85,16 @@ def chaves_de_planilha(caminho: str) -> list[str]:
     return chaves
 
 
-def ler_chaves_canceladas(caminhos: list[str], destino: str) -> ProgressoDasCanceladas:
-    """Grava `chaves_canceladas.parquet` em `destino`, uma linha por chave."""
+def ler_chaves_canceladas(caminhos: list[str], destino: str,
+                          de_eventos: list[tuple[str, str]] = ()) -> ProgressoDasCanceladas:
+    """Grava `chaves_canceladas.parquet` em `destino`, uma linha por chave.
+
+    `de_eventos` são (chave, arquivo) de eventos que a leitura dos XML já achou
+    — os que vêm dentro de zip, misturados com as notas.
+    """
     os.makedirs(destino, exist_ok=True)
-    progresso = ProgressoDasCanceladas()
-    vistas: dict[str, tuple[str, str]] = {}
+    progresso = ProgressoDasCanceladas(eventos=len(de_eventos))
+    vistas: dict[str, tuple[str, str]] = {c: (a, "evento") for c, a in de_eventos}
     for caminho in caminhos:
         nome = os.path.basename(caminho)
         progresso.arquivos += 1

@@ -455,7 +455,13 @@ avisa quando `fora_do_periodo` é maior que zero.
 A extração de movimentos lê, depois das EFD, os arquivos do lote do tipo
 `xml_nfe` — que desde a v0.53 inclui o CF-e SAT (`<CFe>`), e cujo rótulo passou
 a "XML de NF-e ou CF-e". A barra conta EFD e XML juntos; o passo da segunda
-fase é "Lendo os itens dos XML". XML dentro de zip ainda não é lido.
+fase é "Lendo os itens dos XML". Desde a v0.53.2 o lote tem também o tipo
+`xml_compactado` ("Zip de XML", alimenta): zip com XML de NF-e ou CF-e, com
+`detalhe` = "N XML" e o CNPJ da primeira nota. As etapas 2 e 3 leem os membros
+do zip — e de um nível de zip dentro dele — sem extrair; a barra conta um por
+XML de dentro, e `arquivo` vira `lote.zip > nota.xml`. Evento de cancelamento
+dentro do zip vai para `chaves_canceladas.parquet`. O zip `xml_compactado`
+também é fonte da pré-validação dos arquivos do cliente.
 
 `movimentos.parquet` ganha colunas:
 

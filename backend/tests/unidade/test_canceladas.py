@@ -97,6 +97,11 @@ class TestClassificacao:
         (tmp_path / "cce.xml").write_bytes(evento(CHAVE_OUTRA, "110110"))
         assert classificar(str(tmp_path / "cce.xml")).tipo is TipoDeArquivo.XML_OUTRO
 
+    def test_cancelamento_de_cte_nao_e_de_nota(self, tmp_path):
+        cte = evento(CHAVE_OUTRA).replace(b"<chNFe>", b"<chCTe>").replace(b"</chNFe>", b"</chCTe>")
+        (tmp_path / "cte.xml").write_bytes(cte.replace(b"procEventoNFe", b"procEventoCTe"))
+        assert classificar(str(tmp_path / "cte.xml")).tipo is TipoDeArquivo.XML_OUTRO
+
     def test_lista_em_texto_precisa_do_nome(self, tmp_path):
         conteudo = f"{CHAVE_OUTRA}\r\n{CHAVE_ENTRADA}\r\n"
         lista = escrever(tmp_path, "NOTAS FISCAIS CANCELADAS - 072022 A 062024.txt", [conteudo])

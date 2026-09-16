@@ -43,6 +43,7 @@ from cat.infraestrutura.analitico.extracao import (
     extrair_efd,
     extrair_pasta,
 )
+from cat.infraestrutura.arquivos.xml_compactado import contar_xml
 from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import (
     ArquivoDoLoteDB,
@@ -154,7 +155,7 @@ def preparar(projeto_id: int, usuario_id: int, sessao: Session) -> ExecucaoDB:
         )
     documentos = caminhos_do_projeto(
         projeto_id,
-        (TipoDeArquivo.XML_NFE, TipoDeArquivo.GERENCIAL_MOVIMENTO),
+        (TipoDeArquivo.XML_NFE, TipoDeArquivo.XML_COMPACTADO, TipoDeArquivo.GERENCIAL_MOVIMENTO),
         sessao,
     )
     if not documentos:
@@ -225,11 +226,11 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
 
     projeto_id = execucao.projeto_id
     efd, substituidas = caminhos_de_efd_vigentes(projeto_id, sessao)
-    xmls = caminhos_do_projeto(projeto_id, (TipoDeArquivo.XML_NFE,), sessao)
+    xmls = caminhos_do_projeto(projeto_id, (TipoDeArquivo.XML_NFE, TipoDeArquivo.XML_COMPACTADO), sessao)
     relatorios = caminhos_do_projeto(
         projeto_id, (TipoDeArquivo.GERENCIAL_MOVIMENTO,), sessao)
 
-    execucao.arquivos_totais = len(efd) + len(xmls) + len(relatorios)
+    execucao.arquivos_totais = len(efd) + contar_xml(xmls) + len(relatorios)
     sessao.commit()
 
     relogio = _Relogio(execucao, sessao, execucao.arquivos_totais)

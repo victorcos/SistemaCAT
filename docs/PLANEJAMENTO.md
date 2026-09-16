@@ -90,7 +90,7 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] Contingência das notas não escrituradas: multa do art. 527, sem SELIC,
       nota a nota na etapa 3 (v0.53.2)
 - [ ] Saída não escriturada sem ICMS destacado: imputar alíquota, como a RVZ? (a decidir)
-- [ ] XML dentro de zip no lote (a Advertising entregou assim)
+- [x] XML dentro de zip no lote, com um nível de zip dentro de zip, sem extrair (v0.53.2)
 
 ### 3. O que a apuração ainda não calcula
 

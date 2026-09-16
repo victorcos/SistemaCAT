@@ -22,6 +22,7 @@ public static class TiposDeArquivo
         Novo("xml_nfe", "XML de NF-e ou CF-e", alimenta: true),
         Novo("xml_outro", "XML de outro documento"),
         Novo("xml_cancelamento", "Evento de cancelamento de NF-e", alimenta: true),
+        Novo("xml_compactado", "Zip de XML", alimenta: true),
         Novo("gerencial_movimento", "Relatório de movimento", alimenta: true),
         Novo("gerencial_inventario", "Relatório de inventário", alimenta: true),
         Novo("gerencial_resumo", "Resumo por produto"),

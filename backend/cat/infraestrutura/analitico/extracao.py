@@ -34,6 +34,7 @@ import pyarrow.parquet as pq
 from cat.dominio.cat42.conferencia import Origem
 from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido, ler_cabecalho
 from cat.dominio.sped.fiscais import PREFIXOS, DocumentoEscriturado, ler_documento
+from cat.infraestrutura.arquivos.xml_compactado import contar_xml, conteudos_de_xml
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -71,6 +72,7 @@ _RE_CHAVE_XML = re.compile(
 _RE_CHAVE_NOME = re.compile(r"(?<!\d)(\d{44})(?!\d)")
 
 BYTES_DE_XML = 4096
+_RE_NAO_E_NOTA = re.compile(rb"<(?:procEventoNFe|envEvento|evento|procInutNFe|inutNFe|retInutNFe|cteProc|CTe)\b")
 
 
 @dataclass
@@ -212,11 +214,12 @@ def extrair_efd(caminhos: list[str], destino: str,
     return progresso
 
 
-def _chave_do_xml(caminho: str) -> str:
+def _chave_do_xml(caminho: str, inicio: bytes | None = None) -> str:
     """Do conteúdo; se não achar, do nome do arquivo."""
     try:
-        with open(caminho, "rb") as f:
-            inicio = f.read(BYTES_DE_XML)
+        if inicio is None:
+            with open(caminho, "rb") as f:
+                inicio = f.read(BYTES_DE_XML)
     except OSError:
         inicio = b""
     achado = _RE_CHAVE_XML.search(inicio)
@@ -277,12 +280,17 @@ def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
     from cat.dominio.gerencial.campos import Especie
     from cat.infraestrutura.arquivos.gerencial import Leitura
 
-    progresso = Progresso(arquivos_totais=len(xmls) + len(relatorios))
+    progresso = Progresso(arquivos_totais=contar_xml(xmls) + len(relatorios))
     escritor = _Escritor(destino, ESQUEMA_PASTA)
     vistas: set[str] = set()
 
-    for caminho in xmls:
-        chave = _chave_do_xml(caminho)
+    # o XML de dentro de zip chega com o começo já lido; o solto, sem conteúdo
+    for caminho, inicio in conteudos_de_xml(xmls, limite=BYTES_DE_XML, recusados=progresso.recusados):
+        if inicio is not None and _RE_NAO_E_NOTA.search(inicio):
+            # evento, inutilização e CT-e vêm misturados no zip do portal
+            progresso.arquivos_lidos += 1
+            continue
+        chave = _chave_do_xml(caminho, inicio)
         if chave and chave not in vistas:
             vistas.add(chave)
             escritor.acrescentar({"chave": chave, "origem": Origem.XML.value,

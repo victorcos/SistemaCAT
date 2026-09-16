@@ -31,6 +31,7 @@ from cat.dominio.sped.cabecalho import (
     ler_cabecalho,
 )
 from cat.infraestrutura.arquivos.gerencial import inspecionar
+from cat.infraestrutura.arquivos.xml_compactado import e_zip, membros_xml
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -85,8 +86,12 @@ _RE_CNPJ_DESTINATARIO = re.compile(
 _RE_EMISSAO = re.compile(r"<(?:dhEmi|dEmi)>(\d{4})-?(\d{2})-?(\d{2})")
 # evento de cancelamento de NF-e: tira a nota da movimentação na etapa 3
 _RE_EVENTO_CANCELAMENTO = re.compile(r"<tpEvento>\s*110111\s*</tpEvento>")
+# o cancelamento de CT-e também é 110111; o de NF-e é o que traz <chNFe>
 _RE_CHAVE_DO_EVENTO = re.compile(r"<chNFe>\s*(\d{44})\s*</chNFe>")
 _RE_CHAVE_SOLTA = re.compile(r"(?<!\d)\d{44}(?!\d)")
+# no zip, a nota se reconhece pelo Id: CT-e também tem <infNFe>, dentro do infDoc
+_RE_ID_DE_NOTA = re.compile(r'Id\s*=\s*["\'](?:NFe|CFe)\d{44}["\']')
+MEMBROS_NA_AMOSTRA_DO_ZIP = 50
 
 
 def _amostra(caminho: str) -> str:
@@ -150,14 +155,14 @@ def _competencia_da_chave(chave: str) -> date | None:
 
 
 def _do_xml(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote:
-    if _RE_EVENTO_CANCELAMENTO.search(texto) and not _RE_NFE.search(texto):
-        chave = _RE_CHAVE_DO_EVENTO.search(texto)
+    chave = _RE_CHAVE_DO_EVENTO.search(texto)
+    if _RE_EVENTO_CANCELAMENTO.search(texto) and chave and not _RE_NFE.search(texto):
         return ArquivoDoLote(
             caminho=caminho, nome=os.path.basename(caminho), tamanho=tamanho,
             tipo=TipoDeArquivo.XML_CANCELAMENTO,
-            cnpj=chave.group(1)[6:20] if chave else None,
-            competencia=_competencia_da_chave(chave.group(1)) if chave else None,
-            detalhe=f"cancela {chave.group(1)}" if chave else "",
+            cnpj=chave.group(1)[6:20],
+            competencia=_competencia_da_chave(chave.group(1)),
+            detalhe=f"cancela {chave.group(1)}",
         )
     e_nfe = _RE_NFE.search(texto) is not None
     emitente = _RE_CNPJ_EMITENTE.search(texto)
@@ -174,6 +179,48 @@ def _do_xml(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote:
         competencia=(date(int(emissao.group(1)), int(emissao.group(2)), 1)
                      if emissao else None),
         motivo="" if e_nfe else "o XML não é de NF-e, NFC-e nem CF-e",
+    )
+
+
+def _do_zip(caminho: str, tamanho: int) -> ArquivoDoLote:
+    """Zip com XML de nota vira `xml_compactado`; o resto continua `compactado`.
+
+    Lê os diretórios centrais (do zip e dos zips de dentro) e o começo de até 50
+    XML. O CNPJ é o da primeira nota achada: é o que separa zip de outra empresa,
+    como no XML solto. A competência fica vazia — um zip costuma ter meses inteiros.
+    """
+    nome = os.path.basename(caminho)
+    recusados: list[str] = []
+    xmls = 0
+    nota = cancelamento = None
+    try:
+        with zipfile.ZipFile(caminho) as arquivo:
+            for _, dono, info in membros_xml(arquivo, caminho, recusados):
+                xmls += 1
+                if nota is None and xmls <= MEMBROS_NA_AMOSTRA_DO_ZIP:
+                    with dono.open(info) as f:
+                        texto = f.read(BYTES_DE_AMOSTRA).decode("utf-8", errors="replace")
+                    if _RE_ID_DE_NOTA.search(texto):
+                        nota = texto
+                    elif cancelamento is None and _RE_EVENTO_CANCELAMENTO.search(texto):
+                        cancelamento = _RE_CHAVE_DO_EVENTO.search(texto)
+    except (OSError, zipfile.BadZipFile, RuntimeError, EOFError, ValueError) as erro:
+        log.warning("zip ilegível na classificação", extra={"arquivo": nome, "motivo": str(erro)})
+        return ArquivoDoLote(caminho=caminho, nome=nome, tamanho=tamanho,
+                             tipo=TipoDeArquivo.COMPACTADO, motivo=f"zip ilegível: {erro}")
+    if nota is None and cancelamento is None:
+        return ArquivoDoLote(
+            caminho=caminho, nome=nome, tamanho=tamanho, tipo=TipoDeArquivo.COMPACTADO,
+            motivo=(f"nenhum dos primeiros {min(xmls, MEMBROS_NA_AMOSTRA_DO_ZIP)} XML do zip "
+                    "é NF-e, NFC-e ou CF-e") if xmls else "")
+    # sem nota na amostra, o CNPJ é o do emitente da nota cancelada, que está na chave
+    emitente = _RE_CNPJ_EMITENTE.search(nota) if nota else None
+    destinatario = _RE_CNPJ_DESTINATARIO.search(nota) if nota else None
+    return ArquivoDoLote(
+        caminho=caminho, nome=nome, tamanho=tamanho, tipo=TipoDeArquivo.XML_COMPACTADO,
+        cnpj=(emitente.group(1) if emitente else None) if nota else cancelamento.group(1)[6:20],
+        cnpj_destinatario=destinatario.group(1) if destinatario else None,
+        detalhe=f"{xmls} XML" + (f", {len(recusados)} zip(s) de dentro ilegíveis" if recusados else ""),
     )
 
 
@@ -262,6 +309,8 @@ def classificar(caminho: str, tamanho: int | None = None) -> ArquivoDoLote:
             return ArquivoDoLote(caminho=caminho, nome=nome, tamanho=0,
                                  tipo=TipoDeArquivo.DESCONHECIDO, motivo=str(erro))
 
+    if e_zip(caminho):
+        return _do_zip(caminho, tamanho)
     if minusculo.endswith(EXTENSOES_COMPACTADAS):
         return ArquivoDoLote(caminho=caminho, nome=nome, tamanho=tamanho,
                              tipo=TipoDeArquivo.COMPACTADO)
