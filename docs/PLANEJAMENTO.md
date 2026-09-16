@@ -86,11 +86,11 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] Nota de entrada não escriturada **não** entra na ficha: a RVZ incluiu a
       pedido do cliente, não é regra (decisão do Victor, 16/09/2026)
 - [x] Notas canceladas na SEFAZ e ativas no SPED/XML: evento de cancelamento e
-      lista de chaves no lote, fora da movimentação e contadas (v0.53.2)
+      lista de chaves no lote, fora da movimentação e contadas (v0.54.0)
 - [x] Contingência das notas não escrituradas: multa do art. 527, sem SELIC,
-      nota a nota na etapa 3 (v0.53.2)
+      nota a nota na etapa 3 (v0.54.0)
 - [ ] Saída não escriturada sem ICMS destacado: imputar alíquota, como a RVZ? (a decidir)
-- [x] XML dentro de zip no lote, com um nível de zip dentro de zip, sem extrair (v0.53.2)
+- [x] XML dentro de zip no lote, com um nível de zip dentro de zip, sem extrair (v0.54.0)
 
 ### 3. O que a apuração ainda não calcula
 

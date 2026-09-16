@@ -440,7 +440,7 @@ def _processos_viaveis() -> bool:
     `__main__` não tem nem um nem outro. Só quebra quando o `__main__` diz ter
     um arquivo que não existe — o script lido da entrada padrão (`<stdin>`).
 
-    Antes da v0.53.2 esta checagem exigia arquivo ou nome, e o motor caía nela:
+    Antes da v0.54.0 esta checagem exigia arquivo ou nome, e o motor caía nela:
     o servidor do uvicorn nasce de um `spawn`, com um `__main__` sem arquivo.
     Resultado: a etapa 7, a pré-validação e a rodada em processo próprio
     rodavam, no motor, num processo só — só os testes e os scripts viam o

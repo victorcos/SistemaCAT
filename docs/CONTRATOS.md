@@ -455,7 +455,7 @@ avisa quando `fora_do_periodo` é maior que zero.
 A extração de movimentos lê, depois das EFD, os arquivos do lote do tipo
 `xml_nfe` — que desde a v0.53 inclui o CF-e SAT (`<CFe>`), e cujo rótulo passou
 a "XML de NF-e ou CF-e". A barra conta EFD e XML juntos; o passo da segunda
-fase é "Lendo os itens dos XML". Desde a v0.53.2 o lote tem também o tipo
+fase é "Lendo os itens dos XML". Desde a v0.54.0 o lote tem também o tipo
 `xml_compactado` ("Zip de XML", alimenta): zip com XML de NF-e ou CF-e, com
 `detalhe` = "N XML" e o CNPJ da primeira nota. As etapas 2 e 3 leem os membros
 do zip — e de um nível de zip dentro dele — sem extrair; a barra conta um por
@@ -495,7 +495,7 @@ do C170 (`valor_icms`, `valor_st`, `bc_st`, mais o FCP-ST) e o retido do XML
 vence o do relatório do cliente. No razão (etapa 5), a saída que veio do XML
 tem `origem = xml`, e ela também troca a linha do relatório com a mesma chave.
 
-### Canceladas na SEFAZ (v0.53.2)
+### Canceladas na SEFAZ (v0.54.0)
 
 Dois tipos de arquivo do lote, ambos com `alimenta_a_cat`:
 
@@ -512,7 +512,7 @@ ganha `chaves_canceladas`, `documentos_cancelados_na_sefaz` e
 `movimentos_cancelados`, e um aviso quando há documento cancelado. Execução
 anterior não tem esses campos.
 
-### Notas não escrituradas e contingência (v0.53.2)
+### Notas não escrituradas e contingência (v0.54.0)
 
 A consolidação grava `contingencia.parquet`: o item de cada XML do
 estabelecimento, de mês com EFD dele, que a EFD dele não tem e que não está

@@ -95,7 +95,7 @@ veio.
 dão 1.011 chaves; 911 estão na EFD, 814 já como canceladas e **97 como
 regulares** — 101 movimentos de saída, R$ 9.968,61, que agora saem.
 
-**Lote antigo.** Evento importado antes da v0.53.2 ficou como `xml_outro`; a
+**Lote antigo.** Evento importado antes da v0.54.0 ficou como `xml_outro`; a
 pasta precisa ser inspecionada de novo para virar `xml_cancelamento`.
 
 ---

@@ -53,11 +53,11 @@ export interface ResumoDaMovimentacao {
   movimentos_do_xml?: number;
   itens_pareados_com_xml?: number;
   itens_sem_par_no_xml?: number;
-  /** Canceladas na SEFAZ (v0.53.2): evento de cancelamento ou lista de chaves. */
+  /** Canceladas na SEFAZ (v0.54.0): evento de cancelamento ou lista de chaves. */
   chaves_canceladas?: number;
   documentos_cancelados_na_sefaz?: number;
   movimentos_cancelados?: number;
-  /** Não escrituradas e a multa do art. 527, sem SELIC (v0.53.2). */
+  /** Não escrituradas e a multa do art. 527, sem SELIC (v0.54.0). */
   nao_escrituradas_entradas?: number;
   nao_escrituradas_saidas?: number;
   valor_nao_escriturado_entradas?: string;

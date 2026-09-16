@@ -40,7 +40,7 @@ class NadaParaPreValidar(ValueError):
 def fontes_do_projeto(projeto_id: int, sessao: Session) -> list[str]:
     """O arquivo digital solto e os zips do lote — o que está dentro só se sabe abrindo.
 
-    O zip que tem XML de nota virou `xml_compactado` na v0.53.2, e pode ter o
+    O zip que tem XML de nota virou `xml_compactado` na v0.54.0, e pode ter o
     arquivo digital junto: entra também.
     """
     return list(sessao.scalars(
