@@ -5,6 +5,82 @@
 
 ---
 
+## 2026-09-16 — O que a CAT 42 da Advertising ensinou: XML, de-para, art. 271 e X.949
+
+**De onde veio.** A CAT 42 que a RVZ entregou para a Advertising Operations
+(43.112.531/0004-21, 08/2022 a 06/2024, R$ 406.362,34) foi comparada com o que
+o sistema faria. **Decisões do Victor:** corrigir tudo, nesta ordem — itens do
+XML, de-para automático com revisão na tela, enquadramento 4 com o art. 271,
+X.949 fora da ficha — e validar rodando a base deles.
+
+**1. O item do XML.** A EFD deles tem 92.928 NF-e de saída sem C170: sem ler o
+XML, o sistema não teria saída nenhuma — o mesmo buraco das lojas de SP do
+Amigão. A etapa 3 passou a ler o item de NF-e, NFC-e e CF-e: completa o
+documento escriturado sem item e fica ao lado do C170 que existe, com os
+valores do XML vencendo na etapa 4. O que a base real mostrou, e virou regra:
+
+| Achado | Regra |
+|---|---|
+| 72 mil CT-e lidos como nota sem chave (o CT-e cita as notas num `infNFe`) | NF-e só com `infNFe` dentro de `NFe` |
+| 13.676 NF-e declaradas UTF-8 com o `º` em Latin-1 | relê como Latin-1 quando o UTF-8 falha |
+| C170 com o custo (ST e IPI embutidos) e XML com a mercadoria: nenhum item casava pelo valor | casa pelo número do item com quantidade ou valor; contagem só em nota de um item |
+| 44.781 NF-e de venda a pessoa física sem enquadramento | `indFinal` do XML diz consumidor final (1) ou não (0) |
+
+Resultado na Advertising: 92.723 das 93.599 saídas completadas; 211 de 215 C170
+com o XML ao lado; ICMS suportado das entradas de R$ 0 para R$ 1.248.698,47,
+tudo destacado no documento; 2 XML ilegíveis de 357.950 arquivos.
+
+**2. De-para de códigos.** O mesmo produto tinha até quatro códigos: `1111` na
+venda, `1111K3` no kit, `1111K3         08` na compra (código de venda + espaços
++ "08") e `X00450IETL` no marketplace. O sistema propõe grupos por GTIN, sufixo
+que se repete (no mínimo 3 pares), kit (com fator) e descrição + NCM, e escolhe
+o código de mais saídas. Três travas vieram da base real: `K3` é kit, não
+sufixo; GTIN não liga kit a unidade nem descrições incompatíveis (o 0200 deles
+tinha no `1114` o GTIN do `1050`, e o GTIN sozinho juntava seis produtos); fator
+em conflito derruba a confiança. O par é da empresa (`depara_item`), gravado
+pela API; o razão aplica só os aprovados e guarda `codigo_original`. O que não
+casa vai numa planilha para o cliente — como a RVZ fez com os 10 códigos de
+marketplace. Na Advertising: 46 pares propostos, todos de confiança alta; 10
+códigos sem par, os mesmos que o cliente preencheu para a RVZ.
+
+**3. Enquadramentos 2 e 4 e o art. 271.** A coluna 21 é o ICMS próprio das
+entradas mais recentes da ficha até a saída (item 3.3.8, a regra que já valora a
+abertura). Ressarcimento = suportado baixado − coluna 21; no enquadramento 4, a
+coluna 21 é também o crédito do art. 271 (coluna 27), que a apuração soma e o
+arquivo digital leva no VL_CONFR. Conferido com a Ficha 3 da RVZ: 2,15 de
+suportado, 0,63 da entrada, 1,52 de ressarcimento e 0,63 de crédito. Na
+Advertising, 57.440 saídas confrontadas e nenhuma pendente.
+
+**4. X.949 fora da ficha.** Remessa e retorno (armazém, depósito) não são compra
+nem venda: saem da ficha e ficam contados, como o uso e consumo.
+
+**Comparação com a RVZ (fichas válidas).** Enquadramento 4, ressarcimento +
+crédito: R$ 389.531,17 contra R$ 548.490,22; crédito do art. 271: R$ 114.663,40
+contra R$ 160.557,57; complemento: R$ 178.109,69 contra R$ 148.770,53. A
+diferença está nas 6 fichas que ficaram negativas e fora do total: a RVZ incluiu
+na CAT notas de entrada não escrituradas ("PRESENTES NA CAT 42" na planilha
+dela), e o sistema as deixa de fora. **Fica para o Victor decidir** se nota não
+escriturada entra na ficha.
+
+---
+
+## 2026-09-16 — A rodada num processo próprio, e o índice sem `mode()`
+
+**O que caiu.** A etapa 4 do Amigão falhou duas vezes por falta de memória
+(#55 e #56), com o motor chegando a 16 GB. Medido fase a fase, com trava de 8 GB:
+ler 20 GB de relatórios chega a 2,8 GB e devolve; percorrer 8,7 milhões de
+itens, 3,9 GB (o teto do DuckDB); o agrupamento por documento passava de 8 GB
+**mesmo com teto de 2 GB** — o `mode()` guarda uma tabela por documento fora do
+controle de memória do DuckDB.
+
+**O que mudou.** O índice conta por documento e CST, e por documento e fonte, e
+escolhe com `arg_max` sobre número pequeno: 82 s e 2,0 GB de pico nos mesmos
+8,7 milhões de itens. E cada rodada da fila roda num processo filho: a memória
+volta ao sistema quando ela acaba, e o filho que morre vira falha com motivo em
+vez de derrubar o motor. `CAT_RODADAS_EM_PROCESSO=false` volta ao que era.
+
+---
+
 ## 2026-09-16 — Base grande: CSV pelo DuckDB e arquivos digitais em paralelo
 
 **CSV.** A Ficha 3 de uma loja do Amigão (1,17 milhão de linhas) levava 60 s

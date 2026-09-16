@@ -55,6 +55,21 @@ class ResumoDaMovimentacao:
     valor_saidas_sem_item_st: Decimal = ZERO        # idem, só CST x60
     saidas_sem_item_por_modelo: list[Fatia] = field(default_factory=list)
 
+    # ---- o XML: o item que a EFD não trouxe, e os valores ao lado do C170 ----
+    xml_arquivos: int = 0
+    xml_documentos: int = 0
+    xml_itens: int = 0
+    xml_repetidos: int = 0
+    xml_nao_sao_documento: int = 0
+    xml_ilegiveis: int = 0
+    saidas_completadas_pelo_xml: int = 0
+    entradas_completadas_pelo_xml: int = 0
+    movimentos_do_xml: int = 0
+    # C170 com o item do XML ao lado (mesmo número do item e mesmo valor)
+    itens_pareados_com_xml: int = 0
+    # C170 de documento que tem XML, mas sem item que case: ficou com a EFD
+    itens_sem_par_no_xml: int = 0
+
     # ---- movimentos: as linhas de item ----
     movimentos: int = 0
     movimentos_entrada: int = 0
@@ -88,21 +103,40 @@ class ResumoDaMovimentacao:
         avisos: list[str] = []
         if self.saidas_sem_item:
             modelos = ", ".join(f.rotulo for f in self.saidas_sem_item_por_modelo[:3])
+            faltam = max(0, self.saidas_sem_item - self.saidas_completadas_pelo_xml)
+            completou = (f" O XML completou {_numero(self.saidas_completadas_pelo_xml)}; "
+                         if self.saidas_completadas_pelo_xml else " ")
             avisos.append(
                 f"{_numero(self.saidas_sem_item)} documento(s) de saída "
                 f"({modelos}) não trazem item na EFD — NF-e própria e cupom "
                 "SAT vão para a EFD só com o analítico. São "
                 f"{_dinheiro(self.valor_saidas_sem_item)} de saídas, dos quais "
                 f"{_dinheiro(self.valor_saidas_sem_item_st)} com CST 60 "
-                "(mercadoria com ST retida). O item dessas saídas virá do XML, "
-                "na próxima etapa."
+                f"(mercadoria com ST retida).{completou}"
+                + (f"{_numero(faltam)} seguem sem item: sem o XML delas, o item só "
+                   "vem do relatório de saídas do cliente, no razão." if faltam else
+                   "nenhuma ficou sem item.")
             )
         if self.entradas_proprias_sem_item:
+            faltam = max(0, self.entradas_proprias_sem_item - self.entradas_completadas_pelo_xml)
             avisos.append(
                 f"{_numero(self.entradas_proprias_sem_item)} nota(s) de entrada "
                 "de emissão própria (devolução de venda, produtor rural, "
                 "retorno) também vêm sem item na EFD — mesma regra da saída "
-                "própria. O item virá do XML."
+                "própria. "
+                + (f"{_numero(faltam)} seguem sem item por falta do XML." if faltam else
+                   "O XML completou todas.")
+            )
+        if self.itens_sem_par_no_xml:
+            avisos.append(
+                f"{_numero(self.itens_sem_par_no_xml)} item(ns) do C170 são de nota "
+                "com XML, mas não casaram com o item do XML (número do item ou valor "
+                "diferentes). Ficaram com os valores da EFD."
+            )
+        if self.xml_ilegiveis:
+            avisos.append(
+                f"{_numero(self.xml_ilegiveis)} XML não abriram (arquivo quebrado ou "
+                "chave inválida). O nome dos arquivos está no log da etapa."
             )
         if self.entradas_sem_item:
             avisos.append(
@@ -114,7 +148,8 @@ class ResumoDaMovimentacao:
             avisos.append(
                 f"{_numero(self.itens_sem_cadastro)} código(s) movimentados não "
                 "estão no cadastro 0200 de nenhum período. Entram no "
-                "histórico sem descrição, NCM nem CEST."
+                "histórico com a descrição, o NCM e o CEST do XML quando há, "
+                "e sem eles quando não há."
             )
         if self.movimentos and not self.inventarios:
             avisos.append(

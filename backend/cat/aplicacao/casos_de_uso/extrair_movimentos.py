@@ -6,6 +6,7 @@ arquivos e 100 GB.
 
     1. EFD → cinco parquets: documentos, itens (C170/C810), analítico
        (C190/C850), cadastro (0200) e inventário (bloco H)
+    1b. XML do lote → o item de cada documento eletrônico
     2. consolidação → cadastro mais recente por item, movimentos com a marca
        da conferência (conferido / pendente / sem chave) e o analítico com
        `tem_item`
@@ -30,6 +31,7 @@ from cat.aplicacao.casos_de_uso.conferir_documentos import (
     ETAPA as ETAPA_CONFERENCIA,
     _Relogio,
     caminhos_de_efd_vigentes,
+    caminhos_do_projeto,
     pasta_da_execucao,
 )
 from cat.aplicacao.casos_de_uso.historico_do_projeto import (
@@ -37,8 +39,10 @@ from cat.aplicacao.casos_de_uso.historico_do_projeto import (
     registrar_de_etapa,
 )
 from cat.dominio.cat42.movimentacao import ResumoDaMovimentacao
+from cat.dominio.lote import TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.confronto import ARQUIVO_CONFERIDOS
+from cat.infraestrutura.analitico.itens_do_xml import ProgressoDoXml, extrair_itens_do_xml
 from cat.infraestrutura.analitico.movimentacao import consolidar
 from cat.infraestrutura.analitico.movimentos import (
     ProgressoDeItens,
@@ -144,22 +148,31 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     sessao.commit()
 
     efd, substituidas = caminhos_de_efd_vigentes(execucao.projeto_id, sessao)
-    execucao.arquivos_totais = len(efd)
+    xmls = caminhos_do_projeto(execucao.projeto_id, (TipoDeArquivo.XML_NFE,), sessao)
+    execucao.arquivos_totais = len(efd) + len(xmls)
     sessao.commit()
 
     inicio = time.time()
-    relogio = _Relogio(execucao, sessao, len(efd))
+    relogio = _Relogio(execucao, sessao, len(efd) + len(xmls))
     progresso = extrair_movimentos(efd, destino, avisar=relogio.marcar)
+
+    # os XML contam arquivos na mesma barra; os documentos e bytes da EFD ficam
+    relogio.deslocar(len(efd))
+    relogio.congelar_totais(documentos=progresso.documentos, bytes_lidos=progresso.bytes_lidos)
+    execucao.passo = "Lendo os itens dos XML"
+    sessao.commit()
+    do_xml = extrair_itens_do_xml(xmls, destino, avisar=relogio.marcar)
 
     execucao.passo = "Consolidando"
     execucao.arquivos_lidos = execucao.arquivos_totais
     execucao.documentos = progresso.documentos
-    execucao.bytes_lidos = progresso.bytes_lidos
+    execucao.bytes_lidos = progresso.bytes_lidos + do_xml.bytes_lidos
     execucao.fracao = 0.97
     sessao.commit()
 
     resumo = consolidar(destino, _conferidos(execucao.projeto_id, sessao))
     resumo.arquivos_fora_de_ordem = len(progresso.arquivos_com_orfaos)
+    _somar_xml(resumo, do_xml)
 
     execucao.situacao = "concluida"
     execucao.passo = "Concluída"
@@ -197,6 +210,15 @@ def _conferidos(projeto_id: int, sessao: Session) -> str | None:
                     extra={"execucao_id": anterior.id, "caminho": caminho})
         return None
     return caminho
+
+
+def _somar_xml(resumo: ResumoDaMovimentacao, do_xml: ProgressoDoXml) -> None:
+    resumo.xml_arquivos = do_xml.arquivos_lidos
+    resumo.xml_documentos = do_xml.documentos
+    resumo.xml_itens = do_xml.itens
+    resumo.xml_repetidos = do_xml.repetidos
+    resumo.xml_nao_sao_documento = do_xml.nao_sao_documento
+    resumo.xml_ilegiveis = do_xml.ilegiveis
 
 
 def _serializar(resumo: ResumoDaMovimentacao, progresso: ProgressoDeItens,

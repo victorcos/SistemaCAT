@@ -18,6 +18,7 @@ export const ROTAS = {
   movimentos: (id: number | string) => `/projetos/${id}/movimentos`,
   suportado: (id: number | string) => `/projetos/${id}/suportado`,
   razao: (id: number | string) => `/projetos/${id}/razao`,
+  depara: (id: number | string) => `/projetos/${id}/depara`,
   apuracao: (id: number | string) => `/projetos/${id}/apuracao`,
   arquivoDigital: (id: number | string) => `/projetos/${id}/arquivo-digital`,
   preValidacao: (id: number | string) => `/projetos/${id}/pre-validacao`,

@@ -62,7 +62,8 @@ ESQUEMA_APURACAO = pa.schema([
     ("competencia", pa.string()),          # "2021-05"
     ("ressarcimento", pa.decimal128(24, 2)),
     ("complemento", pa.decimal128(24, 2)),
-    # coluna 27 da Ficha 3 (art. 271): preparada e zerada até o confronto dos
+    # coluna 27 da Ficha 3 (art. 271): a soma do crédito da operação própria nas saídas de
+    # enquadramento 4 (v0.53); antes era preparada e zerada até o confronto dos
     # enquadramentos 2 e 4 existir
     ("credito_operacao_propria", pa.decimal128(24, 2)),
     ("itens", pa.int32()),
@@ -182,6 +183,9 @@ def _preparar(con, ficha3: str, fichas: str, conferencia: str) -> None:
     """)
     # razão de antes de a abertura ter valor (v0.52) não tem a coluna: vale zero, como era
     tem_valor = "abertura_valor" in pq.read_schema(fichas).names
+    # nem, antes da v0.53, o crédito do art. 271: a coluna entra zerada
+    if "credito_operacao_propria" not in pq.read_schema(ficha3).names:
+        con.execute("ALTER TABLE linhas ADD COLUMN credito_operacao_propria DECIMAL(30, 15) DEFAULT 0")
     con.execute(f"""
         CREATE OR REPLACE TABLE aberturas AS
         SELECT cnpj, codigo, abertura_quantidade,
@@ -245,9 +249,10 @@ def _gravar_apuracao(con, destino: str, uf_por_cnpj: dict, resumo: ResumoDoPerio
                    count(*) AS linhas,
                    sum(CASE WHEN retirada THEN 0 ELSE ressarcimento END) AS ressarcimento,
                    sum(CASE WHEN retirada THEN 0 ELSE complemento END) AS complemento,
+                   sum(CASE WHEN retirada THEN 0 ELSE coalesce(credito_operacao_propria, 0) END) AS credito,
                    count(DISTINCT codigo) FILTER (retirada) AS fichas_retiradas,
                    count(*) FILTER (especie = 'saida' AND NOT devolucao
-                                    AND enquadramento IN (2, 4)) AS confronto_pendente,
+                                    AND enquadramento IN (2, 4) AND icms_efetivo IS NULL) AS confronto_pendente,
                    count(*) FILTER (especie = 'saida' AND NOT devolucao
                                     AND enquadramento IN (1, 3)
                                     AND icms_efetivo IS NULL) AS sem_aliquota,
@@ -281,6 +286,7 @@ def _gravar_apuracao(con, destino: str, uf_por_cnpj: dict, resumo: ResumoDoPerio
                 cnpj=d["cnpj"], uf=uf_por_cnpj.get(d["cnpj"], ""), competencia=d["competencia"],
                 ressarcimento=Decimal(d["ressarcimento"] or 0),
                 complemento=Decimal(d["complemento"] or 0),
+                credito_operacao_propria=Decimal(d["credito"] or 0),
                 itens=d["itens"], linhas=d["linhas"],
                 fichas_retiradas=d["fichas_retiradas"], confronto_pendente=d["confronto_pendente"],
                 sem_aliquota=d["sem_aliquota"], indefinidas=d["indefinidas"],

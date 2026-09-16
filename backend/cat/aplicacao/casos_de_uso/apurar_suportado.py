@@ -308,6 +308,8 @@ def serializar(resumo: ResumoDaApuracao, q: dict, retido: RetidoExtraido | None 
         "valor_total": str(resumo.valor_total),
         "valor_documental": str(resumo.valor_documental),
         "fracao_documental": round(resumo.fracao_documental, 4),
+        "itens_com_valor_do_xml": resumo.itens_com_valor_do_xml,
+        "itens_com_retido_do_xml": resumo.itens_com_retido_do_xml,
         "por_fonte": [{**f, "valor": str(f["valor"])} for f in fatias_por_fonte(resumo)],
         "por_pendencia": {p.value: resumo.por_pendencia[p] for p in Pendencia},
         "por_cst": [{**c, "valor": str(c["valor"])} for c in q["por_cst"]],

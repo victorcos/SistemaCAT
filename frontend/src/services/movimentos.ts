@@ -41,6 +41,18 @@ export interface ResumoDaMovimentacao {
   observacoes?: string[];
   efd_originais_substituidas: number;
   analiticos: number;
+  /** O item do XML (v0.53). Opcionais: execução antiga não leu XML. */
+  xml_arquivos?: number;
+  xml_documentos?: number;
+  xml_itens?: number;
+  xml_repetidos?: number;
+  xml_nao_sao_documento?: number;
+  xml_ilegiveis?: number;
+  saidas_completadas_pelo_xml?: number;
+  entradas_completadas_pelo_xml?: number;
+  movimentos_do_xml?: number;
+  itens_pareados_com_xml?: number;
+  itens_sem_par_no_xml?: number;
 }
 
 export interface ExecucaoDeMovimentos extends Omit<Execucao, "resumo"> {

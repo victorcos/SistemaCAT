@@ -86,7 +86,7 @@ class CompetenciaApurada:
     ressarcimento: Decimal = ZERO
     complemento: Decimal = ZERO
     # coluna 27 da Ficha 3, art. 271 do RICMS: só no enquadramento 4, e vem da
-    # coluna 21 — que ainda não é apurada. Fica preparada e zerada, de propósito
+    # coluna 21 — o ICMS próprio das entradas mais recentes (v0.53)
     credito_operacao_propria: Decimal = ZERO
     itens: int = 0
     linhas: int = 0

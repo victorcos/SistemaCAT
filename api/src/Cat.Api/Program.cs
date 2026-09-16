@@ -64,6 +64,8 @@ builder.Services.AddScoped<IRepositorioDeLotes, LoteRepositorio>();
 builder.Services.AddScoped<Lotes>();
 builder.Services.AddScoped<IRepositorioDeExecucoes, ExecucaoRepositorio>();
 builder.Services.AddScoped<Execucoes>();
+builder.Services.AddScoped<IRepositorioDeDePara, DeParaRepositorio>();
+builder.Services.AddScoped<DeParaDoTrabalho>();
 // canal interno com o motor: apagar pasta de trabalho grande leva tempo
 // sem prazo no cliente: cada chamada ao motor tem o seu, porque inspecionar
 // milhares de arquivos na rede leva minutos e apagar uma pasta, segundos
@@ -123,6 +125,7 @@ app.MapearTrabalhos();
 app.MapearHistorico();
 app.MapearLotes();
 app.MapearExecucoes();
+app.MapearDePara();
 // Desde a fatia 7 nada de /api segue ao motor. Rota que não existe responde
 // aqui, com texto em "detail" — o ASP.NET sozinho devolveria 404 de corpo
 // vazio, e a tela mostraria só "erro".

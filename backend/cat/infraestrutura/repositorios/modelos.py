@@ -9,9 +9,11 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
+from decimal import Decimal
+
 from sqlalchemy import (
     JSON, BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Index,
-    Integer, String, Text, UniqueConstraint, func,
+    Integer, Numeric, String, Text, UniqueConstraint, func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -322,3 +324,36 @@ class ExecucaoDB(Base):
     # pacote. Quem grava é a API; o motor só lê
     aprovada_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     aprovada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DeParaDB(Base):
+    """Um par do de-para: o mesmo produto escriturado com outro código.
+
+    É da **empresa**, não do trabalho: o código de compra que o ERP do cliente
+    grava é o mesmo no trabalho de 2021 e no de 2024, e decidir de novo seria
+    repagar a revisão. `cnpj` vazio vale para todos os estabelecimentos.
+
+    `quantidade na origem × fator = quantidade no destino`: 1 kit de três vira
+    3 unidades. `situacao` é `aprovado` (o razão aplica) ou `recusado` (a
+    proposta não volta a aparecer como pendente).
+    """
+
+    __tablename__ = "depara_item"
+    __table_args__ = (UniqueConstraint("empresa_id", "cnpj", "codigo_origem", name="uq_depara_origem"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), nullable=False)
+    cnpj: Mapped[str] = mapped_column(String(14), nullable=False, default="", server_default="")
+    codigo_origem: Mapped[str] = mapped_column(Text, nullable=False)
+    codigo_destino: Mapped[str] = mapped_column(Text, nullable=False)
+    fator: Mapped[Decimal] = mapped_column(Numeric(24, 9), nullable=False, default=1, server_default="1")
+    motivo: Mapped[str] = mapped_column(String(20), nullable=False)
+    situacao: Mapped[str] = mapped_column(String(12), nullable=False)
+    confianca: Mapped[str | None] = mapped_column(String(10))
+    explicacao: Mapped[str | None] = mapped_column(Text)
+    projeto_id: Mapped[int | None] = mapped_column(ForeignKey("projeto.id"))
+    decidido_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    decidido_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, server_default=func.now(), nullable=False,
+    )
+

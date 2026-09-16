@@ -256,11 +256,31 @@ function Resultado({
             <Metrica
               rotulo="Saídas sem item na EFD"
               valor={resumo.saidas_sem_item}
-              nota={`${dinheiro(resumo.valor_saidas_sem_item_st)} com CST 60`}
+              nota={
+                resumo.saidas_completadas_pelo_xml
+                  ? `${numero(resumo.saidas_completadas_pelo_xml)} completadas pelo XML`
+                  : `${dinheiro(resumo.valor_saidas_sem_item_st)} com CST 60`
+              }
               tom="atencao"
             />
           </Metricas>
         </div>
+
+        {(resumo.xml_arquivos ?? 0) > 0 && (
+          <Aviso tom="info" titulo="Itens do XML" className="mt-4">
+            {numero(resumo.xml_documentos ?? 0)} documento(s) lidos de{" "}
+            {numero(resumo.xml_arquivos ?? 0)} XML, com {numero(resumo.xml_itens ?? 0)} item(ns).
+            O XML completou {numero(resumo.saidas_completadas_pelo_xml ?? 0)} saída(s) e{" "}
+            {numero(resumo.entradas_completadas_pelo_xml ?? 0)} entrada(s) escrituradas sem item
+            ({numero(resumo.movimentos_do_xml ?? 0)} movimentos), e ficou ao lado de{" "}
+            {numero(resumo.itens_pareados_com_xml ?? 0)} item(ns) do C170, onde os valores dele
+            vencem na apuração do suportado.
+            {(resumo.xml_repetidos ?? 0) + (resumo.xml_nao_sao_documento ?? 0) > 0 &&
+              ` Fora da conta: ${numero(resumo.xml_repetidos ?? 0)} repetido(s) e ${numero(
+                resumo.xml_nao_sao_documento ?? 0,
+              )} que não são documento (evento, inutilização).`}
+          </Aviso>
+        )}
 
         <Barra de={cobertura} para={100} tom="sucesso" className="mt-4" />
 

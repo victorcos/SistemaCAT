@@ -85,6 +85,14 @@ class TestClassificar:
         assert a.cnpj == "50948371000178"
         assert a.competencia == date(2025, 3, 1)   # a competência é o mês
 
+    def test_cupom_sat_e_documento(self, tmp_path):
+        cupom = ('<?xml version="1.0"?><CFe><infCFe Id="CFe35210611517841003455590009876540012345678901">'
+                 "<ide><mod>59</mod><dEmi>20210615</dEmi></ide><emit><CNPJ>11517841003455</CNPJ></emit>"
+                 "</infCFe></CFe>")
+        a = classificar(escrever(tmp_path, "cupom.xml", cupom, "utf-8"))
+        assert a.tipo is TipoDeArquivo.XML_NFE
+        assert (a.cnpj, a.competencia) == ("11517841003455", date(2021, 6, 1))
+
     def test_xml_que_nao_e_nota_nao_serve(self, tmp_path):
         outro = '<?xml version="1.0"?><procEventoNFe><evento/></procEventoNFe>'
         a = classificar(escrever(tmp_path, "evento.xml", outro, "utf-8"))

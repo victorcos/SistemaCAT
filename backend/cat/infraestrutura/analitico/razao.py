@@ -12,12 +12,13 @@ cada um é, e percorrer.
 |---|---|---|
 | Entrada | apuração da etapa 4 | é onde está o ICMS suportado de cada item |
 | Saída com item na EFD | movimentação da etapa 3 | documento fiscal: vence o relatório |
-| Saída sem item na EFD | relatório de saídas do cliente | cupom e NFC-e vão à EFD só com o analítico |
+| Saída sem item na EFD, com XML | movimentação da etapa 3 (`origem` = xml) | o item do documento: vence o relatório |
+| Saída sem item em lugar nenhum | relatório de saídas do cliente | cupom e NFC-e vão à EFD só com o analítico |
 | Abertura | bloco H da EFD | o inventário do dia anterior ao período |
 
 No Amigão, 36,5 milhões de documentos de saída não têm item na EFD, e a venda
 com item é R$ 6 milhões contra R$ 5,8 bilhões. Sem o relatório não há saída a
-lançar. O XML dos cupons, quando vier, entra como fonte que vence as duas.
+lançar. O XML, quando vem, entra pela etapa 3 e vence o relatório (v0.53).
 
 ## Quais mercadorias
 
@@ -40,6 +41,17 @@ O juiz final da unidade é o inventário: o saldo da ficha em cada data de
 bloco H é comparado com o que o bloco H diz. Diferença do tamanho de um fator
 de embalagem é marcada como suspeita de unidade.
 
+## Confronto dos enquadramentos 2 e 4, e o crédito do art. 271
+
+A coluna 21 é o ICMS da operação própria da entrada. Como a saída não diz de
+que nota veio, vale a regra do item 3.3.8: as entradas mais recentes da ficha,
+até a data da saída, suficientes para a quantidade, com média ponderada — a
+mesma regra que valora a abertura (`valor_da_abertura`). Sem entrada com esse
+valor antes da saída, o confronto fica pendente, contado. No enquadramento 4, a
+coluna 21 também é o crédito do art. 271 (coluna 27). Conferido contra a Ficha 3
+da RVZ na Advertising: 2,15 suportado, 0,63 da entrada, 1,52 de ressarcimento e
+0,63 de crédito.
+
 ## Ficha com estoque negativo sai do total
 
 Estoque negativo é movimento que falta — perda que não veio, mês de relatório
@@ -52,6 +64,16 @@ Decisão do Victor, 15/09/2026: essas fichas **saem do total até os dados
 chegarem**. Continuam gravadas e marcadas (`retirada`), para consulta e
 download, mas não somam ressarcimento, complemento, enquadramento nem
 competência.
+
+## De-para: o mesmo produto com outro código
+
+Com pares aprovados (`Fontes.depara`, um parquet com `cnpj`, `codigo_origem`,
+`codigo_destino` e `fator`), cada lançamento, o estoque de abertura e as
+entradas anteriores passam para o código da mercadoria antes de tudo, e a
+quantidade é multiplicada pelo fator — 1 kit de três vira 3 unidades. A
+alíquota do confronto é a do 0200 do código de origem, e a do destino quando a
+origem não tem cadastro. A Ficha 3 guarda o código de origem em
+`codigo_original`.
 
 ## De qual loja é a saída do relatório
 
@@ -75,6 +97,7 @@ import pyarrow.parquet as pq
 
 from cat.dominio.cat42.enquadramento import (
     CFOP_DEVOLUCAO,
+    CFOP_OUTRAS_X949,
     CFOP_USO_E_CONSUMO,
     VendaAConsumidor,
     classificar,
@@ -178,6 +201,9 @@ ESQUEMA_FICHA3 = pa.schema([
     ("participante", pa.string()),
     ("numero_documento", pa.string()),
     ("serie", pa.string()),
+    # o código como veio da fonte, quando o de-para o trocou pelo da mercadoria
+    ("codigo_original", pa.string()),
+    ("credito_operacao_propria", pa.decimal128(30, 15)),
 ])
 
 ESQUEMA_FICHAS = pa.schema([
@@ -198,6 +224,7 @@ ESQUEMA_FICHAS = pa.schema([
     ("saldo_valor", pa.decimal128(30, 15)),
     ("ressarcimento", pa.decimal128(30, 15)),
     ("complemento", pa.decimal128(30, 15)),
+    ("credito_operacao_propria", pa.decimal128(30, 15)),
     ("ficou_negativo", pa.bool_()),
     # fora do total até os dados chegarem; o ressarcimento dela não é confiável
     ("retirada", pa.bool_()),
@@ -341,6 +368,8 @@ class Fontes:
     # o período do cadastro do trabalho. Sem ele, o da base. Com ele, o que a
     # base tem antes do início não entra na ficha: serve para valorar a abertura
     periodo: tuple[date, date] | None = None
+    # os pares de de-para aprovados: cnpj, codigo_origem, codigo_destino, fator
+    depara: str | None = None
 
 
 class PeriodoSemMovimento(ValueError):
@@ -368,6 +397,9 @@ class ResumoDaMontagem:
     linhas: int = 0
     ressarcimento: Decimal = Decimal(0)
     complemento: Decimal = Decimal(0)
+    credito_operacao_propria: Decimal = Decimal(0)
+    # saídas de enquadramento 2 e 4 confrontadas com o ICMS próprio das entradas
+    confronto_pela_entrada: int = 0
     por_enquadramento: dict = field(default_factory=dict)
     por_competencia: dict = field(default_factory=dict)
     saidas_por_origem: dict = field(default_factory=dict)
@@ -381,6 +413,8 @@ class ResumoDaMontagem:
     icms_da_abertura: Decimal = Decimal(0)
     # fora da ficha por decisão: uso e consumo não é estoque de comercialização
     lancamentos_de_uso_e_consumo: int = 0
+    # fora da ficha por decisão: X.949, outras entradas e saídas (remessa e retorno)
+    lancamentos_x949: int = 0
     fichas_fora_de_sp: int = 0
     relatorio_sem_estabelecimento: int = 0
     relatorio_trocado_pela_efd: int = 0
@@ -395,6 +429,9 @@ class ResumoDaMontagem:
     # saídas confrontadas com a alíquota do 0200 do próprio mês, diferente da
     # do fim do período — antes da revisão da etapa 7, usava-se a do fim
     saidas_com_aliquota_do_mes: int = 0
+    # lançamentos que o de-para passou para outro código, e de quantos códigos
+    linhas_com_depara: int = 0
+    codigos_trocados_pelo_depara: int = 0
     conferencia: dict = field(default_factory=dict)
 
 
@@ -442,6 +479,10 @@ def montar(
             "SELECT count(*) FROM lancamentos WHERE especie = 'saida' AND NOT devolucao "
             "AND aliquota_do_mes_diferente").fetchone()[0]
         resumo.lancamentos_de_uso_e_consumo = info["uso_e_consumo"]
+        resumo.lancamentos_x949 = info["x949"]
+        resumo.linhas_com_depara, resumo.codigos_trocados_pelo_depara = con.execute(
+            "SELECT count(*), count(DISTINCT (cnpj, codigo_original)) FROM lancamentos "
+            "WHERE codigo_original <> codigo").fetchone()
         aberturas = {(c, k): q for c, k, q in con.execute(
             "SELECT cnpj, codigo, quantidade FROM abertura").fetchall()}
         valores = _valorar_aberturas(con, aberturas)
@@ -650,11 +691,17 @@ def _preparar(con, fontes: Fontes) -> dict:
     """Monta a tabela `lancamentos` e a `abertura`. Tudo em SQL, nada calculado."""
     mov = f"read_parquet('{_escapar(os.path.join(fontes.movimentacao, ARQUIVO_MOVIMENTOS))}')"
     sup = f"read_parquet('{_escapar(os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO))}')"
+    colunas_mov = pq.read_schema(os.path.join(fontes.movimentacao, ARQUIVO_MOVIMENTOS)).names
     # etapas de antes da v0.52 não guardam a série do documento: vai vazia
-    serie_mov = "serie" if "serie" in pq.read_schema(
-        os.path.join(fontes.movimentacao, ARQUIVO_MOVIMENTOS)).names else "NULL::VARCHAR"
-    serie_sup = "s.serie" if "serie" in pq.read_schema(
-        os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO)).names else "NULL::VARCHAR"
+    serie_mov = "serie" if "serie" in colunas_mov else "NULL::VARCHAR"
+    # e de antes da v0.53 não têm item do XML: toda saída com item é da EFD
+    origem_mov = "coalesce(fonte_item, 'efd')" if "fonte_item" in colunas_mov else "'efd'"
+    # o indFinal do XML diz se a NF-e foi a consumidor final
+    consumidor_mov = "consumidor_final_xml" if "consumidor_final_xml" in colunas_mov else "NULL::BOOLEAN"
+    colunas_sup = pq.read_schema(os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO)).names
+    serie_sup = "s.serie" if "serie" in colunas_sup else "NULL::VARCHAR"
+    # apuração de antes da v0.53 não guarda o ICMS próprio: o confronto de 2 e 4 fica pendente
+    proprio_sup = "s.icms_proprio" if "icms_proprio" in colunas_sup else "NULL::DECIMAL(18, 6)"
     itens = os.path.join(fontes.movimentacao, ARQUIVO_ITENS)
     conversoes = os.path.join(fontes.movimentacao, ARQUIVO_CONVERSOES)
     inventario = os.path.join(fontes.movimentacao, ARQUIVO_INVENTARIO)
@@ -671,13 +718,24 @@ def _preparar(con, fontes: Fontes) -> dict:
     lista = lambda conj: ", ".join(f"'{c}'" for c in sorted(conj))  # noqa: E731
 
     con.execute(f"CREATE OR REPLACE TABLE estabs AS SELECT DISTINCT cnpj FROM {mov}")
+    if fontes.depara and os.path.isfile(fontes.depara):
+        con.execute(f"""CREATE OR REPLACE TABLE depara AS
+            SELECT cnpj, codigo_origem, any_value(codigo_destino) AS codigo_destino,
+                   any_value(CAST(fator AS DECIMAL(24, 9))) AS fator
+            FROM read_parquet('{_escapar(fontes.depara)}')
+            WHERE codigo_origem <> codigo_destino AND fator > 0
+            GROUP BY cnpj, codigo_origem""")
+    else:
+        con.execute("CREATE OR REPLACE TABLE depara (cnpj VARCHAR, codigo_origem VARCHAR, "
+                    "codigo_destino VARCHAR, fator DECIMAL(24, 9))")
     con.execute(f"""
         CREATE OR REPLACE TABLE saidas_efd AS
         SELECT cnpj, codigo, data, replace(cfop, '.', '') AS cfop, cst_icms, modelo, unidade,
                quantidade, valor, coalesce(valor_icms, 0) + coalesce(valor_st, 0) AS suportado,
                coalesce(nullif(chave, ''), numero_documento) AS documento, chave,
-               false AS pdv, 'efd' AS origem,
-               numero_item, participante, numero_documento, {serie_mov} AS serie
+               false AS pdv, {origem_mov} AS origem,
+               numero_item, participante, numero_documento, {serie_mov} AS serie,
+               {consumidor_mov} AS consumidor_final
         FROM {mov} WHERE operacao = 'saida'
     """)
 
@@ -722,7 +780,7 @@ def _preparar(con, fontes: Fontes) -> dict:
                    -- o relatório não traz nº do item nem código de participante:
                    -- a linha calcula a ficha, mas não vira registro do arquivo digital
                    NULL::INTEGER AS numero_item, '' AS participante, numero_documento,
-                   NULL::VARCHAR AS serie
+                   NULL::VARCHAR AS serie, CASE WHEN pdv THEN true END AS consumidor_final
             FROM rel_com_cnpj
             WHERE cnpj IS NOT NULL
               AND NOT (length(chave) = 44
@@ -734,8 +792,10 @@ def _preparar(con, fontes: Fontes) -> dict:
 
     con.execute(f"""
         CREATE OR REPLACE TABLE codigos AS
-        SELECT DISTINCT codigo FROM {saidas} WHERE right(coalesce(cst_icms, ''), 2) = '60'
-          AND replace(cfop, '.', '') NOT IN ({lista(CFOP_USO_E_CONSUMO)})
+        SELECT DISTINCT coalesce(d.codigo_destino, s.codigo) AS codigo FROM {saidas} s
+        LEFT JOIN depara d ON d.cnpj = s.cnpj AND d.codigo_origem = s.codigo
+        WHERE right(coalesce(s.cst_icms, ''), 2) = '60'
+          AND replace(s.cfop, '.', '') NOT IN ({lista(CFOP_USO_E_CONSUMO | CFOP_OUTRAS_X949)})
     """)
     codigos = con.execute("SELECT count(*) FROM codigos").fetchone()[0]
     if os.path.isfile(itens):
@@ -773,10 +833,12 @@ def _preparar(con, fontes: Fontes) -> dict:
 
     con.execute(f"""
         CREATE OR REPLACE TABLE lancamentos AS
-        SELECT l.*, coalesce(am.aliq_icms, u.aliq_icms) AS aliquota, u.unidade AS unidade_estoque,
+        SELECT l.* REPLACE (coalesce(d.codigo_destino, l.codigo) AS codigo),
+               l.codigo AS codigo_original,
+               coalesce(am.aliq_icms, u.aliq_icms, ud.aliq_icms) AS aliquota, u.unidade AS unidade_estoque,
                (am.aliq_icms IS NOT NULL AND u.aliq_icms IS NOT NULL
                 AND am.aliq_icms <> u.aliq_icms) AS aliquota_do_mes_diferente,
-               {_FATOR.format(t="l")} AS fator, {_SEM_FATOR.format(t="l")} AS sem_fator
+               {_FATOR.format(t="l")} * coalesce(d.fator, 1) AS fator, {_SEM_FATOR.format(t="l")} AS sem_fator
         FROM (
             SELECT s.cnpj, s.codigo, s.data, replace(s.cfop, '.', '') AS cfop, s.cst_icms, s.modelo,
                    ue.unidade,
@@ -786,7 +848,8 @@ def _preparar(con, fontes: Fontes) -> dict:
                    CASE WHEN replace(s.cfop, '.', '') IN ({lista(_DEVOLUCAO_DE_VENDA)}) THEN 'saida' ELSE 'entrada' END AS especie,
                    replace(s.cfop, '.', '') IN ({lista(_DEVOLUCAO_DE_VENDA)}) AS devolucao,
                    1 AS prioridade,
-                   s.chave, s.numero_item, s.participante, s.numero_documento, {serie_sup} AS serie
+                   s.chave, s.numero_item, s.participante, s.numero_documento, {serie_sup} AS serie,
+                   NULL::BOOLEAN AS consumidor_final, {proprio_sup} AS icms_proprio
             FROM {sup} s
             LEFT JOIN unidade_das_entradas ue
               ON ue.cnpj = s.cnpj AND ue.chave = s.chave AND ue.numero_documento = s.numero_documento
@@ -797,14 +860,17 @@ def _preparar(con, fontes: Fontes) -> dict:
                    CASE WHEN s.cfop IN ({lista(_DEVOLUCAO_DE_COMPRA)}) THEN 'entrada' ELSE 'saida' END,
                    s.cfop IN ({lista(_DEVOLUCAO_DE_COMPRA)}),
                    2,
-                   s.chave, s.numero_item, s.participante, s.numero_documento, s.serie
+                   s.chave, s.numero_item, s.participante, s.numero_documento, s.serie, s.consumidor_final,
+                   NULL::DECIMAL(18, 6) AS icms_proprio
             FROM {saidas} s
         ) l
         LEFT JOIN unid u ON u.cnpj = l.cnpj AND u.codigo = l.codigo
         LEFT JOIN aliq_mes am ON am.cnpj = l.cnpj AND am.codigo = l.codigo
                              AND am.competencia = date_trunc('month', l.data)::DATE
         LEFT JOIN conv cv ON cv.cnpj = l.cnpj AND cv.codigo = l.codigo AND cv.unidade = upper(trim(l.unidade))
-        WHERE l.codigo IN (SELECT codigo FROM codigos)
+        LEFT JOIN depara d ON d.cnpj = l.cnpj AND d.codigo_origem = l.codigo
+        LEFT JOIN unid ud ON ud.cnpj = l.cnpj AND ud.codigo = d.codigo_destino
+        WHERE coalesce(d.codigo_destino, l.codigo) IN (SELECT codigo FROM codigos)
           AND l.cnpj IN (SELECT cnpj FROM estabs)
           AND l.data BETWEEN DATE '{inicio}' AND DATE '{fim}'
     """)
@@ -813,6 +879,10 @@ def _preparar(con, fontes: Fontes) -> dict:
         f"SELECT count(*) FROM lancamentos WHERE cfop IN ({lista(CFOP_USO_E_CONSUMO)})").fetchone()[0]
     if uso_e_consumo:
         con.execute(f"DELETE FROM lancamentos WHERE cfop IN ({lista(CFOP_USO_E_CONSUMO)})")
+    # X.949 também: remessa e retorno não são compra nem venda
+    x949 = con.execute(f"SELECT count(*) FROM lancamentos WHERE cfop IN ({lista(CFOP_OUTRAS_X949)})").fetchone()[0]
+    if x949:
+        con.execute(f"DELETE FROM lancamentos WHERE cfop IN ({lista(CFOP_OUTRAS_X949)})")
 
     abertura_em = None
     if os.path.isfile(inventario):
@@ -823,14 +893,17 @@ def _preparar(con, fontes: Fontes) -> dict:
     if abertura_em is not None:
         con.execute(f"""
             CREATE OR REPLACE TABLE abertura AS
-            SELECT v.cnpj, v.codigo, sum(v.quantidade * {_FATOR.format(t="v")}) AS quantidade,
+            SELECT v.cnpj, coalesce(d.codigo_destino, v.codigo) AS codigo,
+                   sum(v.quantidade * {_FATOR.format(t="v")} * coalesce(d.fator, 1)) AS quantidade,
                    bool_or({_SEM_FATOR.format(t="v")}) AS sem_fator
             FROM read_parquet('{_escapar(inventario)}') v
             LEFT JOIN unid u ON u.cnpj = v.cnpj AND u.codigo = v.codigo
             LEFT JOIN conv cv ON cv.cnpj = v.cnpj AND cv.codigo = v.codigo AND cv.unidade = upper(trim(v.unidade))
+            LEFT JOIN depara d ON d.cnpj = v.cnpj AND d.codigo_origem = v.codigo
             WHERE v.data_inventario = DATE '{abertura_em}'
-              AND v.codigo IN (SELECT codigo FROM codigos) AND v.cnpj IN (SELECT cnpj FROM estabs)
-            GROUP BY v.cnpj, v.codigo HAVING sum(v.quantidade) <> 0
+              AND coalesce(d.codigo_destino, v.codigo) IN (SELECT codigo FROM codigos)
+              AND v.cnpj IN (SELECT cnpj FROM estabs)
+            GROUP BY v.cnpj, coalesce(d.codigo_destino, v.codigo) HAVING sum(v.quantidade) <> 0
         """)
     else:
         con.execute("CREATE OR REPLACE TABLE abertura (cnpj VARCHAR, codigo VARCHAR, "
@@ -843,9 +916,10 @@ def _preparar(con, fontes: Fontes) -> dict:
     if abertura_em is not None:
         con.execute(f"""
             CREATE OR REPLACE TABLE anteriores AS
-            SELECT e.cnpj, e.codigo, e.data, coalesce(e.chave, '') AS chave,
+            SELECT e.cnpj, coalesce(d.codigo_destino, e.codigo) AS codigo, e.data, coalesce(e.chave, '') AS chave,
                    coalesce(e.numero_item, 0) AS numero_item,
-                   e.quantidade * {_FATOR.format(t="e")} AS quantidade, coalesce(e.suportado, 0) AS suportado
+                   e.quantidade * {_FATOR.format(t="e")} * coalesce(d.fator, 1) AS quantidade,
+                   coalesce(e.suportado, 0) AS suportado
             FROM (
                 SELECT s.cnpj, s.codigo, s.data, s.cfop, s.chave, s.numero_item, s.quantidade, s.suportado,
                        ue.unidade
@@ -857,10 +931,12 @@ def _preparar(con, fontes: Fontes) -> dict:
             ) e
             LEFT JOIN unid u ON u.cnpj = e.cnpj AND u.codigo = e.codigo
             LEFT JOIN conv cv ON cv.cnpj = e.cnpj AND cv.codigo = e.codigo AND cv.unidade = upper(trim(e.unidade))
+            LEFT JOIN depara d ON d.cnpj = e.cnpj AND d.codigo_origem = e.codigo
             WHERE replace(e.cfop, '.', '') NOT IN ({lista(_DEVOLUCAO_DE_VENDA)})
-              AND replace(e.cfop, '.', '') NOT IN ({lista(CFOP_USO_E_CONSUMO)})
+              AND replace(e.cfop, '.', '') NOT IN ({lista(CFOP_USO_E_CONSUMO | CFOP_OUTRAS_X949)})
               AND e.quantidade > 0
-              AND EXISTS (SELECT 1 FROM abertura a WHERE a.cnpj = e.cnpj AND a.codigo = e.codigo)
+              AND EXISTS (SELECT 1 FROM abertura a
+                          WHERE a.cnpj = e.cnpj AND a.codigo = coalesce(d.codigo_destino, e.codigo))
         """)
     else:
         con.execute("CREATE OR REPLACE TABLE anteriores (cnpj VARCHAR, codigo VARCHAR, data DATE, chave VARCHAR, "
@@ -868,7 +944,7 @@ def _preparar(con, fontes: Fontes) -> dict:
 
     return {"inicio": inicio, "fim": fim, "abertura_em": abertura_em, "codigos": codigos,
             "sem_estabelecimento": sem_estab, "trocado_pela_efd": trocado,
-            "abertura_sem_fator": abertura_sem_fator, "uso_e_consumo": uso_e_consumo,
+            "abertura_sem_fator": abertura_sem_fator, "uso_e_consumo": uso_e_consumo, "x949": x949,
             "base_inicio": base_inicio, "base_fim": base_fim}
 
 
@@ -877,24 +953,28 @@ def _preparar(con, fontes: Fontes) -> dict:
 # ---------------------------------------------------------------------------
 def _enquadrar(linha: dict, venda_a_consumidor: VendaAConsumidor) -> tuple[EnquadramentoLegal | None, bool]:
     enq = classificar(linha["cfop"] or "", linha["cst_icms"] or "",
-                      consumidor_final=True if linha["pdv"] else None,
+                      consumidor_final=True if linha["pdv"] else linha.get("consumidor_final"),
                       modelo=linha["modelo"] or "",
                       venda_a_consumidor=venda_a_consumidor)
     return enq, enq is None
 
 
-def _confronto(enq: EnquadramentoLegal, linha: dict) -> tuple[Decimal | None, bool, bool]:
+def _confronto(enq: EnquadramentoLegal, linha: dict,
+               entradas: list[EntradaAnterior] | None = None) -> tuple[Decimal | None, bool, bool]:
     """(ICMS efetivo, faltou alíquota, confronto pendente).
 
     Enquadramentos 1 e 3 confrontam com a alíquota interna vezes o valor da
     saída (leiaute, VL_CONFR). Os 2 e 4 confrontam com o ICMS da operação
-    própria da entrada, que ainda não é acompanhado por item: ficam pendentes,
-    contados, sem ressarcimento inventado.
+    própria das entradas mais recentes da ficha até a saída (item 3.3.8); sem
+    entrada com esse valor, ficam pendentes, contados, sem ressarcimento inventado.
     """
     if not enq.gera_ressarcimento:
         return None, False, False
     if not enq.confronta_com_saida:
-        return None, False, True
+        if not entradas:
+            return None, False, True
+        quantidade = Decimal(linha["quantidade"] or 0) * Decimal(linha["fator"] or 1)
+        return valor_da_abertura(abs(quantidade), entradas).valor.quantize(_Q6), False, False
     aliquota = linha["aliquota"]
     valor = linha["valor"]
     if not aliquota or valor is None:
@@ -914,6 +994,8 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
     atual: tuple[str, str] | None = None
     movimentos: list[Movimento] = []
     extras: list[tuple] = []   # (indefinido, faltou alíquota, conversão, documento) por movimento
+    # as entradas da ficha lidas até aqui, com o ICMS próprio: o confronto de 2 e 4
+    entradas_da_ficha: list[EntradaAnterior] = []
     andamento = Andamento(total=total)
     vistos: set[tuple[str, str]] = set()
 
@@ -926,7 +1008,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         razao.lancar_varios(movimentos)
         linhas = razao.apurar()
         indice = {id(m): x for m, x in zip(movimentos, extras)}
-        entradas = saidas = ressarc = compl = Decimal(0)
+        entradas = saidas = ressarc = compl = credito = Decimal(0)
         # estoque negativo em qualquer linha tira a ficha do total
         negativo = any(ln.saldo_quantidade < 0 for ln in linhas)
         retirada = negativo
@@ -947,19 +1029,22 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                     chave_enq = "indefinido" if indefinido else str(int(m.enquadramento))
                     e = resumo.por_enquadramento.setdefault(chave_enq, {
                         "linhas": 0, "quantidade": Decimal(0), "suportado": Decimal(0),
-                        "confronto": Decimal(0), "ressarcimento": Decimal(0), "complemento": Decimal(0)})
+                        "confronto": Decimal(0), "ressarcimento": Decimal(0), "complemento": Decimal(0),
+                        "credito": Decimal(0)})
                     e["linhas"] += 1
                     e["quantidade"] += m.quantidade
                     e["suportado"] += abs(ln.icms_suportado)
                     e["confronto"] += m.icms_efetivo or Decimal(0)
                     e["ressarcimento"] += ln.ressarcimento
                     e["complemento"] += ln.complemento
+                    e["credito"] += ln.credito_operacao_propria
                     origem = resumo.saidas_por_origem.setdefault(m.origem, 0)
                     resumo.saidas_por_origem[m.origem] = origem + 1
             sem_aliq += faltou
             indef += indefinido
             ressarc += ln.ressarcimento
             compl += ln.complemento
+            credito += ln.credito_operacao_propria
             if not retirada:
                 c = resumo.por_competencia.setdefault(competencia, {
                     "linhas": 0, "ressarcimento": Decimal(0), "complemento": Decimal(0)})
@@ -984,6 +1069,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                        ("saldo_quantidade", (ultima.saldo_quantidade if ultima else qtd_abertura).quantize(_Q6)),
                        ("saldo_valor", (ultima.saldo_valor if ultima else valor_abertura).quantize(_Q15)),
                        ("ressarcimento", ressarc.quantize(_Q15)), ("complemento", compl.quantize(_Q15)),
+                       ("credito_operacao_propria", credito.quantize(_Q15)),
                        ("ficou_negativo", negativo), ("retirada", retirada),
                        ("saidas_sem_aliquota", sem_aliq),
                        ("saidas_indefinidas", indef), ("linhas_sem_fator", sem_fator)):
@@ -998,6 +1084,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         else:
             resumo.ressarcimento += ressarc
             resumo.complemento += compl
+            resumo.credito_operacao_propria += credito
         resumo.saidas_sem_aliquota += sem_aliq
         resumo.saidas_indefinidas += indef
         resumo.fichas_negativas += negativo
@@ -1023,11 +1110,15 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                 if chave != atual:
                     if atual is not None:
                         fechar(atual)
-                    atual, movimentos, extras = chave, [], []
+                    atual, movimentos, extras, entradas_da_ficha = chave, [], [], []
                 m, indefinido, faltou, pendente, conversao = _movimento(
-                    linha, len(movimentos), resumo, venda_a_consumidor)
+                    linha, len(movimentos), resumo, venda_a_consumidor, entradas_da_ficha)
                 if m is None:
                     continue
+                if (m.especie is Especie.ENTRADA and not m.devolucao and linha.get("icms_proprio") is not None
+                        and m.quantidade > 0):
+                    entradas_da_ficha.append(EntradaAnterior(m.data, m.quantidade, Decimal(linha["icms_proprio"]),
+                                                             len(entradas_da_ficha)))
                 resumo.confronto_pendente += pendente
                 movimentos.append(m)
                 extras.append((indefinido, faltou, conversao, _documento(linha)))
@@ -1052,14 +1143,18 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
 
 
 def _documento(linha: dict) -> tuple:
-    """(chave, nº do item, modelo, participante, número, série) — o que o arquivo digital pede."""
+    """(chave, nº do item, modelo, participante, número, série, código de origem) — o
+    que o arquivo digital pede, e de que código a linha veio."""
+    original = linha.get("codigo_original")
     return ((linha.get("chave") or "").strip(), linha.get("numero_item"),
             (linha.get("modelo") or "").strip(), (linha.get("participante") or "").strip(),
-            (linha.get("numero_documento") or "").strip(), (linha.get("serie") or "").strip())
+            (linha.get("numero_documento") or "").strip(), (linha.get("serie") or "").strip(),
+            original if original and original != linha.get("codigo") else None)
 
 
 def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
-               venda_a_consumidor: VendaAConsumidor = VendaAConsumidor.ENQUADRAMENTO_1):
+               venda_a_consumidor: VendaAConsumidor = VendaAConsumidor.ENQUADRAMENTO_1,
+               entradas_da_ficha: list[EntradaAnterior] | None = None):
     """Converte um lançamento em `Movimento`. Devolve (movimento, indefinido,
     faltou alíquota, confronto pendente, (unidade de origem, fator, sem fator))."""
     especie = Especie.ENTRADA if linha["especie"] == "entrada" else Especie.SAIDA
@@ -1077,7 +1172,9 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
         classificado, indefinido = _enquadrar(linha, venda_a_consumidor)
         if classificado is not None:
             enq = classificado
-            efetivo, faltou, pendente = _confronto(enq, linha)
+            efetivo, faltou, pendente = _confronto(enq, linha, entradas_da_ficha)
+            if efetivo is not None and not enq.confronta_com_saida:
+                resumo.confronto_pela_entrada += 1
     try:
         m = Movimento(
             data=linha["data"],
@@ -1133,6 +1230,8 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conve
     lote["participante"].append(doc[3])
     lote["numero_documento"].append(doc[4])
     lote["serie"].append(doc[5] if len(doc) > 5 else "")
+    lote["codigo_original"].append(doc[6] if len(doc) > 6 else None)
+    lote["credito_operacao_propria"].append(ln.credito_operacao_propria.quantize(_Q15))
 
 
 # ---------------------------------------------------------------------------
@@ -1233,6 +1332,8 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
         "linhas": resumo.linhas,
         "ressarcimento": texto(resumo.ressarcimento),
         "complemento": texto(resumo.complemento),
+        "credito_operacao_propria": texto(resumo.credito_operacao_propria),
+        "confronto_pela_entrada": resumo.confronto_pela_entrada,
         # fora do total até os dados chegarem: o valor delas não é confiável
         "retiradas": {
             "fichas": resumo.fichas_retiradas,
@@ -1244,7 +1345,7 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
             {"codigo": k, "rotulo": rotulos.get(k, k), "linhas": v["linhas"],
              "quantidade": texto(v["quantidade"]), "suportado": texto(v["suportado"]),
              "confronto": texto(v["confronto"]), "ressarcimento": texto(v["ressarcimento"]),
-             "complemento": texto(v["complemento"])}
+             "complemento": texto(v["complemento"]), "credito": texto(v.get("credito", 0))}
             for k, v in sorted(resumo.por_enquadramento.items(),
                                key=lambda kv: ("1", "2", "3", "4", "0", "indefinido").index(kv[0]))
         ],
@@ -1264,6 +1365,8 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
             "fichas_fora_de_sp": resumo.fichas_fora_de_sp,
             "relatorio_sem_estabelecimento": resumo.relatorio_sem_estabelecimento,
             "relatorio_trocado_pela_efd": resumo.relatorio_trocado_pela_efd,
+            "linhas_com_depara": resumo.linhas_com_depara,
+            "codigos_trocados_pelo_depara": resumo.codigos_trocados_pelo_depara,
             "quantidade_negativa": resumo.quantidade_negativa,
             "linhas_unidade_sem_fator": resumo.linhas_unidade_sem_fator,
             "abertura_sem_fator": resumo.abertura_sem_fator,
@@ -1279,6 +1382,6 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
             "fichas_sem_valor": resumo.fichas_abertura_sem_valor,
             "icms": texto(resumo.icms_da_abertura),
         },
-        "fora_da_ficha": {"uso_e_consumo": resumo.lancamentos_de_uso_e_consumo},
+        "fora_da_ficha": {"uso_e_consumo": resumo.lancamentos_de_uso_e_consumo, "x949": resumo.lancamentos_x949},
         "conferencia_inventario": resumo.conferencia,
     }

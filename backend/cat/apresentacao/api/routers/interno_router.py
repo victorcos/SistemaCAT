@@ -46,6 +46,7 @@ from cat.aplicacao.casos_de_uso import (
     rodada,
 )
 from cat.aplicacao.casos_de_uso.analisar_remessa import RemessaAnalisada, analisar
+from cat.aplicacao.casos_de_uso import depara_do_trabalho
 from cat.aplicacao.casos_de_uso.historico_do_projeto import TrabalhoParado
 from cat.aplicacao.casos_de_uso.inspecionar_lote import (
     PastaInvalida,
@@ -622,6 +623,27 @@ def estabelecimentos_da_entrega(pedido: PedidoDeEstabelecimentos,
     with contexto(etapa=montar_entrega.ETAPA, execucao_id=execucao.id):
         return _traduzir_leitura(lambda: analitico_entrega.estabelecimentos(
             execucao.pasta_de_trabalho or "", pedido.so, pedido.busca, pedido.pagina, pedido.por_pagina))
+
+
+# ---------------------------------------------------------------------------
+# De-para: o que o sistema propõe e o que já foi decidido
+# ---------------------------------------------------------------------------
+class PedidoDeDePara(BaseModel):
+    projeto_id: int
+
+
+@router.post("/depara/candidatos", dependencies=[Depends(exigir_segredo)])
+def candidatos_de_depara(pedido: PedidoDeDePara, sessao: Annotated[Session, Depends(obter_sessao)]) -> dict:
+    with contexto(etapa="depara", projeto_id=pedido.projeto_id):
+        try:
+            return depara_do_trabalho.candidatos_do_projeto(pedido.projeto_id, sessao)
+        except LookupError as erro:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, str(erro)) from erro
+        except depara_do_trabalho.SemMovimentacao as erro:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)) from erro
+        except FileNotFoundError:
+            raise HTTPException(status.HTTP_410_GONE,
+                                "Os arquivos da última movimentação não estão mais em disco. Rode de novo.") from None
 
 
 # ---------------------------------------------------------------------------

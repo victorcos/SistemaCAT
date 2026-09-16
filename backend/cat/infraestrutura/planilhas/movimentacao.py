@@ -47,6 +47,12 @@ COLUNAS_MOVIMENTOS = (
     Coluna("classificacao", "Conferência", "texto", 30),
     Coluna("registro", "Registro", "texto", 9),
     Coluna("arquivo", "Arquivo da EFD", "texto", 34),
+    Coluna("fonte_item", "Item de", "texto", 8),
+    Coluna("codigo_xml", "Código no XML", "texto", 16),
+    Coluna("gtin_xml", "GTIN no XML", "texto", 16),
+    Coluna("valor_st_xml", "ICMS-ST no XML", "numero", 14),
+    Coluna("retido_xml", "Retido informado no XML", "numero", 14),
+    Coluna("arquivo_xml", "Arquivo do XML", "texto", 34),
 )
 
 COLUNAS_ITENS = (

@@ -121,6 +121,9 @@ ESQUEMA_SUPORTADO = pa.schema([
     ("quantidade", pa.decimal128(18, 5)),
     ("bc_st", pa.decimal128(18, 6)),
     ("suportado", pa.decimal128(18, 6)),   # ver a nota do ESQUEMA_RETIDO
+    # o ICMS da operação própria da entrada (o do XML vence o do C170): é a coluna 21
+    # da Ficha 3, o confronto dos enquadramentos 2 e 4
+    ("icms_proprio", pa.decimal128(18, 6)),
     ("fonte", pa.string()),
     ("pendencia", pa.string()),
     ("motivo", pa.string()),
@@ -386,8 +389,22 @@ def apurar(
 
     tem_retido = os.path.isfile(retido)
     tem_cadastro = os.path.isfile(cadastro)
+    colunas = pq.read_schema(movimentos).names
     # movimentação de antes da v0.52 não tem a série: fica vazia
-    tem_serie = "serie" in pq.read_schema(movimentos).names
+    tem_serie = "serie" in colunas
+    # nem o XML ao lado do C170 (v0.53). Com ele, o XML vence: o destacado da
+    # nota e o retido que ela informa valem mais que o C170 e que o relatório
+    tem_xml = "valor_st_xml" in colunas
+    informado = "r.informado" if tem_retido else "NULL"
+    if tem_xml:
+        valores = (f"coalesce(m.valor_icms_xml, m.valor_icms) AS valor_icms, "
+                   f"coalesce(m.valor_st_xml, m.valor_st) AS valor_st, "
+                   f"coalesce(m.fcp_st_xml, 0) AS fcp_st, coalesce(m.bc_st_xml, m.bc_st) AS bc_st, "
+                   f"coalesce(m.retido_xml, {informado}) AS informado, "
+                   f"m.codigo_xml IS NOT NULL AS valor_do_xml, m.retido_xml IS NOT NULL AS informado_do_xml")
+    else:
+        valores = (f"m.valor_icms, m.valor_st, 0 AS fcp_st, m.bc_st, {informado} AS informado, "
+                   "false AS valor_do_xml, false AS informado_do_xml")
     con = _abrir(destino)
     try:
         con.execute(f"""
@@ -396,8 +413,7 @@ def apurar(
                    m.participante, {'m.serie' if tem_serie else 'NULL::VARCHAR'} AS serie,
                    m.data, m.cfop, m.numero_item,
                    m.codigo, m.descricao, m.cst_icms,
-                   m.quantidade, m.valor_icms, m.valor_st, m.bc_st,
-                   {'r.informado' if tem_retido else 'NULL'} AS informado,
+                   m.quantidade, {valores},
                    {'i.aliq_icms' if tem_cadastro else 'NULL'} AS aliquota
             FROM read_parquet('{_escapar(movimentos)}') m
             {f"LEFT JOIN read_parquet('{_escapar(retido)}') r"
@@ -415,6 +431,11 @@ def apurar(
         # conexão limpa, 2
         con.close()
         con = _abrir(destino)
+        # e com metade do fôlego: o agrupamento por documento foi o que caiu por
+        # falta de memória no Amigão (#55, 16/09/2026), com a máquina em 4 GB
+        # livres. Menos linhas de execução e teto menor derramam em disco em vez
+        # de pedir ao sistema o que ele não tem
+        _economizar(con)
         _indexar_documentos(con, saida, os.path.join(destino, ARQUIVO_DOCUMENTOS))
     except ApuracaoCancelada:
         # meio parquet no disco seria lido depois como apuração inteira
@@ -459,11 +480,16 @@ def _percorrer(con, saida: str, avisar: Aviso | None,
                     cst_icms=d["cst_icms"][i] or "",
                     valor_icms=d["valor_icms"][i] or Decimal(0),
                     valor_st=d["valor_st"][i] or Decimal(0),
+                    fcp_st=Decimal(d["fcp_st"][i] or 0),
                     bc_st=d["bc_st"][i] or Decimal(0),
                     retido_informado=d["informado"][i],
                     aliquota_interna=d["aliquota"][i],
                 ))
                 resumo.somar(r)
+                if d["valor_do_xml"][i]:
+                    resumo.itens_com_valor_do_xml += 1
+                if d["informado_do_xml"][i] and r.fonte is Fonte.INFORMADO_PELO_FORNECEDOR:
+                    resumo.itens_com_retido_do_xml += 1
                 lote.acrescentar(d, i, r)
                 estabelecimentos.add(d["cnpj"][i])
             if lote.cheio:
@@ -507,6 +533,19 @@ _AGREGADO_DO_DOCUMENTO = """
 """
 
 
+def _economizar(con) -> None:
+    """Metade das linhas de execução e da memória da conexão, no mínimo 1 e 1 GB."""
+    cfg = obter_config()
+    threads = max(1, (cfg.threads_analiticas or 4) // 2)
+    texto = (cfg.memoria_analitica or "4GB").strip().upper()
+    try:
+        gb = float(texto.removesuffix("GB").removesuffix("GIB"))
+    except ValueError:
+        gb = 4.0
+    con.execute(f"SET threads = {threads}")
+    con.execute(f"SET memory_limit = '{max(1.0, gb / 2):g}GB'")
+
+
 def _indexar_documentos(con, saida: str, destino: str) -> None:
     """Agrupa por documento uma vez, e a tela só pagina.
 
@@ -515,23 +554,69 @@ def _indexar_documentos(con, saida: str, destino: str) -> None:
     na ordem da tela, e o arquivo sai ordenado por ela — uma página vira um
     intervalo de `ordem`, que o parquet acha pelas estatísticas do grupo de
     linhas sem ler o resto.
+
+    **Sem `mode()`.** O CST e a fonte que mais pesam saem de contagens e de
+    `arg_max` sobre número pequeno. O `mode()` guarda uma tabela por documento
+    fora do controle de memória do DuckDB: no Amigão (8,7 milhões de itens) o
+    agrupamento passou de 8 GB com teto de 2 GB, e a apuração caiu duas vezes
+    por falta de memória (#55 e #56, 16/09/2026). Contagem e `arg_max` derramam
+    em disco como o resto.
     """
-    fonte = f"(SELECT *, {_DOCUMENTO} AS documento FROM read_parquet('{_escapar(saida)}'))"
+    fontes = list(CODIGO_DA_FONTE.values())
+    numero = "CASE fonte " + " ".join(f"WHEN '{f}' THEN {i}" for i, f in enumerate(fontes)) + " END"
+    texto = lambda coluna: ("CASE " + coluna + " " + " ".join(  # noqa: E731
+        f"WHEN {i} THEN '{f}'" for i, f in enumerate(fontes)) + " END")
+    con.execute(f"""
+        CREATE OR REPLACE TABLE idx_base AS
+        SELECT {_DOCUMENTO} AS documento, chave, numero_documento, modelo, competencia, participante,
+               bc_st, suportado, right(coalesce(cst_icms, ''), 2) AS cst, {numero} AS f
+        FROM read_parquet('{_escapar(saida)}')
+    """)
+    con.execute("""
+        CREATE OR REPLACE TABLE idx_cst AS
+        SELECT documento, f, cst, count(*) AS n FROM idx_base GROUP BY documento, f, cst
+    """)
+    agregado = """
+        any_value(chave) AS chave, any_value(numero_documento) AS numero_documento,
+        any_value(modelo) AS modelo, min(competencia) AS competencia,
+        any_value(participante) AS participante,
+        count(*) AS itens, sum(bc_st) AS bc_st, sum(suportado) AS suportado
+    """
+    con.execute(f"""
+        CREATE OR REPLACE TABLE idx_juntos AS
+        WITH geral AS (
+            SELECT documento, {agregado}, arg_max(f, suportado) AS f_valor FROM idx_base GROUP BY documento
+        ), cst_geral AS (
+            SELECT documento, arg_max(cst, n) AS cst
+            FROM (SELECT documento, cst, sum(n) AS n FROM idx_cst GROUP BY documento, cst) GROUP BY documento
+        ), fonte_geral AS (
+            SELECT documento, arg_max(f, n) AS f_itens
+            FROM (SELECT documento, f, sum(n) AS n FROM idx_cst GROUP BY documento, f) GROUP BY documento
+        ), por_fonte AS (
+            SELECT f, documento, {agregado} FROM idx_base GROUP BY f, documento
+        ), cst_por_fonte AS (
+            SELECT f, documento, arg_max(cst, n) AS cst FROM idx_cst GROUP BY f, documento
+        )
+        SELECT NULL::VARCHAR AS filtro_fonte, g.documento, g.chave, g.numero_documento, g.modelo,
+               g.competencia, g.participante, g.itens, g.bc_st, g.suportado, c.cst,
+               {texto("g.f_valor")} AS fonte_valor, {texto("fg.f_itens")} AS fonte_itens
+        FROM geral g JOIN cst_geral c USING (documento) JOIN fonte_geral fg USING (documento)
+        UNION ALL
+        SELECT {texto("p.f")}, p.documento, p.chave, p.numero_documento, p.modelo,
+               p.competencia, p.participante, p.itens, p.bc_st, p.suportado, c.cst,
+               {texto("p.f")}, {texto("p.f")}
+        FROM por_fonte p JOIN cst_por_fonte c ON c.f = p.f AND c.documento = p.documento
+    """)
     con.execute(f"""
         COPY (
-            WITH juntos AS (
-                SELECT NULL::VARCHAR AS filtro_fonte, {_AGREGADO_DO_DOCUMENTO}
-                FROM {fonte} GROUP BY documento
-                UNION ALL
-                SELECT fonte AS filtro_fonte, {_AGREGADO_DO_DOCUMENTO}
-                FROM {fonte} GROUP BY fonte, documento
-            )
             SELECT *, row_number() OVER (
                        PARTITION BY filtro_fonte ORDER BY competencia, documento) AS ordem
-            FROM juntos
+            FROM idx_juntos
             ORDER BY filtro_fonte NULLS FIRST, ordem
         ) TO '{_escapar(destino)}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 50000)
     """)
+    for tabela in ("idx_juntos", "idx_cst", "idx_base"):
+        con.execute(f"DROP TABLE IF EXISTS {tabela}")
 
 
 def _indice_serve(indice: str) -> bool:
@@ -550,6 +635,7 @@ def reindexar(destino: str) -> None:
     """Regrava o índice por documento de uma apuração já concluída."""
     con = _abrir(destino)
     try:
+        _economizar(con)
         _indexar_documentos(con, os.path.join(destino, ARQUIVO_SUPORTADO),
                             os.path.join(destino, ARQUIVO_DOCUMENTOS))
     finally:
@@ -571,6 +657,7 @@ class _Lote:
                        "descricao", "cst_icms", "quantidade", "bc_st"):
             self.colunas[coluna].append(d[coluna][i])
         self.colunas["suportado"].append(r.valor)
+        self.colunas["icms_proprio"].append(d["valor_icms"][i] or Decimal(0))
         self.colunas["fonte"].append(CODIGO_DA_FONTE[r.fonte])
         self.colunas["pendencia"].append(r.pendencia.value if r.pendencia else None)
         self.colunas["motivo"].append(r.motivo)

@@ -230,7 +230,8 @@ O resumo (`versao: 2`) traz `itens`, `apurados`, `cobertura`, `valor_total`,
 ordem, com `documental` nulo no não apurável), `por_pendencia`
 (`sem_o_que_apurar`, `falta_dado`), `por_cst`, `por_competencia` (com a
 cobertura do mês), `estabelecimentos`, `cst_sem_o_que_apurar`, `iniciada_por`,
-`relatorios` e `log` (`em`, `nivel`, `texto`). Enquanto roda, só `andamento`
+`relatorios` e `log` (`em`, `nivel`, `texto`); desde a v0.53, `itens_com_valor_do_xml` e
+`itens_com_retido_do_xml` (ver §15). Enquanto roda, só `andamento`
 (`itens`, `apurados`, `estabelecimentos`, `total`) e `log`. Valor em dinheiro
 vai como texto, porque Decimal não é JSON.
 
@@ -448,3 +449,72 @@ O detalhe do trabalho (`GET /api/projetos/{id}`) traz `base`: `efds` (EFD
 importadas), `primeira` e `ultima` competência, e `fora_do_periodo` (quantas EFD
 caem fora do período do cadastro, comparando mês, não dia). A tela do trabalho
 avisa quando `fora_do_periodo` é maior que zero.
+
+## 15. Itens do XML (etapa 3)
+
+A extração de movimentos lê, depois das EFD, os arquivos do lote do tipo
+`xml_nfe` — que desde a v0.53 inclui o CF-e SAT (`<CFe>`), e cujo rótulo passou
+a "XML de NF-e ou CF-e". A barra conta EFD e XML juntos; o passo da segunda
+fase é "Lendo os itens dos XML". XML dentro de zip ainda não é lido.
+
+`movimentos.parquet` ganha colunas:
+
+| Coluna | O que é |
+|---|---|
+| `fonte_item` | `efd` (C170/C810) ou `xml` (item que o XML trouxe para documento escriturado sem item) |
+| `codigo_xml`, `gtin_xml`, `descricao_xml`, `ncm_xml`, `cest_xml`, `unidade_xml`, `quantidade_xml` | o item do XML. No C170, só quando casa: mesma chave, mesmo número do item e valor a um centavo |
+| `valor_icms_xml`, `bc_st_xml`, `valor_st_xml`, `fcp_st_xml` | o destacado no XML |
+| `retido_xml` | ICMS suportado antes, como o XML informa no CST 60 (`vICMSSubstituto` + `vICMSSTRet` + `vFCPSTRet`) |
+| `arquivo_xml` | nome do arquivo do XML |
+| `cadastro_da_efd` | o código está no 0200. Sem ele, `descricao`, `codigo_barras`, `ncm` e `cest` vêm do XML |
+
+`consumidor_final_xml` é o `indFinal` da NF-e (NFC-e e CF-e: verdadeiro). Um
+C170 só ganha as colunas do XML quando o item casa pelo número e pela
+quantidade ou pelo valor; pela contagem, só em nota de um item.
+
+O item com `fonte_item = xml` tem `registro = XML` e o documento da EFD
+(estabelecimento, operação, data, participante, número). Documento cancelado ou
+denegado não é completado. Na entrada de terceiros, o `cfop` é o do analítico
+do documento quando é um só, e senão o do XML com o primeiro dígito do lado de
+quem recebeu.
+
+O resumo da etapa 3 ganha `xml_arquivos`, `xml_documentos`, `xml_itens`,
+`xml_repetidos`, `xml_nao_sao_documento`, `xml_ilegiveis`,
+`saidas_completadas_pelo_xml`, `entradas_completadas_pelo_xml`,
+`movimentos_do_xml`, `itens_pareados_com_xml` e `itens_sem_par_no_xml`. Execução
+anterior não tem nenhum deles.
+
+Na etapa 4, quando a movimentação tem as colunas do XML, o valor do XML vence o
+do C170 (`valor_icms`, `valor_st`, `bc_st`, mais o FCP-ST) e o retido do XML
+vence o do relatório do cliente. No razão (etapa 5), a saída que veio do XML
+tem `origem = xml`, e ela também troca a linha do relatório com a mesma chave.
+
+## 16. De-para de códigos
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `GET` | `/api/projetos/{id}/depara` | as propostas da última movimentação concluída e as decisões da empresa. 422 sem movimentação; 410 com o material apagado; 403 fora do escopo |
+| `POST` | `/api/projetos/{id}/depara` | `{"decisoes": [{"cnpj", "origem", "destino", "fator", "motivo", "situacao", "confianca", "explicacao"}]}`, até 5.000; quem escreve. `cnpj` vazio vale para a empresa inteira; `situacao` é `aprovado` ou `recusado`; `motivo` um de `gtin`, `sufixo`, `kit`, `descricao`, `cliente`, `analista`. A mesma origem é atualizada, não duplicada. 422 com decisão inválida ou origem repetida no pedido. Grava `parametro_alterado` com `parametro: depara` |
+
+A resposta do GET traz `resumo` (`pares`, `pendentes`, `aprovados`, `recusados`,
+`sem_par`, `estabelecimentos`), `pares` (`cnpj`, `origem`, `destino`, `fator`,
+`motivos`, `confianca`, `explicacao`, `proposto`, `situacao`, `decidido_por`,
+`decidido_em`, `destino_decidido`, `fator_decidido`) e `sem_par` (código com
+saída e sem origem que nenhuma proposta resolve, até 5.000).
+
+`quantidade na origem × fator = quantidade no destino`. O razão aplica os pares
+aprovados: a Ficha 3 ganha `codigo_original` e o resumo `linhas_com_depara` e
+`codigos_trocados_pelo_depara`; os pares que valeram ficam em `depara.parquet`
+na pasta da rodada.
+
+## 17. Enquadramentos 2 e 4, art. 271 e X.949 (etapas 4 a 6)
+
+A apuração do suportado grava `icms_proprio` (o ICMS da operação própria da
+entrada, o do XML vencendo). O razão confronta as saídas de enquadramento 2 e 4
+com o ICMS próprio das entradas mais recentes da ficha e grava
+`credito_operacao_propria` (coluna 27) na Ficha 3 e nas fichas; o resumo ganha
+`credito_operacao_propria`, `confronto_pela_entrada`, `por_enquadramento[].credito`
+e `fora_da_ficha.x949`. A apuração do período soma o crédito em
+`credito_operacao_propria` e só conta `confronto_pendente` quando a saída ficou
+sem confronto. Apuração e razão de antes da v0.53 continuam lidos: sem as
+colunas, o confronto de 2 e 4 fica pendente como antes.

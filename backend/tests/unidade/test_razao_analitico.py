@@ -497,6 +497,23 @@ class TestAberturaValorada:
         assert (f["abertura_valor"], f["abertura_parcial"]) == (d(20), True)
         assert serializar(r)["pendencias"]["fichas_abertura_parcial"] == 1
 
+    def test_x949_sai_da_ficha_e_fica_contado(self, fontes, tmp_path):
+        """Remessa para armazém (5.949) e o retorno (1.949): nem venda nem compra."""
+        mov = os.path.join(fontes.movimentacao, ARQUIVO_MOVIMENTOS)
+        linhas = pq.read_table(mov).to_pylist()
+        linhas.append({**linhas[1], "cfop": "5949", "quantidade": d(4), "chave": "8" * 44, "numero_documento": "14"})
+        pq.write_table(pa.Table.from_pylist(linhas, schema=pq.read_schema(mov)), mov)
+        sup = os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO)
+        entradas = pq.read_table(sup).to_pylist()
+        entradas.append({**entradas[0], "cfop": "1949", "quantidade": d(4), "chave": "9" * 44})
+        pq.write_table(pa.Table.from_pylist(entradas, schema=pq.read_schema(sup)), sup)
+        destino = tmp_path / "x949"
+        destino.mkdir()
+        r = montar(fontes, str(destino))
+        assert not [l for l in ficha(destino) if l["cfop"] in ("5949", "1949")]
+        assert r.lancamentos_x949 == 2
+        assert serializar(r)["fora_da_ficha"]["x949"] == 2
+
     def test_uso_e_consumo_sai_da_ficha_e_fica_contado(self, fontes, tmp_path):
         acrescentar_linhas(os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO), [
             entrada_anterior(date(2021, 1, 6), 3, 9, 8, cfop="1556")])
@@ -505,7 +522,7 @@ class TestAberturaValorada:
         r = montar(fontes, str(destino))
         assert len(ficha(destino)) == 4
         assert r.lancamentos_de_uso_e_consumo == 1
-        assert serializar(r)["fora_da_ficha"] == {"uso_e_consumo": 1}
+        assert serializar(r)["fora_da_ficha"] == {"uso_e_consumo": 1, "x949": 0}
 
     def test_periodo_do_cadastro_que_nao_cruza_a_base_e_recusado(self, fontes, tmp_path):
         from cat.infraestrutura.analitico.razao import PeriodoSemMovimento  # noqa: PLC0415
@@ -539,3 +556,96 @@ class TestSerieDaLinha:
         assert por_cfop["1403"] == "3"
         # a venda do relatório não tem série; a transferência da EFD de teste também não
         assert por_cfop["5405"] == ""
+
+
+def trocar_codigos(fontes, entrada: str, inventario: str) -> None:
+    """A entrada de 05/01 escriturada com o código de compra; a abertura, com o do kit."""
+    sup = os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO)
+    linhas = pq.read_table(sup).to_pylist()
+    for l in linhas:
+        if l["cfop"] == "1403":
+            l["codigo"] = entrada
+    pq.write_table(pa.Table.from_pylist(linhas, schema=pq.read_schema(sup)), sup)
+    inv = os.path.join(fontes.movimentacao, ARQUIVO_INVENTARIO)
+    linhas = pq.read_table(inv).to_pylist()
+    for l in linhas:
+        if l["data_inventario"] == date(2020, 12, 31):
+            l["codigo"], l["quantidade"] = inventario, d(2)
+    pq.write_table(pa.Table.from_pylist(linhas, schema=pq.read_schema(inv)), inv)
+
+
+class TestDePara:
+    """A mesma conta do cenário, com a entrada no código de compra (X08) e a
+    abertura em kits de cinco (XK5, 2 kits): o de-para junta tudo em X."""
+
+    def test_sem_de_para_a_entrada_e_a_abertura_se_perdem(self, fontes, tmp_path):
+        trocar_codigos(fontes, "X08", "XK5")
+        destino = tmp_path / "sem_depara"
+        destino.mkdir()
+        montar(fontes, str(destino))
+        assert all(l["especie"] == "saida" for l in ficha(destino))
+
+    def test_com_de_para_a_ficha_e_a_mesma_e_guarda_o_codigo_de_origem(self, fontes, tmp_path, montado):
+        esperado = [(l["especie"], l["saldo_quantidade"], l["saldo_valor"]) for l in ficha(montado[0])]
+        trocar_codigos(fontes, "X08", "XK5")
+        depara = tmp_path / "depara.parquet"
+        pq.write_table(pa.Table.from_pylist([
+            {"cnpj": A, "codigo_origem": "X08", "codigo_destino": "X", "fator": d(1)},
+            {"cnpj": A, "codigo_origem": "XK5", "codigo_destino": "X", "fator": d(5)},
+        ]), str(depara))
+        fontes.depara = str(depara)
+        destino = tmp_path / "com_depara"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+        linhas = ficha(destino)
+        assert [(l["especie"], l["saldo_quantidade"], l["saldo_valor"]) for l in linhas] == esperado
+        entrada = next(l for l in linhas if l["especie"] == "entrada")
+        assert (entrada["codigo"], entrada["codigo_original"]) == ("X", "X08")
+        assert all(l["codigo_original"] is None for l in linhas if l is not entrada)
+        assert (r.linhas_com_depara, r.codigos_trocados_pelo_depara) == (1, 1)
+        assert r.ressarcimento == d("1.4")
+        assert Decimal(lista_de_fichas(str(destino))["linhas"][0]["abertura_quantidade"]) == 10
+
+
+def com_venda_para_outro_estado(fontes, icms_proprio_da_entrada):
+    """06/01: 3 un para outro estado (6.102). A entrada de 05/01 passa a dizer o ICMS próprio."""
+    mov = os.path.join(fontes.movimentacao, ARQUIVO_MOVIMENTOS)
+    linhas = pq.read_table(mov).to_pylist()
+    linhas.append({**linhas[1], "cfop": "6102", "quantidade": d(3), "valor": d(45), "chave": "7" * 44,
+                   "numero_documento": "13"})
+    pq.write_table(pa.Table.from_pylist(linhas, schema=pq.read_schema(mov)), mov)
+    sup = os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO)
+    tabela = pq.read_table(sup)
+    proprio = [icms_proprio_da_entrada if l["cfop"] == "1403" else d(0) for l in tabela.to_pylist()]
+    pq.write_table(tabela.append_column("icms_proprio", pa.array(proprio, pa.decimal128(18, 6))), sup)
+
+
+class TestConfrontoPelaEntrada:
+    """Enquadramento 4: suportado baixado 3,00 (unitário 1,00); ICMS próprio da entrada
+    6,00 em 10 un, 0,60 a unidade, 1,80 nas 3 — ressarcimento 1,20 e crédito do art. 271 1,80."""
+
+    def test_confronta_com_o_icms_proprio_das_entradas_e_da_o_credito(self, fontes, tmp_path):
+        com_venda_para_outro_estado(fontes, d(6))
+        destino = tmp_path / "enq4"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP"})
+        venda = next(l for l in ficha(destino) if l["cfop"] == "6102")
+        assert venda["enquadramento"] == 4
+        assert (venda["icms_efetivo"], venda["ressarcimento"], venda["credito_operacao_propria"]) == (
+            d("1.8"), d("1.2"), d("1.8"))
+        assert (r.confronto_pendente, r.confronto_pela_entrada) == (0, 1)
+        assert r.credito_operacao_propria == d("1.8")
+        enq = {e["codigo"]: e for e in serializar(r)["por_enquadramento"]}
+        assert (enq["4"]["ressarcimento"], enq["4"]["credito"]) == ("1.20", "1.80")
+
+    def test_sem_icms_proprio_na_apuracao_fica_pendente(self, fontes, tmp_path):
+        """Apuração de antes da v0.53 não tem a coluna: o confronto de 2 e 4 fica como era."""
+        com_venda_para_outro_estado(fontes, d(6))
+        sup = os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO)
+        pq.write_table(pq.read_table(sup).drop(["icms_proprio"]), sup)
+        destino = tmp_path / "pendente"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP"})
+        venda = next(l for l in ficha(destino) if l["cfop"] == "6102")
+        assert venda["icms_efetivo"] is None and venda["credito_operacao_propria"] == 0
+        assert (r.confronto_pendente, r.credito_operacao_propria) == (1, 0)

@@ -312,7 +312,7 @@ class TestAvisosDoDominio:
                                  entradas_sem_item=0, conferencia_usada=True)
         avisos = "\n".join(r.avisos)
         assert "179.333 nota(s) de entrada de emissão própria" in avisos
-        assert "O item virá do XML" in avisos
+        assert "seguem sem item por falta do XML" in avisos
         assert "de terceiros" not in avisos
 
         r = ResumoDaMovimentacao(entradas_sem_item=7, conferencia_usada=True)

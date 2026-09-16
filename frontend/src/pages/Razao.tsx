@@ -220,6 +220,15 @@ export default function Razao() {
 
       <TrabalhoParado status={p?.status} projetoId={projetoId} />
 
+      <Faixa titulo="De-para de códigos">
+        Entrada escriturada com um código e venda com outro (código do fornecedor, kit, marketplace) vira duas
+        fichas: uma só com entradas e outra negativa, fora do total.{" "}
+        <BotaoLink para={ROTAS.depara(projetoId)} variante="fantasma" tamanho="sm">
+          Revisar o de-para
+        </BotaoLink>{" "}
+        — os pares aprovados entram na próxima montagem.
+      </Faixa>
+
       {p && (
         <EscolhaDaVendaAConsumidor
           projeto={p}
@@ -355,12 +364,12 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: Re
         { n: pend.fichas_fora_de_sp, texto: "fichas de estabelecimento fora de SP — a CAT 42 é paulista, elas não entram no pedido", tom: "atencao" as Tom },
         { n: pend.fichas_abertura_sem_valor, texto: "fichas abertas com quantidade e sem ICMS suportado: o inventário não traz o imposto e a base não tem entrada anterior ao inventário para valorar a abertura (item 3.3.8) — importe as EFD dos meses antes do período", tom: "atencao" as Tom },
         { n: pend.fichas_abertura_parcial ?? 0, texto: "fichas com a abertura valorada só em parte: as entradas anteriores ao inventário não cobriram a quantidade, e o resto foi pela média delas", tom: "atencao" as Tom },
-        { n: pend.confronto_pendente, texto: "saídas de enquadramento 2 ou 4: o confronto com o ICMS da entrada ainda não é apurado", tom: "atencao" as Tom },
+        { n: pend.confronto_pendente, texto: "saídas de enquadramento 2 ou 4 sem entrada anterior com o ICMS próprio: sem confronto, sem ressarcimento", tom: "atencao" as Tom },
         { n: pend.saidas_sem_aliquota, texto: "saídas sem alíquota interna no cadastro: sem confronto, sem ressarcimento", tom: "atencao" as Tom },
         { n: resumo.retiradas?.fichas ?? pend.fichas_negativas, texto: "fichas retiradas do total até os dados chegarem: o estoque ficou negativo — falta entrada, abertura ou algum tipo de saída (perdas, meses do relatório, produção)", tom: "atencao" as Tom },
         { n: pend.saidas_indefinidas, texto: "saídas com enquadramento indefinido (nota modelo 55 sem dizer quem comprou)", tom: "atencao" as Tom },
         { n: pend.relatorio_sem_estabelecimento, texto: "linhas do relatório de saídas sem loja identificável ficaram de fora", tom: "atencao" as Tom },
-        { n: pend.relatorio_trocado_pela_efd, texto: "linhas do relatório trocadas pela nota com item da EFD, que vence", tom: "neutro" as Tom },
+        { n: pend.relatorio_trocado_pela_efd, texto: "linhas do relatório trocadas pela nota com item da EFD ou do XML, que vence", tom: "neutro" as Tom },
       ].filter((x) => x.n > 0)
     : [];
 
@@ -513,7 +522,7 @@ function Conferencia({ resumo, acao }: { resumo: ResumoDoRazao; acao: ReactNode 
 
 function PorEnquadramento({ resumo, acao }: { resumo: ResumoDoRazao; acao: ReactNode }) {
   const linhas = resumo.por_enquadramento ?? [];
-  const colunas = "grid-cols-[1.6fr_.7fr_.9fr_1fr_1fr_1fr_1fr]";
+  const colunas = "grid-cols-[1.6fr_.7fr_.9fr_1fr_1fr_1fr_1fr_1fr]";
   return (
     <section className="overflow-hidden rounded-cartao border border-borda bg-superficie shadow-cat">
       <div className="flex flex-wrap items-center gap-3.5 border-b border-borda px-5.5 py-4.5">
@@ -529,7 +538,7 @@ function PorEnquadramento({ resumo, acao }: { resumo: ResumoDoRazao; acao: React
       <div className="overflow-x-auto">
         <div className="min-w-[900px]">
           <div className={cn("grid gap-3 bg-tabela-cabecalho-fundo px-5.5 py-3", colunas)}>
-            {["Enquadramento", "Linhas", "Quantidade", "Suportado baixado", "Confronto", "Ressarcimento", "Complemento"].map(
+            {["Enquadramento", "Linhas", "Quantidade", "Suportado baixado", "Confronto", "Ressarcimento", "Complemento", "Crédito art. 271"].map(
               (c, i) => (
                 <span
                   key={c}
@@ -563,6 +572,9 @@ function PorEnquadramento({ resumo, acao }: { resumo: ResumoDoRazao; acao: React
               <span className={cn("text-right font-mono text-[13px]", zero(e.complemento) ? "text-texto-fraco" : "text-atencao")}>
                 {valor(e.complemento)}
               </span>
+              <span className={cn("text-right font-mono text-[13px]", zero(e.credito ?? "0") ? "text-texto-fraco" : "text-sucesso")}>
+                {valor(e.credito ?? "0")}
+              </span>
             </div>
           ))}
           {linhas.length === 0 && (
@@ -575,7 +587,7 @@ function PorEnquadramento({ resumo, acao }: { resumo: ResumoDoRazao; acao: React
       <p className="m-0 border-t border-borda-sutil px-5.5 py-3 text-xs text-texto-fraco">
         Saídas lançadas por origem:{" "}
         {Object.entries(resumo.saidas_por_origem ?? {})
-          .map(([k, n]) => `${k === "efd" ? "EFD" : k === "relatorio" ? "relatório do cliente" : k} ${numero(n)}`)
+          .map(([k, n]) => `${k === "efd" ? "EFD" : k === "xml" ? "XML" : k === "relatorio" ? "relatório do cliente" : k} ${numero(n)}`)
           .join(" · ") || "nenhuma"}
         . A Ficha 3 inteira sai em CSV quando passa do que o Excel aguenta.
       </p>

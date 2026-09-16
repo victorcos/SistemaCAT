@@ -335,6 +335,15 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaApuracao; resumo:
             existe no enquadramento 1.
           </p>
         </Cartao>
+        {!zero(resumo.credito_operacao_propria ?? "0") && (
+          <Cartao className="flex flex-col gap-2">
+            <Rotulo>Crédito da operação própria (art. 271)</Rotulo>
+            <p className="m-0 font-mono text-[32px] leading-none text-sucesso">{valor(resumo.credito_operacao_propria ?? "0")}</p>
+            <p className="m-0 text-xs leading-relaxed text-texto-fraco">
+              Nas saídas para outro estado, o ICMS próprio das entradas volta como crédito, ao lado do ressarcimento.
+            </p>
+          </Cartao>
+        )}
         <Cartao className="flex flex-col gap-2">
           <Rotulo>Competências prontas</Rotulo>
           <p className="m-0 font-mono text-[32px] leading-none text-texto">

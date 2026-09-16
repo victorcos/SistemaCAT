@@ -14,6 +14,7 @@ import ArquivoDigital from "@/pages/ArquivoDigital";
 import PreValidacao from "@/pages/PreValidacao";
 import Entrega from "@/pages/Entrega";
 import Razao from "@/pages/Razao";
+import DePara from "@/pages/DePara";
 import Suportado from "@/pages/Suportado";
 import Projeto from "@/pages/Projeto";
 import TrocarSenha from "@/pages/TrocarSenha";
@@ -82,6 +83,7 @@ export const roteador = createBrowserRouter([
               { path: "/projetos/:id/movimentos", element: <Movimentos /> },
               { path: "/projetos/:id/suportado", element: <Suportado /> },
               { path: "/projetos/:id/razao", element: <Razao /> },
+              { path: "/projetos/:id/depara", element: <DePara /> },
               { path: "/projetos/:id/apuracao", element: <Apuracao /> },
               { path: "/projetos/:id/arquivo-digital", element: <ArquivoDigital /> },
               { path: "/projetos/:id/pre-validacao", element: <PreValidacao /> },

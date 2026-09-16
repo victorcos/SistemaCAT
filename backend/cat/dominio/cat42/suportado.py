@@ -251,6 +251,9 @@ class ResumoDaApuracao:
 
     itens: int = 0
     valor_total: Decimal = ZERO
+    # itens com o XML ao lado do C170, e quantos se apoiaram no retido que o XML informa
+    itens_com_valor_do_xml: int = 0
+    itens_com_retido_do_xml: int = 0
     por_fonte: dict[Fonte, int] | None = None
     valor_por_fonte: dict[Fonte, Decimal] | None = None
     por_pendencia: dict[Pendencia, int] | None = None

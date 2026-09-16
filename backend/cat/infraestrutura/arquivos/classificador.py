@@ -68,8 +68,9 @@ TAMANHO_MAXIMO_DE_STUB = 2048
 _RE_STUB = re.compile(
     r"exceeds the allowed limit|CorrelationId", re.IGNORECASE)
 
-# o XML de NF-e: a chave e o emitente aparecem nos primeiros KB
-_RE_NFE = re.compile(r"<(nfeProc|NFe|infNFe)\b", re.IGNORECASE)
+# o XML de NF-e, NFC-e ou CF-e SAT: a chave e o emitente aparecem nos primeiros
+# KB. O cupom SAT entra desde a v0.53, quando a etapa 3 passou a ler o item do XML
+_RE_NFE = re.compile(r"<(nfeProc|NFe|infNFe|CFe|infCFe)\b", re.IGNORECASE)
 _RE_CNPJ_EMITENTE = re.compile(
     r"<emit>.*?<CNPJ>(\d{14})</CNPJ>", re.IGNORECASE | re.DOTALL)
 # Numa nota que a empresa RECEBE, o emitente é o fornecedor. Sem o
@@ -78,7 +79,8 @@ _RE_CNPJ_EMITENTE = re.compile(
 # vez de CNPJ (venda a consumidor); aí não há o que capturar, e tudo bem.
 _RE_CNPJ_DESTINATARIO = re.compile(
     r"<dest>.*?<CNPJ>(\d{14})</CNPJ>", re.IGNORECASE | re.DOTALL)
-_RE_EMISSAO = re.compile(r"<(?:dhEmi|dEmi)>(\d{4})-(\d{2})-(\d{2})")
+# aaaa-mm-dd na NF-e, aaaammdd no CF-e
+_RE_EMISSAO = re.compile(r"<(?:dhEmi|dEmi)>(\d{4})-?(\d{2})-?(\d{2})")
 
 
 def _amostra(caminho: str) -> str:
@@ -150,7 +152,7 @@ def _do_xml(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote:
         # a competência de uma nota é o mês da emissão
         competencia=(date(int(emissao.group(1)), int(emissao.group(2)), 1)
                      if emissao else None),
-        motivo="" if e_nfe else "o XML não é de NF-e",
+        motivo="" if e_nfe else "o XML não é de NF-e, NFC-e nem CF-e",
     )
 
 

@@ -148,6 +148,9 @@ class LinhaRazao:
     saldo_unitario: Decimal
     ressarcimento: Decimal
     complemento: Decimal
+    # coluna 27, art. 271 do RICMS: no enquadramento 4, a coluna 21 (o ICMS da
+    # operação própria da entrada) volta ao contribuinte como crédito
+    credito_operacao_propria: Decimal = ZERO
 
     @property
     def data(self) -> date:
@@ -201,6 +204,9 @@ class RazaoDoItem:
                 saldo_val = ZERO
 
             ressarc, compl = self._apurar_confronto(m, abs(val))
+            credito = (m.icms_efetivo if m.enquadramento is EnquadramentoLegal.OUTRO_ESTADO
+                       and not m.especie.e_entrada and not m.devolucao and m.icms_efetivo is not None
+                       else ZERO)
 
             linhas.append(
                 LinhaRazao(
@@ -214,6 +220,7 @@ class RazaoDoItem:
                     saldo_unitario=(saldo_val / saldo_qtd) if saldo_qtd else ZERO,
                     ressarcimento=ressarc,
                     complemento=compl,
+                    credito_operacao_propria=credito,
                 )
             )
         return linhas

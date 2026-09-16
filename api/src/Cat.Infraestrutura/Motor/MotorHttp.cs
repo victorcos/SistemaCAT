@@ -29,6 +29,8 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
     public static readonly TimeSpan PrazoPlanilha = TimeSpan.FromMinutes(60);
     // agrupar milhões de itens por documento a cada página leva segundos, não minutos
     public static readonly TimeSpan PrazoLinhas = TimeSpan.FromMinutes(2);
+    // as propostas agrupam a movimentação inteira: numa base do tamanho do Amigão, dezenas de segundos
+    public static readonly TimeSpan PrazoDePara = TimeSpan.FromMinutes(5);
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
@@ -135,6 +137,12 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
             ["execucao_id"] = execucaoId, ["so"] = pedido.So, ["busca"] = pedido.Busca,
             ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
         }), PrazoLinhas, cancelar);
+
+    public async Task<JsonElement> CandidatosDeDePara(int projetoId, CancellationToken cancelar) =>
+        await Chamar("interno/depara/candidatos", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["projeto_id"] = projetoId,
+        }), PrazoDePara, cancelar);
 
     public async Task<JsonElement> EstabelecimentosDaEntrega(int execucaoId, PedidoDeEstabelecimentos pedido, CancellationToken cancelar) =>
         await Chamar("interno/entrega/estabelecimentos", JsonContent.Create(new Dictionary<string, object?>

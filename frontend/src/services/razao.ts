@@ -19,6 +19,8 @@ export interface PorEnquadramento {
   confronto: string;
   ressarcimento: string;
   complemento: string;
+  /** art. 271, só no enquadramento 4 (v0.53) */
+  credito?: string;
 }
 
 export interface PendenciasDoRazao {
@@ -62,6 +64,10 @@ export interface ResumoDoRazao {
   linhas?: number;
   ressarcimento?: string;
   complemento?: string;
+  /** crédito da operação própria do art. 271 nas saídas para outro estado (v0.53) */
+  credito_operacao_propria?: string;
+  /** saídas de enquadramento 2 e 4 confrontadas com o ICMS próprio das entradas (v0.53) */
+  confronto_pela_entrada?: number;
   /** fora do total até os dados chegarem: o valor delas não é confiável */
   retiradas?: { fichas: number; linhas: number; ressarcimento: string; complemento: string };
   por_enquadramento?: PorEnquadramento[];

@@ -9,6 +9,27 @@ Duas coisas, a partir do que `movimentos.py` gravou:
    pendente ou sem chave. Ordenados por estabelecimento, item e data, que é a
    ordem em que a ficha se lê (`movimentos.parquet`).
 
+## O item do XML
+
+Quando a etapa leu XML (`itens_do_xml.parquet`), ele entra de duas formas:
+
+* **completa o documento escriturado sem item** — a NF-e de saída própria, a
+  NFC-e e o CF-e, que vão à EFD só com o analítico. O documento é o da EFD
+  (estabelecimento, operação, data, participante); o item é o do XML
+  (`registro` = ``XML``, `fonte_item` = ``xml``). Só documento regular:
+  cancelado e denegado não têm operação a completar;
+* **ao lado do C170 que já existe** — pelo número do item, confirmado pela
+  quantidade ou pelo valor; sem nenhum dos dois, só em nota de um item só. A
+  contagem de itens igual não basta: na Advertising, nota com os itens em outra
+  ordem no C170 levava o GTIN de um produto para o código de outro. O valor sozinho não serve: na Advertising o C170 grava o custo com ST
+  e IPI embutidos (15.044,19) e o XML, a mercadoria (10.465,92). Os valores do
+  XML vão em colunas próprias (`valor_st_xml`, `retido_xml`...) e vencem na
+  apuração do suportado; os da EFD ficam como vieram.
+
+Na entrada de terceiros completada pelo XML, o CFOP do XML é o de quem vendeu
+(5.401): vale o CFOP do analítico do documento quando ele é um só, e senão o
+do XML com o primeiro dígito virado para o lado de quem recebeu (1.401).
+
 A marca da conferência é a única junção contra o lado grande, e é feita
 pelo lado pequeno de propósito: a lista de conferidos de uma base saudável
 tem dezenas de milhões de chaves, mas os movimentos com item são só as
@@ -28,7 +49,8 @@ from decimal import Decimal
 
 from cat.dominio.cat42.conferencia import Fatia
 from cat.dominio.cat42.movimentacao import ResumoDaMovimentacao
-from cat.infraestrutura.analitico.confronto import _abrir, _escapar, _limpar
+from cat.infraestrutura.analitico.confronto import SITUACOES_COM_DOCUMENTO, _abrir, _escapar, _limpar
+from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML, ESQUEMA_ITENS_DO_XML
 from cat.infraestrutura.analitico.movimentos import (  # noqa: F401
     ARQUIVO_ANALITICO,
     ARQUIVO_CONVERSOES_DA_EFD,
@@ -54,12 +76,34 @@ _CLASSIFICACAO = {
     "nao_conferido": "Sem conferência",
 }
 
+# o que o XML acrescenta a cada movimento. Vazio quando não há XML do documento
+# ou quando o item do XML não é o mesmo do C170
+_COLUNAS_DO_XML = """
+    x.arquivo AS arquivo_xml, x.codigo AS codigo_xml, x.gtin AS gtin_xml,
+    x.descricao AS descricao_xml, x.ncm AS ncm_xml, x.cest AS cest_xml,
+    x.unidade AS unidade_xml, x.quantidade AS quantidade_xml,
+    x.valor_icms AS valor_icms_xml, x.bc_st AS bc_st_xml, x.valor_st AS valor_st_xml,
+    x.fcp_st AS fcp_st_xml, x.retido_informado AS retido_xml,
+    x.consumidor_final AS consumidor_final_xml
+"""
+
+# o primeiro dígito do CFOP, do lado de quem emitiu para o de quem recebeu
+_VIRAR_CFOP = """
+    CASE WHEN d.operacao = 'entrada' THEN
+              CASE substr(x.cfop, 1, 1) WHEN '5' THEN '1' WHEN '6' THEN '2' WHEN '7' THEN '3'
+                   ELSE substr(x.cfop, 1, 1) END
+         ELSE CASE substr(x.cfop, 1, 1) WHEN '1' THEN '5' WHEN '2' THEN '6' WHEN '3' THEN '7'
+                   ELSE substr(x.cfop, 1, 1) END
+    END || substr(x.cfop, 2)
+"""
+
 
 def consolidar(destino: str, conferidos: str | None) -> ResumoDaMovimentacao:
     """Grava `itens`, `movimentos` e `analitico` finais e devolve o resumo."""
     p = lambda nome: _escapar(os.path.join(destino, nome))  # noqa: E731
     con = _abrir(destino)
     try:
+        _preparar_xml(con, destino, p)
         # 1. o cadastro mais recente por estabelecimento e código
         con.execute(f"""
             COPY (
@@ -90,9 +134,9 @@ def consolidar(destino: str, conferidos: str | None) -> ResumoDaMovimentacao:
         if conferidos and os.path.isfile(conferidos):
             # as chaves dos movimentos (lado pequeno) contra a lista de
             # conferidos (lado grande): o que sobra é o que se marca
-            con.execute(f"""
+            con.execute("""
                 CREATE TABLE chaves_dos_movimentos AS
-                SELECT DISTINCT chave FROM read_parquet('{p(ARQUIVO_MOVIMENTOS_BRUTOS)}')
+                SELECT DISTINCT chave FROM movimentos_juntos
                 WHERE length(chave) = 44
             """)
             con.execute(f"""
@@ -110,13 +154,19 @@ def consolidar(destino: str, conferidos: str | None) -> ResumoDaMovimentacao:
             classificacao = "'nao_conferido'"
             juncao = ""
             usada = False
+        # sem 0200, a descrição, o código de barras, o NCM e o CEST vêm do XML;
+        # `cadastro_da_efd` continua dizendo quem não está no cadastro
         con.execute(f"""
             COPY (
                 SELECT m.*,
-                       i.descricao, i.codigo_barras, i.ncm, i.cest,
+                       CASE WHEN i.codigo IS NULL THEN m.descricao_xml ELSE i.descricao END AS descricao,
+                       CASE WHEN i.codigo IS NULL THEN m.gtin_xml ELSE i.codigo_barras END AS codigo_barras,
+                       CASE WHEN i.codigo IS NULL THEN m.ncm_xml ELSE i.ncm END AS ncm,
+                       CASE WHEN i.codigo IS NULL THEN m.cest_xml ELSE i.cest END AS cest,
                        i.unidade AS unidade_cadastro,
+                       i.codigo IS NOT NULL AS cadastro_da_efd,
                        {classificacao} AS classificacao
-                FROM read_parquet('{p(ARQUIVO_MOVIMENTOS_BRUTOS)}') m
+                FROM movimentos_juntos m
                 LEFT JOIN read_parquet('{p(ARQUIVO_ITENS)}') i
                        ON i.cnpj = m.cnpj AND i.codigo = m.codigo
                 {juncao}
@@ -131,6 +181,7 @@ def consolidar(destino: str, conferidos: str | None) -> ResumoDaMovimentacao:
                         extra={"arquivo": ARQUIVO_MOVIMENTOS_BRUTOS})
 
         resumo = _resumir(con, p, usada)
+        _resumir_xml(con, p, resumo)
     finally:
         con.close()
         _limpar(destino)
@@ -144,6 +195,82 @@ def consolidar(destino: str, conferidos: str | None) -> ResumoDaMovimentacao:
                     "sem_cadastro": resumo.itens_sem_cadastro,
                     "inventarios": resumo.inventarios})
     return resumo
+
+
+def _preparar_xml(con, destino: str, p) -> None:
+    """Monta `movimentos_juntos`: os C170/C810 com o XML ao lado, mais os itens
+    que o XML traz para o documento escriturado sem item."""
+    if os.path.isfile(os.path.join(destino, ARQUIVO_ITENS_DO_XML)):
+        con.execute(f"CREATE TABLE xml_itens AS SELECT * FROM read_parquet('{p(ARQUIVO_ITENS_DO_XML)}')")
+    else:
+        con.register("xml_vazio", ESQUEMA_ITENS_DO_XML.empty_table())
+        con.execute("CREATE TABLE xml_itens AS SELECT * FROM xml_vazio")
+        con.unregister("xml_vazio")
+    situacoes = ", ".join(f"'{s}'" for s in SITUACOES_COM_DOCUMENTO)
+    con.execute("CREATE TABLE xml_chaves AS SELECT DISTINCT chave FROM xml_itens")
+    con.execute(f"""
+        CREATE TABLE docs_do_xml AS
+        SELECT d.* FROM read_parquet('{p(ARQUIVO_DOCUMENTOS)}') d
+        SEMI JOIN xml_chaves k ON k.chave = d.chave
+        WHERE d.itens = 0 AND d.situacao IN ({situacoes})
+    """)
+    con.execute(f"""
+        CREATE TABLE cfop_do_analitico AS
+        SELECT a.cnpj, a.chave, min(replace(a.cfop, '.', '')) AS cfop
+        FROM read_parquet('{p(ARQUIVO_ANALITICO)}') a
+        SEMI JOIN docs_do_xml d ON d.cnpj = a.cnpj AND d.chave = a.chave AND d.emitente = 'terceiros'
+        GROUP BY a.cnpj, a.chave HAVING count(DISTINCT replace(a.cfop, '.', '')) = 1
+    """)
+    con.execute("CREATE TABLE xml_contagem AS SELECT chave, count(*) AS itens FROM xml_itens GROUP BY chave")
+    con.execute(f"""
+        CREATE TABLE efd_contagem AS
+        SELECT m.cnpj, m.chave, count(*) AS itens FROM read_parquet('{p(ARQUIVO_MOVIMENTOS_BRUTOS)}') m
+        SEMI JOIN xml_contagem k ON k.chave = m.chave
+        GROUP BY m.cnpj, m.chave
+    """)
+    con.execute(f"""
+        CREATE VIEW movimentos_juntos AS
+        SELECT m.*, 'efd' AS fonte_item, {_COLUNAS_DO_XML}
+        FROM read_parquet('{p(ARQUIVO_MOVIMENTOS_BRUTOS)}') m
+        LEFT JOIN efd_contagem ce ON ce.cnpj = m.cnpj AND ce.chave = m.chave
+        LEFT JOIN xml_contagem cx ON cx.chave = m.chave
+        LEFT JOIN xml_itens x
+               ON x.chave = m.chave AND x.numero_item = m.numero_item
+              AND (abs(x.quantidade - m.quantidade) <= 0.001 OR abs(x.valor - m.valor) <= 0.01
+                   OR (ce.itens = 1 AND cx.itens = 1))
+        UNION ALL BY NAME
+        SELECT d.cnpj, d.competencia, d.arquivo, d.chave, d.modelo, d.situacao,
+               d.numero_documento, d.serie, d.data, d.operacao, d.emitente, d.participante,
+               'XML' AS registro, x.numero_item, x.codigo,
+               x.descricao AS descricao_complementar, x.quantidade, x.unidade, x.valor,
+               x.desconto, '0' AS ind_mov, x.cst_icms,
+               CASE WHEN d.emitente = 'terceiros' THEN coalesce(ca.cfop, {_VIRAR_CFOP})
+                    ELSE x.cfop END AS cfop,
+               x.bc_icms, x.aliq_icms, x.valor_icms, x.bc_st, x.aliq_st, x.valor_st,
+               'xml' AS fonte_item, {_COLUNAS_DO_XML}
+        FROM docs_do_xml d
+        JOIN xml_itens x ON x.chave = d.chave
+        LEFT JOIN cfop_do_analitico ca ON ca.cnpj = d.cnpj AND ca.chave = d.chave
+        -- as colunas das contagens não entram: são só do lado da EFD
+        
+    """)
+
+
+def _resumir_xml(con, p, r: ResumoDaMovimentacao) -> None:
+    """O que o XML completou, casou e deixou de fora."""
+    (r.saidas_completadas_pelo_xml, r.entradas_completadas_pelo_xml) = con.execute("""
+        SELECT count(*) FILTER (WHERE operacao = 'saida'), count(*) FILTER (WHERE operacao = 'entrada')
+        FROM (SELECT DISTINCT cnpj, chave, operacao FROM docs_do_xml
+              WHERE chave IN (SELECT chave FROM xml_itens))
+    """).fetchone()
+    # do parquet final: o intermediário da EFD, em que a view se apoia, já foi apagado
+    (r.movimentos_do_xml, r.itens_pareados_com_xml, r.itens_sem_par_no_xml) = con.execute(f"""
+        SELECT count(*) FILTER (WHERE fonte_item = 'xml'),
+               count(*) FILTER (WHERE fonte_item = 'efd' AND codigo_xml IS NOT NULL),
+               count(*) FILTER (WHERE fonte_item = 'efd' AND codigo_xml IS NULL
+                                  AND chave IN (SELECT chave FROM xml_chaves))
+        FROM read_parquet('{p(ARQUIVO_MOVIMENTOS)}')
+    """).fetchone()
 
 
 def _resumir(con, p, conferencia_usada: bool) -> ResumoDaMovimentacao:
@@ -195,7 +322,7 @@ def _resumir(con, p, conferencia_usada: bool) -> ResumoDaMovimentacao:
                coalesce(sum(valor) FILTER (WHERE operacao = 'saida'), 0),
                coalesce(sum(valor_st) FILTER (WHERE operacao = 'entrada'), 0),
                count(DISTINCT codigo),
-               count(DISTINCT codigo) FILTER (WHERE descricao IS NULL)
+               count(DISTINCT codigo) FILTER (WHERE NOT cadastro_da_efd)
         FROM read_parquet('{mov}')
     """).fetchone()
     r.valor_entradas, r.valor_saidas, r.st_nas_entradas = _dec(v_ent), _dec(v_sai), _dec(st)

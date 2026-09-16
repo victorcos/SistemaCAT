@@ -9,6 +9,9 @@ Quinta etapa. Roda fora da requisição, como as anteriores:
        bloco H;
     3. a ficha, pela regra do domínio, e o resumo no banco.
 
+Os pares de de-para aprovados da empresa entram antes do passo 2: vão para
+`depara.parquet` na pasta da rodada, que fica de rastro do que valeu.
+
 Depende das etapas 3 e 4 concluídas. Da 4, a apuração precisa ter gravado a
 data e o CFOP de cada entrada — apuração de antes disso é recusada com o
 pedido de rodar de novo, em vez de montar ficha sem data.
@@ -20,6 +23,7 @@ import os
 import time
 from datetime import datetime, timezone
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -58,6 +62,7 @@ from cat.infraestrutura.analitico.suportado import ARQUIVO_SUPORTADO, ApuracaoCa
 from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import (
     ArquivoDoLoteDB,
+    DeParaDB,
     ExecucaoDB,
     LoteDB,
     ProjetoDB,
@@ -67,6 +72,7 @@ from cat.log import contexto, obter_log
 log = obter_log(__name__)
 
 ETAPA = "razao"
+ARQUIVO_DEPARA = "depara.parquet"
 # 2: fichas com estoque negativo saem do total (15/09/2026)
 VERSAO_DO_RESUMO = 2
 
@@ -212,13 +218,18 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
 
     projeto = sessao.get(ProjetoDB, execucao.projeto_id)
     periodo = (projeto.competencia_ini, projeto.competencia_fim) if projeto is not None else None
+    ufs = _ufs(execucao.projeto_id, sessao)
+    depara = gravar_depara(projeto.empresa_id, list(ufs), os.path.join(destino, ARQUIVO_DEPARA), sessao)         if projeto is not None else 0
+    if depara:
+        diario.anotar("info", f"{milhar(depara)} pares de de-para aprovados entram na montagem.")
     fontes = Fontes(movimentacao=movimentos.pasta_de_trabalho,
                     apuracao=apuracao.pasta_de_trabalho,
                     saidas_do_relatorio=caminho_saidas,
-                    periodo=periodo)
+                    periodo=periodo,
+                    depara=os.path.join(destino, ARQUIVO_DEPARA) if depara else None)
     venda = venda_a_consumidor_do_projeto(execucao.projeto_id, sessao)
     diario.anotar("info", f"Venda a consumidor final: {venda.rotulo.lower()} (escolha do trabalho).")
-    resumo = montar(fontes, destino, uf_por_cnpj=_ufs(execucao.projeto_id, sessao),
+    resumo = montar(fontes, destino, uf_por_cnpj=ufs,
                     avisar=lancado, deve_parar=parar, venda_a_consumidor=venda)
 
     segundos = round(time.time() - inicio, 1)
@@ -241,6 +252,28 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
         dados={"execucao_id": execucao.id, "fichas": resumo.fichas, "linhas": resumo.linhas,
                "ressarcimento": str(resumo.ressarcimento), "segundos": segundos},
         autor_id=execucao.criada_por)
+
+
+def gravar_depara(empresa_id: int, cnpjs: list[str], destino: str, sessao: Session) -> int:
+    """Os pares aprovados da empresa, por estabelecimento, num parquet. Devolve quantos.
+
+    O par sem CNPJ vale para todos; o do estabelecimento, quando há, vence.
+    """
+    aprovados = sessao.execute(
+        select(DeParaDB.cnpj, DeParaDB.codigo_origem, DeParaDB.codigo_destino, DeParaDB.fator)
+        .where(DeParaDB.empresa_id == empresa_id, DeParaDB.situacao == "aprovado")).all()
+    pares: dict[tuple[str, str], tuple[str, object]] = {}
+    for cnpj, origem, destino_, fator in sorted(aprovados, key=lambda p: p[0] != ""):
+        for alvo in (cnpjs if cnpj == "" else [cnpj]):
+            pares[(alvo, origem)] = (destino_, fator)
+    if not pares:
+        return 0
+    pq.write_table(pa.Table.from_pylist(
+        [{"cnpj": c, "codigo_origem": o, "codigo_destino": d, "fator": f} for (c, o), (d, f) in sorted(pares.items())],
+        schema=pa.schema([("cnpj", pa.string()), ("codigo_origem", pa.string()),
+                          ("codigo_destino", pa.string()), ("fator", pa.decimal128(24, 9))])), destino)
+    log.info("de-para aplicado na montagem", extra={"empresa_id": empresa_id, "pares": len(pares)})
+    return len(pares)
 
 
 def venda_a_consumidor_do_projeto(projeto_id: int, sessao: Session) -> VendaAConsumidor:
@@ -301,6 +334,12 @@ def _anotar_pendencias(diario: Diario, r) -> None:
     if r.fichas_abertura_valorada:
         diario.anotar("info", f"{milhar(r.fichas_abertura_valorada)} fichas com a abertura valorada pelas entradas "
                               f"anteriores ao inventário: {reais(r.icms_da_abertura)} de ICMS suportado.")
+    if r.linhas_com_depara:
+        diario.anotar("info", f"{milhar(r.linhas_com_depara)} lançamentos de {milhar(r.codigos_trocados_pelo_depara)} "
+                              "códigos passaram, pelo de-para, para o código da mercadoria.")
+    if r.lancamentos_x949:
+        diario.anotar("info", f"{milhar(r.lancamentos_x949)} lançamentos X.949 (outras entradas e saídas, como "
+                              "remessa e retorno de armazém) ficaram fora da ficha.")
     if r.lancamentos_de_uso_e_consumo:
         diario.anotar("info", f"{milhar(r.lancamentos_de_uso_e_consumo)} lançamentos de uso e consumo ficaram fora da "
                               "ficha: não são estoque de comercialização.")

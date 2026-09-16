@@ -70,7 +70,7 @@ class TipoDeArquivo(str, Enum):
             TipoDeArquivo.SPED_CONTRIBUICOES: "EFD Contribuições",
             TipoDeArquivo.SPED_ECD: "ECD",
             TipoDeArquivo.SPED_OUTRO: "SPED de outro tipo",
-            TipoDeArquivo.XML_NFE: "XML de NF-e",
+            TipoDeArquivo.XML_NFE: "XML de NF-e ou CF-e",
             TipoDeArquivo.XML_OUTRO: "XML de outro documento",
             TipoDeArquivo.GERENCIAL_MOVIMENTO: "Relatório de movimento",
             TipoDeArquivo.GERENCIAL_INVENTARIO: "Relatório de inventário",

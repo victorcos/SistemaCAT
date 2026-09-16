@@ -19,7 +19,7 @@ public static class TiposDeArquivo
         Novo("sped_contribuicoes", "EFD Contribuições"),
         Novo("sped_ecd", "ECD"),
         Novo("sped_outro", "SPED de outro tipo"),
-        Novo("xml_nfe", "XML de NF-e", alimenta: true),
+        Novo("xml_nfe", "XML de NF-e ou CF-e", alimenta: true),
         Novo("xml_outro", "XML de outro documento"),
         Novo("gerencial_movimento", "Relatório de movimento", alimenta: true),
         Novo("gerencial_inventario", "Relatório de inventário", alimenta: true),

@@ -126,6 +126,10 @@ public interface IMotor
     /// <exception cref="MotorRecusou">não é pré-validação (404), não terminou (409), material apagado (410), recorte inválido (422)</exception>
     Task<System.Text.Json.JsonElement> ArquivosDoCliente(int execucaoId, PedidoDeArquivos pedido, CancellationToken cancelar);
 
+    /// <summary>O de-para do trabalho: as propostas da última movimentação e as decisões da empresa.</summary>
+    /// <exception cref="MotorRecusou">trabalho inexistente (404), sem movimentação (422), material apagado (410)</exception>
+    Task<System.Text.Json.JsonElement> CandidatosDeDePara(int projetoId, CancellationToken cancelar);
+
     /// <summary>Os estabelecimentos de uma entrega montada.</summary>
     /// <exception cref="MotorRecusou">não é entrega (404), não terminou (409), material apagado (410), recorte inválido (422)</exception>
     Task<System.Text.Json.JsonElement> EstabelecimentosDaEntrega(int execucaoId, PedidoDeEstabelecimentos pedido, CancellationToken cancelar);

@@ -7,8 +7,10 @@
 
 ## Onde estamos
 
-**As oito etapas da CAT 42 estão no ar (v0.52.0), e o trabalho do Amigão passou
-por todas.** Da pasta com EFD, XML e relatórios do ERP até o pacote de entrega
+**As oito etapas da CAT 42 estão no ar (v0.53.0), e o trabalho do Amigão passou
+por todas.** Desde a v0.53, a etapa 3 lê o item do XML, o razão aplica o
+de-para aprovado e confronta os enquadramentos 2 e 4 com o crédito do art. 271 —
+correções que vieram da comparação com a CAT 42 da Advertising (DECISOES). Da pasta com EFD, XML e relatórios do ERP até o pacote de entrega
 com o arquivo digital pré-validado e o manifesto com SHA-256, pela tela, com
 fila, cancelamento, histórico e aprovação de quem responde pelo negócio.
 
@@ -74,29 +76,21 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
     (item 3.3.8 do manual); hoje 400 mil fichas abrem sem ICMS;
   - os arquivos de 2023 em diante que o OneDrive não baixou.
 
-### 2. De-para de produtos
+### 2. Comparação com a CAT 42 da Advertising Operations (16/09/2026)
 
-Ainda não existe no sistema. As fontes se juntam hoje pelo documento e pelo
-código do item do cliente (o da EFD e o do relatório do ERP); não há tabela que
-case o produto por código de barras, NCM e CEST ou descrição quando os códigos
-não coincidem.
-
-- [ ] **Comparar com a CAT 42 da Advertising Operations** (`D:\Backup pc
-      Pedro\PROJETOS 2\CAT 42 - Advertising Operations`), principalmente o
-      de-para, e corrigir o que for possível aqui. Pedido de 16/09/2026.
-- [ ] Cascata determinística: código de barras; NCM com CEST e descrição; descrição.
-- [ ] Similaridade textual com o denominador certo e ao menos dois termos
-      distintivos em comum.
-- [ ] Fila de julgamento com as candidatas, e o de-para aprovado guardado para
-      não repagar o mesmo item.
+- [x] Item do XML na etapa 3, com consumidor final pelo `indFinal` (v0.53)
+- [x] De-para: propostas por GTIN, sufixo, kit e descrição; revisão na tela;
+      planilha para o cliente; aplicado no razão (v0.53)
+- [x] Confronto dos enquadramentos 2 e 4 e crédito do art. 271 (v0.53)
+- [x] X.949 fora da ficha, contada (v0.53)
+- [ ] **Decidir** se nota de entrada não escriturada entra na ficha (a RVZ
+      incluiu; é a diferença que sobra na comparação)
+- [ ] Notas canceladas na SEFAZ e ativas no SPED/XML
+- [ ] Contingência das notas não escrituradas (SELIC e multa)
+- [ ] XML dentro de zip no lote (a Advertising entregou assim)
 
 ### 3. O que a apuração ainda não calcula
 
-- [ ] **Confronto dos enquadramentos 2 e 4** (ICMS da operação própria da
-      entrada). Hoje é contado e trava a competência; no piloto, 52
-      competências e as 393 transferências 6409.
-- [ ] Crédito da operação própria do art. 271: a coluna existe, zerada, até o
-      confronto acima.
 - [ ] No arquivo digital: ECF_FAB, 0205 (quem não escritura EFD) e fato gerador
       presumido sem documento (CHV 0, item 999).
 

@@ -21,6 +21,7 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
     public DbSet<LoteLinha> Lotes => Set<LoteLinha>();
     public DbSet<ArquivoDoLoteLinha> ArquivosDoLote => Set<ArquivoDoLoteLinha>();
     public DbSet<ExecucaoLinha> Execucoes => Set<ExecucaoLinha>();
+    public DbSet<DeParaLinha> DePara => Set<DeParaLinha>();
 
     protected override void OnModelCreating(ModelBuilder modelo)
     {
@@ -106,6 +107,25 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
             e.Property(x => x.CriadoPor).HasColumnName("criado_por");
             e.Property(x => x.ResponsavelId).HasColumnName("responsavel_id");
             e.Property(x => x.VendaAConsumidor).HasColumnName("venda_a_consumidor");
+        });
+
+        modelo.Entity<DeParaLinha>(e =>
+        {
+            e.ToTable("depara_item");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.EmpresaId).HasColumnName("empresa_id");
+            e.Property(x => x.Cnpj).HasColumnName("cnpj");
+            e.Property(x => x.CodigoOrigem).HasColumnName("codigo_origem");
+            e.Property(x => x.CodigoDestino).HasColumnName("codigo_destino");
+            e.Property(x => x.Fator).HasColumnName("fator").HasPrecision(24, 9);
+            e.Property(x => x.Motivo).HasColumnName("motivo");
+            e.Property(x => x.Situacao).HasColumnName("situacao");
+            e.Property(x => x.Confianca).HasColumnName("confianca");
+            e.Property(x => x.Explicacao).HasColumnName("explicacao");
+            e.Property(x => x.ProjetoId).HasColumnName("projeto_id");
+            e.Property(x => x.DecididoPor).HasColumnName("decidido_por");
+            e.Property(x => x.DecididoEm).HasColumnName("decidido_em");
         });
 
         modelo.Entity<EventoLinha>(e =>
@@ -258,6 +278,24 @@ public sealed class ProjetoLinha
     public int? CriadoPor { get; set; }
     public int? ResponsavelId { get; set; }
     public string VendaAConsumidor { get; set; } = Dominio.Projeto.VendaAConsumidor.Enquadramento1;
+}
+
+/// <summary>Um par do de-para, da empresa. A tabela é do Alembic (<c>c5e1a9d4b7f2</c>).</summary>
+public sealed class DeParaLinha
+{
+    public int Id { get; set; }
+    public int EmpresaId { get; set; }
+    public string Cnpj { get; set; } = "";
+    public string CodigoOrigem { get; set; } = "";
+    public string CodigoDestino { get; set; } = "";
+    public decimal Fator { get; set; } = 1;
+    public string Motivo { get; set; } = "";
+    public string Situacao { get; set; } = "";
+    public string? Confianca { get; set; }
+    public string? Explicacao { get; set; }
+    public int? ProjetoId { get; set; }
+    public int? DecididoPor { get; set; }
+    public DateTime DecididoEm { get; set; }
 }
 
 public sealed class EventoLinha

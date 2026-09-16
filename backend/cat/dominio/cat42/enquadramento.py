@@ -116,6 +116,12 @@ CFOP_USO_E_CONSUMO = frozenset({
     "5556", "5557", "6556", "6557",
 })
 
+# Outras entradas e saídas (X.949). Na Advertising eram remessa e retorno de
+# armazém e depósito: a mercadoria sai e volta, e a venda de verdade já está na
+# ficha. Deixá-las dentro dava saída e entrada pelo preço de custo — um falso
+# ressarcimento (decisão do Victor, 16/09/2026: excluir e contar, como a RVZ).
+CFOP_OUTRAS_X949 = frozenset({"1949", "2949", "3949", "5949", "6949", "7949"})
+
 # Modelos que só existem para documentar venda a consumidor final. Não é
 # suposição sobre o comprador: é o que o modelo é. Tabela 4.1.1 do leiaute.
 #
