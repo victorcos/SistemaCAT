@@ -87,8 +87,11 @@ public static class Etapas
             "dia. As saídas sem item na EFD vêm do relatório do cliente.",
             Implementada: true),
         new("apuracao", "Apurar ressarcimento e complemento",
-            "Confrontar o imposto suportado com o ICMS efetivo, por " +
-            "enquadramento legal, e conferir o saldo final contra o inventário."),
+            "Fechar o período por estabelecimento e mês: ressarcimento a pedir e " +
+            "complemento a recolher, separados, com os saldos de cada mercadoria e " +
+            "a conferência contra o inventário. Só a competência sem pendência " +
+            "segue para o arquivo digital.",
+            Implementada: true),
         new("arquivo_digital", "Gerar o arquivo digital",
             "Montar os registros 0000 a 1200 no leiaute da CAT 42 e passar pela " +
             "pré-validação antes do envio à SEFAZ."),

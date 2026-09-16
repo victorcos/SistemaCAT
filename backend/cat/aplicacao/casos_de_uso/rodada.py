@@ -23,7 +23,7 @@ SEGUNDOS_ENTRE_AVISOS = 2.0
 
 # só as etapas cuja rodada confere o freio. Nas outras, gravar "cancelando"
 # deixaria a tela dizendo que vai parar uma rodada que vai até o fim
-ETAPAS_CANCELAVEIS = frozenset({"st_suportado", "razao"})
+ETAPAS_CANCELAVEIS = frozenset({"st_suportado", "razao", "apuracao"})
 
 
 class Diario:

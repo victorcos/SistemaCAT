@@ -20,6 +20,9 @@ public sealed record PedidoDeFichas(string? Busca, string? So, int Pagina, int P
 
 public sealed record PedidoDeFicha(string Cnpj, string Codigo, int Pagina, int PorPagina);
 
+/// <param name="So">aptas, bloqueadas, ou o código de um motivo de bloqueio</param>
+public sealed record PedidoDeCompetencias(string? So, string? Busca, int Pagina, int PorPagina);
+
 public interface IRepositorioDeExecucoes
 {
     Task<ExecucaoLida?> Buscar(int id, CancellationToken cancelar);
@@ -48,13 +51,14 @@ public sealed class Execucoes(
     public const string Movimentos = "movimentos";
     public const string Suportado = "st_suportado";
     public const string Razao = "razao";
+    public const string Apuracao = "apuracao";
 
     /// <summary>
     /// As etapas que concluem com uma rodada do motor. Uma lista só: o roteiro
     /// do trabalho e a consulta que o alimenta liam cada uma a sua, e a etapa
     /// nova que entrasse numa e não na outra ficaria para sempre "pendente".
     /// </summary>
-    public static readonly IReadOnlyList<string> DeProcessamento = [Conferencia, Movimentos, Suportado, Razao];
+    public static readonly IReadOnlyList<string> DeProcessamento = [Conferencia, Movimentos, Suportado, Razao, Apuracao];
 
     /// <summary>Ainda não terminou: inclui o pedido de parar que a rodada não atendeu ainda.</summary>
     public static bool EmCurso(string situacao) => situacao is "na_fila" or "rodando" or "cancelando";
@@ -126,6 +130,13 @@ public sealed class Execucoes(
     {
         var e = await Detalhar(execucaoId, Razao, usuario, cancelar);
         return await motor.LinhasDoRazao(e.Id, pedido, cancelar);
+    }
+
+    /// <summary>As competências fechadas, maior ressarcimento primeiro.</summary>
+    public async Task<JsonElement> CompetenciasApuradas(int execucaoId, PedidoDeCompetencias pedido, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, Apuracao, usuario, cancelar);
+        return await motor.CompetenciasApuradas(e.Id, pedido, cancelar);
     }
 
     public async Task<PlanilhaPronta> Planilha(int execucaoId, string etapaDaRota, string? etapaExigida, string qual,

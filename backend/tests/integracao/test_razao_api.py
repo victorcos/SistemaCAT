@@ -159,6 +159,38 @@ class TestFluxo:
             assert r.status_code == 200, (qual, r.text)
             assert r.content[:2] == b"PK"
 
+    def test_a_apuracao_fecha_o_periodo_sobre_a_ficha(self, cliente, projeto_id, razao):
+        """Etapa 6: o mesmo ressarcimento, agora por estabelecimento e mês, com
+        os saldos que o registro 1050 vai pedir."""
+        apuracao = rodar(cliente, "apuracao", projeto_id)
+        r = apuracao["resumo"]
+        assert r["competencias"] == 1 and r["estabelecimentos"] == 1
+        assert Decimal(r["ressarcimento"]) == Decimal("0.95")
+        assert Decimal(r["complemento"]) == Decimal("0.00")
+        assert Decimal(r["credito_operacao_propria"]) == Decimal("0.00")
+        assert r["por_competencia"][0]["competencia"] == "2021-05"
+
+        c = cliente.post("/interno/apuracao/competencias", headers=SEGREDO,
+                         json={"execucao_id": apuracao["id"]})
+        assert c.status_code == 200, c.text
+        linha = c.json()["linhas"][0]
+        assert linha["cnpj"] == CNPJ and linha["uf"] == "SP"
+        # sem bloco H no lote, a competência não tem como conferir o saldo
+        assert [m["codigo"] for m in linha["motivos"]] == ["sem_inventario"]
+        assert not linha["apta"] and r["aptas"] == 0
+
+        for qual in ("apuracao", "saldos"):
+            planilha_ = planilha(cliente, "apuracao", apuracao["id"], qual)
+            assert planilha_.status_code == 200, (qual, planilha_.text)
+            assert planilha_.content[:2] == b"PK"
+
+    def test_apuracao_recusa_antes_do_razao(self, cliente, projeto_id, razao):
+        from tests.integracao.cadastro import execucoes  # noqa: PLC0415
+        movimentos = execucoes(projeto_id, "movimentos")[0]
+        r = cliente.post("/interno/apuracao/competencias", headers=SEGREDO,
+                         json={"execucao_id": movimentos["id"]})
+        assert r.status_code == 404
+
     def test_razao_de_outra_etapa_nao_existe(self, cliente, projeto_id, razao):
         from tests.integracao.cadastro import execucoes  # noqa: PLC0415
         movimentos = execucoes(projeto_id, "movimentos")[0]

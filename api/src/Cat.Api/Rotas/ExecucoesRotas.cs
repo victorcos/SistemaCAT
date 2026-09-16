@@ -22,6 +22,19 @@ public static class ExecucoesRotas
         Etapa(api, Execucoes.Movimentos, "movimentos", detalheExigeEtapa: true, "extrair movimentos");
         Etapa(api, Execucoes.Suportado, "suportado", detalheExigeEtapa: true, "apurar o ICMS suportado");
         Etapa(api, Execucoes.Razao, "razao", detalheExigeEtapa: true, "montar o razão");
+        Etapa(api, Execucoes.Apuracao, "apuracao", detalheExigeEtapa: true, "apurar ressarcimento e complemento");
+
+        api.MapGet("/apuracao/{execucaoId:int}/competencias", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                {
+                    var q = http.Request.Query;
+                    var pedido = new PedidoDeCompetencias(
+                        q["so"].FirstOrDefault() is { Length: > 0 } s ? s : null,
+                        q["busca"].FirstOrDefault() is { Length: > 0 } b ? b : null,
+                        Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 50));
+                    return Results.Json(await caso.CompetenciasApuradas(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
+                }))
+            .ExigirUsuario();
 
         api.MapGet("/razao/{execucaoId:int}/fichas", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>

@@ -34,6 +34,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cat.aplicacao.casos_de_uso import (
+    apurar_periodo,
     apurar_suportado,
     conferir_documentos,
     extrair_movimentos,
@@ -50,6 +51,7 @@ from cat.aplicacao.casos_de_uso.inspecionar_lote import (
 )
 from cat.config import obter_config
 from cat.dominio.comum.cnpj import Cnpj
+from cat.infraestrutura.analitico import apuracao as analitico_apuracao
 from cat.infraestrutura.analitico import razao as analitico_razao
 from cat.infraestrutura.analitico import suportado as analitico_suportado
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
@@ -308,6 +310,8 @@ PREPARADORES = {
                              "Já existe uma apuração do ICMS suportado em andamento neste trabalho."),
     montar_razao.ETAPA: (montar_razao.preparar, montar_razao.NadaParaMontar,
                          "Já existe uma montagem do razão em andamento neste trabalho."),
+    apurar_periodo.ETAPA: (apurar_periodo.preparar, apurar_periodo.NadaParaApurar,
+                           "Já existe uma apuração do período em andamento neste trabalho."),
 }
 
 # "cancelando" ainda está em curso: a rodada só para no próximo ponto seguro, e
@@ -496,6 +500,33 @@ def linhas_do_razao(pedido: PedidoDeFicha, sessao: Annotated[Session, Depends(ob
     with contexto(etapa=montar_razao.ETAPA, execucao_id=execucao.id):
         return _traduzir_leitura(lambda: analitico_razao.linhas_da_ficha(
             execucao.pasta_de_trabalho or "", pedido.cnpj, pedido.codigo, pedido.pagina,
+            pedido.por_pagina))
+
+
+# ---------------------------------------------------------------------------
+# Apuração do período: as competências fechadas
+# ---------------------------------------------------------------------------
+class PedidoDeCompetencias(BaseModel):
+    execucao_id: int
+    so: str | None = None
+    busca: str | None = Field(default=None, max_length=100)
+    pagina: int = Field(default=1, ge=1)
+    por_pagina: int = Field(default=analitico_apuracao.POR_PAGINA_PADRAO, ge=1)
+
+
+@router.post("/apuracao/competencias", dependencies=[Depends(exigir_segredo)])
+def competencias_apuradas(
+    pedido: PedidoDeCompetencias,
+    sessao: Annotated[Session, Depends(obter_sessao)],
+) -> dict:
+    execucao = sessao.get(ExecucaoDB, pedido.execucao_id)
+    if execucao is None or execucao.etapa != apurar_periodo.ETAPA:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Apuração não encontrada.")
+    if execucao.situacao != "concluida":
+        raise HTTPException(status.HTTP_409_CONFLICT, "A apuração do período ainda não terminou.")
+    with contexto(etapa=apurar_periodo.ETAPA, execucao_id=execucao.id):
+        return _traduzir_leitura(lambda: analitico_apuracao.competencias(
+            execucao.pasta_de_trabalho or "", pedido.so, pedido.busca, pedido.pagina,
             pedido.por_pagina))
 
 

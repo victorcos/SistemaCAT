@@ -68,8 +68,9 @@ public sealed class EtapasTestes
         Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "movimentos"));
         Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "st_suportado"));
         Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "razao"));
-        Assert.Equal(SituacaoEtapa.NaoDisponivel, Situacao(e, "apuracao"));
-        Assert.Equal((0, 5), Etapas.Progresso(e));
+        Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "apuracao"));
+        Assert.Equal(SituacaoEtapa.NaoDisponivel, Situacao(e, "arquivo_digital"));
+        Assert.Equal((0, 6), Etapas.Progresso(e));
     }
 
     [Fact]
@@ -79,7 +80,7 @@ public sealed class EtapasTestes
         Assert.Equal(SituacaoEtapa.Concluida, Situacao(e, "importar"));
         Assert.Equal(SituacaoEtapa.Pendente, Situacao(e, "conferencia"));
         Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "movimentos"));
-        Assert.Equal((1, 5), Etapas.Progresso(e));
+        Assert.Equal((1, 6), Etapas.Progresso(e));
     }
 
     [Fact]
@@ -100,7 +101,7 @@ public sealed class EtapasTestes
         var e = Montar(["movimentos"]);
         Assert.Equal(SituacaoEtapa.Concluida, Situacao(e, "movimentos"));
         Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "conferencia"));
-        Assert.Equal((1, 5), Etapas.Progresso(e));
+        Assert.Equal((1, 6), Etapas.Progresso(e));
     }
 
     [Fact]

@@ -161,11 +161,13 @@ class TestFila:
     def test_etapa_que_o_motor_nao_conhece_falha_em_vez_de_ficar_parada(self, cliente, projeto_id):
         from workers import fila  # noqa: PLC0415
         fila.processar_pendentes()
-        desconhecida = self._nova(projeto_id, etapa="apuracao")
+        # um nome que nenhuma etapa vai ter: as do roteiro vão sendo
+        # implementadas, e o teste não pode passar a testar outra coisa
+        desconhecida = self._nova(projeto_id, etapa="etapa_do_futuro")
         assert fila.processar_uma() == desconhecida
         d = self._situacao(desconhecida)
         assert d["situacao"] == "falhou"
-        assert "apuracao" in d["erro"]
+        assert "etapa_do_futuro" in d["erro"]
 
     def test_excecao_que_escapa_do_executor_marca_falha(self, cliente, projeto_id, monkeypatch):
         from workers import fila  # noqa: PLC0415

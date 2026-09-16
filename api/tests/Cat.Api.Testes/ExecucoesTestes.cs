@@ -27,6 +27,7 @@ public sealed class MotorDeExecucoesFalso : IAsyncLifetime
     public Func<int, JsonElement, Task<IResult>> AoCancelar { get; set; } = (_, _) => Task.FromResult(Results.StatusCode(500));
     public Func<JsonElement, IResult> AoPedirLinhas { get; set; } = _ => Results.StatusCode(500);
     public Func<string, JsonElement, IResult> AoPedirRazao { get; set; } = (_, _) => Results.StatusCode(500);
+    public Func<JsonElement, IResult> AoPedirCompetencias { get; set; } = _ => Results.StatusCode(500);
 
     public async Task InitializeAsync()
     {
@@ -64,6 +65,14 @@ public sealed class MotorDeExecucoesFalso : IAsyncLifetime
             var pedido = await http.Request.ReadFromJsonAsync<JsonElement>();
             Pedidos.Enqueue(pedido);
             return AoPedirLinhas(pedido);
+        });
+        _app.MapPost("/interno/apuracao/competencias", async (HttpContext http) =>
+        {
+            if (http.Request.Headers["X-Cat-Motor-Segredo"] != Segredo)
+                return Results.StatusCode(403);
+            var pedido = await http.Request.ReadFromJsonAsync<JsonElement>();
+            Pedidos.Enqueue(pedido);
+            return AoPedirCompetencias(pedido);
         });
         foreach (var rota in new[] { "fichas", "ficha" })
             _app.MapPost($"/interno/razao/{rota}", async (HttpContext http) =>
@@ -166,6 +175,7 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
     [InlineData("movimentos", "movimentos")]
     [InlineData("suportado", "st_suportado")]
     [InlineData("razao", "razao")]
+    [InlineData("apuracao", "apuracao")]
     public async Task Pedir_repassa_ao_motor_e_devolve_a_execucao_da_fila(string segmento, string etapa)
     {
         var (quem, _, c) = await Pessoa("dev");
@@ -470,5 +480,26 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
         Assert.Equal("Informe o estabelecimento e a mercadoria da ficha.", await Detalhe(sem));
         // pela rota do razão, só execução do razão
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/razao/{suportado}/fichas")).StatusCode);
+    }
+
+    // ------------------------------------------------------------------ apuração do período
+    [Fact]
+    public async Task Competencias_repassam_recorte_e_busca_e_so_valem_na_rota_da_apuracao()
+    {
+        var (_, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var id = await Execucao(projeto, "apuracao");
+        var razao = await Execucao(projeto, "razao");
+        motor.AoPedirCompetencias = p => Results.Json(new { total = 1, linhas = new[] { new { cnpj = "1", apta = true } }, so = p.GetProperty("so").GetString() });
+
+        var r = await c.GetAsync($"/api/apuracao/{id}/competencias?so=aptas&busca=2021-05&pagina=2&por_pagina=10");
+
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal("aptas", (await Json(r)).GetProperty("so").GetString());
+        var pedido = motor.Pedidos.Last(x => x.TryGetProperty("so", out _));
+        Assert.Equal((id, "aptas", "2021-05", 2, 10),
+            (pedido.GetProperty("execucao_id").GetInt32(), pedido.GetProperty("so").GetString(),
+             pedido.GetProperty("busca").GetString(), pedido.GetProperty("pagina").GetInt32(), pedido.GetProperty("por_pagina").GetInt32()));
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/apuracao/{razao}/competencias")).StatusCode);
     }
 }

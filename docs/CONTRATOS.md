@@ -265,3 +265,29 @@ devolução e indefinido), `enquadramento_indefinido`, `quantidade` (com sinal),
 `icms_suportado`, `valor_unitario_usado`, `icms_efetivo` (valor de confronto,
 nulo quando não se apura), `saldo_quantidade`, `saldo_unitario`, `saldo_valor`,
 `ressarcimento`, `complemento`.
+
+## 9. Apuração do período (etapa 6)
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `POST` | `/api/projetos/{id}/apuracao` | põe o fechamento na fila (202). 422 sem razão concluído |
+| `GET` | `/api/projetos/{id}/apuracao` | as rodadas, mais recente primeiro |
+| `GET` | `/api/apuracao/{execucao}` | uma rodada, com o resumo |
+| `POST` | `/api/apuracao/{execucao}/cancelar` | como nas etapas 4 e 5 |
+| `GET` | `/api/apuracao/{execucao}/competencias` | uma página das competências: `so` (aptas, bloqueadas ou o código de um motivo), `busca`, `pagina`, `por_pagina` |
+| `GET` | `/api/apuracao/{execucao}/planilhas/apuracao` | uma linha por estabelecimento e mês |
+| `GET` | `/api/apuracao/{execucao}/planilhas/saldos` | os saldos por mercadoria e mês — o registro 1050 |
+
+O resumo (`versao: 1`) traz `competencias`, `aptas`, `estabelecimentos`,
+`estabelecimentos_aptos`, `itens`, `linhas`, `saldos`, `ressarcimento`,
+`complemento`, `credito_operacao_propria`, **`ressarcimento_apto`** e
+`complemento_apto` (só das competências sem pendência), `por_competencia` e
+`por_motivo` (código, rótulo, o que fazer, quantas competências).
+
+**Ressarcimento e complemento nunca vêm somados** — um é crédito a pedir, o
+outro é imposto a recolher, e o líquido é leitura, não o valor do pedido.
+
+Cada competência traz `apta` e `motivos` (código, rótulo e o que fazer). Os
+motivos possíveis: `fora_de_sp`, `ficha_retirada`, `confronto_pendente`,
+`sem_aliquota`, `enquadramento_indefinido`, `diverge_do_inventario` e
+`sem_inventario`.

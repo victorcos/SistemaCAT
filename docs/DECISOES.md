@@ -5,6 +5,32 @@
 
 ---
 
+## 2026-09-16 — Etapa 6: o período fecha por estabelecimento e mês
+
+**Decisões do Victor.** Ressarcimento e complemento **separados** (o líquido é
+leitura, nunca o valor do pedido); competência com pendência **apura e fica
+marcada**, em vez de bloquear o número; e o crédito da operação própria do art.
+271 entra como **coluna preparada e zerada**, até o confronto dos enquadramentos
+2 e 4 existir.
+
+**Por estabelecimento e mês** porque é a unidade do arquivo digital: o registro
+0000 leva CNPJ, IE e o período `mmaaaa`. Apurar pela empresa daria um número que
+não vira arquivo nenhum.
+
+**Apurar não é poder entregar.** O valor aparece sempre; ao lado dele, o que
+trava — fora de SP, ficha retirada, confronto pendente, saída sem alíquota,
+enquadramento indefinido, saldo que não fecha com o inventário, mês sem bloco H.
+Cada motivo diz o que fazer, e o resumo separa `ressarcimento` (tudo) de
+`ressarcimento_apto` (o que dá para pedir hoje).
+
+**Os saldos saem prontos para o 1050.** Uma linha por (estabelecimento, mês,
+mercadoria) com quantidade e ICMS suportado no início e no fim — os quatro
+campos do registro 1050. O saldo inicial é o final do mês anterior da mesma
+ficha; no primeiro mês em que a mercadoria se move, é a abertura do inventário.
+Nada é recalculado: vem da coluna de saldo da própria Ficha 3.
+
+---
+
 ## 2026-09-15 — Ficha com estoque negativo sai do total até os dados chegarem
 
 **O que o piloto mostrou.** Primeira montagem do razão sobre o Amigão

@@ -82,6 +82,14 @@ const DESTINOS: Record<
       padrao: "Montar o razão",
     },
   },
+  apuracao: {
+    rota: ROTAS.apuracao,
+    rotulos: {
+      concluida: "Ver o que dá para pedir e o que trava",
+      em_andamento: "Acompanhar a apuração",
+      padrao: "Apurar ressarcimento e complemento",
+    },
+  },
 };
 
 const TOM_DA_SITUACAO: Record<string, TomDeEtiqueta> = {

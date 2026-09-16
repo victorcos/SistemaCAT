@@ -99,4 +99,8 @@ public interface IMotor
 
     /// <summary>As linhas de uma ficha do razão.</summary>
     Task<System.Text.Json.JsonElement> LinhasDoRazao(int execucaoId, PedidoDeFicha pedido, CancellationToken cancelar);
+
+    /// <summary>As competências fechadas na apuração do período.</summary>
+    /// <exception cref="MotorRecusou">não é apuração (404), não terminou (409), material apagado (410), recorte inválido (422)</exception>
+    Task<System.Text.Json.JsonElement> CompetenciasApuradas(int execucaoId, PedidoDeCompetencias pedido, CancellationToken cancelar);
 }
