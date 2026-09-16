@@ -30,6 +30,7 @@ from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_ITENS,
     ARQUIVO_MOVIMENTOS,
 )
+from cat.infraestrutura.analitico.contingencia import ARQUIVO_CONTINGENCIA
 from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO
 from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO, ARQUIVO_SALDOS
 from cat.infraestrutura.analitico.arquivo_digital import ARQUIVO_ARQUIVOS, ARQUIVO_OCORRENCIAS
@@ -49,6 +50,7 @@ from cat.infraestrutura.planilhas.conferencia import (
 )
 from cat.infraestrutura.planilhas.movimentacao import (
     gerar_analitico,
+    gerar_contingencia,
     gerar_inventario,
     gerar_itens,
     gerar_movimentos,
@@ -88,6 +90,7 @@ PLANILHAS = {
         "itens": ("itens.xlsx", ARQUIVO_ITENS, gerar_itens),
         "inventario": ("inventario.xlsx", ARQUIVO_INVENTARIO, gerar_inventario),
         "analitico": ("analitico.xlsx", ARQUIVO_ANALITICO, gerar_analitico),
+        "contingencia": ("contingencia_nao_escrituradas.xlsx", ARQUIVO_CONTINGENCIA, gerar_contingencia),
     },
     apurar_suportado.ETAPA: {
         "suportado": ("icms_suportado.xlsx", ARQUIVO_SUPORTADO, gerar_suportado),

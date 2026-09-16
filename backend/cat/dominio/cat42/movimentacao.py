@@ -75,6 +75,16 @@ class ResumoDaMovimentacao:
     documentos_cancelados_na_sefaz: int = 0
     movimentos_cancelados: int = 0
 
+    # ---- não escrituradas: XML do estabelecimento fora da EFD do mês ----
+    # a multa do art. 527 do RICMS/SP, sem SELIC (ver `contingencia.py`)
+    nao_escrituradas_entradas: int = 0
+    nao_escrituradas_saidas: int = 0
+    valor_nao_escriturado_entradas: Decimal = ZERO
+    icms_nao_escriturado_saidas: Decimal = ZERO
+    multa_nao_escrituradas_entradas: Decimal = ZERO
+    multa_nao_escrituradas_saidas: Decimal = ZERO
+    contingencia_por_ano: list[Fatia] = field(default_factory=list)
+
     # ---- movimentos: as linhas de item ----
     movimentos: int = 0
     movimentos_entrada: int = 0
@@ -137,6 +147,15 @@ class ResumoDaMovimentacao:
                 f"{_numero(self.itens_sem_par_no_xml)} item(ns) do C170 são de nota "
                 "com XML, mas não casaram com o item do XML (número do item ou valor "
                 "diferentes). Ficaram com os valores da EFD."
+            )
+        if self.nao_escrituradas_entradas or self.nao_escrituradas_saidas:
+            multa = self.multa_nao_escrituradas_entradas + self.multa_nao_escrituradas_saidas
+            avisos.append(
+                f"{_numero(self.nao_escrituradas_entradas)} entrada(s) e "
+                f"{_numero(self.nao_escrituradas_saidas)} saída(s) têm XML e não estão na EFD do "
+                f"estabelecimento: contingência de {_dinheiro(multa)} em multa do art. 527 do "
+                "RICMS/SP (10% do valor nas entradas, 75% do ICMS nas saídas), sem SELIC. "
+                "Não entram na ficha; a planilha traz nota a nota."
             )
         if self.documentos_cancelados_na_sefaz:
             avisos.append(

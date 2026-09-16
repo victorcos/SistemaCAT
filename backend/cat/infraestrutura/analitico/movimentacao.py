@@ -38,6 +38,12 @@ movimentação — o C170 e o item do XML —, e o resumo conta quantos document
 e movimentos saíram. O documento continua em `documentos.parquet`: é a
 escrituração como veio, e é ela que se retifica.
 
+## Não escrituradas
+
+O XML do estabelecimento, de mês com EFD, que a EFD dele não tem e que não está
+cancelado vai para `contingencia.parquet`, item a item, com a multa do art. 527
+do RICMS/SP — sem SELIC. A regra está em `contingencia.py`.
+
 A marca da conferência é a única junção contra o lado grande, e é feita
 pelo lado pequeno de propósito: a lista de conferidos de uma base saudável
 tem dezenas de milhões de chaves, mas os movimentos com item são só as
@@ -59,6 +65,11 @@ from cat.dominio.cat42.conferencia import Fatia
 from cat.dominio.cat42.movimentacao import ResumoDaMovimentacao
 from cat.infraestrutura.analitico.canceladas import ARQUIVO_CHAVES_CANCELADAS, ESQUEMA_CHAVES_CANCELADAS
 from cat.infraestrutura.analitico.confronto import SITUACOES_COM_DOCUMENTO, _abrir, _escapar, _limpar
+from cat.infraestrutura.analitico.contingencia import (
+    ARQUIVO_CONTINGENCIA,
+    montar_contingencia,
+    resumir_contingencia,
+)
 from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML, ESQUEMA_ITENS_DO_XML
 from cat.infraestrutura.analitico.movimentos import (  # noqa: F401
     ARQUIVO_ANALITICO,
@@ -183,6 +194,9 @@ def consolidar(destino: str, conferidos: str | None) -> ResumoDaMovimentacao:
             ) TO '{p(ARQUIVO_MOVIMENTOS)}' (FORMAT PARQUET, COMPRESSION ZSTD)
         """)
 
+        # 3. as notas do XML que a EFD não escriturou, com a multa de cada item
+        montar_contingencia(con, p(ARQUIVO_DOCUMENTOS), p(ARQUIVO_CONTINGENCIA))
+
         try:
             os.remove(os.path.join(destino, ARQUIVO_MOVIMENTOS_BRUTOS))
         except OSError:
@@ -191,6 +205,7 @@ def consolidar(destino: str, conferidos: str | None) -> ResumoDaMovimentacao:
 
         resumo = _resumir(con, p, usada)
         _resumir_xml(con, p, resumo)
+        _resumir_contingencia(con, p, resumo)
     finally:
         con.close()
         _limpar(destino)
@@ -300,6 +315,17 @@ def _resumir_xml(con, p, r: ResumoDaMovimentacao) -> None:
                                   AND chave IN (SELECT chave FROM xml_chaves))
         FROM read_parquet('{p(ARQUIVO_MOVIMENTOS)}')
     """).fetchone()
+
+
+def _resumir_contingencia(con, p, r: ResumoDaMovimentacao) -> None:
+    c = resumir_contingencia(con, p(ARQUIVO_CONTINGENCIA))
+    r.nao_escrituradas_entradas, r.nao_escrituradas_saidas = c["entradas"], c["saidas"]
+    r.valor_nao_escriturado_entradas = _dec(c["valor_entradas"])
+    r.icms_nao_escriturado_saidas = _dec(c["icms_saidas"])
+    r.multa_nao_escrituradas_entradas = _dec(c["multa_entradas"])
+    r.multa_nao_escrituradas_saidas = _dec(c["multa_saidas"])
+    r.contingencia_por_ano = [Fatia(rotulo=ano, documentos=n, valor=_dec(v), codigo=ano)
+                              for ano, n, v in c["por_ano"]]
 
 
 def _resumir(con, p, conferencia_usada: bool) -> ResumoDaMovimentacao:

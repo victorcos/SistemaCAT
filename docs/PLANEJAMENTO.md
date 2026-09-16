@@ -87,7 +87,9 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       pedido do cliente, não é regra (decisão do Victor, 16/09/2026)
 - [x] Notas canceladas na SEFAZ e ativas no SPED/XML: evento de cancelamento e
       lista de chaves no lote, fora da movimentação e contadas (v0.53.2)
-- [ ] Contingência das notas não escrituradas: só a multa do art. 527, sem SELIC
+- [x] Contingência das notas não escrituradas: multa do art. 527, sem SELIC,
+      nota a nota na etapa 3 (v0.53.2)
+- [ ] Saída não escriturada sem ICMS destacado: imputar alíquota, como a RVZ? (a decidir)
 - [ ] XML dentro de zip no lote (a Advertising entregou assim)
 
 ### 3. O que a apuração ainda não calcula

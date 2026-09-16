@@ -57,14 +57,27 @@ export interface ResumoDaMovimentacao {
   chaves_canceladas?: number;
   documentos_cancelados_na_sefaz?: number;
   movimentos_cancelados?: number;
+  /** Não escrituradas e a multa do art. 527, sem SELIC (v0.53.2). */
+  nao_escrituradas_entradas?: number;
+  nao_escrituradas_saidas?: number;
+  valor_nao_escriturado_entradas?: string;
+  icms_nao_escriturado_saidas?: string;
+  multa_nao_escrituradas_entradas?: string;
+  multa_nao_escrituradas_saidas?: string;
+  contingencia_por_ano?: Fatia[];
 }
 
 export interface ExecucaoDeMovimentos extends Omit<Execucao, "resumo"> {
   resumo: ResumoDaMovimentacao | null;
 }
 
-/** As quatro listas que a etapa exporta. */
-export type PlanilhaDeMovimentos = "movimentos" | "itens" | "inventario" | "analitico";
+/** As listas que a etapa exporta. */
+export type PlanilhaDeMovimentos =
+  | "movimentos"
+  | "itens"
+  | "inventario"
+  | "analitico"
+  | "contingencia";
 
 /** O nome que a janela de salvar sugere. */
 const NOME_SUGERIDO: Record<PlanilhaDeMovimentos, string> = {
@@ -72,6 +85,7 @@ const NOME_SUGERIDO: Record<PlanilhaDeMovimentos, string> = {
   itens: "cadastro_de_itens",
   inventario: "inventario",
   analitico: "analitico_por_documento",
+  contingencia: "contingencia_nao_escrituradas",
 };
 
 export const iniciarMovimentos = (projetoId: number) =>

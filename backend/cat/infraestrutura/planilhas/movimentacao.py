@@ -10,7 +10,9 @@ quebra em abas, identificador como texto, valor e data tipados):
 * **itens** — o cadastro que vale, um por estabelecimento e código;
 * **inventário** — o saldo de abertura, item a item;
 * **analítico** — o total por CST/CFOP de cada documento, com `tem_item`.
-  É por aqui que se vê o que a EFD não detalha.
+  É por aqui que se vê o que a EFD não detalha;
+* **contingência** — o item de cada nota não escriturada, com a multa do
+  art. 527 e o fundamento.
 """
 
 from __future__ import annotations
@@ -110,6 +112,33 @@ COLUNAS_ANALITICO = (
 )
 
 
+COLUNAS_CONTINGENCIA = (
+    Coluna("cnpj", "CNPJ do estabelecimento", "texto", 20),
+    Coluna("competencia", "Competência", "data", 13),
+    Coluna("emissao", "Emissão", "data", 13),
+    Coluna("operacao", "Operação", "texto", 10),
+    Coluna("modelo", "Modelo", "texto", 8),
+    Coluna("numero_documento", "Número", "texto", 12),
+    Coluna("serie", "Série", "texto", 7),
+    Coluna("chave", "Chave de acesso", "texto", 46),
+    Coluna("emitente", "Emitente", "texto", 20),
+    Coluna("destinatario", "Destinatário", "texto", 20),
+    Coluna("numero_item", "Item", "numero_inteiro", 6),
+    Coluna("codigo", "Código do item", "texto", 16),
+    Coluna("descricao", "Descrição", "texto", 40),
+    Coluna("ncm", "NCM", "texto", 11),
+    Coluna("cfop", "CFOP", "texto", 7),
+    Coluna("cst_icms", "CST ICMS", "texto", 9),
+    Coluna("valor", "Valor do item", "numero", 16),
+    Coluna("valor_icms", "ICMS destacado", "numero", 14),
+    Coluna("base_da_multa", "Base da multa", "numero", 16),
+    Coluna("percentual", "Multa %", "numero", 9),
+    Coluna("multa", "Multa", "numero", 14),
+    Coluna("fundamento", "Fundamento", "texto", 44),
+    Coluna("arquivo", "Arquivo do XML", "texto", 34),
+)
+
+
 def gerar_movimentos(parquet: str, destino: str,
                      modelos: frozenset[str] | None = None,
                      classificacoes: frozenset[str] | None = None,
@@ -140,4 +169,12 @@ def gerar_analitico(parquet: str, destino: str,
                     classificacoes: frozenset[str] | None = None,
                     formato: str = "xlsx") -> int:
     return gerar(parquet, destino, COLUNAS_ANALITICO, "Analítico",
+                 modelos=modelos, formato=formato)
+
+
+def gerar_contingencia(parquet: str, destino: str,
+                       modelos: frozenset[str] | None = None,
+                       classificacoes: frozenset[str] | None = None,
+                       formato: str = "xlsx") -> int:
+    return gerar(parquet, destino, COLUNAS_CONTINGENCIA, "Não escrituradas",
                  modelos=modelos, formato=formato)

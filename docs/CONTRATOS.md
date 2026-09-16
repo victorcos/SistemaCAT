@@ -506,6 +506,26 @@ ganha `chaves_canceladas`, `documentos_cancelados_na_sefaz` e
 `movimentos_cancelados`, e um aviso quando há documento cancelado. Execução
 anterior não tem esses campos.
 
+### Notas não escrituradas e contingência (v0.53.2)
+
+A consolidação grava `contingencia.parquet`: o item de cada XML do
+estabelecimento, de mês com EFD dele, que a EFD dele não tem e que não está
+cancelado. Colunas: `cnpj`, `competencia`, `emissao`, `operacao` (do lado do
+estabelecimento), `modelo`, `numero_documento`, `serie`, `chave`, `emitente`,
+`destinatario`, `numero_item`, `codigo`, `descricao`, `ncm`, `cfop`,
+`cst_icms`, `valor`, `valor_icms`, `base_da_multa`, `percentual`, `multa`,
+`fundamento`, `arquivo`.
+
+Multa do art. 527 do RICMS/SP, sem SELIC: entrada, 10% do `valor`; saída, 75%
+do `valor_icms` destacado no XML.
+
+O resumo ganha `nao_escrituradas_entradas`, `nao_escrituradas_saidas`
+(documentos), `valor_nao_escriturado_entradas`, `icms_nao_escriturado_saidas`,
+`multa_nao_escrituradas_entradas`, `multa_nao_escrituradas_saidas` (texto
+decimal) e `contingencia_por_ano` (fatias: ano, documentos, multa). A planilha
+é `GET /api/movimentos/{execucao}/planilhas/contingencia`
+(`contingencia_nao_escrituradas.xlsx`, aceita `modelos` e `formato`).
+
 ## 16. De-para de códigos
 
 | Método | Rota | O que faz |

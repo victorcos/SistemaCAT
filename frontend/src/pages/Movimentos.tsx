@@ -415,6 +415,42 @@ function Resultado({
           fatias={resumo.saidas_sem_item_por_modelo}
         />
       </Secao>
+
+      {resumo.multa_nao_escrituradas_entradas !== undefined && (
+        <Secao
+          titulo="Notas não escrituradas"
+          sub="XML do estabelecimento, de mês com EFD, que a EFD não tem e que não está cancelado. Não entra na ficha. A contingência é a multa do art. 527 do RICMS/SP — 10% do valor nas entradas, 75% do ICMS destacado nas saídas —, sem SELIC."
+          acao={
+            <BaixarPlanilha
+              aoBaixar={(formato) => aoBaixar("contingencia", formato)}
+              desabilitado={
+                ocupado ||
+                (resumo.nao_escrituradas_entradas ?? 0) + (resumo.nao_escrituradas_saidas ?? 0) === 0
+              }
+              baixando={baixando?.qual === "contingencia" ? baixando.formato : null}
+              aoCancelar={aoCancelar}
+            />
+          }
+        >
+          <Numerao
+            nota={`${numero(resumo.nao_escrituradas_entradas ?? 0)} entrada(s), ${dinheiro(
+              resumo.valor_nao_escriturado_entradas ?? "0",
+            )} em valor, ${dinheiro(resumo.multa_nao_escrituradas_entradas ?? "0")} de multa · ${numero(
+              resumo.nao_escrituradas_saidas ?? 0,
+            )} saída(s), ${dinheiro(resumo.icms_nao_escriturado_saidas ?? "0")} de ICMS, ${dinheiro(
+              resumo.multa_nao_escrituradas_saidas ?? "0",
+            )} de multa.`}
+          >
+            {dinheiro(
+              (
+                Number(resumo.multa_nao_escrituradas_entradas ?? 0) +
+                Number(resumo.multa_nao_escrituradas_saidas ?? 0)
+              ).toFixed(2),
+            )}
+          </Numerao>
+          <Recortes titulo="Multa por ano de emissão" fatias={resumo.contingencia_por_ano ?? []} />
+        </Secao>
+      )}
     </>
   );
 }

@@ -5,6 +5,37 @@
 
 ---
 
+## 2026-09-16 — A contingência das notas não escrituradas
+
+**O que é.** Nota não escriturada não entra na ficha, mas o fisco que a achar
+fora da EFD cobra multa, e o cliente precisa do número para decidir se
+retifica. A RVZ calculou na Advertising; aqui sai na etapa 3, que é onde o XML
+é lido por inteiro, em `contingencia.parquet` (um item por linha), no resumo e
+numa planilha.
+
+**Quem entra.** XML do estabelecimento (emitente ou destinatário com EFD no
+projeto), emitido num mês que tem EFD dele, sem a chave na EFD dele e não
+cancelado na SEFAZ. Mês sem EFD fica de fora: ali não se sabe. A operação é a
+do estabelecimento — emitida por ele com `tpNF` 1 é saída, com `tpNF` 0 é
+entrada; recebida, o contrário.
+
+**A multa, sem SELIC** (a CAT 42 não se atualiza pela SELIC — orientação dos
+colegas do Victor). Infração do art. 215 do RICMS/SP:
+
+* entrada — art. 527, V, "a": 10% do valor do item;
+* saída — art. 527, I, "b": 75% do ICMS **destacado no XML**.
+
+**Na Advertising.** Entradas: 19.432 notas, R$ 908.908,64, multa
+R$ 90.893,31 — a RVZ chegou a R$ 902.270,47 de valor e R$ 90.227,05 de multa
+antes da SELIC. Saídas: 1.740 notas, R$ 388.760,93 de valor, mas só R$ 43,40 de
+ICMS destacado (quase tudo CST x60 em CFOP 5.949/6.949), multa R$ 32,57. A RVZ
+aplicou 18% sobre o valor das "saídas tributadas" (ICMS R$ 69.962,86, multa
+R$ 52.472,14 antes da SELIC). Aqui vale o XML, e mercadoria com ST retida não
+tem imposto próprio na saída interna. **Fica para o Victor decidir** se a saída
+sem destaque deve ter alíquota imputada.
+
+---
+
 ## 2026-09-16 — Canceladas na SEFAZ saem da movimentação
 
 **O problema.** A EFD pode trazer como regular a nota que o emitente cancelou na
