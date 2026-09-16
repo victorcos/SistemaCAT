@@ -526,7 +526,7 @@ function PorEnquadramento({ resumo, acao }: { resumo: ResumoDoRazao; acao: React
   return (
     <section className="overflow-hidden rounded-cartao border border-borda bg-superficie shadow-cat">
       <div className="flex flex-wrap items-center gap-3.5 border-b border-borda px-5.5 py-4.5">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[280px] flex-1">
           <h2 className="m-0 text-lg font-extrabold text-texto">Saídas por enquadramento legal</h2>
           <p className="m-0 mt-1 text-xs text-texto-fraco">
             O enquadramento decide contra o quê a saída é confrontada. Venda de PDV é consumidor final pelo tipo do
@@ -662,7 +662,7 @@ function Fichas({ execucaoId, total, rodape }: { execucaoId: number; total: numb
   return (
     <section className="overflow-hidden rounded-cartao border border-borda bg-superficie shadow-cat">
       <div className="flex flex-wrap items-center gap-3.5 border-b border-borda px-5.5 py-4.5">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[280px] flex-1">
           <h2 className="m-0 text-lg font-extrabold text-texto">Fichas</h2>
           <p className="m-0 mt-1 text-xs text-texto-fraco">
             {dados

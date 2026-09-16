@@ -543,7 +543,7 @@ function Arquivos({ execucaoId, total, rodape }: { execucaoId: number; total: nu
   return (
     <section className="overflow-hidden rounded-cartao border border-borda bg-superficie shadow-cat">
       <div className="flex flex-wrap items-center gap-3.5 border-b border-borda px-5.5 py-4.5">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[280px] flex-1">
           <h2 className="m-0 text-lg font-extrabold text-texto">Arquivos</h2>
           <p className="m-0 mt-1 text-xs text-texto-fraco">
             {dados
