@@ -31,11 +31,14 @@ from __future__ import annotations
 
 import csv
 import os
+import shutil
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
+import duckdb
+import pyarrow as pa
 import pyarrow.parquet as pq
 import xlsxwriter
 
@@ -228,29 +231,81 @@ def _texto_para_csv(valor, coluna: Coluna) -> str:
     return str(valor)
 
 
+def _literal(texto: str) -> str:
+    return "'" + str(texto).replace("'", "''") + "'"
+
+
+def _expressao_csv(coluna: Coluna, tipos: dict[str, pa.DataType]) -> str:
+    """A coluna como texto do CSV, em SQL, com as regras de `_texto_para_csv`.
+
+    As duas implementações dizem a mesma coisa de propósito: a do Python
+    documenta a regra, e a do SQL é a que roda. O teste de igualdade entre elas
+    é o que impede que divirjam.
+    """
+    if coluna.campo not in tipos:
+        return "NULL"
+    col = '"' + coluna.campo.replace('"', '""') + '"'
+    tipo = tipos[coluna.campo]
+    traducao = _TRADUCOES.get(coluna.campo)
+    if traducao:
+        casos = " ".join(f"WHEN {_literal(k)} THEN {_literal(v)}" for k, v in traducao.items())
+        expr = f"CASE CAST({col} AS VARCHAR) {casos} ELSE CAST({col} AS VARCHAR) END"
+    elif pa.types.is_boolean(tipo):
+        expr = f"CASE WHEN {col} THEN 'Sim' WHEN NOT {col} THEN 'Não' END"
+    elif coluna.tipo == "data" and pa.types.is_date(tipo):
+        expr = f"strftime({col}, '%d/%m/%Y')"
+    elif coluna.tipo in CASAS:
+        expr = f"replace(printf('%.{CASAS[coluna.tipo]}f', TRY_CAST({col} AS DOUBLE)), '.', ',')"
+    else:
+        expr = f"CAST({col} AS VARCHAR)"
+    # vazio vira nulo: o DuckDB escreve texto vazio entre aspas ("") para
+    # distinguir de nulo, e o CSV desta casa sempre saiu com o campo vazio
+    return f"nullif({expr}, '')"
+
+
 def _gerar_csv(parquet: str, destino: str, colunas: tuple[Coluna, ...],
                modelos: frozenset[str] | None = None,
                classificacoes: frozenset[str] | None = None,
                campo: str = "classificacao") -> int:
     """Uma linha por registro, sem limite e sem aba.
 
-    `utf-8-sig` grava o BOM: sem ele o Excel lê o arquivo como ANSI e todo
-    acento vira lixo. `newline=""` é exigência do módulo csv no Windows —
-    sem isso sai uma linha em branco entre cada duas.
+    Escrito pelo DuckDB, e não linha a linha em Python: a Ficha 3 de uma loja
+    do Amigão (1,17 milhão de linhas) levava 60 s, e o dossiê de uma base do
+    tamanho da BOA leva uma por filial. Os bytes são os mesmos que o módulo
+    `csv` escrevia — `;`, aspas só onde precisa, CRLF, vírgula decimal —, e o
+    BOM vai à mão: sem ele o Excel lê o arquivo como ANSI e todo acento vira lixo.
     """
-    escritas = 0
+    tipos = {campo_.name: campo_.type for campo_ in pq.read_schema(parquet)}
+    filtros = []
+    if modelos is not None:
+        filtros.append(f"modelo IN ({', '.join(map(_literal, sorted(modelos)))})"
+                       if "modelo" in tipos and modelos else "false")
+    if classificacoes is not None:
+        filtros.append(f'"{campo}" IN ({", ".join(map(_literal, sorted(classificacoes)))})'
+                       if campo in tipos and classificacoes else "false")
+    onde = f"WHERE {' AND '.join(filtros)}" if filtros else ""
+    selecao = ", ".join(f"{_expressao_csv(c, tipos)} AS c{i}" for i, c in enumerate(colunas))
+    corpo = destino + ".corpo"
+    pasta = _pasta_de_rascunho(destino)
+
     with open(destino, "w", encoding="utf-8-sig", newline="") as f:
-        escritor = csv.writer(f, delimiter=SEPARADOR_CSV,
-                              quoting=csv.QUOTE_MINIMAL)
-        escritor.writerow([c.titulo for c in colunas])
-        for r in _filtradas(parquet, modelos, classificacoes, campo):
-            linha = []
-            for coluna in colunas:
-                valor = r.get(coluna.campo)
-                linha.append("" if valor is None or valor == ""
-                             else _texto_para_csv(valor, coluna))
-            escritor.writerow(linha)
-            escritas += 1
+        csv.writer(f, delimiter=SEPARADOR_CSV, quoting=csv.QUOTE_MINIMAL).writerow([c.titulo for c in colunas])
+    con = duckdb.connect()
+    try:
+        con.execute("SET threads TO 4")
+        con.execute(f"SET temp_directory = {_literal(pasta)}")
+        escritas = con.execute(
+            f"COPY (SELECT {selecao} FROM read_parquet({_literal(parquet)}) {onde}) TO {_literal(corpo)} "
+            f"(HEADER false, DELIMITER '{SEPARADOR_CSV}', QUOTE '\"', ESCAPE '\"', NEW_LINE '\r\n')"
+        ).fetchone()[0]
+    finally:
+        con.close()
+    try:
+        with open(destino, "ab") as saida, open(corpo, "rb") as origem:
+            shutil.copyfileobj(origem, saida, 1 << 20)
+    finally:
+        if os.path.isfile(corpo):
+            os.remove(corpo)
 
     log.info("csv gerado",
              extra={"arquivo": os.path.basename(destino), "linhas": escritas})
