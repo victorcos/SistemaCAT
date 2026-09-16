@@ -53,12 +53,16 @@ class TipoDeArquivo(str, Enum):
     SPED_OUTRO = "sped_outro"
     XML_NFE = "xml_nfe"
     XML_OUTRO = "xml_outro"
+    # evento de cancelamento de NF-e (procEventoNFe 110111): tira a nota da movimentação
+    XML_CANCELAMENTO = "xml_cancelamento"
     GERENCIAL_MOVIMENTO = "gerencial_movimento"
     GERENCIAL_INVENTARIO = "gerencial_inventario"
     GERENCIAL_RESUMO = "gerencial_resumo"
     # o TXT que o cliente transmitiu à SEFAZ, gerado por outra ferramenta: não
     # alimenta a apuração, é o que a pré-validação do cliente lê
     CAT42_ARQUIVO_DIGITAL = "cat42_arquivo_digital"
+    # lista de chaves canceladas na SEFAZ (TXT, CSV ou planilha com "cancel" no nome)
+    LISTA_DE_CANCELADAS = "lista_de_canceladas"
     COMPACTADO = "compactado"
     NAO_BAIXADO = "nao_baixado"
     DESCONHECIDO = "desconhecido"
@@ -72,10 +76,12 @@ class TipoDeArquivo(str, Enum):
             TipoDeArquivo.SPED_OUTRO: "SPED de outro tipo",
             TipoDeArquivo.XML_NFE: "XML de NF-e ou CF-e",
             TipoDeArquivo.XML_OUTRO: "XML de outro documento",
+            TipoDeArquivo.XML_CANCELAMENTO: "Evento de cancelamento de NF-e",
             TipoDeArquivo.GERENCIAL_MOVIMENTO: "Relatório de movimento",
             TipoDeArquivo.GERENCIAL_INVENTARIO: "Relatório de inventário",
             TipoDeArquivo.GERENCIAL_RESUMO: "Resumo por produto",
             TipoDeArquivo.CAT42_ARQUIVO_DIGITAL: "Arquivo digital da CAT 42",
+            TipoDeArquivo.LISTA_DE_CANCELADAS: "Lista de notas canceladas",
             TipoDeArquivo.COMPACTADO: "Compactado",
             TipoDeArquivo.NAO_BAIXADO: "Não baixado do OneDrive",
             TipoDeArquivo.DESCONHECIDO: "Não reconhecido",
@@ -110,6 +116,8 @@ _ALIMENTAM = frozenset({
     TipoDeArquivo.XML_NFE,
     TipoDeArquivo.GERENCIAL_MOVIMENTO,
     TipoDeArquivo.GERENCIAL_INVENTARIO,
+    TipoDeArquivo.XML_CANCELAMENTO,
+    TipoDeArquivo.LISTA_DE_CANCELADAS,
 })
 
 

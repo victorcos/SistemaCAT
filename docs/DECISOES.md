@@ -5,6 +5,41 @@
 
 ---
 
+## 2026-09-16 — Canceladas na SEFAZ saem da movimentação
+
+**O problema.** A EFD pode trazer como regular a nota que o emitente cancelou na
+SEFAZ, e o XML autorizado continua na pasta — o de cancelamento é outro
+arquivo. Pedir ressarcimento sobre ela é pedir sobre operação que não houve. A
+RVZ consultou a SEFAZ nota a nota com o certificado do cliente; o sistema não
+guarda certificado de cliente, então a cancelada entra pelo lote.
+
+**Dois tipos novos no lote, os dois alimentam a CAT.**
+
+* `xml_cancelamento` — `procEventoNFe` com `tpEvento` 110111. CNPJ e competência
+  vêm da chave cancelada. Carta de correção e outros eventos continuam
+  `xml_outro`.
+* `lista_de_canceladas` — TXT ou CSV com "cancel" no nome e chave de acesso em
+  pelo menos metade das linhas; planilha com "cancel" no nome e alguma chave
+  escrita como texto. O nome é a trava: uma lista de chaves qualquer (a de
+  conferidos, a de notas ausentes) não pode tirar nota da apuração. Chave que o
+  Excel gravou como número já perdeu os dígitos do fim e não se adivinha.
+
+**Na etapa 3.** A extração grava `chaves_canceladas.parquet` (sempre, mesmo
+vazio, para a pasta não herdar lista de rodada anterior). A consolidação tira da
+movimentação o C170 e o item do XML de chave cancelada, e conta: chaves lidas,
+documentos que a EFD trazia e movimentos que saíram, com aviso de que a EFD pede
+retificação. O documento fica em `documentos.parquet` — é a escrituração como
+veio.
+
+**Na Advertising.** As duas listas da pasta (a extraída pela RVZ e a do cliente)
+dão 1.011 chaves; 911 estão na EFD, 814 já como canceladas e **97 como
+regulares** — 101 movimentos de saída, R$ 9.968,61, que agora saem.
+
+**Lote antigo.** Evento importado antes da v0.53.2 ficou como `xml_outro`; a
+pasta precisa ser inspecionada de novo para virar `xml_cancelamento`.
+
+---
+
 ## 2026-09-16 — O motor abre processos de verdade
 
 **O que se viu.** A primeira rodada da v0.53 no Amigão (#57) correu dentro do

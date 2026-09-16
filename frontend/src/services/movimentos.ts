@@ -53,6 +53,10 @@ export interface ResumoDaMovimentacao {
   movimentos_do_xml?: number;
   itens_pareados_com_xml?: number;
   itens_sem_par_no_xml?: number;
+  /** Canceladas na SEFAZ (v0.53.2): evento de cancelamento ou lista de chaves. */
+  chaves_canceladas?: number;
+  documentos_cancelados_na_sefaz?: number;
+  movimentos_cancelados?: number;
 }
 
 export interface ExecucaoDeMovimentos extends Omit<Execucao, "resumo"> {

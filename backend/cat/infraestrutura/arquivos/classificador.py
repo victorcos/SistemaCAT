@@ -17,6 +17,8 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import unicodedata
+import zipfile
 from datetime import date
 from typing import Iterator
 
@@ -81,6 +83,10 @@ _RE_CNPJ_DESTINATARIO = re.compile(
     r"<dest>.*?<CNPJ>(\d{14})</CNPJ>", re.IGNORECASE | re.DOTALL)
 # aaaa-mm-dd na NF-e, aaaammdd no CF-e
 _RE_EMISSAO = re.compile(r"<(?:dhEmi|dEmi)>(\d{4})-?(\d{2})-?(\d{2})")
+# evento de cancelamento de NF-e: tira a nota da movimentação na etapa 3
+_RE_EVENTO_CANCELAMENTO = re.compile(r"<tpEvento>\s*110111\s*</tpEvento>")
+_RE_CHAVE_DO_EVENTO = re.compile(r"<chNFe>\s*(\d{44})\s*</chNFe>")
+_RE_CHAVE_SOLTA = re.compile(r"(?<!\d)\d{44}(?!\d)")
 
 
 def _amostra(caminho: str) -> str:
@@ -137,7 +143,22 @@ def _do_arquivo_da_cat42(caminho: str, tamanho: int, texto: str) -> ArquivoDoLot
     )
 
 
+def _competencia_da_chave(chave: str) -> date | None:
+    """AAMM das posições 3 a 6 da chave de acesso."""
+    ano, mes = int(chave[2:4]), int(chave[4:6])
+    return date(2000 + ano, mes, 1) if 1 <= mes <= 12 else None
+
+
 def _do_xml(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote:
+    if _RE_EVENTO_CANCELAMENTO.search(texto) and not _RE_NFE.search(texto):
+        chave = _RE_CHAVE_DO_EVENTO.search(texto)
+        return ArquivoDoLote(
+            caminho=caminho, nome=os.path.basename(caminho), tamanho=tamanho,
+            tipo=TipoDeArquivo.XML_CANCELAMENTO,
+            cnpj=chave.group(1)[6:20] if chave else None,
+            competencia=_competencia_da_chave(chave.group(1)) if chave else None,
+            detalhe=f"cancela {chave.group(1)}" if chave else "",
+        )
     e_nfe = _RE_NFE.search(texto) is not None
     emitente = _RE_CNPJ_EMITENTE.search(texto)
     destinatario = _RE_CNPJ_DESTINATARIO.search(texto)
@@ -154,6 +175,49 @@ def _do_xml(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote:
                      if emissao else None),
         motivo="" if e_nfe else "o XML não é de NF-e, NFC-e nem CF-e",
     )
+
+
+def _nome_de_canceladas(nome: str) -> bool:
+    sem_acento = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode().lower()
+    return "cancel" in sem_acento
+
+
+def _da_lista_de_canceladas(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote | None:
+    """TXT ou CSV com "cancel" no nome e chaves de acesso em pelo menos metade das linhas."""
+    if not _nome_de_canceladas(os.path.basename(caminho)):
+        return None
+    linhas = [l for l in texto.splitlines() if l.strip()]
+    com_chave = sum(1 for l in linhas if _RE_CHAVE_SOLTA.search(l))
+    if not linhas or com_chave == 0 or com_chave * 2 < len(linhas):
+        return None
+    return ArquivoDoLote(caminho=caminho, nome=os.path.basename(caminho), tamanho=tamanho,
+                         tipo=TipoDeArquivo.LISTA_DE_CANCELADAS,
+                         detalhe=f"{com_chave} chaves nas primeiras linhas")
+
+
+def _da_planilha_de_canceladas(caminho: str, tamanho: int) -> ArquivoDoLote | None:
+    """Planilha com "cancel" no nome e alguma chave de acesso escrita como texto."""
+    if not _nome_de_canceladas(os.path.basename(caminho)):
+        return None
+    from openpyxl import load_workbook  # noqa: PLC0415
+    try:
+        livro = load_workbook(caminho, read_only=True, data_only=True)
+    except (OSError, ValueError, KeyError, zipfile.BadZipFile) as erro:
+        log.warning("planilha de canceladas ilegível na classificação",
+                    extra={"arquivo": os.path.basename(caminho), "motivo": str(erro)})
+        return None
+    try:
+        chaves = 0
+        for aba in livro.worksheets:
+            for linha in aba.iter_rows(values_only=True, max_row=200):
+                chaves += sum(1 for v in linha if isinstance(v, str) and _RE_CHAVE_SOLTA.search(v))
+    finally:
+        livro.close()
+    if not chaves:
+        return None
+    return ArquivoDoLote(caminho=caminho, nome=os.path.basename(caminho), tamanho=tamanho,
+                         tipo=TipoDeArquivo.LISTA_DE_CANCELADAS,
+                         detalhe=f"{chaves} chaves nas primeiras linhas")
 
 
 def _do_gerencial(caminho: str, tamanho: int) -> ArquivoDoLote:
@@ -202,6 +266,11 @@ def classificar(caminho: str, tamanho: int | None = None) -> ArquivoDoLote:
         return ArquivoDoLote(caminho=caminho, nome=nome, tamanho=tamanho,
                              tipo=TipoDeArquivo.COMPACTADO)
 
+    if minusculo.endswith((".xlsx", ".xlsm")):
+        planilha = _da_planilha_de_canceladas(caminho, tamanho)
+        if planilha is not None:
+            return planilha
+
     try:
         texto = _amostra(caminho)
     except OSError as erro:
@@ -227,6 +296,9 @@ def classificar(caminho: str, tamanho: int | None = None) -> ArquivoDoLote:
         return da_cat42
 
     if minusculo.endswith(EXTENSOES_TEXTO) or minusculo.endswith(".csv"):
+        lista = _da_lista_de_canceladas(caminho, tamanho, texto)
+        if lista is not None:
+            return lista
         return _do_gerencial(caminho, tamanho)
 
     return ArquivoDoLote(caminho=caminho, nome=nome, tamanho=tamanho,

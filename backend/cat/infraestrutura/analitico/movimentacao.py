@@ -30,6 +30,14 @@ Na entrada de terceiros completada pelo XML, o CFOP do XML é o de quem vendeu
 (5.401): vale o CFOP do analítico do documento quando ele é um só, e senão o
 do XML com o primeiro dígito virado para o lado de quem recebeu (1.401).
 
+## Canceladas na SEFAZ
+
+Com `chaves_canceladas.parquet` (evento de cancelamento ou lista de chaves), o
+documento que a EFD traz como válido e está cancelado na SEFAZ sai da
+movimentação — o C170 e o item do XML —, e o resumo conta quantos documentos
+e movimentos saíram. O documento continua em `documentos.parquet`: é a
+escrituração como veio, e é ela que se retifica.
+
 A marca da conferência é a única junção contra o lado grande, e é feita
 pelo lado pequeno de propósito: a lista de conferidos de uma base saudável
 tem dezenas de milhões de chaves, mas os movimentos com item são só as
@@ -49,6 +57,7 @@ from decimal import Decimal
 
 from cat.dominio.cat42.conferencia import Fatia
 from cat.dominio.cat42.movimentacao import ResumoDaMovimentacao
+from cat.infraestrutura.analitico.canceladas import ARQUIVO_CHAVES_CANCELADAS, ESQUEMA_CHAVES_CANCELADAS
 from cat.infraestrutura.analitico.confronto import SITUACOES_COM_DOCUMENTO, _abrir, _escapar, _limpar
 from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML, ESQUEMA_ITENS_DO_XML
 from cat.infraestrutura.analitico.movimentos import (  # noqa: F401
@@ -199,7 +208,13 @@ def consolidar(destino: str, conferidos: str | None) -> ResumoDaMovimentacao:
 
 def _preparar_xml(con, destino: str, p) -> None:
     """Monta `movimentos_juntos`: os C170/C810 com o XML ao lado, mais os itens
-    que o XML traz para o documento escriturado sem item."""
+    que o XML traz para o documento escriturado sem item, menos o cancelado na SEFAZ."""
+    if os.path.isfile(os.path.join(destino, ARQUIVO_CHAVES_CANCELADAS)):
+        con.execute(f"CREATE TABLE canceladas AS SELECT DISTINCT chave FROM read_parquet('{p(ARQUIVO_CHAVES_CANCELADAS)}')")
+    else:
+        con.register("canceladas_vazio", ESQUEMA_CHAVES_CANCELADAS.empty_table())
+        con.execute("CREATE TABLE canceladas AS SELECT DISTINCT chave FROM canceladas_vazio")
+        con.unregister("canceladas_vazio")
     if os.path.isfile(os.path.join(destino, ARQUIVO_ITENS_DO_XML)):
         con.execute(f"CREATE TABLE xml_itens AS SELECT * FROM read_parquet('{p(ARQUIVO_ITENS_DO_XML)}')")
     else:
@@ -229,7 +244,7 @@ def _preparar_xml(con, destino: str, p) -> None:
         GROUP BY m.cnpj, m.chave
     """)
     con.execute(f"""
-        CREATE VIEW movimentos_juntos AS
+        CREATE VIEW movimentos_com_xml AS
         SELECT m.*, 'efd' AS fonte_item, {_COLUNAS_DO_XML}
         FROM read_parquet('{p(ARQUIVO_MOVIMENTOS_BRUTOS)}') m
         LEFT JOIN efd_contagem ce ON ce.cnpj = m.cnpj AND ce.chave = m.chave
@@ -252,16 +267,30 @@ def _preparar_xml(con, destino: str, p) -> None:
         JOIN xml_itens x ON x.chave = d.chave
         LEFT JOIN cfop_do_analitico ca ON ca.cnpj = d.cnpj AND ca.chave = d.chave
         -- as colunas das contagens não entram: são só do lado da EFD
-        
+    """)
+    # a nota cancelada na SEFAZ não tem operação: sai da movimentação e fica
+    # contada — aqui, antes que o intermediário da EFD seja apagado
+    con.execute("""
+        CREATE TABLE canceladas_contadas AS
+        SELECT count(DISTINCT (m.cnpj, m.chave)) AS documentos, count(*) AS movimentos
+        FROM movimentos_com_xml m SEMI JOIN canceladas c ON c.chave = m.chave
+    """)
+    con.execute("""
+        CREATE VIEW movimentos_juntos AS
+        SELECT m.* FROM movimentos_com_xml m ANTI JOIN canceladas c ON c.chave = m.chave
     """)
 
 
 def _resumir_xml(con, p, r: ResumoDaMovimentacao) -> None:
-    """O que o XML completou, casou e deixou de fora."""
+    """O que o XML completou, casou e deixou de fora; e o que saiu por cancelado."""
+    r.chaves_canceladas = con.execute("SELECT count(*) FROM canceladas").fetchone()[0]
+    (r.documentos_cancelados_na_sefaz, r.movimentos_cancelados) = con.execute(
+        "SELECT documentos, movimentos FROM canceladas_contadas").fetchone()
     (r.saidas_completadas_pelo_xml, r.entradas_completadas_pelo_xml) = con.execute("""
         SELECT count(*) FILTER (WHERE operacao = 'saida'), count(*) FILTER (WHERE operacao = 'entrada')
         FROM (SELECT DISTINCT cnpj, chave, operacao FROM docs_do_xml
-              WHERE chave IN (SELECT chave FROM xml_itens))
+              WHERE chave IN (SELECT chave FROM xml_itens)
+                AND chave NOT IN (SELECT chave FROM canceladas))
     """).fetchone()
     # do parquet final: o intermediário da EFD, em que a view se apoia, já foi apagado
     (r.movimentos_do_xml, r.itens_pareados_com_xml, r.itens_sem_par_no_xml) = con.execute(f"""

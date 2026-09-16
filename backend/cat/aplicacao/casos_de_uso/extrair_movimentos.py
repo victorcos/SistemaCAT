@@ -41,6 +41,7 @@ from cat.aplicacao.casos_de_uso.historico_do_projeto import (
 from cat.dominio.cat42.movimentacao import ResumoDaMovimentacao
 from cat.dominio.lote import TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
+from cat.infraestrutura.analitico.canceladas import ler_chaves_canceladas
 from cat.infraestrutura.analitico.confronto import ARQUIVO_CONFERIDOS
 from cat.infraestrutura.analitico.itens_do_xml import ProgressoDoXml, extrair_itens_do_xml
 from cat.infraestrutura.analitico.movimentacao import consolidar
@@ -162,6 +163,13 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     execucao.passo = "Lendo os itens dos XML"
     sessao.commit()
     do_xml = extrair_itens_do_xml(xmls, destino, avisar=relogio.marcar)
+
+    # sempre grava, mesmo vazio: a pasta não herda lista de uma rodada anterior
+    execucao.passo = "Lendo as notas canceladas"
+    sessao.commit()
+    canceladas = caminhos_do_projeto(
+        execucao.projeto_id, (TipoDeArquivo.XML_CANCELAMENTO, TipoDeArquivo.LISTA_DE_CANCELADAS), sessao)
+    ler_chaves_canceladas(canceladas, destino)
 
     execucao.passo = "Consolidando"
     execucao.arquivos_lidos = execucao.arquivos_totais

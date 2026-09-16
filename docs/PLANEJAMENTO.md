@@ -85,7 +85,8 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] X.949 fora da ficha, contada (v0.53)
 - [x] Nota de entrada não escriturada **não** entra na ficha: a RVZ incluiu a
       pedido do cliente, não é regra (decisão do Victor, 16/09/2026)
-- [ ] Notas canceladas na SEFAZ e ativas no SPED/XML
+- [x] Notas canceladas na SEFAZ e ativas no SPED/XML: evento de cancelamento e
+      lista de chaves no lote, fora da movimentação e contadas (v0.53.2)
 - [ ] Contingência das notas não escrituradas: só a multa do art. 527, sem SELIC
 - [ ] XML dentro de zip no lote (a Advertising entregou assim)
 

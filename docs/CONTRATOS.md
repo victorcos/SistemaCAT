@@ -489,6 +489,23 @@ do C170 (`valor_icms`, `valor_st`, `bc_st`, mais o FCP-ST) e o retido do XML
 vence o do relatório do cliente. No razão (etapa 5), a saída que veio do XML
 tem `origem = xml`, e ela também troca a linha do relatório com a mesma chave.
 
+### Canceladas na SEFAZ (v0.53.2)
+
+Dois tipos de arquivo do lote, ambos com `alimenta_a_cat`:
+
+| Tipo | Rótulo | O que é |
+|---|---|---|
+| `xml_cancelamento` | Evento de cancelamento de NF-e | `procEventoNFe` com `tpEvento` 110111; `cnpj` e `competencia` saem da chave |
+| `lista_de_canceladas` | Lista de notas canceladas | TXT/CSV com "cancel" no nome e chave em metade das linhas, ou planilha com "cancel" no nome e chave como texto |
+
+A etapa 3 lê os dois depois dos XML (passo "Lendo as notas canceladas") e grava
+`chaves_canceladas.parquet` (`chave`, `arquivo`, `origem` = `evento` ou
+`lista`). Movimento de chave cancelada — C170 ou item do XML — não vai para
+`movimentos.parquet`; o documento continua em `documentos.parquet`. O resumo
+ganha `chaves_canceladas`, `documentos_cancelados_na_sefaz` e
+`movimentos_cancelados`, e um aviso quando há documento cancelado. Execução
+anterior não tem esses campos.
+
 ## 16. De-para de códigos
 
 | Método | Rota | O que faz |

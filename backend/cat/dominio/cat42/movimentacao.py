@@ -69,6 +69,11 @@ class ResumoDaMovimentacao:
     itens_pareados_com_xml: int = 0
     # C170 de documento que tem XML, mas sem item que case: ficou com a EFD
     itens_sem_par_no_xml: int = 0
+    # canceladas na SEFAZ (evento de cancelamento ou lista de chaves): as
+    # chaves lidas, e o que a EFD trazia como válido e saiu da movimentação
+    chaves_canceladas: int = 0
+    documentos_cancelados_na_sefaz: int = 0
+    movimentos_cancelados: int = 0
 
     # ---- movimentos: as linhas de item ----
     movimentos: int = 0
@@ -132,6 +137,13 @@ class ResumoDaMovimentacao:
                 f"{_numero(self.itens_sem_par_no_xml)} item(ns) do C170 são de nota "
                 "com XML, mas não casaram com o item do XML (número do item ou valor "
                 "diferentes). Ficaram com os valores da EFD."
+            )
+        if self.documentos_cancelados_na_sefaz:
+            avisos.append(
+                f"{_numero(self.documentos_cancelados_na_sefaz)} documento(s) estão cancelados na "
+                "SEFAZ (evento de cancelamento ou lista de canceladas) e a EFD os traz como "
+                f"válidos: {_numero(self.movimentos_cancelados)} movimento(s) ficaram fora da "
+                "apuração. A EFD desses períodos pede retificação."
             )
         if self.xml_ilegiveis:
             avisos.append(
