@@ -23,6 +23,27 @@ enquadramento indefinido, saldo que não fecha com o inventário, mês sem bloco
 Cada motivo diz o que fazer, e o resumo separa `ressarcimento` (tudo) de
 `ressarcimento_apto` (o que dá para pedir hoje).
 
+**O piloto (execução 47, 46 segundos).** 775 competências em 71
+estabelecimentos, 2.464.669 saldos gravados, R$ 66.681,16 de ressarcimento e
+R$ 1.534.323,19 de complemento — e **nenhuma competência apta**.
+
+| UF | Lojas | Competências | Ressarcimento |
+|---|---|---|---|
+| PR | 47 | 517 | R$ 0,00 |
+| **SP** | **22** | **234** | **R$ 0,00** |
+| MS | 2 | 24 | R$ 66.681,15 |
+
+O que o quadro diz, e que nenhuma tela dizia antes: **o Amigão tem 22
+estabelecimentos em São Paulo, e todo o valor apurado é de lojas do Mato Grosso
+do Sul**, que não entram na CAT 42. As 234 competências paulistas têm entrada e
+não têm saída — o relatório de saídas que o download entregou é das lojas MS e
+do CD do Paraná. Sem o relatório de saídas das lojas de SP (ou o XML dos
+cupons), o pedido paulista é zero por falta de dado, não por falta de direito.
+
+Travas: 638 competências divergem do inventário, 541 são de fora de SP, 137 não
+têm bloco H no mês, 52 dependem do confronto dos enquadramentos 2 e 4, 46 têm
+ficha retirada, 6 têm saída sem alíquota e 3 têm enquadramento indefinido.
+
 **Os saldos saem prontos para o 1050.** Uma linha por (estabelecimento, mês,
 mercadoria) com quantidade e ICMS suportado no início e no fim — os quatro
 campos do registro 1050. O saldo inicial é o final do mês anterior da mesma
