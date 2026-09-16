@@ -91,6 +91,17 @@ dela), e o sistema as deixa de fora. **Decisão do Victor (16/09/2026): continua
 de fora.** Incluí-las foi pedido particular da Advertising na época, não regra do
 trabalho; nota não escriturada segue na lista da conferência, para cobrar.
 
+**Sem SELIC (decisão do Victor, 16/09/2026).** A RVZ atualizou a contingência das
+notas não escrituradas pela SELIC. Aqui não: a CAT 42 não se atualiza pela SELIC
+(orientação dos colegas do Victor). A contingência, quando entrar, é só a multa
+do art. 527 do RICMS/SP — 10% do valor nas entradas, 75% do ICMS nas saídas.
+
+**Canceladas na SEFAZ (decisão do Victor, 16/09/2026).** Entram pelos eventos de
+cancelamento em XML (`procEventoNFe`, 110111) e por lista de chaves canceladas
+(TXT ou planilha, como a que a RVZ extraiu e a que o cliente mandou); a nota
+cancelada sai da movimentação e fica contada. Sem consulta à SEFAZ: não se guarda
+certificado de cliente no sistema.
+
 ---
 
 ## 2026-09-16 — A rodada num processo próprio, e o índice sem `mode()`
