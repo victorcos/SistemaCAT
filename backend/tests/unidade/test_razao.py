@@ -314,3 +314,35 @@ class TestResumo:
         assert r.linhas == 3
         assert r.ressarcimento == D(12)
         assert r.saldo_quantidade == D(8)
+
+
+class TestValorDaAbertura:
+    """Item 3.3.8: as entradas mais recentes, suficientes para a quantidade, com média ponderada."""
+
+    def test_o_exemplo_do_manual(self):
+        from cat.dominio.cat42.razao import EntradaAnterior, valor_da_abertura  # noqa: PLC0415
+        # último: 10 un a R$ 15; penúltimo: 20 un a R$ 10; quantidade 12
+        v = valor_da_abertura(D(12), [EntradaAnterior(date(2020, 11, 5), D(20), D(200)),
+                                      EntradaAnterior(date(2020, 12, 20), D(10), D(150))])
+        assert v.valor == D(170)
+        assert (v.valor / 12).quantize(D("0.01")) == D("14.17")
+        assert not v.parcial and not v.sem_valor
+
+    def test_entradas_que_nao_alcancam_valoram_o_resto_pela_media(self):
+        from cat.dominio.cat42.razao import EntradaAnterior, valor_da_abertura  # noqa: PLC0415
+        v = valor_da_abertura(D(10), [EntradaAnterior(date(2020, 12, 1), D(4), D(8))])
+        assert (v.valor, v.coberta, v.parcial) == (D(20), D(4), True)
+
+    def test_sem_entrada_fica_sem_valor(self):
+        from cat.dominio.cat42.razao import valor_da_abertura  # noqa: PLC0415
+        v = valor_da_abertura(D(10), [])
+        assert (v.valor, v.sem_valor, v.parcial) == (D(0), True, False)
+        assert not valor_da_abertura(D(0), []).sem_valor
+
+    def test_no_mesmo_dia_vale_a_ordem(self):
+        from cat.dominio.cat42.razao import EntradaAnterior, valor_da_abertura  # noqa: PLC0415
+        dia = date(2020, 12, 20)
+        # a de ordem maior é a mais recente: 5 un a R$ 4 cobrem tudo
+        v = valor_da_abertura(D(5), [EntradaAnterior(dia, D(5), D(10), ordem=0),
+                                     EntradaAnterior(dia, D(5), D(20), ordem=1)])
+        assert v.valor == D(20)

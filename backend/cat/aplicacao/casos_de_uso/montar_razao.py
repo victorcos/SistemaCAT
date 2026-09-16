@@ -210,9 +210,12 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
         diario.base["andamento"] = {"linhas": a.linhas, "total": a.total, "fichas": a.fichas}
         diario.salvar_de_vez_em_quando()
 
+    projeto = sessao.get(ProjetoDB, execucao.projeto_id)
+    periodo = (projeto.competencia_ini, projeto.competencia_fim) if projeto is not None else None
     fontes = Fontes(movimentacao=movimentos.pasta_de_trabalho,
                     apuracao=apuracao.pasta_de_trabalho,
-                    saidas_do_relatorio=caminho_saidas)
+                    saidas_do_relatorio=caminho_saidas,
+                    periodo=periodo)
     venda = venda_a_consumidor_do_projeto(execucao.projeto_id, sessao)
     diario.anotar("info", f"Venda a consumidor final: {venda.rotulo.lower()} (escolha do trabalho).")
     resumo = montar(fontes, destino, uf_por_cnpj=_ufs(execucao.projeto_id, sessao),
@@ -281,7 +284,11 @@ def _anotar_pendencias(diario: Diario, r) -> None:
         (r.confronto_pendente, "saídas de enquadramento 2 ou 4: o confronto com o ICMS da entrada ainda não é apurado"),
         (r.fichas_retiradas, "fichas retiradas do total até os dados chegarem: o estoque ficou "
                              "negativo — falta entrada, abertura ou algum tipo de saída"),
-        (r.fichas_abertura_sem_valor, "fichas abertas com quantidade e sem ICMS suportado: o inventário não traz o imposto"),
+        (r.fichas_abertura_sem_valor, "fichas abertas com quantidade e sem ICMS suportado: o inventário não traz o "
+                                      "imposto e a base não tem entrada anterior ao inventário para valorar a abertura "
+                                      "(item 3.3.8) — importe as EFD dos meses antes do período"),
+        (r.fichas_abertura_parcial, "fichas com abertura valorada só em parte: as entradas anteriores ao inventário "
+                                    "não cobriram a quantidade, e o resto foi pela média delas"),
         (r.fichas_fora_de_sp, "fichas de estabelecimento fora de SP, que não entram na CAT 42"),
         (r.linhas_unidade_sem_fator, "linhas com unidade diferente da do inventário e sem fator "
                                      "de conversão (0220): quantidade mantida como veio"),
@@ -291,6 +298,12 @@ def _anotar_pendencias(diario: Diario, r) -> None:
     for n, texto in avisos:
         if n:
             diario.anotar("aviso", f"{milhar(n)} {texto}.")
+    if r.fichas_abertura_valorada:
+        diario.anotar("info", f"{milhar(r.fichas_abertura_valorada)} fichas com a abertura valorada pelas entradas "
+                              f"anteriores ao inventário: {reais(r.icms_da_abertura)} de ICMS suportado.")
+    if r.lancamentos_de_uso_e_consumo:
+        diario.anotar("info", f"{milhar(r.lancamentos_de_uso_e_consumo)} lançamentos de uso e consumo ficaram fora da "
+                              "ficha: não são estoque de comercialização.")
     if r.saidas_com_aliquota_do_mes:
         diario.anotar("info", f"{milhar(r.saidas_com_aliquota_do_mes)} saídas confrontadas com a alíquota do "
                               "cadastro do próprio mês, diferente da do fim do período.")

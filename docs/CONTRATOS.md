@@ -261,6 +261,13 @@ confrontadas com a alíquota do 0200 do próprio mês, diferente da do fim do
 período) e `conferencia_inventario`. Enquanto roda, `andamento` com `linhas`,
 `total` e `fichas`.
 
+O período do razão é o do **cadastro do trabalho** (sem ele, o da base); se ele
+não cruza com a base, a montagem falha dizendo os dois períodos. `abertura`
+traz `fichas_valoradas`, `fichas_parciais`, `fichas_sem_valor` e `icms` — o
+ICMS da abertura pelas entradas até o dia do inventário (item 3.3.8); cada
+ficha ganhou `abertura_valor` e `abertura_parcial`. `fora_da_ficha` traz
+`uso_e_consumo` (lançamentos de CFOP de uso e consumo, que não entram na ficha).
+
 A alíquota do confronto (enquadramentos 1 e 3) é a do 0200 da EFD do **mês da
 saída**; só quando o mês não traz alíquota vale a do cadastro mais recente. A
 unidade é sempre a do cadastro mais recente.

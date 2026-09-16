@@ -255,6 +255,63 @@ class SaldoInicial:
         return self.valor / self.quantidade if self.quantidade else ZERO
 
 
+@dataclass(frozen=True)
+class EntradaAnterior:
+    """Uma entrada de antes do inventário de abertura, na unidade da ficha."""
+
+    data: date
+    quantidade: Decimal
+    icms_suportado: Decimal
+    ordem: int = 0          # desempate estável no mesmo dia: a maior é a mais recente
+
+
+@dataclass(frozen=True)
+class ValorDaAbertura:
+    valor: Decimal
+    coberta: Decimal        # quanto da quantidade as entradas alcançaram
+    quantidade: Decimal = ZERO
+
+    @property
+    def parcial(self) -> bool:
+        return ZERO < self.coberta < self.quantidade
+
+    @property
+    def sem_valor(self) -> bool:
+        return self.quantidade > ZERO and self.coberta == ZERO
+
+
+def valor_da_abertura(quantidade: Decimal, entradas) -> ValorDaAbertura:
+    """O ICMS suportado do estoque de abertura, pelas entradas mais recentes.
+
+    O inventário do cliente pode vir sem o imposto (o do Amigão veio vazio em
+    842 mil linhas). O manual não diz como valorar a abertura, mas diz, no
+    item 3.3.8, como se acha o valor quando não se identifica a entrada: as
+    entradas mais recentes, suficientes para comportar a quantidade, com média
+    ponderada quando uma nota não basta. É a mesma pergunta — de que entradas
+    veio este estoque — e foi a regra escolhida (decisão do Victor, 16/09/2026).
+
+    Quando as entradas não alcançam a quantidade inteira, o que falta é
+    valorado pela média das que alcançaram, e `coberta` diz quanto foi de fato
+    coberto. Sem entrada nenhuma, o valor é zero e a ficha fica sinalizada.
+    """
+    if quantidade <= ZERO:
+        return ValorDaAbertura(ZERO, ZERO, quantidade)
+    restante = quantidade
+    valor = ZERO
+    for e in sorted(entradas, key=lambda e: (e.data, e.ordem), reverse=True):
+        if restante <= ZERO:
+            break
+        if e.quantidade <= ZERO:
+            continue
+        usada = min(restante, e.quantidade)
+        valor += e.icms_suportado * usada / e.quantidade
+        restante -= usada
+    coberta = quantidade - restante
+    if ZERO < coberta < quantidade:
+        valor = valor * quantidade / coberta
+    return ValorDaAbertura(valor, coberta, quantidade)
+
+
 @dataclass
 class ResumoDoRazao:
     """Totais de uma ficha, para conferir contra o que o cliente entregou."""

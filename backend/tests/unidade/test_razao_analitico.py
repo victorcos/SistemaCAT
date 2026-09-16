@@ -443,3 +443,82 @@ class TestATela:
         destino, _ = montado
         with pytest.raises(ValueError):
             lista_de_fichas(str(destino), so="tudo")
+
+
+def acrescentar_linhas(caminho, linhas: list[dict]) -> None:
+    t = pq.read_table(caminho)
+    pq.write_table(pa.Table.from_pylist(t.to_pylist() + linhas, schema=t.schema), caminho)
+
+
+def entrada_anterior(data, quantidade, suportado, n, cfop="1403") -> dict:
+    return {"cnpj": A, "codigo": "X", "data": data, "cfop": cfop, "cst_icms": "060", "modelo": "55",
+            "quantidade": d(quantidade), "suportado": d(suportado), "chave": str(n) * 44,
+            "numero_documento": str(n), "numero_item": 1}
+
+
+class TestAberturaValorada:
+    """A abertura de 31/12/2020 (10 un) pelas entradas de antes do período (item 3.3.8)."""
+
+    def test_as_entradas_mais_recentes_valoram_a_abertura(self, fontes, tmp_path):
+        # 6 un a R$ 2 em dezembro e 10 un a R$ 3 em novembro: 6 x 2 + 4 x 3 = R$ 24
+        acrescentar_linhas(os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO), [
+            entrada_anterior(date(2020, 11, 10), 10, 30, 7),
+            entrada_anterior(date(2020, 12, 20), 6, 12, 8),
+            # devolução de venda e uso e consumo não são de onde o estoque veio
+            entrada_anterior(date(2020, 12, 28), 50, 999, 9, cfop="1411"),
+        ])
+        destino = tmp_path / "abertura"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+        f = pq.read_table(str(destino / ARQUIVO_FICHAS)).to_pylist()[0]
+        assert (f["abertura_valor"], f["abertura_sem_valor"], f["abertura_parcial"]) == (d(24), False, False)
+        # a entrada de 05/01 soma R$ 20 aos R$ 24 da abertura
+        assert ficha(destino)[0]["saldo_valor"] == d(44)
+        assert (r.fichas_abertura_valorada, r.fichas_abertura_sem_valor, r.icms_da_abertura) == (1, 0, d(24))
+        # as entradas de 2020 valoram a abertura e não entram na ficha
+        assert len(ficha(destino)) == 4
+        assert serializar(r)["abertura"]["icms"] == "24.00"
+
+        # e a etapa 6 abre o 1050 com o ICMS da abertura
+        from cat.infraestrutura.analitico.apuracao import ARQUIVO_SALDOS, apurar  # noqa: PLC0415
+        periodo = tmp_path / "periodo"
+        periodo.mkdir()
+        apurar(str(destino), str(periodo), {A: "SP"})
+        saldo = pq.read_table(str(periodo / ARQUIVO_SALDOS)).to_pylist()[0]
+        assert (saldo["qtd_ini"], saldo["icms_tot_ini"]) == (d(10), d(24))
+
+    def test_entradas_que_nao_alcancam_marcam_a_abertura_como_parcial(self, fontes, tmp_path):
+        acrescentar_linhas(os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO), [
+            entrada_anterior(date(2020, 12, 20), 4, 8, 8)])
+        destino = tmp_path / "parcial"
+        destino.mkdir()
+        r = montar(fontes, str(destino))
+        f = pq.read_table(str(destino / ARQUIVO_FICHAS)).to_pylist()[0]
+        assert (f["abertura_valor"], f["abertura_parcial"]) == (d(20), True)
+        assert serializar(r)["pendencias"]["fichas_abertura_parcial"] == 1
+
+    def test_uso_e_consumo_sai_da_ficha_e_fica_contado(self, fontes, tmp_path):
+        acrescentar_linhas(os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO), [
+            entrada_anterior(date(2021, 1, 6), 3, 9, 8, cfop="1556")])
+        destino = tmp_path / "uso"
+        destino.mkdir()
+        r = montar(fontes, str(destino))
+        assert len(ficha(destino)) == 4
+        assert r.lancamentos_de_uso_e_consumo == 1
+        assert serializar(r)["fora_da_ficha"] == {"uso_e_consumo": 1}
+
+    def test_periodo_do_cadastro_que_nao_cruza_a_base_e_recusado(self, fontes, tmp_path):
+        from cat.infraestrutura.analitico.razao import PeriodoSemMovimento  # noqa: PLC0415
+        fontes.periodo = (date(2019, 1, 1), date(2019, 12, 31))
+        destino = tmp_path / "sem_periodo"
+        destino.mkdir()
+        with pytest.raises(PeriodoSemMovimento, match="01/2019 a 12/2019"):
+            montar(fontes, str(destino))
+
+    def test_periodo_do_cadastro_manda_no_inicio(self, fontes, tmp_path):
+        # com o cadastro em 2021, a mesma base monta a mesma ficha
+        fontes.periodo = (date(2021, 1, 1), date(2021, 12, 31))
+        destino = tmp_path / "com_periodo"
+        destino.mkdir()
+        r = montar(fontes, str(destino))
+        assert (r.periodo_inicio, r.periodo_fim, len(ficha(destino))) == ("2021-01-01", "2021-12-31", 4)

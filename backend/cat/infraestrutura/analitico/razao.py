@@ -67,7 +67,7 @@ import os
 import shutil
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pyarrow as pa
@@ -75,11 +75,15 @@ import pyarrow.parquet as pq
 
 from cat.dominio.cat42.enquadramento import (
     CFOP_DEVOLUCAO,
+    CFOP_USO_E_CONSUMO,
     VendaAConsumidor,
     classificar,
 )
 from cat.dominio.cat42.razao import (
+    EntradaAnterior,
     EnquadramentoLegal,
+    ValorDaAbertura,
+    valor_da_abertura,
     Especie,
     Movimento,
     MovimentoInvalido,
@@ -182,7 +186,11 @@ ESQUEMA_FICHAS = pa.schema([
     ("descricao", pa.string()),
     ("linhas", pa.int32()),
     ("abertura_quantidade", pa.decimal128(24, 6)),
+    # o ICMS da abertura pelas entradas anteriores ao inventário (item 3.3.8)
+    ("abertura_valor", pa.decimal128(30, 15)),
     ("abertura_sem_valor", pa.bool_()),
+    # as entradas anteriores não alcançaram a quantidade: o resto foi pela média delas
+    ("abertura_parcial", pa.bool_()),
     ("entradas", pa.decimal128(24, 6)),
     ("saidas", pa.decimal128(24, 6)),
     ("saldo_quantidade", pa.decimal128(24, 6)),
@@ -329,6 +337,13 @@ class Fontes:
     movimentacao: str           # pasta da etapa 3
     apuracao: str               # pasta da etapa 4
     saidas_do_relatorio: str | None = None
+    # o período do cadastro do trabalho. Sem ele, o da base. Com ele, o que a
+    # base tem antes do início não entra na ficha: serve para valorar a abertura
+    periodo: tuple[date, date] | None = None
+
+
+class PeriodoSemMovimento(ValueError):
+    """O cadastro do trabalho não cruza com a base importada."""
 
 
 @dataclass
@@ -360,6 +375,11 @@ class ResumoDaMontagem:
     confronto_pendente: int = 0
     fichas_negativas: int = 0
     fichas_abertura_sem_valor: int = 0
+    fichas_abertura_valorada: int = 0
+    fichas_abertura_parcial: int = 0
+    icms_da_abertura: Decimal = Decimal(0)
+    # fora da ficha por decisão: uso e consumo não é estoque de comercialização
+    lancamentos_de_uso_e_consumo: int = 0
     fichas_fora_de_sp: int = 0
     relatorio_sem_estabelecimento: int = 0
     relatorio_trocado_pela_efd: int = 0
@@ -420,16 +440,23 @@ def montar(
         resumo.saidas_com_aliquota_do_mes = con.execute(
             "SELECT count(*) FROM lancamentos WHERE especie = 'saida' AND NOT devolucao "
             "AND aliquota_do_mes_diferente").fetchone()[0]
+        resumo.lancamentos_de_uso_e_consumo = info["uso_e_consumo"]
         aberturas = {(c, k): q for c, k, q in con.execute(
             "SELECT cnpj, codigo, quantidade FROM abertura").fetchall()}
+        valores = _valorar_aberturas(con, aberturas)
         total = con.execute("SELECT count(*) FROM lancamentos").fetchone()[0]
+        if total == 0 and not aberturas and info["base_inicio"] is not None and fontes.periodo:
+            raise PeriodoSemMovimento(
+                f"Nenhum movimento no período do trabalho ({info['inicio']:%m/%Y} a {info['fim']:%m/%Y}); "
+                f"a base vai de {info['base_inicio']:%m/%Y} a {info['base_fim']:%m/%Y}. "
+                "Corrija o cadastro do trabalho ou a base importada.")
 
         leitor = con.execute("""
             SELECT * FROM lancamentos
             ORDER BY cnpj, codigo, data, prioridade, origem, documento
         """).to_arrow_reader(LINHAS_POR_LOTE)
         _percorrer(leitor, aberturas, ficha3, fichas, resumo, total,
-                   uf_por_cnpj, descricoes or {}, avisar, deve_parar, venda_a_consumidor)
+                   uf_por_cnpj, descricoes or {}, avisar, deve_parar, venda_a_consumidor, valores)
         # conexão nova para a conferência: a do percurso ainda segura o leitor
         # (a lição do índice da etapa 4). O banco é em arquivo, as tabelas ficam
         del leitor
@@ -454,6 +481,41 @@ def montar(
         "fichas": resumo.fichas, "linhas": resumo.linhas,
         "ressarcimento": str(resumo.ressarcimento), "complemento": str(resumo.complemento)})
     return resumo
+
+
+def _valorar_aberturas(con, aberturas: dict) -> dict[tuple[str, str], ValorDaAbertura]:
+    """O ICMS de cada abertura pelas entradas mais recentes até o inventário.
+
+    As entradas vêm da mais recente para a mais antiga, e param de ser
+    guardadas quando já cobrem a quantidade: numa base com anos de entrada, o
+    item não precisa de todas na memória.
+    """
+    valores: dict[tuple[str, str], ValorDaAbertura] = {}
+    atual: tuple[str, str] | None = None
+    entradas: list[EntradaAnterior] = []
+    coberto = Decimal(0)
+    cursor = con.execute("""
+        SELECT cnpj, codigo, data, quantidade, suportado FROM anteriores
+        ORDER BY cnpj, codigo, data DESC, chave DESC, numero_item DESC
+    """)
+    while lote := cursor.fetchmany(LINHAS_POR_LOTE):
+        for cnpj, codigo, data_, quantidade, suportado in lote:
+            chave = (cnpj, codigo)
+            if chave != atual:
+                if atual is not None:
+                    valores[atual] = valor_da_abertura(Decimal(aberturas[atual]), entradas)
+                atual, entradas, coberto = chave, [], Decimal(0)
+            if coberto >= Decimal(aberturas[chave]):
+                continue
+            q = Decimal(quantidade)
+            entradas.append(EntradaAnterior(data_, q, Decimal(suportado), ordem=-len(entradas)))
+            coberto += q
+    if atual is not None:
+        valores[atual] = valor_da_abertura(Decimal(aberturas[atual]), entradas)
+    for chave, quantidade in aberturas.items():
+        if chave not in valores:
+            valores[chave] = valor_da_abertura(Decimal(quantidade), [])
+    return valores
 
 
 def _completar_fichas(con, fichas: str, itens: str, conferencia: str) -> None:
@@ -593,7 +655,11 @@ def _preparar(con, fontes: Fontes) -> dict:
     rel = fontes.saidas_do_relatorio
     tem_rel = bool(rel and os.path.isfile(rel))
 
-    inicio, fim = con.execute(f"SELECT min(competencia), max(competencia) FROM {mov}").fetchone()
+    base_inicio, base_fim = con.execute(f"SELECT min(competencia), max(competencia) FROM {mov}").fetchone()
+    if fontes.periodo:
+        inicio, fim = fontes.periodo[0].replace(day=1), fontes.periodo[1]
+    else:
+        inicio, fim = base_inicio, base_fim
     # fim do último mês
     fim = (fim.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
     lista = lambda conj: ", ".join(f"'{c}'" for c in sorted(conj))  # noqa: E731
@@ -662,6 +728,7 @@ def _preparar(con, fontes: Fontes) -> dict:
     con.execute(f"""
         CREATE OR REPLACE TABLE codigos AS
         SELECT DISTINCT codigo FROM {saidas} WHERE right(coalesce(cst_icms, ''), 2) = '60'
+          AND replace(cfop, '.', '') NOT IN ({lista(CFOP_USO_E_CONSUMO)})
     """)
     codigos = con.execute("SELECT count(*) FROM codigos").fetchone()[0]
     if os.path.isfile(itens):
@@ -734,6 +801,11 @@ def _preparar(con, fontes: Fontes) -> dict:
           AND l.cnpj IN (SELECT cnpj FROM estabs)
           AND l.data BETWEEN DATE '{inicio}' AND DATE '{fim}'
     """)
+    # uso e consumo não é estoque de comercialização: sai da ficha e fica contado
+    uso_e_consumo = con.execute(
+        f"SELECT count(*) FROM lancamentos WHERE cfop IN ({lista(CFOP_USO_E_CONSUMO)})").fetchone()[0]
+    if uso_e_consumo:
+        con.execute(f"DELETE FROM lancamentos WHERE cfop IN ({lista(CFOP_USO_E_CONSUMO)})")
 
     abertura_em = None
     if os.path.isfile(inventario):
@@ -758,9 +830,39 @@ def _preparar(con, fontes: Fontes) -> dict:
                     "quantidade DECIMAL(38, 9), sem_fator BOOLEAN)")
     abertura_sem_fator = con.execute("SELECT count(*) FROM abertura WHERE sem_fator").fetchone()[0]
 
+    # as entradas até o dia do inventário, na unidade da ficha: é delas que o
+    # estoque de abertura veio (item 3.3.8). Só existem se a base tiver meses
+    # antes do período do trabalho
+    if abertura_em is not None:
+        con.execute(f"""
+            CREATE OR REPLACE TABLE anteriores AS
+            SELECT e.cnpj, e.codigo, e.data, coalesce(e.chave, '') AS chave,
+                   coalesce(e.numero_item, 0) AS numero_item,
+                   e.quantidade * {_FATOR.format(t="e")} AS quantidade, coalesce(e.suportado, 0) AS suportado
+            FROM (
+                SELECT s.cnpj, s.codigo, s.data, s.cfop, s.chave, s.numero_item, s.quantidade, s.suportado,
+                       ue.unidade
+                FROM {sup} s
+                LEFT JOIN unidade_das_entradas ue
+                  ON ue.cnpj = s.cnpj AND ue.chave = s.chave AND ue.numero_documento = s.numero_documento
+                 AND ue.data = s.data AND ue.numero_item = s.numero_item AND ue.codigo = s.codigo
+                WHERE s.data <= DATE '{abertura_em}'
+            ) e
+            LEFT JOIN unid u ON u.cnpj = e.cnpj AND u.codigo = e.codigo
+            LEFT JOIN conv cv ON cv.cnpj = e.cnpj AND cv.codigo = e.codigo AND cv.unidade = upper(trim(e.unidade))
+            WHERE replace(e.cfop, '.', '') NOT IN ({lista(_DEVOLUCAO_DE_VENDA)})
+              AND replace(e.cfop, '.', '') NOT IN ({lista(CFOP_USO_E_CONSUMO)})
+              AND e.quantidade > 0
+              AND EXISTS (SELECT 1 FROM abertura a WHERE a.cnpj = e.cnpj AND a.codigo = e.codigo)
+        """)
+    else:
+        con.execute("CREATE OR REPLACE TABLE anteriores (cnpj VARCHAR, codigo VARCHAR, data DATE, chave VARCHAR, "
+                    "numero_item INTEGER, quantidade DECIMAL(38, 9), suportado DECIMAL(38, 15))")
+
     return {"inicio": inicio, "fim": fim, "abertura_em": abertura_em, "codigos": codigos,
             "sem_estabelecimento": sem_estab, "trocado_pela_efd": trocado,
-            "abertura_sem_fator": abertura_sem_fator}
+            "abertura_sem_fator": abertura_sem_fator, "uso_e_consumo": uso_e_consumo,
+            "base_inicio": base_inicio, "base_fim": base_fim}
 
 
 # ---------------------------------------------------------------------------
@@ -795,7 +897,8 @@ def _confronto(enq: EnquadramentoLegal, linha: dict) -> tuple[Decimal | None, bo
 
 def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: ResumoDaMontagem,
                total: int, uf_por_cnpj: dict, descricoes: dict, avisar, deve_parar,
-               venda_a_consumidor: VendaAConsumidor = VendaAConsumidor.ENQUADRAMENTO_1) -> None:
+               venda_a_consumidor: VendaAConsumidor = VendaAConsumidor.ENQUADRAMENTO_1,
+               valores: dict | None = None) -> None:
     escritor = pq.ParquetWriter(ficha3, ESQUEMA_FICHA3)
     escritor_fichas = pq.ParquetWriter(fichas, ESQUEMA_FICHAS)
     lote: dict[str, list] = {c: [] for c in ESQUEMA_FICHA3.names}
@@ -810,7 +913,9 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
     def fechar(chave: tuple[str, str]) -> None:
         cnpj, codigo = chave
         qtd_abertura = Decimal(aberturas.get(chave) or 0)
-        razao = RazaoDoItem(codigo, SaldoInicial(qtd_abertura, Decimal(0)))
+        va = (valores or {}).get(chave)
+        valor_abertura = va.valor if va is not None else Decimal(0)
+        razao = RazaoDoItem(codigo, SaldoInicial(qtd_abertura, valor_abertura))
         razao.lancar_varios(movimentos)
         linhas = razao.apurar()
         indice = {id(m): x for m, x in zip(movimentos, extras)}
@@ -865,10 +970,12 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                        ("descricao", descricoes.get((cnpj, codigo)) or descricoes.get(("", codigo), "")),
                        ("linhas", len(linhas)),
                        ("abertura_quantidade", qtd_abertura.quantize(_Q6)),
-                       ("abertura_sem_valor", qtd_abertura != 0),
+                       ("abertura_valor", valor_abertura.quantize(_Q15)),
+                       ("abertura_sem_valor", qtd_abertura != 0 and valor_abertura == 0),
+                       ("abertura_parcial", bool(va is not None and va.parcial)),
                        ("entradas", entradas.quantize(_Q6)), ("saidas", saidas.quantize(_Q6)),
                        ("saldo_quantidade", (ultima.saldo_quantidade if ultima else qtd_abertura).quantize(_Q6)),
-                       ("saldo_valor", (ultima.saldo_valor if ultima else Decimal(0)).quantize(_Q15)),
+                       ("saldo_valor", (ultima.saldo_valor if ultima else valor_abertura).quantize(_Q15)),
                        ("ressarcimento", ressarc.quantize(_Q15)), ("complemento", compl.quantize(_Q15)),
                        ("ficou_negativo", negativo), ("retirada", retirada),
                        ("saidas_sem_aliquota", sem_aliq),
@@ -887,7 +994,10 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         resumo.saidas_sem_aliquota += sem_aliq
         resumo.saidas_indefinidas += indef
         resumo.fichas_negativas += negativo
-        resumo.fichas_abertura_sem_valor += qtd_abertura != 0
+        resumo.fichas_abertura_sem_valor += qtd_abertura != 0 and valor_abertura == 0
+        resumo.fichas_abertura_valorada += valor_abertura != 0
+        resumo.fichas_abertura_parcial += bool(va is not None and va.parcial)
+        resumo.icms_da_abertura += valor_abertura
         resumo.fichas_fora_de_sp += bool(uf) and uf != "SP"
         estabelecimentos.add(cnpj)
         vistos.add(chave)
@@ -1142,6 +1252,7 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
             "confronto_pendente": resumo.confronto_pendente,
             "fichas_negativas": resumo.fichas_negativas,
             "fichas_abertura_sem_valor": resumo.fichas_abertura_sem_valor,
+            "fichas_abertura_parcial": resumo.fichas_abertura_parcial,
             "fichas_fora_de_sp": resumo.fichas_fora_de_sp,
             "relatorio_sem_estabelecimento": resumo.relatorio_sem_estabelecimento,
             "relatorio_trocado_pela_efd": resumo.relatorio_trocado_pela_efd,
@@ -1154,5 +1265,12 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
             "linhas_sem_fator": resumo.linhas_unidade_sem_fator,
         },
         "saidas_com_aliquota_do_mes": resumo.saidas_com_aliquota_do_mes,
+        "abertura": {
+            "fichas_valoradas": resumo.fichas_abertura_valorada,
+            "fichas_parciais": resumo.fichas_abertura_parcial,
+            "fichas_sem_valor": resumo.fichas_abertura_sem_valor,
+            "icms": texto(resumo.icms_da_abertura),
+        },
+        "fora_da_ficha": {"uso_e_consumo": resumo.lancamentos_de_uso_e_consumo},
         "conferencia_inventario": resumo.conferencia,
     }

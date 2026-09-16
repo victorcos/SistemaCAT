@@ -33,6 +33,7 @@ export interface PendenciasDoRazao {
   quantidade_negativa: number;
   linhas_unidade_sem_fator?: number;
   abertura_sem_fator?: number;
+  fichas_abertura_parcial?: number;
 }
 
 /** O saldo da ficha em cada data de bloco H contra o que a empresa declarou. */
@@ -87,7 +88,10 @@ export interface Ficha {
   descricao: string;
   linhas: number;
   abertura_quantidade: string;
+  /** o ICMS da abertura pelas entradas anteriores ao inventário (item 3.3.8) */
+  abertura_valor?: string;
   abertura_sem_valor: boolean;
+  abertura_parcial?: boolean;
   entradas: string;
   saidas: string;
   saldo_quantidade: string;

@@ -5,7 +5,9 @@ from cat.dominio.cat42.entrega import Gravidade, SituacaoDaCompetencia, pendenci
 RESUMOS = {
     "conferencia": {"sem_documento_cobravel": 120, "nao_escrituradas": 0, "sem_chave_na_efd": 3},
     "st_suportado": {"por_pendencia": {"sem_o_que_apurar": 900, "falta_dado": 45}},
-    "razao": {"pendencias": {"saidas_sem_aliquota": 2, "fichas_negativas": 0, "fichas_fora_de_sp": 7}},
+    "razao": {"pendencias": {"saidas_sem_aliquota": 2, "fichas_negativas": 0, "fichas_fora_de_sp": 7,
+                             "fichas_abertura_parcial": 3},
+              "fora_da_ficha": {"uso_e_consumo": 12}},
     "apuracao": {"por_motivo": [
         {"codigo": "fora_de_sp", "rotulo": "Estabelecimento fora de São Paulo", "o_que_fazer": "x", "competencias": 5},
         {"codigo": "sem_inventario", "rotulo": "Sem inventário", "o_que_fazer": "y", "competencias": 2},
@@ -29,7 +31,8 @@ class TestPendencias:
     def test_so_entra_o_que_tem_quantidade(self):
         codigos = {p.codigo for p in pendencias(RESUMOS)}
         assert "nao_escrituradas" not in codigos
-        assert {"documentos_a_cobrar", "sem_chave_na_efd", "icms_suportado", "sem_aliquota", "fora_de_sp"} <= codigos
+        assert {"documentos_a_cobrar", "sem_chave_na_efd", "icms_suportado", "sem_aliquota", "fora_de_sp",
+                "abertura_parcial", "uso_e_consumo"} <= codigos
 
     def test_trava_primeiro_depois_atencao_depois_informacao(self):
         lista = pendencias(RESUMOS)

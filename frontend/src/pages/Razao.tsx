@@ -353,7 +353,8 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: Re
           texto: "comparações com o inventário com diferença do tamanho de um fator de embalagem — suspeita de unidade", tom: "atencao" as Tom },
         { n: pend.linhas_unidade_sem_fator ?? 0, texto: "linhas com unidade diferente da do inventário e sem fator de conversão (0220): a quantidade ficou como veio", tom: "atencao" as Tom },
         { n: pend.fichas_fora_de_sp, texto: "fichas de estabelecimento fora de SP — a CAT 42 é paulista, elas não entram no pedido", tom: "atencao" as Tom },
-        { n: pend.fichas_abertura_sem_valor, texto: "fichas abertas com quantidade e sem ICMS suportado: o inventário não traz o imposto, e o custo médio fica subestimado até o estoque girar", tom: "atencao" as Tom },
+        { n: pend.fichas_abertura_sem_valor, texto: "fichas abertas com quantidade e sem ICMS suportado: o inventário não traz o imposto e a base não tem entrada anterior ao inventário para valorar a abertura (item 3.3.8) — importe as EFD dos meses antes do período", tom: "atencao" as Tom },
+        { n: pend.fichas_abertura_parcial ?? 0, texto: "fichas com a abertura valorada só em parte: as entradas anteriores ao inventário não cobriram a quantidade, e o resto foi pela média delas", tom: "atencao" as Tom },
         { n: pend.confronto_pendente, texto: "saídas de enquadramento 2 ou 4: o confronto com o ICMS da entrada ainda não é apurado", tom: "atencao" as Tom },
         { n: pend.saidas_sem_aliquota, texto: "saídas sem alíquota interna no cadastro: sem confronto, sem ressarcimento", tom: "atencao" as Tom },
         { n: resumo.retiradas?.fichas ?? pend.fichas_negativas, texto: "fichas retiradas do total até os dados chegarem: o estoque ficou negativo — falta entrada, abertura ou algum tipo de saída (perdas, meses do relatório, produção)", tom: "atencao" as Tom },
@@ -742,6 +743,7 @@ function Fichas({ execucaoId, total, rodape }: { execucaoId: number; total: numb
                   <span className="flex flex-wrap gap-1">
                     {(f.retirada ?? f.ficou_negativo) && <Marca>retirada · estoque negativo</Marca>}
                     {f.abertura_sem_valor && <Marca>abertura s/ ICMS</Marca>}
+                    {f.abertura_parcial && <Marca>abertura em parte</Marca>}
                     {f.saidas_sem_aliquota > 0 && <Marca>s/ alíquota</Marca>}
                     {f.saidas_indefinidas > 0 && <Marca>indefinida</Marca>}
                     {f.suspeita_de_unidade && <Marca>suspeita de unidade</Marca>}

@@ -107,6 +107,15 @@ CFOP_DEVOLUCAO = frozenset({
     "6201", "6202", "6410", "6411",
 })
 
+# Uso e consumo. Não entra no estoque de comercialização que a Ficha 3 controla:
+# a compra para consumo (1.407, 1.556), a transferência de material de consumo
+# (1.557) e as devoluções e saídas correspondentes. No Amigão eram 366 linhas
+# de entrada na ficha (decisão do Victor, 16/09/2026: excluir e contar).
+CFOP_USO_E_CONSUMO = frozenset({
+    "1407", "1556", "1557", "2407", "2556", "2557",
+    "5556", "5557", "6556", "6557",
+})
+
 # Modelos que só existem para documentar venda a consumidor final. Não é
 # suposição sobre o comprador: é o que o modelo é. Tabela 4.1.1 do leiaute.
 #

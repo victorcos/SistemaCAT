@@ -180,9 +180,13 @@ def _preparar(con, ficha3: str, fichas: str, conferencia: str) -> None:
         FROM read_parquet('{_escapar(ficha3)}') l
         JOIN read_parquet('{_escapar(fichas)}') f ON f.cnpj = l.cnpj AND f.codigo = l.codigo
     """)
+    # razão de antes de a abertura ter valor (v0.52) não tem a coluna: vale zero, como era
+    tem_valor = "abertura_valor" in pq.read_schema(fichas).names
     con.execute(f"""
         CREATE OR REPLACE TABLE aberturas AS
-        SELECT cnpj, codigo, abertura_quantidade, retirada FROM read_parquet('{_escapar(fichas)}')
+        SELECT cnpj, codigo, abertura_quantidade,
+               {"abertura_valor" if tem_valor else "0::DECIMAL(30, 15)"} AS abertura_valor, retirada
+        FROM read_parquet('{_escapar(fichas)}')
     """)
     # o saldo do mês é o da última linha do mês; o inicial é o final do mês
     # anterior, e no primeiro mês da mercadoria é a abertura do inventário
@@ -197,7 +201,7 @@ def _preparar(con, ficha3: str, fichas: str, conferencia: str) -> None:
         CREATE OR REPLACE TABLE saldos_do_periodo AS
         SELECT s.cnpj, s.competencia, s.codigo,
                coalesce(lag(s.qtd_fim) OVER janela, a.abertura_quantidade, 0) AS qtd_ini,
-               coalesce(lag(s.icms_fim) OVER janela, 0) AS icms_tot_ini,
+               coalesce(lag(s.icms_fim) OVER janela, a.abertura_valor, 0) AS icms_tot_ini,
                s.qtd_fim, s.icms_fim AS icms_tot_fim, a.retirada
         FROM saldo_mes s
         LEFT JOIN aberturas a ON a.cnpj = s.cnpj AND a.codigo = s.codigo

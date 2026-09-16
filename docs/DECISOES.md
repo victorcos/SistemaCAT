@@ -5,6 +5,36 @@
 
 ---
 
+## 2026-09-16 — Abertura pelas entradas anteriores, uso e consumo fora da ficha, 5929 como a BOA
+
+**Abertura sem imposto.** O inventário do Amigão veio sem ICMS em 842 mil
+linhas, e a abertura entrava com valor zero em 400.984 fichas — o complemento
+saía inflado e a devolução de compra deixava ICMS negativo. O manual não diz
+como valorar a abertura; diz, no item 3.3.8, como achar o valor quando não se
+identifica a entrada: **as entradas mais recentes, suficientes para comportar a
+quantidade, com média ponderada**. **Decisão do Victor:** usar essa regra com as
+entradas até o dia do inventário.
+
+- A regra é do domínio (`valor_da_abertura`), testada com o exemplo do próprio
+  manual (10 un a R$ 15 e 20 un a R$ 10, saída de 12: R$ 170, R$ 14,17 a unidade).
+- Devolução de venda e uso e consumo não são de onde o estoque veio: ficam de fora.
+- Quando as entradas não alcançam a quantidade, o resto vai pela média delas, e a
+  ficha fica marcada `abertura_parcial`. Sem entrada nenhuma, zero e marcada.
+- O período do razão passou a ser o do **cadastro do trabalho**. O que a base tem
+  antes dele não entra na ficha: serve para valorar a abertura. Para valer no
+  Amigão, é preciso importar as EFD de antes de 01/2021.
+- A etapa 6 abre o 1050 do primeiro mês com esse ICMS, e não mais com zero.
+
+**Uso e consumo.** 1.407, 1.556, 1.557, os 2.xxx e as saídas 5/6.556 e 5/6.557
+não são estoque de comercialização. **Decisão do Victor:** saem da ficha e ficam
+contadas (`fora_da_ficha.uso_e_consumo`). No Amigão eram 366 entradas.
+
+**CFOP 5.929** (NF-e de venda já registrada em cupom). **Decisão do Victor:** fica
+como a BOA transmitiu e a SEFAZ aceitou — saída comum, enquadramento 0. Só
+documentado; no Amigão não há nenhuma linha.
+
+---
+
 ## 2026-09-16 — Uma pendência por problema, com a medida de cada etapa
 
 **O que a entrega do Amigão mostrou.** 26 pendências, e várias eram o mesmo
