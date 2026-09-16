@@ -110,6 +110,9 @@ class Regra(Enum):
     SALDO_EM_QUANTIDADE = (Severidade.ERRO, "Ficha 3 recomposta não chega ao QTD_FIM do 1050", "Falta ou sobra movimento do item no mês.")
     SALDO_EM_VALOR = (Severidade.AVISO, "Ficha 3 recomposta passa de 5 centavos do ICMS_TOT_FIM", "Conferir o custo médio do item.")
     SALDO_NEGATIVO = (Severidade.ERRO, "Estoque negativo na Ficha 3 recomposta", "Saída sem estoque: falta entrada ou abertura.")
+    # só se confere com vários meses juntos: a pré-validação do cliente
+    SALDO_INICIAL_DIFERENTE_DO_ANTERIOR = (Severidade.AVISO, "Saldo inicial diferente do final da última competência do item",
+                                           "Conferir se falta arquivo entre os dois meses ou se o estoque foi ajustado por fora.")
 
     @property
     def severidade(self) -> Severidade:
@@ -151,6 +154,9 @@ class Validacao:
     itens_recompostos: int = 0
     itens_que_fecham: int = 0
     maior_diferenca_de_valor: Decimal = Decimal(0)
+    # o 1050 de cada item (qtd e ICMS no início e no fim): é o que a conferência
+    # entre meses precisa, e só existe depois de ler o arquivo inteiro
+    saldos: dict[str, tuple[Decimal, Decimal, Decimal, Decimal]] = field(default_factory=dict)
 
     def anotar(self, regra: Regra, linha: int | None, registro: str, campo: str, mensagem: str,
                item: str = "") -> None:
@@ -505,6 +511,7 @@ class _Leitor:
                      f"Item '{codigo}' movimentado sem 1050.", codigo)
         for codigo, (qi, vi, qf, vf, numero) in self.saldos.items():
             self._recompor(codigo, qi, vi, qf, vf, numero, tolerancia_de_valor)
+            v.saldos[codigo] = (qi, vi, qf, vf)
         return v
 
     def _recompor(self, codigo: str, qi: Decimal, vi: Decimal, qf: Decimal, vf: Decimal, numero: int,

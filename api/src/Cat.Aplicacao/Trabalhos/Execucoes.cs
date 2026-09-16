@@ -60,6 +60,12 @@ public sealed class Execucoes(
     public const string ArquivoDigital = "arquivo_digital";
 
     /// <summary>
+    /// Fora do roteiro de propósito: pré-validar o que o cliente já transmitiu não
+    /// depende de nenhuma etapa, e trabalho de auditoria pode nem ter EFD.
+    /// </summary>
+    public const string PreValidacao = "pre_validacao";
+
+    /// <summary>
     /// As etapas que concluem com uma rodada do motor. Uma lista só: o roteiro
     /// do trabalho e a consulta que o alimenta liam cada uma a sua, e a etapa
     /// nova que entrasse numa e não na outra ficaria para sempre "pendente".
@@ -152,11 +158,19 @@ public sealed class Execucoes(
         return await motor.ArquivosGerados(e.Id, pedido, cancelar);
     }
 
-    /// <summary>As ocorrências da pré-validação de um arquivo.</summary>
-    public async Task<JsonElement> OcorrenciasDoArquivo(int execucaoId, PedidoDeOcorrencias pedido, Usuario usuario, CancellationToken cancelar)
+    /// <summary>As ocorrências da pré-validação de um arquivo — gerado pelo sistema ou do cliente.</summary>
+    public async Task<JsonElement> OcorrenciasDoArquivo(int execucaoId, string etapa, PedidoDeOcorrencias pedido, Usuario usuario,
+        CancellationToken cancelar)
     {
-        var e = await Detalhar(execucaoId, ArquivoDigital, usuario, cancelar);
+        var e = await Detalhar(execucaoId, etapa, usuario, cancelar);
         return await motor.OcorrenciasDoArquivo(e.Id, pedido, cancelar);
+    }
+
+    /// <summary>Os arquivos que o cliente transmitiu, com o que a pré-validação achou em cada um.</summary>
+    public async Task<JsonElement> ArquivosDoCliente(int execucaoId, PedidoDeArquivos pedido, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, PreValidacao, usuario, cancelar);
+        return await motor.ArquivosDoCliente(e.Id, pedido, cancelar);
     }
 
     public async Task<PlanilhaPronta> Planilha(int execucaoId, string etapaDaRota, string? etapaExigida, string qual,

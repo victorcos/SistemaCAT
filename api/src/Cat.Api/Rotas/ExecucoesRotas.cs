@@ -37,17 +37,32 @@ public static class ExecucoesRotas
                 }))
             .ExigirUsuario();
 
-        api.MapGet("/arquivo-digital/{execucaoId:int}/ocorrencias", async (int execucaoId, HttpContext http, Execucoes caso) =>
+        Etapa(api, Execucoes.PreValidacao, "pre-validacao", detalheExigeEtapa: true, "pré-validar os arquivos do cliente");
+
+        api.MapGet("/pre-validacao/{execucaoId:int}/arquivos", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>
                 {
                     var q = http.Request.Query;
-                    var nome = q["arquivo"].FirstOrDefault() ?? "";
-                    if (nome.Length == 0)
-                        return CorpoJson.Recusar("Informe o arquivo.", StatusCodes.Status422UnprocessableEntity);
-                    var pedido = new PedidoDeOcorrencias(nome, Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 50));
-                    return Results.Json(await caso.OcorrenciasDoArquivo(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
+                    var pedido = new PedidoDeArquivos(
+                        q["so"].FirstOrDefault() is { Length: > 0 } s ? s : null,
+                        q["busca"].FirstOrDefault() is { Length: > 0 } b ? b : null,
+                        Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 50));
+                    return Results.Json(await caso.ArquivosDoCliente(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
                 }))
             .ExigirUsuario();
+
+        foreach (var (segmento, etapa) in new[] { ("arquivo-digital", Execucoes.ArquivoDigital), ("pre-validacao", Execucoes.PreValidacao) })
+            api.MapGet($"/{segmento}/{{execucaoId:int}}/ocorrencias", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                    await Traduzir(async () =>
+                    {
+                        var q = http.Request.Query;
+                        var nome = q["arquivo"].FirstOrDefault() ?? "";
+                        if (nome.Length == 0)
+                            return CorpoJson.Recusar("Informe o arquivo.", StatusCodes.Status422UnprocessableEntity);
+                        var pedido = new PedidoDeOcorrencias(nome, Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 50));
+                        return Results.Json(await caso.OcorrenciasDoArquivo(execucaoId, etapa, pedido, http.UsuarioAtual(), http.RequestAborted));
+                    }))
+                .ExigirUsuario();
 
         api.MapGet("/apuracao/{execucaoId:int}/competencias", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>

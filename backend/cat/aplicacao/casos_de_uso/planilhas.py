@@ -17,6 +17,7 @@ from cat.aplicacao.casos_de_uso import (
     extrair_movimentos,
     gerar_arquivo_digital,
     montar_razao,
+    pre_validar_arquivos,
 )
 from cat.infraestrutura.analitico.confronto import (
     ARQUIVO_CONFERIDOS,
@@ -31,6 +32,7 @@ from cat.infraestrutura.analitico.movimentacao import (
 from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO
 from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO, ARQUIVO_SALDOS
 from cat.infraestrutura.analitico.arquivo_digital import ARQUIVO_ARQUIVOS, ARQUIVO_OCORRENCIAS
+from cat.infraestrutura.analitico.pre_validacao_do_cliente import ARQUIVO_ARQUIVOS_DO_CLIENTE
 from cat.infraestrutura.analitico.razao import (
     ARQUIVO_CONFERENCIA_INVENTARIO,
     ARQUIVO_FICHA3,
@@ -52,6 +54,7 @@ from cat.infraestrutura.planilhas.movimentacao import (
 from cat.infraestrutura.planilhas.apuracao import gerar_apuracao, gerar_saldos
 from cat.infraestrutura.planilhas.arquivo_digital import (
     gerar_arquivos,
+    gerar_arquivos_do_cliente,
     gerar_ocorrencias,
     zip_de_envio,
     zip_de_previas,
@@ -103,6 +106,10 @@ PLANILHAS = {
         "envio": ("arquivos_para_envio.zip", ARQUIVO_ARQUIVOS, zip_de_envio),
         "previas": ("previas.zip", ARQUIVO_ARQUIVOS, zip_de_previas),
     },
+    pre_validar_arquivos.ETAPA: {
+        "arquivos": ("arquivos_do_cliente.xlsx", ARQUIVO_ARQUIVOS_DO_CLIENTE, gerar_arquivos_do_cliente),
+        "ocorrencias": ("pre_validacao_do_cliente.xlsx", ARQUIVO_OCORRENCIAS, gerar_ocorrencias),
+    },
 }
 
 NAO_TERMINOU = {
@@ -112,6 +119,7 @@ NAO_TERMINOU = {
     montar_razao.ETAPA: "A montagem do razão ainda não terminou.",
     apurar_periodo.ETAPA: "A apuração do período ainda não terminou.",
     gerar_arquivo_digital.ETAPA: "A geração do arquivo digital ainda não terminou.",
+    pre_validar_arquivos.ETAPA: "A pré-validação ainda não terminou.",
 }
 
 
@@ -160,7 +168,7 @@ def gerar(execucao: ExecucaoDB, etapa_da_rota: str, qual: str,
         if etapa_da_rota == extrair_movimentos.ETAPA:
             raise PlanilhaRecusada(410, "Os arquivos desta extração não estão mais em disco. Rode de novo.")
         if etapa_da_rota in (apurar_suportado.ETAPA, montar_razao.ETAPA, apurar_periodo.ETAPA,
-                             gerar_arquivo_digital.ETAPA):
+                             gerar_arquivo_digital.ETAPA, pre_validar_arquivos.ETAPA):
             raise PlanilhaRecusada(410, "Os arquivos desta apuração não estão mais em disco. Rode de novo.")
         motivo = ("Esta conferência é de uma versão anterior e não tem esta lista."
                   if os.path.isdir(pasta) else "Os arquivos desta conferência não estão mais em disco.")

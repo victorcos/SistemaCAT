@@ -116,6 +116,25 @@ def _do_sped(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote | None:
     )
 
 
+def _do_arquivo_da_cat42(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote | None:
+    """O arquivo digital da CAT 42: `0000|mmaaaa|NOME|CNPJ|IE|COD_MUN|01|00`.
+
+    Sem `|` no começo — é o que o separa da EFD, que começa com `|0000|`.
+    """
+    linha = next((l for l in texto.splitlines() if l.strip()), "")
+    campos = linha.split("|")
+    if len(campos) != 8 or campos[0] != "0000" or len(campos[1]) != 6 or not campos[1].isdigit():
+        return None
+    mes, ano = int(campos[1][:2]), int(campos[1][2:])
+    if not 1 <= mes <= 12:
+        return None
+    return ArquivoDoLote(
+        caminho=caminho, nome=os.path.basename(caminho), tamanho=tamanho,
+        tipo=TipoDeArquivo.CAT42_ARQUIVO_DIGITAL, cnpj=campos[3] or None,
+        competencia=date(ano, mes, 1), uf="SP", detalhe=campos[2],
+    )
+
+
 def _do_xml(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote:
     e_nfe = _RE_NFE.search(texto) is not None
     emitente = _RE_CNPJ_EMITENTE.search(texto)
@@ -200,6 +219,10 @@ def classificar(caminho: str, tamanho: int | None = None) -> ArquivoDoLote:
     do_sped = _do_sped(caminho, tamanho, texto)
     if do_sped is not None:
         return do_sped
+
+    da_cat42 = _do_arquivo_da_cat42(caminho, tamanho, texto)
+    if da_cat42 is not None:
+        return da_cat42
 
     if minusculo.endswith(EXTENSOES_TEXTO) or minusculo.endswith(".csv"):
         return _do_gerencial(caminho, tamanho)

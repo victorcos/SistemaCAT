@@ -75,8 +75,8 @@ public sealed class MotorDeExecucoesFalso : IAsyncLifetime
             Pedidos.Enqueue(pedido);
             return AoPedirCompetencias(pedido);
         });
-        foreach (var rota in new[] { "arquivos", "ocorrencias" })
-            _app.MapPost($"/interno/arquivo_digital/{rota}", async (HttpContext http) =>
+        foreach (var rota in new[] { "arquivo_digital/arquivos", "arquivo_digital/ocorrencias", "pre_validacao/arquivos" })
+            _app.MapPost($"/interno/{rota}", async (HttpContext http) =>
             {
                 if (http.Request.Headers["X-Cat-Motor-Segredo"] != Segredo)
                     return Results.StatusCode(403);
@@ -187,6 +187,7 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
     [InlineData("razao", "razao")]
     [InlineData("apuracao", "apuracao")]
     [InlineData("arquivo-digital", "arquivo_digital")]
+    [InlineData("pre-validacao", "pre_validacao")]
     public async Task Pedir_repassa_ao_motor_e_devolve_a_execucao_da_fila(string segmento, string etapa)
     {
         var (quem, _, c) = await Pessoa("dev");
@@ -526,7 +527,7 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
 
         var r = await c.GetAsync($"/api/arquivo-digital/{id}/arquivos?so=previa&busca=2021&pagina=3&por_pagina=20");
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
-        Assert.Equal("arquivos", (await Json(r)).GetProperty("rota").GetString());
+        Assert.Equal("arquivo_digital/arquivos", (await Json(r)).GetProperty("rota").GetString());
         var pedido = motor.Pedidos.Last(x => x.TryGetProperty("so", out _));
         Assert.Equal((id, "previa", "2021", 3, 20),
             (pedido.GetProperty("execucao_id").GetInt32(), pedido.GetProperty("so").GetString(),
@@ -537,5 +538,29 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
         Assert.Equal("CAT5_SP_1_2021.txt", motor.Pedidos.Last(x => x.TryGetProperty("nome", out _)).GetProperty("nome").GetString());
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await c.GetAsync($"/api/arquivo-digital/{id}/ocorrencias")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/arquivo-digital/{apuracao}/arquivos")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Pre_validacao_do_cliente_tem_rotas_proprias_e_nao_se_mistura_com_a_etapa_7()
+    {
+        var (_, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var pre = await Execucao(projeto, "pre_validacao");
+        var gerado = await Execucao(projeto, "arquivo_digital");
+        motor.AoPedirArquivoDigital = (rota, p) => Results.Json(new { rota, total = 3 });
+
+        var r = await c.GetAsync($"/api/pre-validacao/{pre}/arquivos?so=com_erro");
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal("pre_validacao/arquivos", (await Json(r)).GetProperty("rota").GetString());
+        r = await c.GetAsync($"/api/pre-validacao/{pre}/ocorrencias?arquivo=CAT5_SP_1_2021.txt");
+        Assert.Equal("arquivo_digital/ocorrencias", (await Json(r)).GetProperty("rota").GetString());
+
+        // cada rota só com a sua execução
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/pre-validacao/{gerado}/arquivos")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/arquivo-digital/{pre}/ocorrencias?arquivo=x")).StatusCode);
+
+        // e ela não entra no roteiro do trabalho
+        var etapas = (await Json(await c.GetAsync($"/api/projetos/{projeto}"))).GetProperty("etapas");
+        Assert.DoesNotContain("pre_validacao", etapas.EnumerateArray().Select(e => e.GetProperty("chave").GetString()));
     }
 }

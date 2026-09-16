@@ -56,6 +56,9 @@ class TipoDeArquivo(str, Enum):
     GERENCIAL_MOVIMENTO = "gerencial_movimento"
     GERENCIAL_INVENTARIO = "gerencial_inventario"
     GERENCIAL_RESUMO = "gerencial_resumo"
+    # o TXT que o cliente transmitiu à SEFAZ, gerado por outra ferramenta: não
+    # alimenta a apuração, é o que a pré-validação do cliente lê
+    CAT42_ARQUIVO_DIGITAL = "cat42_arquivo_digital"
     COMPACTADO = "compactado"
     NAO_BAIXADO = "nao_baixado"
     DESCONHECIDO = "desconhecido"
@@ -72,6 +75,7 @@ class TipoDeArquivo(str, Enum):
             TipoDeArquivo.GERENCIAL_MOVIMENTO: "Relatório de movimento",
             TipoDeArquivo.GERENCIAL_INVENTARIO: "Relatório de inventário",
             TipoDeArquivo.GERENCIAL_RESUMO: "Resumo por produto",
+            TipoDeArquivo.CAT42_ARQUIVO_DIGITAL: "Arquivo digital da CAT 42",
             TipoDeArquivo.COMPACTADO: "Compactado",
             TipoDeArquivo.NAO_BAIXADO: "Não baixado do OneDrive",
             TipoDeArquivo.DESCONHECIDO: "Não reconhecido",

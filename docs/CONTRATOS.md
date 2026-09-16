@@ -341,3 +341,32 @@ contagem por registro, `linhas_sem_documento`, `erros`, `avisos`, `bytes` e
 `devolucao_sem_venda`, `confronto_pendente`, `saldo_negativo`,
 `item_sem_cadastro`, `participante_sem_cadastro`, `sem_abertura` e
 `pre_validacao`.
+
+## 12. Pré-validação dos arquivos do cliente
+
+Fora do roteiro do trabalho: não depende de etapa nenhuma nem entra na conta
+de etapas concluídas.
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `POST` | `/api/projetos/{id}/pre-validacao` | põe a pré-validação na fila (202). 422 se o lote não tem arquivo digital da CAT 42 nem zip |
+| `GET` | `/api/projetos/{id}/pre-validacao` | as rodadas, mais recente primeiro |
+| `GET` | `/api/pre-validacao/{execucao}` | uma rodada, com o resumo |
+| `POST` | `/api/pre-validacao/{execucao}/cancelar` | como nas outras rodadas |
+| `GET` | `/api/pre-validacao/{execucao}/arquivos` | uma página dos arquivos lidos: `so` (`com_erro`, `com_aviso`, `sem_ocorrencia`, `repetidos`), `busca`, `pagina`, `por_pagina` |
+| `GET` | `/api/pre-validacao/{execucao}/ocorrencias?arquivo=` | as ocorrências de um arquivo, erros primeiro |
+| `GET` | `/api/pre-validacao/{execucao}/planilhas/arquivos` | o índice dos arquivos lidos, com origem e SHA-256 |
+| `GET` | `/api/pre-validacao/{execucao}/planilhas/ocorrencias` | as ocorrências de todos os arquivos |
+
+Lê do lote o tipo `cat42_arquivo_digital` (o TXT solto, reconhecido pelo
+`0000|mmaaaa|` sem `|` no começo) e os zips, com um nível de zip aninhado.
+Arquivo de outra raiz de CNPJ fica de fora e contado; o mesmo estabelecimento e
+mês lido duas vezes fica como `repetido`, sem ler de novo.
+
+O resumo (`versao: 1`) traz `fontes`, `arquivos`, `sem_ocorrencia`, `com_erro`,
+`com_aviso`, `repetidos`, `de_outra_empresa`, `nao_sao_da_cat42`, `ilegiveis`,
+`linhas`, `bytes`, `erros`, `avisos`, `itens_recompostos`, `itens_que_fecham`,
+`estabelecimentos`, `competencia_inicial`, `competencia_final` e `por_regra`.
+Além das regras de cada arquivo, uma que só se vê com o conjunto:
+`saldo_inicial_diferente_do_anterior` (aviso), quando o saldo inicial de um item
+não é o final da última competência em que ele apareceu.

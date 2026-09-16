@@ -112,6 +112,10 @@ public interface IMotor
     /// <exception cref="MotorRecusou">não é geração (404), não terminou (409), material apagado (410), recorte inválido (422)</exception>
     Task<System.Text.Json.JsonElement> ArquivosGerados(int execucaoId, PedidoDeArquivos pedido, CancellationToken cancelar);
 
-    /// <summary>As ocorrências da pré-validação de um arquivo digital.</summary>
+    /// <summary>As ocorrências da pré-validação de um arquivo digital, gerado ou do cliente.</summary>
     Task<System.Text.Json.JsonElement> OcorrenciasDoArquivo(int execucaoId, PedidoDeOcorrencias pedido, CancellationToken cancelar);
+
+    /// <summary>Os arquivos do cliente de uma pré-validação.</summary>
+    /// <exception cref="MotorRecusou">não é pré-validação (404), não terminou (409), material apagado (410), recorte inválido (422)</exception>
+    Task<System.Text.Json.JsonElement> ArquivosDoCliente(int execucaoId, PedidoDeArquivos pedido, CancellationToken cancelar);
 }

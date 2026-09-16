@@ -116,6 +116,15 @@ class TestClassificar:
         a = classificar(escrever(tmp_path, "base_Error.txt", conteudo))
         assert a.tipo is TipoDeArquivo.SPED_ICMS_IPI
 
+    def test_arquivo_digital_da_cat42_e_reconhecido_e_nao_alimenta_a_apuracao(self, tmp_path):
+        # sem | no começo: é o que o separa da EFD
+        a = classificar(escrever(tmp_path, "CAT5_SP_50948371001301_1_2024.txt",
+                                 "0000|012024|LOJA|50948371001301|798092322114|3552205|01|00\r\n"
+                                 "0150|1|LOJA|1058|50948371001301||798092322114|3552205\r\n"))
+        assert a.tipo is TipoDeArquivo.CAT42_ARQUIVO_DIGITAL
+        assert not a.alimenta_a_cat
+        assert (a.cnpj, a.competencia, a.detalhe) == ("50948371001301", date(2024, 1, 1), "LOJA")
+
     def test_compactado_nao_e_aberto(self, tmp_path):
         a = classificar(escrever(tmp_path, "base.rar", "Rar!\x1a\x07"))
         assert a.tipo is TipoDeArquivo.COMPACTADO

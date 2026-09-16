@@ -117,9 +117,16 @@ export function arquivosGerados(
   return chamar<Pagina<ArquivoGerado>>(`/arquivo-digital/${execucaoId}/arquivos?${p}`, { signal: sinal });
 }
 
-export function ocorrenciasDoArquivo(execucaoId: number, nome: string, pagina: number, sinal?: AbortSignal) {
+/** `segmento` diz de quem é a execução: a geração da etapa 7 ou a pré-validação do cliente. */
+export function ocorrenciasDoArquivo(
+  execucaoId: number,
+  nome: string,
+  pagina: number,
+  sinal?: AbortSignal,
+  segmento: "arquivo-digital" | "pre-validacao" = "arquivo-digital",
+) {
   const p = new URLSearchParams({ arquivo: nome, pagina: String(pagina), por_pagina: "50" });
-  return chamar<Pagina<Ocorrencia>>(`/arquivo-digital/${execucaoId}/ocorrencias?${p}`, { signal: sinal });
+  return chamar<Pagina<Ocorrencia>>(`/${segmento}/${execucaoId}/ocorrencias?${p}`, { signal: sinal });
 }
 
 const NOME: Record<PlanilhaDoArquivoDigital, string> = {

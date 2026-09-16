@@ -5,6 +5,33 @@
 
 ---
 
+## 2026-09-16 — Pré-validar o que o cliente já transmitiu
+
+**Decisão do Victor.** A pré-validação da etapa 7 vale **também para o arquivo
+que o cliente gerou com outra ferramenta** — a auditoria da BOA e da Casa
+Avenida, que já entregam a CAT 42.
+
+**Fora do roteiro.** Não depende de etapa nenhuma e não entra na conta de
+etapas concluídas: trabalho de auditoria pode nem ter EFD, só os TXT. A tela do
+trabalho tem um atalho próprio para ela.
+
+**Lê do lote, inclusive de dentro de zip.** O classificador reconhece o arquivo
+digital pelo `0000|mmaaaa|` sem `|` no começo (tipo `cat42_arquivo_digital`,
+que não alimenta a apuração). Os zips do lote são abertos na rodada: cada TXT
+é lido em fluxo, sem extrair. O zip dentro de zip é exceção — lido por dentro,
+cada membro descomprimiria o de fora desde o começo —, e vai compactado à pasta
+da execução, que é apagado no fim.
+
+**O que só se vê com o conjunto.** Arquivo de outra raiz de CNPJ fica de fora e
+contado. O mesmo estabelecimento e mês visto duas vezes (o zip que é cópia de
+outro, na BOA) fica listado como repetido, sem ler de novo. E o saldo inicial
+de cada item tem de ser o final da **última competência em que o item
+apareceu** — não do mês anterior, porque o 1050 só traz item com movimento. Se
+não é, falta arquivo no meio ou o estoque foi ajustado por fora: aviso, com as
+duas competências na mensagem.
+
+---
+
 ## 2026-09-16 — Etapa 7: o arquivo digital, a prévia e a pré-validação
 
 **Decisões do Victor.** Competência de SP que não está pronta **sai como

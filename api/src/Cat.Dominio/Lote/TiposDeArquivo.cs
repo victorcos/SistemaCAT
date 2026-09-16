@@ -24,6 +24,7 @@ public static class TiposDeArquivo
         Novo("gerencial_movimento", "Relatório de movimento", alimenta: true),
         Novo("gerencial_inventario", "Relatório de inventário", alimenta: true),
         Novo("gerencial_resumo", "Resumo por produto"),
+        Novo("cat42_arquivo_digital", "Arquivo digital da CAT 42"),
         Novo("compactado", "Compactado"),
         Novo("nao_baixado", "Não baixado do OneDrive"),
         Novo("desconhecido", "Não reconhecido"),

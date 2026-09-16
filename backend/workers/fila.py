@@ -36,6 +36,7 @@ from cat.aplicacao.casos_de_uso import (
     extrair_movimentos,
     gerar_arquivo_digital,
     montar_razao,
+    pre_validar_arquivos,
 )
 from cat.aplicacao.casos_de_uso.historico_do_projeto import registrar_de_etapa
 from cat.dominio.projeto.historico import TipoDeEvento
@@ -55,6 +56,7 @@ EXECUTORES = {
     montar_razao.ETAPA: montar_razao.executar,
     apurar_periodo.ETAPA: apurar_periodo.executar,
     gerar_arquivo_digital.ETAPA: gerar_arquivo_digital.executar,
+    pre_validar_arquivos.ETAPA: pre_validar_arquivos.executar,
 }
 
 MOTIVO_INTERRUPCAO = "Interrompida: o motor reiniciou durante a rodada. Rode de novo."

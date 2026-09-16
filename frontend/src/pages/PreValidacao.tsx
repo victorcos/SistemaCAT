@@ -11,8 +11,6 @@ import {
   duracao,
   mesAno,
   quando,
-  valor,
-  zero,
 } from "@/components/shared/Rodada";
 import { TrabalhoParado } from "@/components/shared/TrabalhoParado";
 import { Aviso } from "@/components/ui/Aviso";
@@ -21,7 +19,6 @@ import { Busca, Segmentado } from "@/components/ui/Filtros";
 import { CabecalhoDePagina, Voltar } from "@/components/ui/Pagina";
 import {
   IconeArquivoDigital,
-  IconeBaixar,
   IconeCarregando,
   IconeExpandir,
   IconeParar,
@@ -35,34 +32,31 @@ import { cn } from "@/lib/cn";
 import { comoErro } from "@/lib/errors";
 import { numero } from "@/lib/format";
 import type { Pagina } from "@/services/apuracao";
-import {
-  VERSAO_DO_RESUMO_DO_ARQUIVO_DIGITAL,
-  arquivosGerados,
-  baixarPacote,
-  baixarPlanilhaDoArquivoDigital,
-  cancelarArquivoDigital,
-  detalharArquivoDigital,
-  iniciarArquivoDigital,
-  listarArquivoDigital,
-  ocorrenciasDoArquivo,
-  type ArquivoGerado,
-  type ExecucaoDoArquivoDigital,
-  type PacoteDoArquivoDigital,
-  type PlanilhaDoArquivoDigital,
-  type RecorteDeArquivo,
-  type ResumoDoArquivoDigital,
-} from "@/services/arquivoDigital";
+import { ocorrenciasDoArquivo } from "@/services/arquivoDigital";
 import { EM_CURSO, type Formato } from "@/services/conferencia";
 import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
+import {
+  VERSAO_DO_RESUMO_DA_PRE_VALIDACAO,
+  arquivosDoCliente,
+  baixarPlanilhaDaPreValidacao,
+  cancelarPreValidacao,
+  detalharPreValidacao,
+  iniciarPreValidacao,
+  listarPreValidacao,
+  type ArquivoDoCliente,
+  type ExecucaoDaPreValidacao,
+  type PlanilhaDaPreValidacao,
+  type RecorteDoCliente,
+  type ResumoDaPreValidacao,
+} from "@/services/preValidacao";
 import type { ErroApi } from "@/types/erro";
 
 /**
- * Etapa 7 — gerar o arquivo digital.
+ * Pré-validar os arquivos digitais que o cliente já transmitiu.
  *
- * Um arquivo por estabelecimento de SP e por mês. Duas regras mandam na tela:
- * **envio e prévia nunca se misturam** (zips separados, PREVIA no nome), e
- * **todo arquivo diz por que não foi para o envio** — o que a apuração deixou
- * pendente, o que não se escreve, e o que a pré-validação achou.
+ * A mesma pré-validação da etapa 7 — leiaute, tabela de natureza e a Ficha 3
+ * recomposta a partir do próprio arquivo —, sobre o TXT que outra ferramenta
+ * gerou. Serve à auditoria: dizer ao cliente o que a SEFAZ acharia.
  */
 
 const ESPERA_PARA_CANCELAR_MS = 400;
@@ -79,18 +73,13 @@ const tamanho = (bytes: number | undefined) => {
   return `${Math.ceil(b / 1024).toLocaleString("pt-BR")} KB`;
 };
 
-const VENDA: Record<string, string> = {
-  enquadramento_1: "enquadramento 1 (ressarcimento e complemento)",
-  demais_saidas: "demais saídas (0), como a BOA",
-};
-
-export default function ArquivoDigital() {
+export default function PreValidacao() {
   const { id } = useParams<{ id: string }>();
   const projetoId = Number(id);
 
   const [projeto, setProjeto] = useState<ProjetoDetalhe | null>(null);
-  const [atual, setAtual] = useState<ExecucaoDoArquivoDigital | null>(null);
-  const [resultado, setResultado] = useState<ExecucaoDoArquivoDigital | null>(null);
+  const [atual, setAtual] = useState<ExecucaoDaPreValidacao | null>(null);
+  const [resultado, setResultado] = useState<ExecucaoDaPreValidacao | null>(null);
   const [carregado, setCarregado] = useState(false);
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -106,7 +95,7 @@ export default function ArquivoDigital() {
 
   const acompanhar = useCallback(async (execucaoId: number) => {
     try {
-      const e = await detalharArquivoDigital(execucaoId);
+      const e = await detalharPreValidacao(execucaoId);
       setAtual(e);
       if (e.situacao === "concluida") setResultado(e);
       if (!EM_CURSO.includes(e.situacao)) parar();
@@ -126,7 +115,7 @@ export default function ArquivoDigital() {
   useEffect(() => {
     if (!projetoId) return;
     detalharProjeto(projetoId).then(setProjeto).catch((x) => setErro(comoErro(x)));
-    listarArquivoDigital(projetoId)
+    listarPreValidacao(projetoId)
       .then((lista) => {
         const ultima = lista[0] ?? null;
         setAtual(ultima);
@@ -151,7 +140,7 @@ export default function ArquivoDigital() {
     setOcupado(true);
     setErro(null);
     try {
-      const nova = await iniciarArquivoDigital(projetoId);
+      const nova = await iniciarPreValidacao(projetoId);
       setAtual(nova);
       seguir(nova.id);
     } catch (x) {
@@ -164,7 +153,7 @@ export default function ArquivoDigital() {
   async function cancelar() {
     if (!atual) return;
     try {
-      const e = await cancelarArquivoDigital(atual.id);
+      const e = await cancelarPreValidacao(atual.id);
       setAtual(e);
       if (!EM_CURSO.includes(e.situacao)) parar();
     } catch (x) {
@@ -174,7 +163,7 @@ export default function ArquivoDigital() {
 
   const anda = !projeto || aceitaProcessamento(projeto.projeto.status);
   const resumo = resultado?.resumo ?? null;
-  const anterior = resultado !== null && (resumo?.versao ?? 0) < VERSAO_DO_RESUMO_DO_ARQUIVO_DIGITAL;
+  const anterior = resultado !== null && (resumo?.versao ?? 0) < VERSAO_DO_RESUMO_DA_PRE_VALIDACAO;
   const p = projeto?.projeto;
 
   let acao: ReactNode = null;
@@ -189,12 +178,12 @@ export default function ArquivoDigital() {
           Cancelar
         </Botao>
       ) : (
-        <Botao carregando>Gerando…</Botao>
+        <Botao carregando>Pré-validando…</Botao>
       );
   } else if (atual) {
     acao = (
       <Botao icone={IconeTentarDeNovo} onClick={comecar} carregando={ocupado} disabled={!anda} className="shadow-acao">
-        {resultado && !anterior ? "Gerar de novo" : "Gerar os arquivos"}
+        {resultado && !anterior ? "Pré-validar de novo" : "Pré-validar os arquivos"}
       </Botao>
     );
   }
@@ -204,15 +193,15 @@ export default function ArquivoDigital() {
       <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
 
       <CabecalhoDePagina
-        eyebrow="Etapa 7 · Arquivo digital"
-        titulo="Gerar o arquivo digital"
-        sub="Um arquivo por estabelecimento de SP e por mês, no leiaute da CAT 42. Cada um é lido de volta e pré-validado: a Ficha 3 é recomposta a partir do próprio arquivo e tem de chegar ao saldo do 1050."
+        eyebrow="Auditoria · Arquivo digital do cliente"
+        titulo="Pré-validar o que o cliente transmitiu"
+        sub="Os arquivos da CAT 42 que o cliente já gerou, soltos no lote ou dentro de zip: o leiaute campo a campo, a tabela de natureza de operação e a Ficha 3 recomposta a partir do próprio arquivo, que tem de chegar ao 1050."
         acao={
           <div className="flex flex-col items-end gap-2.5">
             {acao}
             {resultado && !rodando && (
               <p className="m-0 text-right text-[11px] leading-normal text-texto-fraco">
-                Gerado em {quando(resultado.terminada_em)}
+                Pré-validado em {quando(resultado.terminada_em)}
                 {resumo?.iniciada_por ? ` por ${resumo.iniciada_por}` : ""}
               </p>
             )}
@@ -225,9 +214,6 @@ export default function ArquivoDigital() {
             {p.cnpj_matriz_formatado && (
               <code className="font-mono text-xs text-texto-fraco">{p.cnpj_matriz_formatado}</code>
             )}
-            <span className="text-xs text-texto-fraco">
-              · venda a consumidor final no {VENDA[p.venda_a_consumidor] ?? p.venda_a_consumidor}
-            </span>
           </div>
         )}
       </CabecalhoDePagina>
@@ -237,7 +223,7 @@ export default function ArquivoDigital() {
       {erro && <Aviso titulo={erro.message} codigo={erro.requisicaoId} aoFechar={() => setErro(null)} />}
 
       {atual?.situacao === "falhou" && (
-        <Aviso titulo="A geração do arquivo digital falhou">
+        <Aviso titulo="A pré-validação falhou">
           <span className="block">{atual.erro}</span>
           <code className="mt-2 inline-block rounded-lg border border-dashed border-erro/40 bg-erro/5 px-2.5 py-1.5 font-mono text-xs">
             execução #{atual.id}
@@ -247,8 +233,8 @@ export default function ArquivoDigital() {
 
       {atual?.situacao === "cancelada" && (
         <Faixa titulo="A última rodada foi cancelada">
-          Parou a pedido, sem deixar arquivo pela metade.
-          {resultado ? " Abaixo, a última geração que concluiu." : " Rode de novo quando quiser."}
+          Parou a pedido, sem gravar nada.
+          {resultado ? " Abaixo, a última pré-validação que concluiu." : " Rode de novo quando quiser."}
         </Faixa>
       )}
 
@@ -257,14 +243,19 @@ export default function ArquivoDigital() {
           <div className="flex h-11 w-11 items-center justify-center rounded-[13px] border border-laranja-500/30 bg-laranja-500/14 text-laranja-700 escuro:text-laranja-300">
             <IconeArquivoDigital size={20} strokeWidth={1.8} aria-hidden />
           </div>
-          <p className="m-0 text-[17px] font-extrabold text-texto">O arquivo digital ainda não foi gerado</p>
+          <p className="m-0 text-[17px] font-extrabold text-texto">Nada pré-validado ainda</p>
           <p className="m-0 max-w-[600px] text-[13px] leading-relaxed text-texto-suave [text-wrap:pretty]">
-            Precisa do período apurado. Só a competência pronta e sem erro na pré-validação vai para o
-            envio; as outras de São Paulo saem como prévia, para conferir o que falta.
+            Importe no lote a pasta com os arquivos que o cliente transmitiu — o TXT solto ou os zips. Arquivo
+            de outra empresa fica de fora, contado.
           </p>
-          <Botao onClick={comecar} carregando={ocupado} disabled={!anda} className="mt-1 shadow-acao">
-            Gerar os arquivos
-          </Botao>
+          <div className="mt-1 flex flex-wrap justify-center gap-2">
+            <Botao onClick={comecar} carregando={ocupado} disabled={!anda} className="shadow-acao">
+              Pré-validar os arquivos
+            </Botao>
+            <BotaoLink para={ROTAS.arquivos(projetoId)} variante="secundario">
+              Importar arquivos
+            </BotaoLink>
+          </div>
         </section>
       )}
 
@@ -272,7 +263,7 @@ export default function ArquivoDigital() {
 
       {anterior && !rodando && (
         <Faixa titulo="Execução de versão anterior">
-          Esta geração não guarda o resumo que a tela pede. Rode de novo.
+          Esta pré-validação não guarda o resumo que a tela pede. Rode de novo.
         </Faixa>
       )}
 
@@ -283,22 +274,22 @@ export default function ArquivoDigital() {
 
 /* ------------------------------------------------------------------ */
 
-function EmCurso({ e }: { e: ExecucaoDoArquivoDigital }) {
+function EmCurso({ e }: { e: ExecucaoDaPreValidacao }) {
   const a = e.resumo?.andamento;
   return (
     <Cartao className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <IconeCarregando size={17} className="animate-spin text-marca-laranja" aria-hidden />
         <p className="m-0 text-[15px] font-extrabold text-texto">
-          {e.situacao === "cancelando" ? "Cancelando…" : "Escrevendo e pré-validando…"}
+          {e.situacao === "cancelando" ? "Cancelando…" : "Lendo e recompondo…"}
         </p>
         <code className="ml-auto font-mono text-[13px] text-laranja-700 escuro:text-laranja-300">
-          {a ? `${numero(a.arquivos)} de ${numero(a.total)} arquivos` : `${Math.round(e.fracao * 100)}%`}
+          {a ? `${numero(a.arquivos)} arquivos · ${tamanho(a.bytes)}` : "—"}
         </code>
       </div>
       <BarraFina fracao={e.fracao} classe="bg-marca-laranja" />
       <p className="m-0 text-xs text-texto-fraco">
-        {e.passo ?? "Na fila"} · pode fechar esta tela: a geração continua no servidor.
+        {e.passo ?? "Na fila"} · pode fechar esta tela: a pré-validação continua no servidor.
       </p>
       {(e.resumo?.log ?? []).length > 0 && <ListaDoLog log={e.resumo?.log ?? []} emCurso />}
     </Cartao>
@@ -307,34 +298,28 @@ function EmCurso({ e }: { e: ExecucaoDoArquivoDigital }) {
 
 /* ------------------------------------------------------------------ */
 
-function Concluido({ execucao, resumo }: { execucao: ExecucaoDoArquivoDigital; resumo: ResumoDoArquivoDigital }) {
+function Concluido({ execucao, resumo }: { execucao: ExecucaoDaPreValidacao; resumo: ResumoDaPreValidacao }) {
   const download = useAcao();
-  const [baixando, setBaixando] = useState<string | null>(null);
+  const [baixando, setBaixando] = useState<{ qual: PlanilhaDaPreValidacao; formato: Formato } | null>(null);
 
-  async function baixar(qual: PlanilhaDoArquivoDigital, formato: Formato) {
-    setBaixando(`${qual}.${formato}`);
-    await download.executar((sinal) => baixarPlanilhaDoArquivoDigital(execucao.id, qual, formato, sinal));
+  async function baixar(qual: PlanilhaDaPreValidacao, formato: Formato) {
+    setBaixando({ qual, formato });
+    await download.executar((sinal) => baixarPlanilhaDaPreValidacao(execucao.id, qual, formato, sinal));
     setBaixando(null);
   }
 
-  async function pacote(qual: PacoteDoArquivoDigital) {
-    setBaixando(qual);
-    await download.executar((sinal) => baixarPacote(execucao.id, qual, sinal));
-    setBaixando(null);
-  }
-
-  const par = (qual: PlanilhaDoArquivoDigital, rotulo: string) => (
+  const par = (qual: PlanilhaDaPreValidacao, rotulo: string) => (
     <BaixarPlanilha
       aoBaixar={(formato) => baixar(qual, formato)}
       desabilitado={download.carregando || (resumo.arquivos ?? 0) === 0}
-      baixando={baixando?.startsWith(`${qual}.`) ? (baixando.split(".")[1] as Formato) : null}
+      baixando={baixando?.qual === qual ? baixando.formato : null}
       aoCancelar={download.podeCancelar ? download.cancelar : undefined}
       rotulo={rotulo}
     />
   );
 
-  const envio = resumo.para_envio ?? 0;
-  const previas = resumo.previas ?? 0;
+  const arquivos = resumo.arquivos ?? 0;
+  const comErro = resumo.com_erro ?? 0;
   const recompostos = resumo.itens_recompostos ?? 0;
   const fecham = resumo.itens_que_fecham ?? 0;
 
@@ -344,54 +329,23 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoArquivoDigital; r
         <Aviso titulo={download.erro.message} codigo={download.erro.requisicaoId} aoFechar={() => download.setErro(null)} />
       )}
 
-      <section className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4">
+      <section className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">
         <Cartao className="flex flex-col gap-2">
-          <Rotulo>Prontos para enviar à SEFAZ</Rotulo>
-          <p className={cn("m-0 font-mono text-[32px] leading-none", envio ? "text-sucesso" : "text-texto-fraco")}>
-            {numero(envio)}
-            <span className="ml-2 text-sm text-texto-fraco">de {numero(resumo.arquivos ?? 0)}</span>
+          <Rotulo>Arquivos sem erro</Rotulo>
+          <p className={cn("m-0 font-mono text-[32px] leading-none", comErro ? "text-atencao" : "text-sucesso")}>
+            {numero(arquivos - comErro)}
+            <span className="ml-2 text-sm text-texto-fraco">de {numero(arquivos)}</span>
           </p>
           <p className="m-0 text-xs leading-relaxed text-texto-fraco">
-            Competência apta, nenhuma trava e nenhum erro na pré-validação. Ressarcimento neles:{" "}
-            <strong className="font-mono text-texto">{valor(resumo.ressarcimento_para_envio)}</strong>.
+            {numero(resumo.estabelecimentos ?? 0)} estabelecimentos
+            {resumo.competencia_inicial && resumo.competencia_final
+              ? `, de ${mesAno(resumo.competencia_inicial)} a ${mesAno(resumo.competencia_final)}`
+              : ""}
+            . {numero(resumo.com_aviso ?? 0)} com aviso; {numero(resumo.linhas ?? 0)} linhas, {tamanho(resumo.bytes)}.
           </p>
-          <Botao
-            variante="principal"
-            icone={IconeBaixar}
-            className="mt-1 self-start shadow-acao"
-            disabled={download.carregando || envio === 0}
-            carregando={baixando === "envio"}
-            aoCancelar={baixando === "envio" && download.podeCancelar ? download.cancelar : undefined}
-            onClick={() => pacote("envio")}
-          >
-            Baixar os arquivos de envio
-          </Botao>
         </Cartao>
         <Cartao className="flex flex-col gap-2">
-          <Rotulo>Prévias</Rotulo>
-          <p className={cn("m-0 font-mono text-[32px] leading-none", previas ? "text-atencao" : "text-texto-fraco")}>
-            {numero(previas)}
-          </p>
-          <p className="m-0 text-xs leading-relaxed text-texto-fraco">
-            Competências de SP com o que resolver antes. O arquivo sai para conferir, com PREVIA no nome, e
-            nunca no pacote de envio.
-            {(resumo.competencias_fora_de_sp ?? 0) > 0 &&
-              ` ${numero(resumo.competencias_fora_de_sp ?? 0)} competências fora de SP não geram arquivo.`}
-          </p>
-          <Botao
-            variante="secundario"
-            icone={IconeBaixar}
-            className="mt-1 self-start"
-            disabled={download.carregando || previas === 0}
-            carregando={baixando === "previas"}
-            aoCancelar={baixando === "previas" && download.podeCancelar ? download.cancelar : undefined}
-            onClick={() => pacote("previas")}
-          >
-            Baixar as prévias
-          </Botao>
-        </Cartao>
-        <Cartao className="flex flex-col gap-2">
-          <Rotulo>Pré-validação</Rotulo>
+          <Rotulo>Ficha 3 recomposta</Rotulo>
           <p className="m-0 font-mono text-[32px] leading-none text-texto">
             {numero(fecham)}
             <span className="ml-2 text-sm text-texto-fraco">de {numero(recompostos)} itens fecham</span>
@@ -400,34 +354,21 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoArquivoDigital; r
             <BarraFina fracao={recompostos ? fecham / recompostos : 0} classe={fecham === recompostos ? "bg-sucesso" : "bg-atencao"} />
           </div>
           <p className="m-0 text-xs leading-relaxed text-texto-fraco">
-            A Ficha 3 recomposta de cada arquivo chega ao 1050?{" "}
-            <span className={cn("font-mono", (resumo.erros ?? 0) > 0 ? "text-erro" : "text-texto")}>
-              {numero(resumo.erros ?? 0)} erros
-            </span>{" "}
-            · <span className="font-mono text-texto">{numero(resumo.avisos ?? 0)} avisos</span> ·{" "}
-            {numero(resumo.linhas ?? 0)} linhas, {tamanho(resumo.bytes)}
+            Do 1050 inicial e das linhas do arquivo, o saldo tem de chegar ao 1050 final: quantidade exata, valor
+            até 5 centavos.
+          </p>
+        </Cartao>
+        <Cartao className="flex flex-col gap-2">
+          <Rotulo>Ficaram de fora</Rotulo>
+          <p className="m-0 font-mono text-[32px] leading-none text-texto">
+            {numero((resumo.repetidos ?? 0) + (resumo.de_outra_empresa ?? 0))}
+          </p>
+          <p className="m-0 text-xs leading-relaxed text-texto-fraco">
+            {numero(resumo.repetidos ?? 0)} repetidos (mesmo estabelecimento e mês já lido) e{" "}
+            {numero(resumo.de_outra_empresa ?? 0)} de outra empresa, em {numero(resumo.fontes ?? 0)} fontes do lote.
           </p>
         </Cartao>
       </section>
-
-      {(resumo.por_trava ?? []).length > 0 && (
-        <section className="rounded-cartao border border-atencao/25 border-l-[3px] border-l-atencao bg-atencao-fundo px-5 py-4.5">
-          <p className="m-0 text-sm font-extrabold text-atencao">O que impede o envio</p>
-          <p className="m-0 mt-1.5 max-w-[800px] text-[13px] leading-relaxed text-texto">
-            Um arquivo pode ter mais de um motivo. Resolvido o motivo, gere de novo: o que ficar limpo passa
-            para o envio.
-          </p>
-          <ul className="m-0 mt-3 flex list-none flex-col gap-2 p-0">
-            {(resumo.por_trava ?? []).map((t) => (
-              <li key={t.codigo} className="flex flex-wrap gap-3 text-[13px] leading-relaxed">
-                <span className="min-w-[70px] text-right font-mono text-atencao">{numero(t.arquivos)}</span>
-                <span className="font-bold text-texto">{t.rotulo}</span>
-                <span className="text-texto-suave">{t.o_que_fazer}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       {(resumo.por_regra ?? []).length > 0 && (
         <Cartao className="flex flex-col gap-3">
@@ -459,7 +400,7 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoArquivoDigital; r
         </Cartao>
       )}
 
-      <Arquivos execucaoId={execucao.id} total={resumo.arquivos ?? 0} rodape={par("arquivos", "Baixar o índice dos arquivos")} />
+      <Arquivos execucaoId={execucao.id} total={arquivos} rodape={par("arquivos", "Baixar o índice dos arquivos")} />
 
       {(resumo.log ?? []).length > 0 && (
         <Cartao className="flex flex-col gap-3">
@@ -473,19 +414,6 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoArquivoDigital; r
           <ListaDoLog log={resumo.log ?? []} />
         </Cartao>
       )}
-
-      <section className="flex flex-wrap items-center gap-3.5 rounded-cartao border border-borda bg-superficie-vidro px-5.5 py-4.5">
-        <div className="min-w-[240px] flex-1">
-          <p className="m-0 text-sm font-extrabold text-texto">Antes de enviar</p>
-          <p className="m-0 mt-1 text-xs leading-relaxed text-texto-suave">
-            A pré-validação daqui aproxima a da SEFAZ: confere o leiaute e recompõe a Ficha 3, mas as regras
-            de crítica do validador oficial não são públicas. Copie para a rede conferindo o SHA-256 do índice.
-          </p>
-        </div>
-        <BotaoLink para={ROTAS.projeto(execucao.projeto_id)} variante="secundario">
-          Ver as etapas
-        </BotaoLink>
-      </section>
     </div>
   );
 }
@@ -493,11 +421,11 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoArquivoDigital; r
 /* ------------------------------------------------------------------ */
 
 function Arquivos({ execucaoId, total, rodape }: { execucaoId: number; total: number; rodape: ReactNode }) {
-  const [recorte, setRecorte] = useState<RecorteDeArquivo>("todos");
+  const [recorte, setRecorte] = useState<RecorteDoCliente>("todos");
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [pagina, setPagina] = useState(1);
-  const [dados, setDados] = useState<Pagina<ArquivoGerado> | null>(null);
+  const [dados, setDados] = useState<Pagina<ArquivoDoCliente> | null>(null);
   const [aberto, setAberto] = useState<string | null>(null);
   const leitura = useAcao();
   const { executar } = leitura;
@@ -518,7 +446,7 @@ function Arquivos({ execucaoId, total, rodape }: { execucaoId: number; total: nu
   useEffect(() => {
     let vivo = true;
     executar((sinal) =>
-      arquivosGerados(execucaoId, { recorte, busca: buscaAplicada, pagina: paginaAtual, porPagina: POR_PAGINA }, sinal),
+      arquivosDoCliente(execucaoId, { recorte, busca: buscaAplicada, pagina: paginaAtual, porPagina: POR_PAGINA }, sinal),
     ).then((r) => {
       if (vivo && r) setDados(r);
     });
@@ -528,28 +456,27 @@ function Arquivos({ execucaoId, total, rodape }: { execucaoId: number; total: nu
   }, [execucaoId, recorte, buscaAplicada, paginaAtual, executar]);
 
   const paginas = dados ? Math.max(1, Math.ceil(dados.total / dados.por_pagina)) : 1;
-  const colunas = "grid-cols-[28px_1.5fr_.6fr_.9fr_.8fr_.8fr_1.8fr]";
+  const colunas = "grid-cols-[28px_1.6fr_.6fr_.7fr_.9fr_.9fr_1fr]";
 
   return (
     <section className="overflow-hidden rounded-cartao border border-borda bg-superficie shadow-cat">
       <div className="flex flex-wrap items-center gap-3.5 border-b border-borda px-5.5 py-4.5">
         <div className="min-w-0 flex-1">
-          <h2 className="m-0 text-lg font-extrabold text-texto">Arquivos</h2>
+          <h2 className="m-0 text-lg font-extrabold text-texto">Arquivos do cliente</h2>
           <p className="m-0 mt-1 text-xs text-texto-fraco">
-            {dados
-              ? `Um por estabelecimento e mês. ${numero(dados.total)} neste recorte · ${numero(total)} no total`
-              : "Carregando…"}
+            {dados ? `${numero(dados.total)} neste recorte · ${numero(total)} lidos` : "Carregando…"}
           </p>
         </div>
         <Busca valor={busca} aoMudar={setBusca} placeholder="Buscar CNPJ, competência ou arquivo…" className="max-w-[320px]" />
-        <Segmentado<RecorteDeArquivo>
+        <Segmentado<RecorteDoCliente>
           rotulo="Recorte dos arquivos"
           valor={recorte}
           aoMudar={setRecorte}
           opcoes={[
             { chave: "todos", rotulo: "Todos" },
-            { chave: "envio", rotulo: "Envio" },
-            { chave: "previa", rotulo: "Prévias" },
+            { chave: "com_erro", rotulo: "Com erro" },
+            { chave: "com_aviso", rotulo: "Com aviso" },
+            { chave: "sem_ocorrencia", rotulo: "Limpos" },
           ]}
         />
       </div>
@@ -561,9 +488,9 @@ function Arquivos({ execucaoId, total, rodape }: { execucaoId: number; total: nu
       )}
 
       <div className={cn("overflow-x-auto transition-opacity", leitura.carregando && "opacity-60")}>
-        <div className="min-w-[1120px]">
+        <div className="min-w-[1080px]">
           <div className={cn("grid gap-3 bg-tabela-cabecalho-fundo px-5.5 py-3", colunas)}>
-            {["", "Estabelecimento", "Competência", "Ressarcimento", "Registros", "Pré-validação", "Situação"].map((c, i) => (
+            {["", "Arquivo", "Competência", "Registros", "Pré-validação", "Ficha 3", "Situação"].map((c, i) => (
               <span
                 key={`${c}-${i}`}
                 className={cn(
@@ -578,7 +505,7 @@ function Arquivos({ execucaoId, total, rodape }: { execucaoId: number; total: nu
           {dados?.linhas.map((a) => {
             const expandido = aberto === a.nome;
             return (
-              <Fragment key={a.nome}>
+              <Fragment key={`${a.origem}|${a.nome}`}>
                 <button
                   type="button"
                   onClick={() => setAberto(expandido ? null : a.nome)}
@@ -595,43 +522,57 @@ function Arquivos({ execucaoId, total, rodape }: { execucaoId: number; total: nu
                   />
                   <span className="min-w-0">
                     <span className="block font-mono text-xs text-texto">{cnpjFormatado(a.cnpj)}</span>
-                    <span className="mt-0.5 block truncate font-mono text-[11px] text-texto-fraco">{a.nome}</span>
+                    <span className="mt-0.5 block truncate font-mono text-[11px] text-texto-fraco" title={a.origem}>
+                      {a.nome}
+                    </span>
                   </span>
                   <code className="font-mono text-[13px] text-texto">{mesAno(a.competencia)}</code>
-                  <span className={cn("text-right font-mono text-[13px]", zero(a.ressarcimento) ? "text-texto-fraco" : "text-sucesso")}>
-                    {valor(a.ressarcimento)}
-                  </span>
                   <span className="text-right font-mono text-xs text-texto-suave">
                     {numero(a.eletronicos + a.nao_eletronicos)}
-                    {a.linhas_sem_documento > 0 && (
-                      <span className="block text-[11px] text-atencao">{numero(a.linhas_sem_documento)} sem documento</span>
-                    )}
+                    <span className="block text-[11px] text-texto-fraco">{tamanho(a.bytes)}</span>
                   </span>
                   <span className="text-right font-mono text-xs">
                     <span className={a.erros ? "text-erro" : "text-texto-suave"}>{numero(a.erros)} erros</span>
-                    <span className="block text-[11px] text-texto-fraco">
-                      {numero(a.itens_que_fecham)}/{numero(a.itens_recompostos)} itens fecham
-                    </span>
+                    <span className="block text-[11px] text-texto-fraco">{numero(a.avisos)} avisos</span>
+                  </span>
+                  <span className="text-right font-mono text-xs text-texto-suave">
+                    {numero(a.itens_que_fecham)}/{numero(a.itens_recompostos)}
+                    <span className="block text-[11px] text-texto-fraco">itens fecham</span>
                   </span>
                   <span className="flex flex-wrap items-center gap-1.5">
-                    {a.destino === "envio" ? (
-                      <span className="rounded-full border border-sucesso/35 bg-sucesso-fundo px-2 py-0.5 text-[10px] font-bold text-sucesso">
-                        pronto para envio
+                    {a.repetido ? (
+                      <span className="rounded-full border border-borda-forte px-2 py-0.5 text-[10px] font-bold text-texto-fraco">
+                        repetido, não lido
+                      </span>
+                    ) : a.erros ? (
+                      <span className="rounded-full border border-erro/35 bg-erro/8 px-2 py-0.5 text-[10px] font-bold text-erro">
+                        a SEFAZ recusaria
                       </span>
                     ) : (
-                      a.travas.map((t) => (
-                        <span
-                          key={t.codigo}
-                          title={t.o_que_fazer}
-                          className="rounded-full border border-atencao/35 bg-atencao-fundo px-2 py-0.5 text-[10px] font-bold text-atencao"
-                        >
-                          {t.rotulo}
-                        </span>
-                      ))
+                      <span className="rounded-full border border-sucesso/35 bg-sucesso-fundo px-2 py-0.5 text-[10px] font-bold text-sucesso">
+                        {a.avisos ? "passa, com aviso" : "passa"}
+                      </span>
                     )}
                   </span>
                 </button>
-                {expandido && <Detalhe execucaoId={execucaoId} arquivo={a} />}
+                {expandido && (
+                  <OcorrenciasDoArquivo
+                    chave={`${execucaoId}|${a.nome}`}
+                    carregar={(sinal) => ocorrenciasDoArquivo(execucaoId, a.nome, 1, sinal, "pre-validacao")}
+                    cabecalho={
+                      <div className="flex flex-wrap gap-x-6 gap-y-1.5 font-mono text-[11px] text-texto-suave">
+                        <span>0150 · {numero(a.participantes)}</span>
+                        <span>0200 · {numero(a.itens)}</span>
+                        <span>1050 · {numero(a.saldos)}</span>
+                        <span>1100 · {numero(a.eletronicos)}</span>
+                        <span>1200 · {numero(a.nao_eletronicos)}</span>
+                        <span className="truncate" title={a.origem}>
+                          de {a.origem}
+                        </span>
+                      </div>
+                    }
+                  />
+                )}
               </Fragment>
             );
           })}
@@ -671,35 +612,5 @@ function Arquivos({ execucaoId, total, rodape }: { execucaoId: number; total: nu
         {rodape}
       </div>
     </section>
-  );
-}
-
-function Detalhe({ execucaoId, arquivo }: { execucaoId: number; arquivo: ArquivoGerado }) {
-  return (
-    <OcorrenciasDoArquivo
-      chave={`${execucaoId}|${arquivo.nome}`}
-      carregar={(sinal) => ocorrenciasDoArquivo(execucaoId, arquivo.nome, 1, sinal)}
-      cabecalho={
-        <>
-          <div className="flex flex-wrap gap-x-6 gap-y-1.5 font-mono text-[11px] text-texto-suave">
-            <span>0150 · {numero(arquivo.participantes)}</span>
-            <span>0200 · {numero(arquivo.itens)}</span>
-            <span>1050 · {numero(arquivo.saldos)}</span>
-            <span>1100 · {numero(arquivo.eletronicos)}</span>
-            <span>1200 · {numero(arquivo.nao_eletronicos)}</span>
-            <span>{tamanho(arquivo.bytes)}</span>
-            <span className="truncate" title={arquivo.sha256}>
-              SHA-256 {arquivo.sha256.slice(0, 16)}…
-            </span>
-          </div>
-          {arquivo.motivos.length > 0 && (
-            <p className="m-0 mt-3 text-xs leading-relaxed text-texto-suave">
-              <strong className="text-texto">Pendências da apuração:</strong>{" "}
-              {arquivo.motivos.map((m) => m.rotulo.toLowerCase()).join("; ")}.
-            </p>
-          )}
-        </>
-      }
-    />
   );
 }

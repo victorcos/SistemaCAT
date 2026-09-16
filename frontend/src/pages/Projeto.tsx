@@ -12,7 +12,7 @@ import {
   Secao,
   Voltar,
 } from "@/components/ui/Pagina";
-import { IconeApagar, IconeConfirma, IconeHistorico } from "@/constants/icons";
+import { IconeApagar, IconeArquivoDigital, IconeConfirma, IconeHistorico } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
 import {
   TOM_DO_STATUS,
@@ -241,6 +241,22 @@ export default function Projeto() {
           ))}
         </ol>
       </Secao>
+
+      <section className="flex flex-wrap items-center gap-4 rounded-cartao border border-borda bg-superficie-vidro p-6">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border border-laranja-500/30 bg-laranja-500/14 text-laranja-700 escuro:text-laranja-300">
+          <IconeArquivoDigital size={18} strokeWidth={1.8} aria-hidden />
+        </div>
+        <div className="min-w-[240px] flex-1">
+          <h2 className="m-0 text-base font-extrabold text-texto">Auditoria do que o cliente já transmitiu</h2>
+          <p className="m-0 mt-1.5 max-w-[680px] text-[13px] leading-relaxed text-texto-suave">
+            Pré-validar os arquivos da CAT 42 que o cliente gerou com outra ferramenta, soltos no lote ou em
+            zip. Não depende das etapas acima.
+          </p>
+        </div>
+        <BotaoLink para={ROTAS.preValidacao(p.id)} variante="secundario">
+          Pré-validar os arquivos do cliente
+        </BotaoLink>
+      </section>
 
       {podeExcluirTrabalho && (
         <section className="flex flex-wrap items-center justify-between gap-4 rounded-cartao border border-erro/30 border-l-[3px] border-l-erro bg-erro-fundo p-6">

@@ -41,6 +41,7 @@ from cat.aplicacao.casos_de_uso import (
     gerar_arquivo_digital,
     montar_razao,
     planilhas,
+    pre_validar_arquivos,
     rodada,
 )
 from cat.aplicacao.casos_de_uso.analisar_remessa import RemessaAnalisada, analisar
@@ -54,6 +55,7 @@ from cat.config import obter_config
 from cat.dominio.comum.cnpj import Cnpj
 from cat.infraestrutura.analitico import apuracao as analitico_apuracao
 from cat.infraestrutura.analitico import arquivo_digital as analitico_arquivo_digital
+from cat.infraestrutura.analitico import pre_validacao_do_cliente as analitico_pre_validacao
 from cat.infraestrutura.analitico import razao as analitico_razao
 from cat.infraestrutura.analitico import suportado as analitico_suportado
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
@@ -316,6 +318,8 @@ PREPARADORES = {
                            "Já existe uma apuração do período em andamento neste trabalho."),
     gerar_arquivo_digital.ETAPA: (gerar_arquivo_digital.preparar, gerar_arquivo_digital.NadaParaGerar,
                                   "Já existe uma geração do arquivo digital em andamento neste trabalho."),
+    pre_validar_arquivos.ETAPA: (pre_validar_arquivos.preparar, pre_validar_arquivos.NadaParaPreValidar,
+                                 "Já existe uma pré-validação dos arquivos do cliente em andamento neste trabalho."),
 }
 
 # "cancelando" ainda está em curso: a rodada só para no próximo ponto seguro, e
@@ -552,9 +556,10 @@ class PedidoDeOcorrencias(BaseModel):
     por_pagina: int = Field(default=analitico_arquivo_digital.POR_PAGINA_PADRAO, ge=1)
 
 
-def _arquivo_digital_concluido(execucao_id: int, sessao: Session) -> ExecucaoDB:
+def _arquivo_digital_concluido(execucao_id: int, sessao: Session,
+                               etapas: tuple[str, ...] = (gerar_arquivo_digital.ETAPA,)) -> ExecucaoDB:
     execucao = sessao.get(ExecucaoDB, execucao_id)
-    if execucao is None or execucao.etapa != gerar_arquivo_digital.ETAPA:
+    if execucao is None or execucao.etapa not in etapas:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Geração do arquivo digital não encontrada.")
     if execucao.situacao != "concluida":
         raise HTTPException(status.HTTP_409_CONFLICT, "A geração do arquivo digital ainda não terminou.")
@@ -571,10 +576,24 @@ def arquivos_gerados(pedido: PedidoDeArquivos, sessao: Annotated[Session, Depend
 
 @router.post("/arquivo_digital/ocorrencias", dependencies=[Depends(exigir_segredo)])
 def ocorrencias_do_arquivo(pedido: PedidoDeOcorrencias, sessao: Annotated[Session, Depends(obter_sessao)]) -> dict:
-    execucao = _arquivo_digital_concluido(pedido.execucao_id, sessao)
-    with contexto(etapa=gerar_arquivo_digital.ETAPA, execucao_id=execucao.id, arquivo=pedido.nome):
+    # a pré-validação do cliente grava as ocorrências no mesmo formato
+    execucao = _arquivo_digital_concluido(pedido.execucao_id, sessao,
+                                          (gerar_arquivo_digital.ETAPA, pre_validar_arquivos.ETAPA))
+    with contexto(etapa=execucao.etapa, execucao_id=execucao.id, arquivo=pedido.nome):
         return _traduzir_leitura(lambda: analitico_arquivo_digital.ocorrencias(
             execucao.pasta_de_trabalho or "", pedido.nome, pedido.pagina, pedido.por_pagina))
+
+
+@router.post("/pre_validacao/arquivos", dependencies=[Depends(exigir_segredo)])
+def arquivos_do_cliente(pedido: PedidoDeArquivos, sessao: Annotated[Session, Depends(obter_sessao)]) -> dict:
+    execucao = sessao.get(ExecucaoDB, pedido.execucao_id)
+    if execucao is None or execucao.etapa != pre_validar_arquivos.ETAPA:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Pré-validação não encontrada.")
+    if execucao.situacao != "concluida":
+        raise HTTPException(status.HTTP_409_CONFLICT, "A pré-validação ainda não terminou.")
+    with contexto(etapa=pre_validar_arquivos.ETAPA, execucao_id=execucao.id):
+        return _traduzir_leitura(lambda: analitico_pre_validacao.arquivos_do_cliente(
+            execucao.pasta_de_trabalho or "", pedido.so, pedido.busca, pedido.pagina, pedido.por_pagina))
 
 
 # ---------------------------------------------------------------------------

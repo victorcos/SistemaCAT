@@ -48,6 +48,33 @@ COLUNAS_OCORRENCIAS = (
 )
 
 
+COLUNAS_ARQUIVOS_DO_CLIENTE = (
+    Coluna("nome", "Arquivo", "texto", 44),
+    Coluna("origem", "De onde veio (pasta, zip e membro)", "texto", 70),
+    Coluna("cnpj", "CNPJ do estabelecimento", "texto", 20),
+    Coluna("competencia", "Competência", "texto", 12),
+    Coluna("repetido", "Repetido (não lido de novo)", "texto", 12),
+    Coluna("erros", "Erros da pré-validação", "numero_inteiro", 12),
+    Coluna("avisos", "Avisos da pré-validação", "numero_inteiro", 12),
+    Coluna("itens_recompostos", "Itens recompostos", "numero_inteiro", 12),
+    Coluna("itens_que_fecham", "Itens que fecham com o 1050", "numero_inteiro", 14),
+    Coluna("maior_diferenca_de_valor", "Maior diferença de valor no 1050", "numero", 16),
+    Coluna("linhas", "Linhas", "numero_inteiro", 12),
+    Coluna("eletronicos", "Registros 1100", "numero_inteiro", 12),
+    Coluna("nao_eletronicos", "Registros 1200", "numero_inteiro", 12),
+    Coluna("saldos", "Registros 1050", "numero_inteiro", 12),
+    Coluna("itens", "Registros 0200", "numero_inteiro", 12),
+    Coluna("participantes", "Registros 0150", "numero_inteiro", 12),
+    Coluna("bytes", "Tamanho (bytes)", "numero_inteiro", 14),
+    Coluna("sha256", "SHA-256", "texto", 66),
+)
+
+
+def gerar_arquivos_do_cliente(parquet: str, destino: str, modelos=None, classificacoes=None,
+                              formato: str = "xlsx") -> int:
+    return gerar(parquet, destino, COLUNAS_ARQUIVOS_DO_CLIENTE, "Arquivos do cliente", formato=formato)
+
+
 def gerar_arquivos(parquet: str, destino: str, modelos=None, classificacoes=None, formato: str = "xlsx") -> int:
     return gerar(parquet, destino, COLUNAS_ARQUIVOS, "Arquivos digitais", formato=formato)
 
