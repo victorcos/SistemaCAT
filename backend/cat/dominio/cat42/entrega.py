@@ -49,7 +49,27 @@ _ORDEM_DA_GRAVIDADE = {Gravidade.TRAVA: 0, Gravidade.ATENCAO: 1, Gravidade.INFOR
 
 
 @dataclass(frozen=True)
+class Medida:
+    """Quanto de um problema uma etapa viu, na unidade dela."""
+
+    quantidade: int
+    unidade: str
+    etapa: str
+
+    @property
+    def nome_da_etapa(self) -> str:
+        return NOME_DA_ETAPA.get(self.etapa, self.etapa)
+
+
+@dataclass(frozen=True)
 class Pendencia:
+    """Um problema, com a primeira etapa que o viu e as medidas de todas.
+
+    `quantidade` e `unidade` são da primeira medida — a da etapa mais cedo, que
+    é onde se resolve. `medidas` traz as outras: o mesmo confronto pendente é
+    linha no razão, competência na apuração e arquivo na etapa 7.
+    """
+
     etapa: str
     codigo: str
     rotulo: str
@@ -57,6 +77,7 @@ class Pendencia:
     unidade: str
     gravidade: Gravidade
     o_que_fazer: str
+    medidas: tuple[Medida, ...] = ()
 
     @property
     def nome_da_etapa(self) -> str:
@@ -124,11 +145,81 @@ def _valor(resumo: dict, caminho: str) -> int:
         return 0
 
 
+# O mesmo problema visto por etapas diferentes, cada uma na sua unidade. Na
+# entrega do Amigão (16/09/2026) o confronto pendente aparecia quatro vezes —
+# linhas, competências, arquivos e ocorrências da pré-validação — e o revisor
+# lia quatro problemas onde havia um. Assunto -> (rótulo, o que fazer).
+_ASSUNTOS: dict[str, tuple[str, str]] = {
+    "sem_aliquota": ("Saídas sem alíquota interna no cadastro",
+                     "Completar a alíquota no 0200 da EFD e montar o razão de novo."),
+    "enquadramento_indefinido": ("Saídas com enquadramento indefinido",
+                                 "Dizer quem comprou, ou escolher o cupom nas demais saídas no trabalho."),
+    "confronto_pendente": ("Saídas de enquadramento 2 ou 4 sem valor de confronto",
+                           "Apurar o ICMS da operação própria da entrada (coluna 21, art. 271)."),
+    "estoque_negativo": ("Estoque negativo: fichas retiradas do total",
+                         "Falta entrada, abertura ou algum tipo de saída: completar a base e montar o razão de novo."),
+    "fora_de_sp": ("Estabelecimentos fora de SP", "A CAT 42 é paulista: não entram no pedido."),
+    "icms_suportado": ("Entradas sem ICMS suportado apurado",
+                       "Pedir o XML ou o relatório de entradas com a ST informada: sem o imposto, o ressarcimento sai menor."),
+}
+
+# (etapa, código de origem) -> assunto
+_ASSUNTO_DE: dict[tuple[str, str], str] = {
+    ("razao", "saidas_sem_aliquota"): "sem_aliquota",
+    ("apuracao", "sem_aliquota"): "sem_aliquota",
+    ("razao", "saidas_indefinidas"): "enquadramento_indefinido",
+    ("apuracao", "enquadramento_indefinido"): "enquadramento_indefinido",
+    ("arquivo_digital", "saida_indefinida"): "enquadramento_indefinido",
+    ("razao", "confronto_pendente"): "confronto_pendente",
+    ("apuracao", "confronto_pendente"): "confronto_pendente",
+    ("arquivo_digital", "confronto_pendente"): "confronto_pendente",
+    ("arquivo_digital", "pre_validacao_vl_confr"): "confronto_pendente",
+    ("razao", "fichas_retiradas"): "estoque_negativo",
+    ("apuracao", "ficha_retirada"): "estoque_negativo",
+    ("arquivo_digital", "saldo_negativo"): "estoque_negativo",
+    ("arquivo_digital", "pre_validacao_item_sem_saldo"): "estoque_negativo",
+    ("arquivo_digital", "pre_validacao_saldo_negativo"): "estoque_negativo",
+    ("razao", "fichas_fora_de_sp"): "fora_de_sp",
+    ("apuracao", "fora_de_sp"): "fora_de_sp",
+    ("st_suportado", "suportado_falta_dado"): "icms_suportado",
+    ("arquivo_digital", "entradas_sem_icms"): "icms_suportado",
+}
+
+
+def _juntar(soltas: list[Pendencia]) -> list[Pendencia]:
+    """Uma pendência por assunto; a gravidade é a mais alta entre as etapas."""
+    grupos: dict[str, list[Pendencia]] = {}
+    for p in soltas:
+        chave = _ASSUNTO_DE.get((p.etapa, p.codigo), f"{p.etapa}:{p.codigo}")
+        grupos.setdefault(chave, []).append(p)
+    saida = []
+    for chave, membros in grupos.items():
+        membros.sort(key=lambda p: _ORDEM_DA_ETAPA.get(p.etapa, 99))
+        primeira = membros[0]
+        # duas regras da mesma etapa na mesma unidade (item sem 1050 e estoque
+        # negativo, ambas "ocorrências") somam: é o mesmo problema contado duas vezes
+        somadas: dict[tuple[str, str], int] = {}
+        for p in membros:
+            somadas[(p.etapa, p.unidade)] = somadas.get((p.etapa, p.unidade), 0) + p.quantidade
+        medidas = tuple(Medida(n, unidade, etapa) for (etapa, unidade), n in somadas.items())
+        gravidade = min((p.gravidade for p in membros), key=_ORDEM_DA_GRAVIDADE.__getitem__)
+        if chave in _ASSUNTOS:
+            rotulo, o_que_fazer = _ASSUNTOS[chave]
+            codigo = chave
+        else:
+            rotulo, o_que_fazer, codigo = primeira.rotulo, primeira.o_que_fazer, primeira.codigo
+        saida.append(Pendencia(primeira.etapa, codigo, rotulo, primeira.quantidade, primeira.unidade,
+                               gravidade, o_que_fazer, medidas))
+    return saida
+
+
 def pendencias(resumos: dict[str, dict]) -> list[Pendencia]:
     """As pendências de todas as etapas, das que travam para as que informam.
 
     `resumos` é etapa -> resumo da execução que a entrega usou. Etapa ausente
     não gera pendência: não é papel da entrega inventar o que não foi medido.
+    O mesmo problema visto por várias etapas vira uma pendência só, com a
+    medida de cada uma.
     """
     saida: list[Pendencia] = []
     for etapa, caminho, codigo, rotulo, unidade, gravidade, o_que_fazer in _DOS_RESUMOS:
@@ -155,7 +246,7 @@ def pendencias(resumos: dict[str, dict]) -> list[Pendencia]:
                                    f"Pré-validação: {r['rotulo']}", int(r["ocorrencias"]), "ocorrências",
                                    gravidade, r.get("o_que_fazer", "")))
 
-    return sorted(saida, key=lambda p: (_ORDEM_DA_GRAVIDADE[p.gravidade], _ORDEM_DA_ETAPA.get(p.etapa, 99)))
+    return sorted(_juntar(saida), key=lambda p: (_ORDEM_DA_GRAVIDADE[p.gravidade], _ORDEM_DA_ETAPA.get(p.etapa, 99)))
 
 
 class SituacaoDaCompetencia(str, Enum):

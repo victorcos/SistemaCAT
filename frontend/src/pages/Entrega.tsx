@@ -422,7 +422,9 @@ function Concluida({
                     <span className="min-w-[260px] flex-1 text-[13px] text-texto">
                       <strong>{x.rotulo}</strong>
                       <span className="block text-[11px] text-texto-fraco">
-                        {x.nome_da_etapa} · {x.unidade}
+                        {(x.medidas?.length ? x.medidas : [{ quantidade: x.quantidade, unidade: x.unidade, nome_da_etapa: x.nome_da_etapa }])
+                          .map((m) => `${numero(m.quantidade)} ${m.unidade} em «${m.nome_da_etapa.toLowerCase()}»`)
+                          .join(" · ")}
                       </span>
                     </span>
                     <span className="max-w-[520px] text-xs leading-relaxed text-texto-suave">{x.o_que_fazer}</span>

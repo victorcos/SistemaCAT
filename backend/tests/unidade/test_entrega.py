@@ -28,27 +28,54 @@ RESUMOS = {
 class TestPendencias:
     def test_so_entra_o_que_tem_quantidade(self):
         codigos = {p.codigo for p in pendencias(RESUMOS)}
-        assert "nao_escrituradas" not in codigos and "fichas_retiradas" not in codigos
-        assert {"documentos_a_cobrar", "sem_chave_na_efd", "suportado_falta_dado", "saidas_sem_aliquota",
-                "fichas_fora_de_sp", "entradas_sem_icms"} <= codigos
+        assert "nao_escrituradas" not in codigos
+        assert {"documentos_a_cobrar", "sem_chave_na_efd", "icms_suportado", "sem_aliquota", "fora_de_sp"} <= codigos
 
     def test_trava_primeiro_depois_atencao_depois_informacao(self):
         lista = pendencias(RESUMOS)
         gravidades = [p.gravidade for p in lista]
         assert gravidades == sorted(gravidades, key=[Gravidade.TRAVA, Gravidade.ATENCAO, Gravidade.INFORMACAO].index)
-        # dentro da mesma gravidade, na ordem das etapas
+        # dentro da mesma gravidade, na ordem das etapas em que se resolve
         travas = [p.etapa for p in lista if p.gravidade is Gravidade.TRAVA]
         assert travas == ["razao", "apuracao", "arquivo_digital", "arquivo_digital"]
 
     def test_listas_das_etapas_6_e_7(self):
         por_codigo = {p.codigo: p for p in pendencias(RESUMOS)}
-        assert por_codigo["fora_de_sp"].gravidade is Gravidade.INFORMACAO
         assert por_codigo["sem_inventario"].gravidade is Gravidade.TRAVA
         assert por_codigo["sem_inventario"].unidade == "competências"
         # "não apta" repete os motivos da etapa 6: não entra duas vezes
         assert "nao_apta" not in por_codigo
-        assert por_codigo["pre_validacao_vl_confr"].gravidade is Gravidade.TRAVA
         assert por_codigo["pre_validacao_saldo_em_valor"].gravidade is Gravidade.ATENCAO
+
+    def test_o_mesmo_problema_visto_por_varias_etapas_vira_uma_pendencia(self):
+        por_codigo = {p.codigo: p for p in pendencias(RESUMOS)}
+        # fora de SP: fichas no razão e competências na apuração
+        fora = por_codigo["fora_de_sp"]
+        assert fora.gravidade is Gravidade.INFORMACAO and fora.etapa == "razao"
+        assert [(m.quantidade, m.unidade, m.etapa) for m in fora.medidas] == [
+            (7, "fichas", "razao"), (5, "competências", "apuracao")]
+        # estoque negativo: só a etapa 7 viu neste resumo, e o rótulo é o do assunto
+        assert por_codigo["estoque_negativo"].medidas[0].unidade == "arquivos"
+        # o suportado que faltou na etapa 4 é o ICMS_TOT zero da etapa 7
+        suportado = por_codigo["icms_suportado"]
+        assert (suportado.etapa, suportado.quantidade) == ("st_suportado", 45)
+        assert [m.etapa for m in suportado.medidas] == ["st_suportado", "arquivo_digital"]
+        # a regra VL_CONFR da pré-validação é o confronto pendente: trava
+        assert por_codigo["confronto_pendente"].gravidade is Gravidade.TRAVA
+        assert "pre_validacao_vl_confr" not in por_codigo
+
+    def test_gravidade_do_assunto_e_a_mais_alta(self):
+        resumos = {"razao": {"pendencias": {"confronto_pendente": 3}},
+                   "arquivo_digital": {"por_regra": [{"codigo": "vl_confr", "rotulo": "x", "severidade": "erro",
+                                                      "o_que_fazer": "", "ocorrencias": 2}]}}
+        [p] = pendencias(resumos)
+        assert (p.codigo, p.gravidade, p.quantidade, len(p.medidas)) == ("confronto_pendente", Gravidade.TRAVA, 3, 2)
+
+    def test_regras_da_mesma_etapa_e_unidade_somam(self):
+        regra = lambda codigo, n: {"codigo": codigo, "rotulo": codigo, "severidade": "erro",  # noqa: E731
+                                   "o_que_fazer": "", "ocorrencias": n}
+        [p] = pendencias({"arquivo_digital": {"por_regra": [regra("item_sem_saldo", 69), regra("saldo_negativo", 2)]}})
+        assert [(m.quantidade, m.unidade) for m in p.medidas] == [(71, "ocorrências")]
 
     def test_resumo_ausente_ou_antigo_nao_inventa_pendencia(self):
         assert pendencias({}) == []

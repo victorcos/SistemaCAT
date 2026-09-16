@@ -412,8 +412,10 @@ O resumo (`versao: 1`) traz `competencias`, `competencias_de_sp`, `para_envio`,
 `estabelecimentos_no_dossie`, `ressarcimento`, `complemento`,
 `ressarcimento_para_envio`, `complemento_para_envio`, `arquivos_no_dossie`,
 `arquivos_no_pacote`, `bytes_do_pacote`, `sha256_do_pacote`, `por_gravidade`
-(`trava`, `atencao`, `informacao`), `pendencias` (etapa, nome da etapa,
-código, rótulo, quantidade, unidade, gravidade, o que fazer) e o id de cada
+(`trava`, `atencao`, `informacao`), `pendencias` (etapa onde se resolve, nome
+da etapa, código, rótulo, quantidade e unidade da primeira medida, gravidade,
+o que fazer e `medidas` — o mesmo problema como cada etapa o viu: quantidade,
+unidade, etapa) e o id de cada
 execução usada (`arquivo_digital_execucao_id`, `apuracao_execucao_id`,
 `razao_execucao_id`, `st_suportado_execucao_id`, `movimentos_execucao_id`,
 `conferencia_execucao_id`).

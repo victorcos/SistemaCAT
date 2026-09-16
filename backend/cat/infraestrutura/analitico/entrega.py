@@ -557,8 +557,8 @@ def _relatorio(caminho: str, contexto: Contexto, resumo: ResumoDaEntrega, compet
         aba.write_number(i, 7, float(m["complemento"]), f["dinheiro"])
 
     # --- Pendências -----------------------------------------------------------
-    colunas = (("Gravidade", 16), ("Etapa", 32), ("Pendência", 60), ("Quantidade", 14), ("De quê", 14),
-               ("O que fazer", 90))
+    colunas = (("Gravidade", 16), ("Etapa onde se resolve", 32), ("Pendência", 56), ("Quantidade", 14),
+               ("De quê", 14), ("Como cada etapa viu", 60), ("O que fazer", 90))
     aba = _aba_com_cabecalho(livro, "Pendências", colunas, f)
     for i, p in enumerate(resumo.pendencias, 1):
         aba.write_string(i, 0, p.gravidade.rotulo, f[p.gravidade.value])
@@ -566,7 +566,9 @@ def _relatorio(caminho: str, contexto: Contexto, resumo: ResumoDaEntrega, compet
         aba.write_string(i, 2, p.rotulo)
         aba.write_number(i, 3, p.quantidade, f["inteiro"])
         aba.write_string(i, 4, p.unidade)
-        aba.write_string(i, 5, p.o_que_fazer)
+        aba.write_string(i, 5, " · ".join(
+            f"{m.quantidade:,} {m.unidade} ({m.nome_da_etapa.lower()})".replace(",", ".") for m in p.medidas))
+        aba.write_string(i, 6, p.o_que_fazer)
 
     # --- Trilha ---------------------------------------------------------------
     colunas = (("Etapa", 36), ("Execução", 10), ("Concluída em", 18), ("Iniciada por", 24), ("Duração (s)", 12))
@@ -732,7 +734,9 @@ def serializar(resumo: ResumoDaEntrega) -> dict:
         "pendencias": [
             {"etapa": p.etapa, "nome_da_etapa": p.nome_da_etapa, "codigo": p.codigo, "rotulo": p.rotulo,
              "quantidade": p.quantidade, "unidade": p.unidade, "gravidade": p.gravidade.value,
-             "gravidade_rotulo": p.gravidade.rotulo, "o_que_fazer": p.o_que_fazer}
+             "gravidade_rotulo": p.gravidade.rotulo, "o_que_fazer": p.o_que_fazer,
+             "medidas": [{"quantidade": m.quantidade, "unidade": m.unidade, "etapa": m.etapa,
+                          "nome_da_etapa": m.nome_da_etapa} for m in p.medidas]}
             for p in resumo.pendencias
         ],
     }

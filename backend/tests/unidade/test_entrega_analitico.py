@@ -72,7 +72,9 @@ class TestOResumo:
     def test_pendencias_vem_dos_resumos(self, montada):
         _, r = montada
         s = serializar(r)
-        assert [p["codigo"] for p in s["pendencias"]] == ["sem_inventario", "entradas_sem_icms"]
+        assert [p["codigo"] for p in s["pendencias"]] == ["sem_inventario", "icms_suportado"]
+        assert s["pendencias"][1]["medidas"] == [
+            {"quantidade": 3, "unidade": "entradas", "etapa": "arquivo_digital", "nome_da_etapa": "Gerar o arquivo digital"}]
         assert s["por_gravidade"] == {"trava": 1, "atencao": 1, "informacao": 0}
 
 

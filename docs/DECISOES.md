@@ -5,6 +5,24 @@
 
 ---
 
+## 2026-09-16 — Uma pendência por problema, com a medida de cada etapa
+
+**O que a entrega do Amigão mostrou.** 26 pendências, e várias eram o mesmo
+problema contado de novo: o confronto pendente dos enquadramentos 2 e 4 aparecia
+como linhas no razão, competências na apuração, arquivos na etapa 7 e
+ocorrências de VL_CONFR na pré-validação. O revisor lia quatro problemas onde
+havia um.
+
+**Como ficou.** O domínio da entrega junta por assunto — saída sem alíquota,
+enquadramento indefinido, confronto pendente, estoque negativo, fora de SP e
+entrada sem ICMS suportado (o que falta na etapa 4 é o ICMS_TOT zero da etapa
+7). A pendência fica com a etapa mais cedo, que é onde se resolve, a gravidade
+mais alta entre as etapas e a lista de medidas; regras da mesma etapa na mesma
+unidade somam. O relatório ganhou a coluna «Como cada etapa viu». No piloto,
+26 pendências viraram 15.
+
+---
+
 ## 2026-09-16 — O cadastro do trabalho muda, e a base fora do período aparece
 
 **O que o piloto mostrou.** O trabalho do Amigão nasceu como "Ressarcimento ST

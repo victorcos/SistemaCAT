@@ -23,6 +23,8 @@ export interface PendenciaDaEntrega {
   gravidade: Gravidade;
   gravidade_rotulo: string;
   o_que_fazer: string;
+  /** o mesmo problema como cada etapa o viu, na unidade dela; a primeira é onde se resolve */
+  medidas?: { quantidade: number; unidade: string; etapa: string; nome_da_etapa: string }[];
 }
 
 export interface EstabelecimentoDaEntrega {
