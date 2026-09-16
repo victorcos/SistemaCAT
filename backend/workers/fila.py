@@ -34,6 +34,7 @@ from cat.aplicacao.casos_de_uso import (
     apurar_suportado,
     conferir_documentos,
     extrair_movimentos,
+    gerar_arquivo_digital,
     montar_razao,
 )
 from cat.aplicacao.casos_de_uso.historico_do_projeto import registrar_de_etapa
@@ -53,6 +54,7 @@ EXECUTORES = {
     apurar_suportado.ETAPA: apurar_suportado.executar,
     montar_razao.ETAPA: montar_razao.executar,
     apurar_periodo.ETAPA: apurar_periodo.executar,
+    gerar_arquivo_digital.ETAPA: gerar_arquivo_digital.executar,
 }
 
 MOTIVO_INTERRUPCAO = "Interrompida: o motor reiniciou durante a rodada. Rode de novo."

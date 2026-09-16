@@ -21,10 +21,11 @@ from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
 from cat.config import obter_config
-from cat.infraestrutura.repositorios.modelos import Base
+from cat.infraestrutura.repositorios.banco import Sessao
+from cat.infraestrutura.repositorios.modelos import Base, ProjetoDB
 from tests.integracao.cadastro import (
     SEGREDO,
-    conferir, criar_empresa, criar_lote, criar_projeto, criar_usuario, execucao,
+    conferir, criar_empresa, criar_lote, criar_projeto, criar_usuario, execucao, execucoes,
     iniciar, planilha, rodar_fila, ultima_situacao,
 )
 
@@ -183,6 +184,51 @@ class TestFluxo:
             planilha_ = planilha(cliente, "apuracao", apuracao["id"], qual)
             assert planilha_.status_code == 200, (qual, planilha_.text)
             assert planilha_.content[:2] == b"PK"
+
+    def test_o_arquivo_digital_sai_como_previa_e_diz_por_que(self, cliente, projeto_id, razao):
+        """Etapa 7: a venda de PDV do relatório não tem chave, e sem bloco H a
+        competência não está apta — o arquivo sai, mas como prévia."""
+        if not execucoes(projeto_id, "apuracao"):
+            rodar(cliente, "apuracao", projeto_id)
+        gerado = rodar(cliente, "arquivo_digital", projeto_id)
+        r = gerado["resumo"]
+        assert (r["arquivos"], r["para_envio"], r["previas"]) == (1, 0, 1)
+        assert r["linhas_sem_documento"] == 1
+        assert {t["codigo"] for t in r["por_trava"]} >= {"nao_apta", "sem_documento", "pre_validacao"}
+        assert r["venda_a_consumidor"] == "enquadramento_1"
+
+        a = cliente.post("/interno/arquivo_digital/arquivos", headers=SEGREDO,
+                         json={"execucao_id": gerado["id"], "so": "previa"})
+        assert a.status_code == 200, a.text
+        previa = a.json()["linhas"][0]
+        assert previa["nome"] == f"CAT5_SP_{CNPJ}_5_2021_PREVIA.txt"
+        assert previa["eletronicos"] == 2          # as duas entradas com chave
+        o = cliente.post("/interno/arquivo_digital/ocorrencias", headers=SEGREDO,
+                         json={"execucao_id": gerado["id"], "nome": previa["nome"]})
+        assert o.status_code == 200 and o.json()["total"] > 0
+
+        for qual in ("arquivos", "ocorrencias"):
+            p = planilha(cliente, "arquivo_digital", gerado["id"], qual)
+            assert p.status_code == 200, (qual, p.text)
+            assert p.content[:2] == b"PK"
+        z = planilha(cliente, "arquivo_digital", gerado["id"], "previas")
+        assert z.status_code == 200 and z.json()["tipo"] == "application/zip"
+        assert planilha(cliente, "arquivo_digital", gerado["id"], "arquivos", formato="zip").status_code == 404
+
+    def test_o_arquivo_digital_recusa_razao_de_outra_escolha(self, cliente, projeto_id, razao):
+        if not execucoes(projeto_id, "apuracao"):
+            rodar(cliente, "apuracao", projeto_id)
+        with Sessao() as s:
+            s.get(ProjetoDB, projeto_id).venda_a_consumidor = "demais_saidas"
+            s.commit()
+        try:
+            r = iniciar(cliente, "arquivo_digital", projeto_id, "raz_analista")
+            assert r.status_code == 422
+            assert "Monte o razão e apure o período de novo" in r.json()["detail"]
+        finally:
+            with Sessao() as s:
+                s.get(ProjetoDB, projeto_id).venda_a_consumidor = "enquadramento_1"
+                s.commit()
 
     def test_apuracao_recusa_antes_do_razao(self, cliente, projeto_id, razao):
         from tests.integracao.cadastro import execucoes  # noqa: PLC0415

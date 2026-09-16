@@ -28,6 +28,7 @@ public sealed class MotorDeExecucoesFalso : IAsyncLifetime
     public Func<JsonElement, IResult> AoPedirLinhas { get; set; } = _ => Results.StatusCode(500);
     public Func<string, JsonElement, IResult> AoPedirRazao { get; set; } = (_, _) => Results.StatusCode(500);
     public Func<JsonElement, IResult> AoPedirCompetencias { get; set; } = _ => Results.StatusCode(500);
+    public Func<string, JsonElement, IResult> AoPedirArquivoDigital { get; set; } = (_, _) => Results.StatusCode(500);
 
     public async Task InitializeAsync()
     {
@@ -74,6 +75,15 @@ public sealed class MotorDeExecucoesFalso : IAsyncLifetime
             Pedidos.Enqueue(pedido);
             return AoPedirCompetencias(pedido);
         });
+        foreach (var rota in new[] { "arquivos", "ocorrencias" })
+            _app.MapPost($"/interno/arquivo_digital/{rota}", async (HttpContext http) =>
+            {
+                if (http.Request.Headers["X-Cat-Motor-Segredo"] != Segredo)
+                    return Results.StatusCode(403);
+                var pedido = await http.Request.ReadFromJsonAsync<JsonElement>();
+                Pedidos.Enqueue(pedido);
+                return AoPedirArquivoDigital(rota, pedido);
+            });
         foreach (var rota in new[] { "fichas", "ficha" })
             _app.MapPost($"/interno/razao/{rota}", async (HttpContext http) =>
             {
@@ -176,6 +186,7 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
     [InlineData("suportado", "st_suportado")]
     [InlineData("razao", "razao")]
     [InlineData("apuracao", "apuracao")]
+    [InlineData("arquivo-digital", "arquivo_digital")]
     public async Task Pedir_repassa_ao_motor_e_devolve_a_execucao_da_fila(string segmento, string etapa)
     {
         var (quem, _, c) = await Pessoa("dev");
@@ -501,5 +512,30 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
             (pedido.GetProperty("execucao_id").GetInt32(), pedido.GetProperty("so").GetString(),
              pedido.GetProperty("busca").GetString(), pedido.GetProperty("pagina").GetInt32(), pedido.GetProperty("por_pagina").GetInt32()));
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/apuracao/{razao}/competencias")).StatusCode);
+    }
+
+    // ------------------------------------------------------------------ arquivo digital
+    [Fact]
+    public async Task Arquivos_e_ocorrencias_repassam_e_so_valem_na_rota_do_arquivo_digital()
+    {
+        var (_, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var id = await Execucao(projeto, "arquivo_digital");
+        var apuracao = await Execucao(projeto, "apuracao");
+        motor.AoPedirArquivoDigital = (rota, p) => Results.Json(new { rota, total = 1 });
+
+        var r = await c.GetAsync($"/api/arquivo-digital/{id}/arquivos?so=previa&busca=2021&pagina=3&por_pagina=20");
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal("arquivos", (await Json(r)).GetProperty("rota").GetString());
+        var pedido = motor.Pedidos.Last(x => x.TryGetProperty("so", out _));
+        Assert.Equal((id, "previa", "2021", 3, 20),
+            (pedido.GetProperty("execucao_id").GetInt32(), pedido.GetProperty("so").GetString(),
+             pedido.GetProperty("busca").GetString(), pedido.GetProperty("pagina").GetInt32(), pedido.GetProperty("por_pagina").GetInt32()));
+
+        r = await c.GetAsync($"/api/arquivo-digital/{id}/ocorrencias?arquivo=CAT5_SP_1_2021.txt");
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal("CAT5_SP_1_2021.txt", motor.Pedidos.Last(x => x.TryGetProperty("nome", out _)).GetProperty("nome").GetString());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await c.GetAsync($"/api/arquivo-digital/{id}/ocorrencias")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/arquivo-digital/{apuracao}/arquivos")).StatusCode);
     }
 }

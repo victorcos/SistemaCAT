@@ -107,4 +107,11 @@ public interface IMotor
     /// <summary>As competências fechadas na apuração do período.</summary>
     /// <exception cref="MotorRecusou">não é apuração (404), não terminou (409), material apagado (410), recorte inválido (422)</exception>
     Task<System.Text.Json.JsonElement> CompetenciasApuradas(int execucaoId, PedidoDeCompetencias pedido, CancellationToken cancelar);
+
+    /// <summary>Os arquivos digitais de uma geração.</summary>
+    /// <exception cref="MotorRecusou">não é geração (404), não terminou (409), material apagado (410), recorte inválido (422)</exception>
+    Task<System.Text.Json.JsonElement> ArquivosGerados(int execucaoId, PedidoDeArquivos pedido, CancellationToken cancelar);
+
+    /// <summary>As ocorrências da pré-validação de um arquivo digital.</summary>
+    Task<System.Text.Json.JsonElement> OcorrenciasDoArquivo(int execucaoId, PedidoDeOcorrencias pedido, CancellationToken cancelar);
 }

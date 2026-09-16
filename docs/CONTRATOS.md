@@ -291,3 +291,53 @@ Cada competência traz `apta` e `motivos` (código, rótulo e o que fazer). Os
 motivos possíveis: `fora_de_sp`, `ficha_retirada`, `confronto_pendente`,
 `sem_aliquota`, `enquadramento_indefinido`, `diverge_do_inventario` e
 `sem_inventario`.
+
+A linha da Ficha 3 guarda também o documento, para o arquivo digital: `chave`,
+`numero_item`, `modelo`, `participante` e `numero_documento`. A venda de PDV do
+relatório fica sem chave e sem `numero_item`. O resumo do razão diz
+`venda_a_consumidor`, a escolha do trabalho com que foi montado.
+
+## 10. Venda a consumidor final (escolha do trabalho)
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `GET` | `/api/venda-a-consumidor` | as duas leituras: `valor`, `rotulo`, `explicacao` |
+| `PUT` | `/api/projetos/{id}/venda-a-consumidor` | `{"valor": "enquadramento_1" \| "demais_saidas"}`; devolve o cartão do trabalho. 409 se já está assim, 422 valor desconhecido; grava evento `parametro_alterado` com `de` e `para` |
+
+O cartão do trabalho traz `venda_a_consumidor` e `venda_a_consumidor_rotulo`.
+Em `demais_saidas` o cupom e a venda comum dentro do estado vão ao
+enquadramento 0; 5.927, interestadual e isenção não mudam.
+
+## 11. Arquivo digital (etapa 7)
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `POST` | `/api/projetos/{id}/arquivo-digital` | põe a geração na fila (202). 422 sem apuração, com razão mais novo que a apuração, com razão de outra escolha de venda a consumidor ou de antes do documento por linha |
+| `GET` | `/api/projetos/{id}/arquivo-digital` | as rodadas, mais recente primeiro |
+| `GET` | `/api/arquivo-digital/{execucao}` | uma rodada, com o resumo |
+| `POST` | `/api/arquivo-digital/{execucao}/cancelar` | como nas etapas 4 a 6 |
+| `GET` | `/api/arquivo-digital/{execucao}/arquivos` | uma página dos arquivos: `so` (`envio`, `previa` ou o código de uma trava), `busca`, `pagina`, `por_pagina` |
+| `GET` | `/api/arquivo-digital/{execucao}/ocorrencias?arquivo=` | as ocorrências da pré-validação de um arquivo, erros primeiro |
+| `GET` | `/api/arquivo-digital/{execucao}/planilhas/arquivos` | o índice dos arquivos, com tamanho e SHA-256 (xlsx ou csv) |
+| `GET` | `/api/arquivo-digital/{execucao}/planilhas/ocorrencias` | as ocorrências de todos os arquivos (xlsx ou csv) |
+| `GET` | `/api/arquivo-digital/{execucao}/planilhas/envio` | zip com os TXT prontos para a SEFAZ |
+| `GET` | `/api/arquivo-digital/{execucao}/planilhas/previas` | zip com as prévias — nunca junto do envio |
+
+Um arquivo por estabelecimento **de SP** e por mês, com nome
+`CAT5_SP_<CNPJ>_<M>_<AAAA>.txt`; a prévia leva `_PREVIA` antes da extensão.
+Vai para o envio só a competência `apta` na etapa 6, sem trava e sem erro na
+pré-validação.
+
+O resumo (`versao: 1`) traz `competencias` (de SP), `competencias_fora_de_sp`,
+`arquivos`, `para_envio`, `previas`, `linhas`, `bytes`, `por_registro`,
+`linhas_sem_documento`, `erros`, `avisos`, `itens_recompostos`,
+`itens_que_fecham`, `ressarcimento_para_envio`, `complemento_para_envio`,
+`venda_a_consumidor`, `por_trava` e `por_regra` (código, rótulo, severidade, o
+que fazer, arquivos, ocorrências).
+
+Cada arquivo traz `destino`, `apta`, `motivos` (da etapa 6), `travas` (desta),
+contagem por registro, `linhas_sem_documento`, `erros`, `avisos`, `bytes` e
+`sha256`. As travas: `nao_apta`, `sem_documento`, `saida_indefinida`,
+`devolucao_sem_venda`, `confronto_pendente`, `saldo_negativo`,
+`item_sem_cadastro`, `participante_sem_cadastro`, `sem_abertura` e
+`pre_validacao`.

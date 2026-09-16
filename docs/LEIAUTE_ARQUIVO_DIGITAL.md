@@ -25,10 +25,12 @@
 | Fim de linha | **CRLF** (13, 10) em todas as linhas |
 | Campos | todos presentes, na ordem do leiaute, mesmo vazios (vazio = `||`) |
 
-> ⚠ **Diferente da EFD.** A EFD começa e termina a linha com `|`; o exemplo do
-> manual não (`5550|José Silva & Irmãos Ltda|60001556000257|01238578455`).
-> Conferir contra um CAT5 real da BOA (`CAT5_SP_<CNPJ>_<M>_<AAAA>.txt`) antes
-> de gerar — o Pós-Validador é o juiz.
+> ⚠ **Diferente da EFD.** A EFD começa e termina a linha com `|`; o arquivo
+> da CAT 42 não. **Conferido em 16/09/2026** contra três CAT5 reais da BOA
+> (`CAT5_SP_<CNPJ>_<M>_<AAAA>.txt`, 24 a 77 MB): nenhuma linha começa com `|`, e
+> só terminam com `|` as que têm o último campo vazio (o 1100 de entrada, sem
+> COD_LEGAL). Quantidade sempre com 3 casas, valor com 2, NUM_ITEM com 3
+> dígitos (`033`), COD_PAIS `1058`.
 
 ### Formato dos campos
 
@@ -325,5 +327,10 @@ Cruzado com o estado das etapas 1 a 5 em 15/09/2026.
 9. **0150** com o próprio estabelecimento e só participantes com movimento,
    **sem** os de documentos 02, 2D, 59, 60 e 65. O relatório do cliente dá
    código de participante, não 0150 completo — o 0150 da EFD serve.
-10. **Conferir o pipe no início da linha** contra um CAT5 real da BOA antes de
-    escrever o gerador (seção 1).
+10. ~~Conferir o pipe no início da linha contra um CAT5 real da BOA~~ —
+    conferido em 16/09/2026 (seção 1).
+
+**Como a etapa 7 ficou** (16/09/2026, ver `DECISOES.md`): o gerador está em
+`cat/dominio/cat42/arquivo_digital.py` e a pré-validação em
+`cat/dominio/cat42/pre_validacao.py`. Na BOA real, o cupom vai com COD_LEGAL
+0 — o que virou a escolha de venda a consumidor por trabalho.

@@ -90,6 +90,14 @@ const DESTINOS: Record<
       padrao: "Apurar ressarcimento e complemento",
     },
   },
+  arquivo_digital: {
+    rota: ROTAS.arquivoDigital,
+    rotulos: {
+      concluida: "Baixar os arquivos e ver a pré-validação",
+      em_andamento: "Acompanhar a geração",
+      padrao: "Gerar o arquivo digital",
+    },
+  },
 };
 
 const TOM_DA_SITUACAO: Record<string, TomDeEtiqueta> = {

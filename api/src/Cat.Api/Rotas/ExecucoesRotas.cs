@@ -23,6 +23,31 @@ public static class ExecucoesRotas
         Etapa(api, Execucoes.Suportado, "suportado", detalheExigeEtapa: true, "apurar o ICMS suportado");
         Etapa(api, Execucoes.Razao, "razao", detalheExigeEtapa: true, "montar o razão");
         Etapa(api, Execucoes.Apuracao, "apuracao", detalheExigeEtapa: true, "apurar ressarcimento e complemento");
+        Etapa(api, Execucoes.ArquivoDigital, "arquivo-digital", detalheExigeEtapa: true, "gerar o arquivo digital");
+
+        api.MapGet("/arquivo-digital/{execucaoId:int}/arquivos", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                {
+                    var q = http.Request.Query;
+                    var pedido = new PedidoDeArquivos(
+                        q["so"].FirstOrDefault() is { Length: > 0 } s ? s : null,
+                        q["busca"].FirstOrDefault() is { Length: > 0 } b ? b : null,
+                        Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 50));
+                    return Results.Json(await caso.ArquivosGerados(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
+                }))
+            .ExigirUsuario();
+
+        api.MapGet("/arquivo-digital/{execucaoId:int}/ocorrencias", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                {
+                    var q = http.Request.Query;
+                    var nome = q["arquivo"].FirstOrDefault() ?? "";
+                    if (nome.Length == 0)
+                        return CorpoJson.Recusar("Informe o arquivo.", StatusCodes.Status422UnprocessableEntity);
+                    var pedido = new PedidoDeOcorrencias(nome, Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 50));
+                    return Results.Json(await caso.OcorrenciasDoArquivo(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
+                }))
+            .ExigirUsuario();
 
         api.MapGet("/apuracao/{execucaoId:int}/competencias", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>

@@ -392,11 +392,11 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaApuracao; resumo:
           <p className="m-0 text-sm font-extrabold text-texto">Próxima etapa: gerar o arquivo digital</p>
           <p className="m-0 mt-1 text-xs leading-relaxed text-texto-suave">
             Os registros 0000 a 1200 no leiaute da CAT 42, um arquivo por estabelecimento de SP e por
-            mês — só com as competências prontas.
+            mês. As competências prontas vão para o envio; as outras de SP saem como prévia.
           </p>
         </div>
-        <BotaoLink para={ROTAS.projeto(execucao.projeto_id)} variante="secundario">
-          Ver as etapas
+        <BotaoLink para={ROTAS.arquivoDigital(execucao.projeto_id)} variante="secundario">
+          Ir para o arquivo digital
         </BotaoLink>
       </section>
     </div>

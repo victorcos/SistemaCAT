@@ -115,6 +115,20 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
             ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
         }), PrazoLinhas, cancelar);
 
+    public async Task<JsonElement> ArquivosGerados(int execucaoId, PedidoDeArquivos pedido, CancellationToken cancelar) =>
+        await Chamar("interno/arquivo_digital/arquivos", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["execucao_id"] = execucaoId, ["so"] = pedido.So, ["busca"] = pedido.Busca,
+            ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
+        }), PrazoLinhas, cancelar);
+
+    public async Task<JsonElement> OcorrenciasDoArquivo(int execucaoId, PedidoDeOcorrencias pedido, CancellationToken cancelar) =>
+        await Chamar("interno/arquivo_digital/ocorrencias", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["execucao_id"] = execucaoId, ["nome"] = pedido.Nome,
+            ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
+        }), PrazoLinhas, cancelar);
+
     private async Task<JsonElement> Chamar(string rota, HttpContent conteudo, TimeSpan prazo, CancellationToken cancelar)
     {
         if (string.IsNullOrEmpty(config.MotorSegredo))

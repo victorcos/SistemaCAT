@@ -27,6 +27,7 @@ export {
   RefreshCw as IconeTentarDeNovo,
   CircleStop as IconeParar,
   ChartColumnBig as IconeApuracao,
+  FileCheck2 as IconeArquivoDigital,
 
   // navegação e controles
   House as IconeInicio,

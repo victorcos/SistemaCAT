@@ -93,8 +93,11 @@ public static class Etapas
             "segue para o arquivo digital.",
             Implementada: true),
         new("arquivo_digital", "Gerar o arquivo digital",
-            "Montar os registros 0000 a 1200 no leiaute da CAT 42 e passar pela " +
-            "pré-validação antes do envio à SEFAZ."),
+            "Um arquivo por estabelecimento de SP e por mês, com os registros 0000 a " +
+            "1200 no leiaute da CAT 42, e a pré-validação que recompõe a Ficha 3 a " +
+            "partir do próprio arquivo. Só a competência apta e sem erro vai para o " +
+            "envio; as outras saem como prévia.",
+            Implementada: true),
         new("entrega", "Relatórios e entrega",
             "Planilhas de conferência por filial e competência, e o dossiê que " +
             "acompanha o pedido."),

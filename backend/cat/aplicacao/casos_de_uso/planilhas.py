@@ -15,6 +15,7 @@ from cat.aplicacao.casos_de_uso import (
     apurar_suportado,
     conferir_documentos,
     extrair_movimentos,
+    gerar_arquivo_digital,
     montar_razao,
 )
 from cat.infraestrutura.analitico.confronto import (
@@ -29,6 +30,7 @@ from cat.infraestrutura.analitico.movimentacao import (
 )
 from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO
 from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO, ARQUIVO_SALDOS
+from cat.infraestrutura.analitico.arquivo_digital import ARQUIVO_ARQUIVOS, ARQUIVO_OCORRENCIAS
 from cat.infraestrutura.analitico.razao import (
     ARQUIVO_CONFERENCIA_INVENTARIO,
     ARQUIVO_FICHA3,
@@ -48,6 +50,12 @@ from cat.infraestrutura.planilhas.movimentacao import (
     gerar_movimentos,
 )
 from cat.infraestrutura.planilhas.apuracao import gerar_apuracao, gerar_saldos
+from cat.infraestrutura.planilhas.arquivo_digital import (
+    gerar_arquivos,
+    gerar_ocorrencias,
+    zip_de_envio,
+    zip_de_previas,
+)
 from cat.infraestrutura.planilhas.razao import gerar_conferencia, gerar_ficha3, gerar_fichas
 from cat.infraestrutura.planilhas.suportado import gerar_suportado
 from cat.infraestrutura.repositorios.modelos import ExecucaoDB
@@ -60,6 +68,7 @@ log = obter_log(__name__)
 TIPOS = {
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "csv": "text/csv; charset=utf-8",
+    "zip": "application/zip",
 }
 
 # nome do arquivo que o usuário recebe, e do que fica em cache na execução
@@ -87,6 +96,13 @@ PLANILHAS = {
         "apuracao": ("apuracao_do_periodo.xlsx", ARQUIVO_APURACAO, gerar_apuracao),
         "saldos": ("saldos_1050.xlsx", ARQUIVO_SALDOS, gerar_saldos),
     },
+    gerar_arquivo_digital.ETAPA: {
+        "arquivos": ("arquivos_digitais.xlsx", ARQUIVO_ARQUIVOS, gerar_arquivos),
+        "ocorrencias": ("pre_validacao.xlsx", ARQUIVO_OCORRENCIAS, gerar_ocorrencias),
+        # os TXT em zip: um para a SEFAZ, outro para as prévias, que nunca se misturam
+        "envio": ("arquivos_para_envio.zip", ARQUIVO_ARQUIVOS, zip_de_envio),
+        "previas": ("previas.zip", ARQUIVO_ARQUIVOS, zip_de_previas),
+    },
 }
 
 NAO_TERMINOU = {
@@ -95,6 +111,7 @@ NAO_TERMINOU = {
     apurar_suportado.ETAPA: "A apuração ainda não terminou.",
     montar_razao.ETAPA: "A montagem do razão ainda não terminou.",
     apurar_periodo.ETAPA: "A apuração do período ainda não terminou.",
+    gerar_arquivo_digital.ETAPA: "A geração do arquivo digital ainda não terminou.",
 }
 
 
@@ -121,12 +138,17 @@ def gerar(execucao: ExecucaoDB, etapa_da_rota: str, qual: str,
     catalogo = PLANILHAS.get(etapa_da_rota, {})
     if qual not in catalogo:
         raise PlanilhaRecusada(404, "Planilha desconhecida.")
-    if formato not in FORMATOS:
+    if formato not in (*FORMATOS, "zip"):
         raise PlanilhaRecusada(404, f"Formato desconhecido: {formato}. Vale xlsx ou csv.")
     if execucao.situacao != "concluida":
         raise PlanilhaRecusada(409, NAO_TERMINOU[etapa_da_rota])
 
     nome, parquet, gerador = catalogo[qual]
+    # o zip não tem par em csv: o formato é o do próprio arquivo
+    if nome.endswith(".zip"):
+        formato = "zip"
+    elif formato == "zip":
+        raise PlanilhaRecusada(404, "Esta lista não sai em zip. Vale xlsx ou csv.")
     escolhidos = conjunto(modelos)
     classes = conjunto(classificacoes)
     pasta = execucao.pasta_de_trabalho or ""
@@ -137,7 +159,8 @@ def gerar(execucao: ExecucaoDB, etapa_da_rota: str, qual: str,
         # é de antes de esta lista existir: a pasta está lá, a lista não.
         if etapa_da_rota == extrair_movimentos.ETAPA:
             raise PlanilhaRecusada(410, "Os arquivos desta extração não estão mais em disco. Rode de novo.")
-        if etapa_da_rota in (apurar_suportado.ETAPA, montar_razao.ETAPA, apurar_periodo.ETAPA):
+        if etapa_da_rota in (apurar_suportado.ETAPA, montar_razao.ETAPA, apurar_periodo.ETAPA,
+                             gerar_arquivo_digital.ETAPA):
             raise PlanilhaRecusada(410, "Os arquivos desta apuração não estão mais em disco. Rode de novo.")
         motivo = ("Esta conferência é de uma versão anterior e não tem esta lista."
                   if os.path.isdir(pasta) else "Os arquivos desta conferência não estão mais em disco.")

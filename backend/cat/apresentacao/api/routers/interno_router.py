@@ -38,6 +38,7 @@ from cat.aplicacao.casos_de_uso import (
     apurar_suportado,
     conferir_documentos,
     extrair_movimentos,
+    gerar_arquivo_digital,
     montar_razao,
     planilhas,
     rodada,
@@ -52,6 +53,7 @@ from cat.aplicacao.casos_de_uso.inspecionar_lote import (
 from cat.config import obter_config
 from cat.dominio.comum.cnpj import Cnpj
 from cat.infraestrutura.analitico import apuracao as analitico_apuracao
+from cat.infraestrutura.analitico import arquivo_digital as analitico_arquivo_digital
 from cat.infraestrutura.analitico import razao as analitico_razao
 from cat.infraestrutura.analitico import suportado as analitico_suportado
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
@@ -312,6 +314,8 @@ PREPARADORES = {
                          "Já existe uma montagem do razão em andamento neste trabalho."),
     apurar_periodo.ETAPA: (apurar_periodo.preparar, apurar_periodo.NadaParaApurar,
                            "Já existe uma apuração do período em andamento neste trabalho."),
+    gerar_arquivo_digital.ETAPA: (gerar_arquivo_digital.preparar, gerar_arquivo_digital.NadaParaGerar,
+                                  "Já existe uma geração do arquivo digital em andamento neste trabalho."),
 }
 
 # "cancelando" ainda está em curso: a rodada só para no próximo ponto seguro, e
@@ -528,6 +532,49 @@ def competencias_apuradas(
         return _traduzir_leitura(lambda: analitico_apuracao.competencias(
             execucao.pasta_de_trabalho or "", pedido.so, pedido.busca, pedido.pagina,
             pedido.por_pagina))
+
+
+# ---------------------------------------------------------------------------
+# Arquivo digital: os arquivos gerados e a pré-validação de cada um
+# ---------------------------------------------------------------------------
+class PedidoDeArquivos(BaseModel):
+    execucao_id: int
+    so: str | None = None
+    busca: str | None = Field(default=None, max_length=100)
+    pagina: int = Field(default=1, ge=1)
+    por_pagina: int = Field(default=analitico_arquivo_digital.POR_PAGINA_PADRAO, ge=1)
+
+
+class PedidoDeOcorrencias(BaseModel):
+    execucao_id: int
+    nome: str = Field(min_length=1, max_length=120)
+    pagina: int = Field(default=1, ge=1)
+    por_pagina: int = Field(default=analitico_arquivo_digital.POR_PAGINA_PADRAO, ge=1)
+
+
+def _arquivo_digital_concluido(execucao_id: int, sessao: Session) -> ExecucaoDB:
+    execucao = sessao.get(ExecucaoDB, execucao_id)
+    if execucao is None or execucao.etapa != gerar_arquivo_digital.ETAPA:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Geração do arquivo digital não encontrada.")
+    if execucao.situacao != "concluida":
+        raise HTTPException(status.HTTP_409_CONFLICT, "A geração do arquivo digital ainda não terminou.")
+    return execucao
+
+
+@router.post("/arquivo_digital/arquivos", dependencies=[Depends(exigir_segredo)])
+def arquivos_gerados(pedido: PedidoDeArquivos, sessao: Annotated[Session, Depends(obter_sessao)]) -> dict:
+    execucao = _arquivo_digital_concluido(pedido.execucao_id, sessao)
+    with contexto(etapa=gerar_arquivo_digital.ETAPA, execucao_id=execucao.id):
+        return _traduzir_leitura(lambda: analitico_arquivo_digital.arquivos(
+            execucao.pasta_de_trabalho or "", pedido.so, pedido.busca, pedido.pagina, pedido.por_pagina))
+
+
+@router.post("/arquivo_digital/ocorrencias", dependencies=[Depends(exigir_segredo)])
+def ocorrencias_do_arquivo(pedido: PedidoDeOcorrencias, sessao: Annotated[Session, Depends(obter_sessao)]) -> dict:
+    execucao = _arquivo_digital_concluido(pedido.execucao_id, sessao)
+    with contexto(etapa=gerar_arquivo_digital.ETAPA, execucao_id=execucao.id, arquivo=pedido.nome):
+        return _traduzir_leitura(lambda: analitico_arquivo_digital.ocorrencias(
+            execucao.pasta_de_trabalho or "", pedido.nome, pedido.pagina, pedido.por_pagina))
 
 
 # ---------------------------------------------------------------------------

@@ -5,6 +5,64 @@
 
 ---
 
+## 2026-09-16 — Etapa 7: o arquivo digital, a prévia e a pré-validação
+
+**Decisões do Victor.** Competência de SP que não está pronta **sai como
+prévia** (PREVIA no nome, zip separado), em vez de não gerar nada; e a
+pré-validação vale **também para arquivo que o cliente já transmitiu** (vem na
+próxima entrega).
+
+**O formato foi medido antes de escrito.** Três arquivos reais da BOA (24, 33 e
+77 MB) confirmaram o leiaute e resolveram o que o manual deixa em aberto: a
+linha não começa com `|` e só termina com `|` quando o último campo é vazio;
+CRLF; quantidade com 3 casas e valor com 2, sempre; nº do item com 3 dígitos;
+país `1058`; todo item do 0200 tem 1050. O nome dos arquivos
+(`CAT5_SP_<CNPJ>_<M>_<AAAA>.txt`, mês sem zero) é o que a BOA usou.
+
+**A pré-validação recompõe a Ficha 3 a partir do próprio arquivo** — é o que o
+Pós-Validador faz. Lendo só o 1050 inicial e o 1100, o mesmo `RazaoDoItem` do
+sistema chegou ao 1050 final em **100% das quantidades** e em 99,99% dos
+valores a até 5 centavos, nos arquivos da BOA. Daí as severidades: quantidade
+que não fecha é **erro**; valor fora de 5 centavos é **aviso**, com a
+diferença dita.
+
+**Calibrada contra o que a SEFAZ aceitou.** Nos quatro arquivos reais a
+pré-validação não acusa erro nenhum (875.789 linhas em 25 s o maior). Duas
+coisas viraram aviso por isso: item de nota com **dois códigos** (3 casos num
+arquivo aceito — kit desmembrado, provavelmente) e saldo em valor de item
+zerado em que a BOA guardou resíduo (R$ 6,27 e R$ 29,60).
+
+**Envio só com tudo limpo.** Vai para `envio/` a competência apta na etapa 6,
+sem trava de escrita e sem erro lendo o arquivo de volta do disco. As travas
+desta etapa: linha da Ficha 3 sem documento (a venda de PDV do relatório não
+tem chave nem nº do item), saída sem enquadramento, devolução de venda sem a
+venda original, confronto pendente, saldo negativo, item ou participante sem
+cadastro na EFD, estabelecimento sem EFD no mês e erro de pré-validação.
+
+**O que sai de onde.** 0000 e 0150 do bloco 0 da EFD vigente do mês (lido até o
+0990, sem atravessar o bloco C) — o 0150 só com os participantes citados, fora
+os de modelo 02, 2D, 59, 60 e 65, e o próprio estabelecimento; 0200 do cadastro
+de itens da etapa 3; 1050 dos saldos da etapa 6; 1100 e 1200 da Ficha 3.
+
+**Devolução de venda sem a nota original.** O COD_LEGAL dela é o da venda.
+Sem a nota referenciada, só dois casos se resolvem: a interestadual (4) e, no
+trabalho com o cupom no 0, a de dentro do estado (0). O resto trava, em vez de
+enquadrar no escuro.
+
+**Recusa antes da fila** o que daria arquivo de uma coisa e apuração de outra:
+razão montado com outra escolha de venda a consumidor, razão mais novo que a
+apuração, razão de antes de a Ficha 3 guardar o documento de cada linha.
+
+**Memória constante.** 1100 e 1200 vão a um rascunho enquanto se descobre o que
+citam; o arquivo é o cabeçalho seguido do rascunho. Ocorrências: todas contadas,
+as 200 primeiras de cada regra guardadas.
+
+**O que ainda não se resolve aqui:** série do documento não eletrônico (o 1200
+sai sem SER, a etapa 3 não a guarda), ECF_FAB, o 0205 (só para quem não
+escritura EFD) e o fato gerador presumido sem documento (CHV 0, item 999).
+
+---
+
 ## 2026-09-16 — A venda a consumidor final é escolha do trabalho
 
 **O que o arquivo real mostrou.** Antes de escrever o gerador da etapa 7, três

@@ -23,6 +23,11 @@ public sealed record PedidoDeFicha(string Cnpj, string Codigo, int Pagina, int P
 /// <param name="So">aptas, bloqueadas, ou o código de um motivo de bloqueio</param>
 public sealed record PedidoDeCompetencias(string? So, string? Busca, int Pagina, int PorPagina);
 
+/// <param name="So">envio, previa, ou o código de uma trava</param>
+public sealed record PedidoDeArquivos(string? So, string? Busca, int Pagina, int PorPagina);
+
+public sealed record PedidoDeOcorrencias(string Nome, int Pagina, int PorPagina);
+
 public interface IRepositorioDeExecucoes
 {
     Task<ExecucaoLida?> Buscar(int id, CancellationToken cancelar);
@@ -52,13 +57,14 @@ public sealed class Execucoes(
     public const string Suportado = "st_suportado";
     public const string Razao = "razao";
     public const string Apuracao = "apuracao";
+    public const string ArquivoDigital = "arquivo_digital";
 
     /// <summary>
     /// As etapas que concluem com uma rodada do motor. Uma lista só: o roteiro
     /// do trabalho e a consulta que o alimenta liam cada uma a sua, e a etapa
     /// nova que entrasse numa e não na outra ficaria para sempre "pendente".
     /// </summary>
-    public static readonly IReadOnlyList<string> DeProcessamento = [Conferencia, Movimentos, Suportado, Razao, Apuracao];
+    public static readonly IReadOnlyList<string> DeProcessamento = [Conferencia, Movimentos, Suportado, Razao, Apuracao, ArquivoDigital];
 
     /// <summary>Ainda não terminou: inclui o pedido de parar que a rodada não atendeu ainda.</summary>
     public static bool EmCurso(string situacao) => situacao is "na_fila" or "rodando" or "cancelando";
@@ -137,6 +143,20 @@ public sealed class Execucoes(
     {
         var e = await Detalhar(execucaoId, Apuracao, usuario, cancelar);
         return await motor.CompetenciasApuradas(e.Id, pedido, cancelar);
+    }
+
+    /// <summary>Os arquivos gerados: os de envio primeiro, depois as prévias.</summary>
+    public async Task<JsonElement> ArquivosGerados(int execucaoId, PedidoDeArquivos pedido, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, ArquivoDigital, usuario, cancelar);
+        return await motor.ArquivosGerados(e.Id, pedido, cancelar);
+    }
+
+    /// <summary>As ocorrências da pré-validação de um arquivo.</summary>
+    public async Task<JsonElement> OcorrenciasDoArquivo(int execucaoId, PedidoDeOcorrencias pedido, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, ArquivoDigital, usuario, cancelar);
+        return await motor.OcorrenciasDoArquivo(e.Id, pedido, cancelar);
     }
 
     public async Task<PlanilhaPronta> Planilha(int execucaoId, string etapaDaRota, string? etapaExigida, string qual,
