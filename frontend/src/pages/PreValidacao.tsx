@@ -364,8 +364,9 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaPreValidacao; res
             {numero((resumo.repetidos ?? 0) + (resumo.de_outra_empresa ?? 0))}
           </p>
           <p className="m-0 text-xs leading-relaxed text-texto-fraco">
-            {numero(resumo.repetidos ?? 0)} repetidos (mesmo estabelecimento e mês já lido) e{" "}
-            {numero(resumo.de_outra_empresa ?? 0)} de outra empresa, em {numero(resumo.fontes ?? 0)} fontes do lote.
+            {numero(resumo.repetidos ?? 0)} repetidos (mesmo estabelecimento e mês já lido)
+            {(resumo.substituidos ?? 0) > 0 && `, dos quais ${numero(resumo.substituidos ?? 0)} vencidos por uma substituição (COD_FIN 02)`}{" "}
+            e {numero(resumo.de_outra_empresa ?? 0)} de outra empresa, em {numero(resumo.fontes ?? 0)} fontes do lote.
           </p>
         </Cartao>
       </section>
@@ -540,7 +541,11 @@ function Arquivos({ execucaoId, total, rodape }: { execucaoId: number; total: nu
                     <span className="block text-[11px] text-texto-fraco">itens fecham</span>
                   </span>
                   <span className="flex flex-wrap items-center gap-1.5">
-                    {a.repetido ? (
+                    {a.substituido ? (
+                      <span className="rounded-full border border-borda-forte px-2 py-0.5 text-[10px] font-bold text-texto-fraco">
+                        vencido pela substituição
+                      </span>
+                    ) : a.repetido ? (
                       <span className="rounded-full border border-borda-forte px-2 py-0.5 text-[10px] font-bold text-texto-fraco">
                         repetido, não lido
                       </span>

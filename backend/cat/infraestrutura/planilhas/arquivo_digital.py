@@ -54,6 +54,8 @@ COLUNAS_ARQUIVOS_DO_CLIENTE = (
     Coluna("cnpj", "CNPJ do estabelecimento", "texto", 20),
     Coluna("competencia", "Competência", "texto", 12),
     Coluna("repetido", "Repetido (não lido de novo)", "texto", 12),
+    Coluna("finalidade", "Finalidade (COD_FIN)", "texto", 10),
+    Coluna("substituido", "Vencido por uma substituição", "texto", 12),
     Coluna("erros", "Erros da pré-validação", "numero_inteiro", 12),
     Coluna("avisos", "Avisos da pré-validação", "numero_inteiro", 12),
     Coluna("itens_recompostos", "Itens recompostos", "numero_inteiro", 12),

@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-09-16 — Série no 1200 e a substituição entre arquivos do cliente
+
+**Série.** O 1200 saía sem SER: a série era lida no C100 e não chegava à
+movimentação. Agora passa pela movimentação, pelo suportado e pela Ficha 3 até
+o arquivo, sem máscara (`U-2` vira `U2`, como o manual pede). Etapas montadas
+antes desta versão não têm a coluna e o 1200 sai como saía.
+
+**Substituição.** Entre dois arquivos do cliente do mesmo estabelecimento e mês,
+valia o primeiro lido — que podia ser o original de uma remessa que o cliente
+já tinha substituído. Agora a substituição (COD_FIN 02) vence o que não é
+substituição: lida depois, ela é validada e o original vira `substituido`, fora
+dos totais, das ocorrências e da continuidade dos saldos; lida antes, o original
+que vem depois é só repetido. Entre dois iguais, segue valendo o primeiro.
+
+---
+
 ## 2026-09-16 — Abertura pelas entradas anteriores, uso e consumo fora da ficha, 5929 como a BOA
 
 **Abertura sem imposto.** O inventário do Amigão veio sem ICMS em 842 mil

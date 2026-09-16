@@ -356,7 +356,8 @@ contagem por registro, `linhas_sem_documento`, `entradas_sem_icms`,
 `devolucao_sem_venda`, `confronto_pendente`, `saldo_negativo` (quantidade
 negativa no 1050), `valor_negativo` (quantidade positiva e ICMS negativo),
 `item_sem_cadastro`, `participante_sem_cadastro`, `sem_abertura` e
-`pre_validacao`. O recorte `so` por trava compara o código inteiro.
+`pre_validacao`. O recorte `so` por trava compara o código inteiro. O 1200 leva
+a série do documento (SER, sem máscara) quando a movimentação a guarda.
 
 De onde vem o cadastro: o 0200 é o da EFD do mês do arquivo (descrição, código
 de barras, NCM, alíquota, CEST), com o mais recente onde o mês não diz, e a
@@ -383,7 +384,11 @@ de etapas concluídas.
 Lê do lote o tipo `cat42_arquivo_digital` (o TXT solto, reconhecido pelo
 `0000|mmaaaa|` sem `|` no começo) e os zips, com um nível de zip aninhado.
 Arquivo de outra raiz de CNPJ fica de fora e contado; o mesmo estabelecimento e
-mês lido duas vezes fica como `repetido`, sem ler de novo. Dois arquivos
+mês lido duas vezes fica como `repetido`, sem ler de novo — salvo a substituição
+(COD_FIN 02) lida depois de um original: ela é validada e o original fica
+`repetido` e `substituido`, fora dos totais, das ocorrências e da continuidade.
+Cada arquivo traz `finalidade`; o recorte `so` aceita também `substituidos`, e o
+resumo traz `substituidos`. Dois arquivos
 diferentes com o mesmo nome (outra ferramenta pode chamar todo mês de
 `CAT42.txt`) não se misturam: o segundo ganha `(<CNPJ> <aaaa-mm>)` no nome,
 que é a chave das ocorrências.

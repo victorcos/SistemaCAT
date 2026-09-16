@@ -31,6 +31,10 @@ export interface ArquivoDoCliente {
   itens_que_fecham: number;
   maior_diferenca_de_valor: string;
   repetido: boolean;
+  /** COD_FIN do 0000: 00 regular, 01 intimação, 02 substituição */
+  finalidade?: string;
+  /** lido e depois vencido por uma substituição do mesmo mês */
+  substituido?: boolean;
 }
 
 export interface ResumoDaPreValidacao {
@@ -41,6 +45,7 @@ export interface ResumoDaPreValidacao {
   com_erro?: number;
   com_aviso?: number;
   repetidos?: number;
+  substituidos?: number;
   de_outra_empresa?: number;
   linhas?: number;
   bytes?: number;
@@ -62,7 +67,7 @@ export interface ExecucaoDaPreValidacao extends Omit<Execucao, "resumo"> {
   resumo: ResumoDaPreValidacao | null;
 }
 
-/** "todos", "com_erro", "com_aviso", "sem_ocorrencia" ou "repetidos". */
+/** "todos", "com_erro", "com_aviso", "sem_ocorrencia", "repetidos" ou "substituidos". */
 export type RecorteDoCliente = string;
 export type PlanilhaDaPreValidacao = "arquivos" | "ocorrencias";
 

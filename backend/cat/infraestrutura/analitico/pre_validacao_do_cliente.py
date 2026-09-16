@@ -17,7 +17,9 @@ exceção — lido por dentro, cada membro descomprimiria o de fora desde o come
 
 * **Arquivo repetido.** O mesmo estabelecimento e mês em dois lugares (o zip que
   é cópia de outro, na BOA). O primeiro é lido; os outros ficam listados como
-  repetidos, sem ler de novo.
+  repetidos, sem ler de novo — salvo a **substituição** (COD_FIN 02), que é o
+  que vale na SEFAZ: lida depois de um original, ela é validada e o original
+  vira substituído, fora dos totais, das ocorrências e da continuidade.
 * **Continuidade do saldo.** O QTD_INI de um item num mês tem de ser o QTD_FIM
   da última competência em que ele apareceu. Quando não é, falta arquivo no
   meio ou o estoque foi ajustado por fora — aviso, com as duas competências.
@@ -59,6 +61,8 @@ ESQUEMA_ARQUIVOS_DO_CLIENTE = pa.schema([
     ("cnpj", pa.string()),
     ("competencia", pa.string()),              # "2024-01"
     ("repetido", pa.bool_()),
+    ("finalidade", pa.string()),               # COD_FIN do 0000: 00 regular, 01 intimação, 02 substituição
+    ("substituido", pa.bool_()),               # lido e depois vencido por uma substituição do mesmo mês
     ("linhas", pa.int64()),
     ("bytes", pa.int64()),
     ("sha256", pa.string()),
@@ -107,6 +111,7 @@ class ResumoDaPreValidacao:
     com_erro: int = 0
     com_aviso: int = 0
     repetidos: int = 0
+    substituidos: int = 0
     de_outra_empresa: int = 0
     nao_sao_da_cat42: int = 0
     ilegiveis: int = 0
@@ -185,12 +190,20 @@ class _Contado:
             yield linha
 
 
-def _abertura(primeira: bytes) -> tuple[str, str] | None:
-    """(CNPJ, competência "aaaa-mm") do 0000, ou None se não é arquivo da CAT 42."""
+def _abertura(primeira: bytes) -> tuple[str, str, str] | None:
+    """(CNPJ, competência "aaaa-mm", finalidade) do 0000, ou None se não é arquivo da CAT 42."""
     campos = primeira.rstrip(b"\r\n").decode("latin-1").split("|")
     if len(campos) != 8 or campos[0] != "0000" or len(campos[1]) != 6 or not campos[1].isdigit():
         return None
-    return campos[3], f"{campos[1][2:]}-{campos[1][:2]}"
+    return campos[3], f"{campos[1][2:]}-{campos[1][:2]}", campos[7]
+
+
+FINALIDADE_SUBSTITUICAO = "02"
+
+
+def _substitui(nova: str, anterior: str) -> bool:
+    """A substituição vence o que não é substituição; entre iguais, vale o primeiro lido."""
+    return nova == FINALIDADE_SUBSTITUICAO and anterior != FINALIDADE_SUBSTITUICAO
 
 
 # ---------------------------------------------------------------------------
@@ -208,12 +221,18 @@ def pre_validar(
     caminho_arquivos = os.path.join(destino, ARQUIVO_ARQUIVOS_DO_CLIENTE)
     caminho_ocorrencias = os.path.join(destino, ARQUIVO_OCORRENCIAS)
     caminho_saldos = os.path.join(destino, ARQUIVO_SALDOS_DO_CLIENTE)
+    # ocorrências e saldos vão primeiro a rascunhos: o arquivo substituído depois
+    # de lido sai deles no fim, sem segurar os de todos na memória
+    rascunho_oc = os.path.join(destino, ".ocorrencias_lidas.parquet")
+    rascunho_saldos = os.path.join(destino, ".saldos_lidos.parquet")
     linhas_de_arquivo: list[dict] = []
-    vistos: dict[tuple[str, str], str] = {}
+    vistos: dict[tuple[str, str], dict] = {}
     nomes: dict[str, tuple[str, str]] = {}
+    por_regra_do_arquivo: dict[str, dict] = {}
+    descartados: set[str] = set()
 
-    escritor_oc = pq.ParquetWriter(caminho_ocorrencias, ESQUEMA_OCORRENCIAS)
-    escritor_saldos = pq.ParquetWriter(caminho_saldos, ESQUEMA_SALDOS_DO_CLIENTE)
+    escritor_oc = pq.ParquetWriter(rascunho_oc, ESQUEMA_OCORRENCIAS)
+    escritor_saldos = pq.ParquetWriter(rascunho_saldos, ESQUEMA_SALDOS_DO_CLIENTE)
     try:
         for c in candidatos(fontes, resumo, destino):
             _conferir(deve_parar)
@@ -224,19 +243,19 @@ def pre_validar(
                     if abertura is None:
                         resumo.nao_sao_da_cat42 += 1
                         continue
-                    cnpj, competencia = abertura
+                    cnpj, competencia, finalidade = abertura
                     if cnpj[:8] != raiz_cnpj:
                         resumo.de_outra_empresa += 1
                         log.warning("arquivo da CAT 42 de outra empresa, fora da pré-validação",
                                     extra={"arquivo": c.origem, "cnpj": cnpj})
                         continue
-                    if (cnpj, competencia) in vistos:
+                    anterior = vistos.get((cnpj, competencia))
+                    if anterior is not None and not _substitui(finalidade, anterior["finalidade"]):
                         resumo.repetidos += 1
-                        linhas_de_arquivo.append(_repetido(c, cnpj, competencia))
+                        linhas_de_arquivo.append(_repetido(c, cnpj, competencia, finalidade))
                         log.info("arquivo repetido na pré-validação",
-                                 extra={"arquivo": c.origem, "primeiro": vistos[(cnpj, competencia)]})
+                                 extra={"arquivo": c.origem, "primeiro": anterior["origem"]})
                         continue
-                    vistos[(cnpj, competencia)] = c.origem
                     c = _com_nome_unico(c, cnpj, competencia, nomes)
                     contado = _Contado(_com_a_primeira(primeira, bruto))
                     v = validar(contado)
@@ -245,7 +264,19 @@ def pre_validar(
                 log.warning("arquivo ilegível na pré-validação", extra={"arquivo": c.origem, "motivo": str(erro)})
                 continue
 
-            linhas_de_arquivo.append(_linha(c, cnpj, competencia, contado, v))
+            linha = _linha(c, cnpj, competencia, contado, v, finalidade)
+            if anterior is not None:
+                # a substituição vence o original lido antes: ele sai dos totais
+                _descontar(resumo, anterior, por_regra_do_arquivo.pop(anterior["nome"], {}))
+                anterior["repetido"] = anterior["substituido"] = True
+                descartados.add(anterior["nome"])
+                resumo.repetidos += 1
+                resumo.substituidos += 1
+                log.info("arquivo substituído na pré-validação",
+                         extra={"arquivo": anterior["origem"], "substituto": c.origem})
+            vistos[(cnpj, competencia)] = linha
+            linhas_de_arquivo.append(linha)
+            por_regra_do_arquivo[c.nome] = {r.codigo: n for r, n in v.por_regra.items()}
             _somar(resumo, cnpj, competencia, contado.bytes, v)
             ocorrencias = [_ocorrencia(c.nome, cnpj, competencia, o, v.por_regra[o.regra]) for o in v.exemplos]
             if ocorrencias:
@@ -263,7 +294,10 @@ def pre_validar(
                 "arquivo": c.origem, "cnpj": cnpj, "competencia": competencia, "erros": v.erros,
                 "avisos": v.avisos, "linhas": v.linhas})
         escritor_saldos.close()
+        _sem_os_descartados(destino, rascunho_saldos, caminho_saldos, descartados)
         _continuidade(destino, caminho_saldos, escritor_oc, linhas_de_arquivo, resumo)
+        escritor_oc.close()
+        _sem_os_descartados(destino, rascunho_oc, caminho_ocorrencias, descartados)
     except ApuracaoCancelada:
         escritor_oc.close()
         escritor_saldos.close()
@@ -274,6 +308,9 @@ def pre_validar(
     finally:
         escritor_oc.close()
         escritor_saldos.close()
+        for rascunho in (rascunho_oc, rascunho_saldos):
+            if os.path.isfile(rascunho):
+                os.remove(rascunho)
 
     for l in linhas_de_arquivo:
         if l["repetido"]:
@@ -317,16 +354,50 @@ def _com_a_primeira(primeira: bytes, resto) -> Iterator[bytes]:
     yield from resto
 
 
-def _repetido(c: Candidato, cnpj: str, competencia: str) -> dict:
+def _sem_os_descartados(destino: str, rascunho: str, final: str, descartados: set[str]) -> None:
+    """Copia o rascunho para o arquivo final, sem as linhas dos arquivos substituídos."""
+    if not descartados:
+        os.replace(rascunho, final)
+        return
+    lista = ", ".join("'" + n.replace("'", "''") + "'" for n in sorted(descartados))
+    con = _leitura(destino)
+    try:
+        con.execute(f"COPY (SELECT * FROM read_parquet('{_escapar(rascunho)}') WHERE nome NOT IN ({lista})) "
+                    f"TO '{_escapar(final)}' (FORMAT PARQUET)")
+    finally:
+        con.close()
+    os.remove(rascunho)
+
+
+def _descontar(resumo: ResumoDaPreValidacao, linha: dict, por_regra: dict[str, int]) -> None:
+    """Tira dos totais o arquivo que uma substituição venceu."""
+    resumo.arquivos -= 1
+    resumo.linhas -= linha["linhas"]
+    resumo.bytes -= linha["bytes"]
+    resumo.erros -= linha["erros"]
+    resumo.avisos -= linha["avisos"]
+    resumo.itens_recompostos -= linha["itens_recompostos"]
+    resumo.itens_que_fecham -= linha["itens_que_fecham"]
+    for codigo, n in por_regra.items():
+        arquivos, ocorrencias = resumo.por_regra.get(codigo, (0, 0))
+        if arquivos <= 1:
+            resumo.por_regra.pop(codigo, None)
+        else:
+            resumo.por_regra[codigo] = (arquivos - 1, ocorrencias - n)
+
+
+def _repetido(c: Candidato, cnpj: str, competencia: str, finalidade: str = "") -> dict:
     return {"nome": c.nome, "origem": c.origem, "cnpj": cnpj, "competencia": competencia, "repetido": True,
+            "finalidade": finalidade, "substituido": False,
             "linhas": 0, "bytes": 0, "sha256": "", "participantes": 0, "itens": 0, "saldos": 0,
             "eletronicos": 0, "nao_eletronicos": 0, "erros": 0, "avisos": 0, "itens_recompostos": 0,
             "itens_que_fecham": 0, "maior_diferenca_de_valor": Decimal(0)}
 
 
-def _linha(c: Candidato, cnpj: str, competencia: str, contado: _Contado, v) -> dict:
+def _linha(c: Candidato, cnpj: str, competencia: str, contado: _Contado, v, finalidade: str = "") -> dict:
     reg = v.por_registro
     return {"nome": c.nome, "origem": c.origem, "cnpj": cnpj, "competencia": competencia, "repetido": False,
+            "finalidade": finalidade, "substituido": False,
             "linhas": v.linhas, "bytes": contado.bytes, "sha256": contado.hash.hexdigest(),
             "participantes": reg.get("0150", 0), "itens": reg.get("0200", 0), "saldos": reg.get("1050", 0),
             "eletronicos": reg.get("1100", 0), "nao_eletronicos": reg.get("1200", 0),
@@ -410,10 +481,11 @@ def _continuidade(destino: str, saldos: str, escritor_oc, linhas_de_arquivo: lis
 # o que a tela lê depois de pronto
 # ---------------------------------------------------------------------------
 _RECORTES = {
-    "com_erro": "erros > 0",
-    "com_aviso": "erros = 0 AND avisos > 0",
+    "com_erro": "NOT repetido AND erros > 0",
+    "com_aviso": "NOT repetido AND erros = 0 AND avisos > 0",
     "sem_ocorrencia": "NOT repetido AND erros = 0 AND avisos = 0",
     "repetidos": "repetido",
+    "substituidos": "substituido",
 }
 
 
@@ -459,6 +531,7 @@ def serializar(resumo: ResumoDaPreValidacao) -> dict:
         "com_erro": resumo.com_erro,
         "com_aviso": resumo.com_aviso,
         "repetidos": resumo.repetidos,
+        "substituidos": resumo.substituidos,
         "de_outra_empresa": resumo.de_outra_empresa,
         "nao_sao_da_cat42": resumo.nao_sao_da_cat42,
         "ilegiveis": resumo.ilegiveis,

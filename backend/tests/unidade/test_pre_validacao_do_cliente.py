@@ -138,3 +138,45 @@ class TestNomes:
         # fevereiro abre com 16 e janeiro fechou com 10: o aviso é só de fevereiro
         assert ocorrencias(str(destino), "CAT42.txt")["total"] == 0
         assert ocorrencias(str(destino), nomes["2024-02"])["linhas"][0]["regra"] == "saldo_inicial_diferente_do_anterior"
+
+
+class TestSubstituicao:
+    def test_a_substituicao_vence_o_original_lido_antes(self, tmp_path):
+        from cat.dominio.cat42.arquivo_digital import Finalidade  # noqa: PLC0415
+        lote = tmp_path / "lote"
+        lote.mkdir()
+        original = so_saldo(1, 10, 20, 10, 20)
+        (lote / "a_original.txt").write_bytes(conteudo(original))
+        # a substituição do mesmo mês, lida depois, com um item sem 0200 (erro)
+        substituto = so_saldo(1, 10, 20, 10, 20)
+        substituto.abertura = Abertura(2024, 1, "LOJA DE TESTE", CNPJ, IE_SP, "3552205", Finalidade.SUBSTITUICAO)
+        substituto.saldos.append(Saldo("SEM_CADASTRO", D(1), D(1), D(1), D(1)))
+        (lote / "b_substituto.txt").write_bytes(conteudo(substituto))
+        destino = tmp_path / "execucao"
+        destino.mkdir()
+        r = pre_validar([str(lote / "a_original.txt"), str(lote / "b_substituto.txt")], str(destino), CNPJ[:8])
+
+        s = serializar(r)
+        assert (s["arquivos"], s["repetidos"], s["substituidos"], s["com_erro"]) == (1, 1, 1, 1)
+        linhas = {l["nome"]: l for l in arquivos_do_cliente(str(destino))["linhas"]}
+        assert (linhas["a_original.txt"]["repetido"], linhas["a_original.txt"]["substituido"]) == (True, True)
+        assert linhas["b_substituto.txt"]["finalidade"] == "02"
+        # o original não aparece em recorte nenhum de erro, e as ocorrências e saldos são só do substituto
+        assert arquivos_do_cliente(str(destino), so="com_erro")["total"] == 1
+        assert arquivos_do_cliente(str(destino), so="substituidos")["total"] == 1
+        nomes_saldos = {x["nome"] for x in pq.read_table(destino / "saldos_do_cliente.parquet").to_pylist()}
+        assert nomes_saldos == {"b_substituto.txt"}
+        assert not [n for n in os.listdir(destino) if n.startswith(".")]
+
+    def test_original_lido_depois_da_substituicao_e_so_repetido(self, tmp_path):
+        from cat.dominio.cat42.arquivo_digital import Finalidade  # noqa: PLC0415
+        lote = tmp_path / "lote"
+        lote.mkdir()
+        substituto = so_saldo(1, 10, 20, 10, 20)
+        substituto.abertura = Abertura(2024, 1, "LOJA DE TESTE", CNPJ, IE_SP, "3552205", Finalidade.SUBSTITUICAO)
+        (lote / "a_substituto.txt").write_bytes(conteudo(substituto))
+        (lote / "b_original.txt").write_bytes(conteudo(so_saldo(1, 10, 20, 10, 20)))
+        destino = tmp_path / "execucao"
+        destino.mkdir()
+        r = pre_validar([str(lote / "a_substituto.txt"), str(lote / "b_original.txt")], str(destino), CNPJ[:8])
+        assert (r.arquivos, r.repetidos, r.substituidos) == (1, 1, 0)
