@@ -83,8 +83,8 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       planilha para o cliente; aplicado no razão (v0.53)
 - [x] Confronto dos enquadramentos 2 e 4 e crédito do art. 271 (v0.53)
 - [x] X.949 fora da ficha, contada (v0.53)
-- [ ] **Decidir** se nota de entrada não escriturada entra na ficha (a RVZ
-      incluiu; é a diferença que sobra na comparação)
+- [x] Nota de entrada não escriturada **não** entra na ficha: a RVZ incluiu a
+      pedido do cliente, não é regra (decisão do Victor, 16/09/2026)
 - [ ] Notas canceladas na SEFAZ e ativas no SPED/XML
 - [ ] Contingência das notas não escrituradas (SELIC e multa)
 - [ ] XML dentro de zip no lote (a Advertising entregou assim)

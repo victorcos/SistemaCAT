@@ -87,8 +87,9 @@ crédito: R$ 389.531,17 contra R$ 548.490,22; crédito do art. 271: R$ 114.663,4
 contra R$ 160.557,57; complemento: R$ 178.109,69 contra R$ 148.770,53. A
 diferença está nas 6 fichas que ficaram negativas e fora do total: a RVZ incluiu
 na CAT notas de entrada não escrituradas ("PRESENTES NA CAT 42" na planilha
-dela), e o sistema as deixa de fora. **Fica para o Victor decidir** se nota não
-escriturada entra na ficha.
+dela), e o sistema as deixa de fora. **Decisão do Victor (16/09/2026): continua
+de fora.** Incluí-las foi pedido particular da Advertising na época, não regra do
+trabalho; nota não escriturada segue na lista da conferência, para cobrar.
 
 ---
 
