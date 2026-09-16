@@ -33,15 +33,21 @@ enquanto se descobre quais participantes e itens elas citam, e o arquivo final
 
 from __future__ import annotations
 
+import glob
 import hashlib
+import multiprocessing
 import os
 import shutil
+import sys
 import zipfile
 from collections.abc import Callable
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
+import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -258,7 +264,14 @@ def gerar(
     venda_a_consumidor: VendaAConsumidor = VendaAConsumidor.ENQUADRAMENTO_1,
     avisar: Callable[[Andamento], None] | None = None,
     deve_parar: DeveParar | None = None,
+    processos: int = 1,
 ) -> ResumoDoArquivoDigital:
+    """Escreve e pré-valida um arquivo por estabelecimento e mês.
+
+    Com `processos` maior que 1, cada arquivo vai a um processo: as tabelas de
+    trabalho são gravadas em partições parquet por estabelecimento e mês, e
+    cada processo lê só a sua. O arquivo que sai é o mesmo byte a byte.
+    """
     apuracao = os.path.join(fontes.apuracao, ARQUIVO_APURACAO)
     saldos = os.path.join(fontes.apuracao, ARQUIVO_SALDOS)
     ficha3 = os.path.join(fontes.razao, ARQUIVO_FICHA3)
@@ -277,21 +290,56 @@ def gerar(
     con = _abrir(destino)
     escritor = pq.ParquetWriter(caminho_arquivos, ESQUEMA_ARQUIVOS)
     escritor_oc = pq.ParquetWriter(caminho_ocorrencias, ESQUEMA_OCORRENCIAS)
+    particoes = os.path.join(destino, PASTA_PARTICOES)
+    andamento = Andamento()
+
+    def gravar(linha_arquivo: dict, ocorrencias: list[dict]) -> None:
+        escritor.write_table(pa.Table.from_pylist([linha_arquivo], schema=ESQUEMA_ARQUIVOS))
+        if ocorrencias:
+            escritor_oc.write_table(pa.Table.from_pylist(ocorrencias, schema=ESQUEMA_OCORRENCIAS))
+        andamento.arquivos += 1
+        if avisar is not None:
+            avisar(andamento)
+
     try:
         alvo = _preparar(con, apuracao, saldos, ficha3, itens, itens_do_mes, resumo)
         cadastros = ler_cadastros(fontes.efds, {(c, m) for c, m, *_ in alvo}, resumo, deve_parar)
-        andamento = Andamento(total=len(alvo))
-        for cnpj, competencia, apta, motivos, ressarc, compl in alvo:
-            _conferir(deve_parar)
-            linha_arquivo, ocorrencias = _um_arquivo(
-                con, destino, cnpj, competencia, apta, motivos, ressarc, compl,
-                cadastros.get((cnpj, competencia)), venda_a_consumidor, resumo)
-            escritor.write_table(pa.Table.from_pylist([linha_arquivo], schema=ESQUEMA_ARQUIVOS))
-            if ocorrencias:
-                escritor_oc.write_table(pa.Table.from_pylist(ocorrencias, schema=ESQUEMA_OCORRENCIAS))
-            andamento.arquivos += 1
-            if avisar is not None:
-                avisar(andamento)
+        andamento.total = len(alvo)
+        if processos > 1 and not _processos_viaveis():
+            log.warning("o módulo principal não se reimporta num processo novo; arquivos num processo só")
+            processos = 1
+        if processos <= 1 or len(alvo) <= 1:
+            for cnpj, competencia, apta, motivos, ressarc, compl in alvo:
+                _conferir(deve_parar)
+                gravar(*_um_arquivo(con, destino, cnpj, competencia, apta, motivos, ressarc, compl,
+                                    cadastros.get((cnpj, competencia)), venda_a_consumidor, resumo))
+        else:
+            _particionar(con, particoes)
+            con.close()
+            tarefas = [dict(particoes=particoes, destino=destino, cnpj=cnpj, competencia=competencia, apta=apta,
+                            motivos=motivos, ressarcimento=ressarc, complemento=compl,
+                            cadastro=cadastros.get((cnpj, competencia)), venda=venda_a_consumidor.value)
+                       for cnpj, competencia, apta, motivos, ressarc, compl in alvo]
+            log.info("arquivos digitais em paralelo", extra={"arquivos": len(tarefas), "processos": processos})
+            # spawn explícito: é o que o Windows faz, e o mesmo em todo lugar evita surpresa
+            contexto_mp = multiprocessing.get_context("spawn")
+            with ProcessPoolExecutor(max_workers=min(processos, len(tarefas)), mp_context=contexto_mp) as pool:
+                futuros = [pool.submit(_um_arquivo_isolado, t) for t in tarefas]
+                try:
+                    for futuro in as_completed(futuros):
+                        try:
+                            linha_arquivo, ocorrencias, parcial = futuro.result()
+                        except BrokenProcessPool as erro:
+                            raise RuntimeError(
+                                "Um processo da geração morreu sem avisar. Rode de novo; se repetir, "
+                                "defina CAT_PROCESSOS_DO_ARQUIVO_DIGITAL=1 no backend/.env.") from erro
+                        _juntar_resumos(resumo, parcial)
+                        gravar(linha_arquivo, ocorrencias)
+                        _conferir(deve_parar)
+                except BaseException:
+                    for futuro in futuros:
+                        futuro.cancel()
+                    raise
     except ApuracaoCancelada:
         escritor.close()
         escritor_oc.close()
@@ -301,11 +349,14 @@ def gerar(
                 os.remove(alvo_)
         for pasta in (PASTA_ENVIO, PASTA_PREVIAS):
             shutil.rmtree(os.path.join(destino, pasta), ignore_errors=True)
+        for rascunho in glob.glob(os.path.join(destino, ".CAT5_*")):
+            os.remove(rascunho)
         raise
     finally:
         escritor.close()
         escritor_oc.close()
         con.close()
+        shutil.rmtree(particoes, ignore_errors=True)
         _limpar(destino)
 
     log.info("arquivo digital gerado", extra={
@@ -378,6 +429,83 @@ def _preparar(con, apuracao: str, saldos: str, ficha3: str, itens: str, itens_do
     return alvo
 
 
+PASTA_PARTICOES = ".particoes"
+
+
+def _processos_viaveis() -> bool:
+    """Se um processo novo consegue reimportar o módulo principal.
+
+    No Windows o processo filho nasce do zero e reimporta o `__main__`. O motor
+    sobe como módulo (`-m uvicorn`) e os testes pelo pytest, e aí funciona; um
+    script lido da entrada padrão não tem arquivo para reimportar, e o pool
+    quebraria no primeiro arquivo.
+    """
+    principal = sys.modules.get("__main__")
+    arquivo = getattr(principal, "__file__", None)
+    return getattr(principal, "__spec__", None) is not None or (arquivo is not None and os.path.isfile(arquivo))
+
+# (tabela, colunas de partição): o que cada arquivo lê, separado por arquivo
+_PARTICIONADAS = (("linhas", ("cnpj", "competencia")), ("saldos", ("cnpj", "competencia")),
+                  ("cadastro", ("cnpj",)), ("cadastro_do_mes", ("cnpj", "competencia")))
+
+
+def _particionar(con, pasta: str) -> None:
+    """As tabelas de trabalho em parquet, uma pasta por estabelecimento e mês.
+
+    Cada processo abre só a sua partição, sem disputar o banco em arquivo da
+    geração — que o DuckDB não deixa dois processos abrirem ao mesmo tempo.
+    """
+    os.makedirs(pasta, exist_ok=True)
+    for tabela, chaves in _PARTICIONADAS:
+        con.execute(f"COPY (SELECT * FROM {tabela} LIMIT 0) TO '{_escapar(os.path.join(pasta, tabela))}_vazia.parquet' "
+                    "(FORMAT PARQUET)")
+        if con.execute(f"SELECT count(*) FROM {tabela}").fetchone()[0]:
+            con.execute(f"COPY {tabela} TO '{_escapar(os.path.join(pasta, tabela))}' "
+                        f"(FORMAT PARQUET, PARTITION_BY ({', '.join(chaves)}), OVERWRITE_OR_IGNORE)")
+
+
+def _um_arquivo_isolado(t: dict) -> tuple[dict, list[dict], "ResumoDoArquivoDigital"]:
+    """Um arquivo, num processo à parte: lê a sua partição e devolve o que o principal junta."""
+    con = duckdb.connect()
+    try:
+        # um núcleo por processo: são vários processos, e o gargalo é o Python
+        con.execute("SET threads TO 1")
+        con.execute("SET memory_limit = '1GB'")
+        valores = {"cnpj": t["cnpj"], "competencia": t["competencia"]}
+        for tabela, chaves in _PARTICIONADAS:
+            pasta = os.path.join(t["particoes"], tabela, *(f"{k}={valores[k]}" for k in chaves))
+            arquivos = sorted(glob.glob(os.path.join(pasta, "*.parquet")))
+            if arquivos:
+                lista = ", ".join(f"'{_escapar(x)}'" for x in arquivos)
+                literais = ", ".join(f"'{valores[k]}' AS {k}" for k in chaves)
+                con.execute(f"CREATE VIEW {tabela} AS SELECT *, {literais} FROM read_parquet([{lista}])")
+            else:
+                vazia = os.path.join(t["particoes"], f"{tabela}_vazia.parquet")
+                con.execute(f"CREATE VIEW {tabela} AS SELECT * FROM read_parquet('{_escapar(vazia)}')")
+        parcial = ResumoDoArquivoDigital(venda_a_consumidor=t["venda"])
+        linha_arquivo, ocorrencias = _um_arquivo(
+            con, t["destino"], t["cnpj"], t["competencia"], t["apta"], t["motivos"], t["ressarcimento"],
+            t["complemento"], t["cadastro"], VendaAConsumidor(t["venda"]), parcial)
+        return linha_arquivo, ocorrencias, parcial
+    finally:
+        con.close()
+
+
+def _juntar_resumos(total: "ResumoDoArquivoDigital", parcial: "ResumoDoArquivoDigital") -> None:
+    """O que um processo contou de um arquivo, somado ao resumo da geração."""
+    for campo_ in ("arquivos", "para_envio", "previas", "linhas", "bytes", "linhas_sem_documento",
+                   "entradas_sem_icms", "erros", "avisos", "itens_recompostos", "itens_que_fecham",
+                   "ressarcimento_para_envio", "complemento_para_envio"):
+        setattr(total, campo_, getattr(total, campo_) + getattr(parcial, campo_))
+    for reg, n in parcial.por_registro.items():
+        total.por_registro[reg] = total.por_registro.get(reg, 0) + n
+    for codigo, n in parcial.por_trava.items():
+        total.por_trava[codigo] = total.por_trava.get(codigo, 0) + n
+    for codigo, (arquivos, ocorrencias) in parcial.por_regra.items():
+        a, o = total.por_regra.get(codigo, (0, 0))
+        total.por_regra[codigo] = (a + arquivos, o + ocorrencias)
+
+
 @dataclass
 class _Contagem:
     eletronicos: int = 0
@@ -426,7 +554,10 @@ def _escrever(con, destino: str, cnpj: str, competencia: str, apta: bool, motivo
 
     # --- 1100 e 1200, num rascunho, descobrindo o que citam ---------------------
     with open(corpo, "wb") as saida_1100, open(corpo + "2", "wb") as saida_1200:
-        cursor = con.execute("SELECT * FROM linhas WHERE cnpj = ? AND competencia = ?", [cnpj, competencia])
+        # a ordem é explícita: o banco da geração não guarda ordem de inserção, e
+        # sem ela o mesmo arquivo podia sair com outro SHA-256
+        cursor = con.execute("SELECT * FROM linhas WHERE cnpj = ? AND competencia = ? "
+                             "ORDER BY data, chave, numero_item, codigo, numero", [cnpj, competencia])
         nomes = [d[0] for d in cursor.description]
         while lote := cursor.fetchmany(LINHAS_POR_LOTE):
             for bruto in lote:

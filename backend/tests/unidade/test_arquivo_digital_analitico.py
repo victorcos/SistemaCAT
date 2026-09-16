@@ -342,3 +342,23 @@ class TestSerieDo1200:
                  if "_1_2024" in n]
         linhas = registros(todos[0])
         assert "1200|F1|01||U2|4455|002|0|04012024|1403|1002140|1,000|0,00||" in linhas
+
+
+class TestEmParalelo:
+    def test_varios_processos_escrevem_os_mesmos_arquivos_e_o_mesmo_resumo(self, fontes, tmp_path):
+        um, dois = tmp_path / "um", tmp_path / "dois"
+        um.mkdir()
+        dois.mkdir()
+        r1 = gerar(fontes, str(um), processos=1)
+        r2 = gerar(fontes, str(dois), processos=2)
+        assert serializar(r1) == serializar(r2)
+
+        def indice(destino):
+            return {(a["nome"], a["sha256"], a["destino"], tuple(x["codigo"] for x in a["travas"])) for a in arquivos(str(destino))["linhas"]}
+
+        assert indice(um) == indice(dois)
+        oc = lambda d: sorted((o["nome"], o["regra"], o["linha"]) for o in  # noqa: E731
+                              pq.read_table(str(d / ARQUIVO_OCORRENCIAS)).to_pylist())
+        assert oc(um) == oc(dois)
+        # as partições são de trabalho: não ficam
+        assert not os.path.exists(dois / ".particoes")

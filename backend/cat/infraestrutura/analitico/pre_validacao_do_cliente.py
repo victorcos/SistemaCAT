@@ -30,18 +30,25 @@ from __future__ import annotations
 
 import hashlib
 import io
+import multiprocessing
 import os
 import shutil
 import zipfile
 from collections.abc import Callable, Iterator
+from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from cat.dominio.cat42.pre_validacao import Regra, Severidade, validar
-from cat.infraestrutura.analitico.arquivo_digital import ARQUIVO_OCORRENCIAS, ESQUEMA_OCORRENCIAS
+from cat.dominio.cat42.pre_validacao import Regra, Severidade, Validacao, validar
+from cat.infraestrutura.analitico.arquivo_digital import (
+    ARQUIVO_OCORRENCIAS,
+    ESQUEMA_OCORRENCIAS,
+    _processos_viaveis,
+)
 from cat.infraestrutura.analitico.confronto import _abrir, _escapar, _limpar
 from cat.infraestrutura.analitico.suportado import ApuracaoCancelada, _leitura
 from cat.log import obter_log
@@ -134,45 +141,77 @@ class Candidato:
     origem: str
     nome: str
     abrir: Callable[[], io.RawIOBase]
+    # onde reabrir em outro processo: ("arquivo", caminho, None) ou ("zip", caminho do zip, membro)
+    local: tuple = ("arquivo", "", None)
 
 
-def candidatos(fontes: list[str], resumo: ResumoDaPreValidacao, rascunho: str) -> Iterator[Candidato]:
-    """Cada TXT solto e cada TXT dentro de zip (com um nível de zip aninhado)."""
+def candidatos(fontes: list[str], resumo: ResumoDaPreValidacao, rascunho: str,
+               aninhados: list[str] | None = None) -> Iterator[Candidato]:
+    """Cada TXT solto e cada TXT dentro de zip (com um nível de zip aninhado).
+
+    `aninhados` recebe o caminho de cada zip aninhado copiado para o disco, que
+    então fica até quem chamou apagar: um processo filho ainda pode estar lendo.
+    Sem a lista, cada um é apagado assim que seus membros acabam.
+    """
     for caminho in fontes:
         resumo.fontes += 1
         if caminho.lower().endswith(".zip"):
             try:
                 with zipfile.ZipFile(caminho) as z:
-                    yield from _do_zip(z, caminho, resumo, rascunho)
+                    yield from _do_zip(z, caminho, caminho, resumo, rascunho, aninhados)
             except (OSError, zipfile.BadZipFile) as erro:
                 resumo.ilegiveis += 1
                 log.warning("zip ilegível na pré-validação", extra={"arquivo": caminho, "motivo": str(erro)})
         else:
-            yield Candidato(caminho, os.path.basename(caminho), lambda c=caminho: open(c, "rb"))
+            yield Candidato(caminho, os.path.basename(caminho), lambda c=caminho: open(c, "rb"),
+                            ("arquivo", caminho, None))
 
 
-def _do_zip(z: zipfile.ZipFile, origem: str, resumo: ResumoDaPreValidacao, rascunho: str,
-            nivel: int = 0) -> Iterator[Candidato]:
+def _do_zip(z: zipfile.ZipFile, origem: str, caminho_do_zip: str, resumo: ResumoDaPreValidacao, rascunho: str,
+            aninhados: list[str] | None, nivel: int = 0) -> Iterator[Candidato]:
     for info in z.infolist():
         nome = info.filename
         if nome.lower().endswith(".txt"):
-            yield Candidato(f"{origem} :: {nome}", os.path.basename(nome), lambda i=info: z.open(i))
+            yield Candidato(f"{origem} :: {nome}", os.path.basename(nome), lambda i=info: z.open(i),
+                            ("zip", caminho_do_zip, nome))
         elif nome.lower().endswith(".zip") and nivel == 0:
             # zip dentro de zip não se lê por dentro: cada membro faria descomprimir
             # o de fora desde o começo. Vai compactado ao disco local e volta a ser zip
             local = os.path.join(rascunho, f".aninhado-{os.getpid()}-{abs(hash(origem + nome))}.zip")
+            if aninhados is not None:
+                aninhados.append(local)
             try:
                 with z.open(info) as interno, open(local, "wb") as saida:
                     shutil.copyfileobj(interno, saida, 1 << 20)
                 with zipfile.ZipFile(local) as zi:
-                    yield from _do_zip(zi, f"{origem} :: {nome}", resumo, rascunho, nivel + 1)
+                    yield from _do_zip(zi, f"{origem} :: {nome}", local, resumo, rascunho, aninhados, nivel + 1)
             except (OSError, zipfile.BadZipFile) as erro:
                 resumo.ilegiveis += 1
                 log.warning("zip aninhado ilegível na pré-validação",
                             extra={"arquivo": f"{origem} :: {nome}", "motivo": str(erro)})
             finally:
-                if os.path.isfile(local):
+                if aninhados is None and os.path.isfile(local):
                     os.remove(local)
+
+
+def _validar_local(local: tuple) -> tuple[int, str, Validacao]:
+    """Lê o arquivo inteiro e pré-valida: o que um processo filho faz.
+
+    Os exemplos e os saldos voltam ao principal, que grava e em seguida os solta
+    — com centenas de arquivos, segurá-los todos não caberia. Cada filho lê um
+    arquivo por vez, e a BOA manda arquivos de até 77 MB: é por arquivo, e não
+    por linha, que a leitura se divide.
+    """
+    tipo, caminho, membro = local
+    if tipo == "zip":
+        with zipfile.ZipFile(caminho) as z, z.open(membro) as bruto:
+            contado = _Contado(bruto)
+            v = validar(contado)
+    else:
+        with open(caminho, "rb") as bruto:
+            contado = _Contado(bruto)
+            v = validar(contado)
+    return contado.bytes, contado.hash.hexdigest(), v
 
 
 class _Contado:
@@ -215,7 +254,15 @@ def pre_validar(
     raiz_cnpj: str,
     avisar: Callable[[Andamento], None] | None = None,
     deve_parar: DeveParar | None = None,
+    processos: int = 1,
 ) -> ResumoDaPreValidacao:
+    """Pré-valida os arquivos do cliente, com `processos` lendo ao mesmo tempo.
+
+    O principal lê só a primeira linha de cada arquivo e decide ali o que é
+    repetido, substituição e nome; a leitura inteira vai a um processo filho
+    (ou roda na hora, com um processo só). Os totais são somados no fim, só com
+    os arquivos que valem.
+    """
     resumo = ResumoDaPreValidacao()
     andamento = Andamento()
     caminho_arquivos = os.path.join(destino, ARQUIVO_ARQUIVOS_DO_CLIENTE)
@@ -225,80 +272,144 @@ def pre_validar(
     # de lido sai deles no fim, sem segurar os de todos na memória
     rascunho_oc = os.path.join(destino, ".ocorrencias_lidas.parquet")
     rascunho_saldos = os.path.join(destino, ".saldos_lidos.parquet")
-    linhas_de_arquivo: list[dict] = []
+    repetidos: list[dict] = []
+    tarefas: list[dict] = []
     vistos: dict[tuple[str, str], dict] = {}
     nomes: dict[str, tuple[str, str]] = {}
-    por_regra_do_arquivo: dict[str, dict] = {}
-    descartados: set[str] = set()
+    aninhados: list[str] = []
+    if processos > 1 and not _processos_viaveis():
+        log.warning("o módulo principal não se reimporta num processo novo; pré-validação num processo só")
+        processos = 1
+    pool = (ProcessPoolExecutor(max_workers=processos, mp_context=multiprocessing.get_context("spawn"))
+            if processos > 1 else None)
+    pendentes: dict[Future, dict] = {}
 
     escritor_oc = pq.ParquetWriter(rascunho_oc, ESQUEMA_OCORRENCIAS)
     escritor_saldos = pq.ParquetWriter(rascunho_saldos, ESQUEMA_SALDOS_DO_CLIENTE)
+
+    def concluir(tarefa: dict, resultado=None, erro: BaseException | None = None) -> None:
+        c, cnpj, competencia = tarefa["candidato"], tarefa["cnpj"], tarefa["competencia"]
+        if erro is not None:
+            if not isinstance(erro, (OSError, zipfile.BadZipFile, EOFError)):
+                raise erro
+            resumo.ilegiveis += 1
+            tarefa["ilegivel"] = True
+            anterior = tarefa.get("substitui")
+            if anterior is not None and vistos.get((cnpj, competencia)) is tarefa:
+                # o substituto não se leu: vale o que estava
+                anterior["substituido"] = False
+                vistos[(cnpj, competencia)] = anterior
+            log.warning("arquivo ilegível na pré-validação", extra={"arquivo": c.origem, "motivo": str(erro)})
+            return
+        tamanho, sha, v = resultado
+        tarefa["linha"] = _linha(c, cnpj, competencia, tamanho, sha, v, tarefa["finalidade"])
+        ocorrencias = [_ocorrencia(c.nome, cnpj, competencia, o, v.por_regra[o.regra]) for o in v.exemplos]
+        if ocorrencias:
+            escritor_oc.write_table(pa.Table.from_pylist(ocorrencias, schema=ESQUEMA_OCORRENCIAS))
+        if v.saldos:
+            escritor_saldos.write_table(pa.Table.from_pylist([
+                {"nome": c.nome, "cnpj": cnpj, "competencia": competencia, "codigo": codigo,
+                 "qtd_ini": qi, "icms_tot_ini": vi, "qtd_fim": qf, "icms_tot_fim": vf}
+                for codigo, (qi, vi, qf, vf) in v.saldos.items()], schema=ESQUEMA_SALDOS_DO_CLIENTE))
+        # o que já foi gravado sai da memória; os totais só precisam das contagens
+        v.saldos, v.exemplos = {}, []
+        tarefa["validacao"] = v
+        andamento.arquivos += 1
+        andamento.bytes += tamanho
+        if avisar is not None:
+            avisar(andamento)
+        log.info("arquivo do cliente pré-validado", extra={
+            "arquivo": c.origem, "cnpj": cnpj, "competencia": competencia, "erros": v.erros,
+            "avisos": v.avisos, "linhas": v.linhas})
+
+    def colher(espera: float) -> None:
+        if not pendentes:
+            return
+        prontos, _ = wait(list(pendentes), timeout=espera, return_when=FIRST_COMPLETED)
+        for futuro in prontos:
+            tarefa = pendentes.pop(futuro)
+            erro = futuro.exception()
+            if isinstance(erro, BrokenProcessPool):
+                raise RuntimeError(
+                    "Um processo da pré-validação parou sem responder (memória?). Para ler um arquivo "
+                    "por vez, defina CAT_PROCESSOS_DO_ARQUIVO_DIGITAL=1 e rode de novo.") from erro
+            concluir(tarefa, None if erro else futuro.result(), erro)
+
     try:
-        for c in candidatos(fontes, resumo, destino):
+        # com processos, o zip aninhado fica no disco até o fim: um filho pode ainda estar lendo
+        for c in candidatos(fontes, resumo, destino, aninhados if pool is not None else None):
             _conferir(deve_parar)
             try:
                 with c.abrir() as bruto:
-                    primeira = bruto.readline()
-                    abertura = _abertura(primeira)
-                    if abertura is None:
-                        resumo.nao_sao_da_cat42 += 1
-                        continue
-                    cnpj, competencia, finalidade = abertura
-                    if cnpj[:8] != raiz_cnpj:
-                        resumo.de_outra_empresa += 1
-                        log.warning("arquivo da CAT 42 de outra empresa, fora da pré-validação",
-                                    extra={"arquivo": c.origem, "cnpj": cnpj})
-                        continue
-                    anterior = vistos.get((cnpj, competencia))
-                    if anterior is not None and not _substitui(finalidade, anterior["finalidade"]):
-                        resumo.repetidos += 1
-                        linhas_de_arquivo.append(_repetido(c, cnpj, competencia, finalidade))
-                        log.info("arquivo repetido na pré-validação",
-                                 extra={"arquivo": c.origem, "primeiro": anterior["origem"]})
-                        continue
-                    c = _com_nome_unico(c, cnpj, competencia, nomes)
-                    contado = _Contado(_com_a_primeira(primeira, bruto))
-                    v = validar(contado)
+                    abertura = _abertura(bruto.readline())
             except (OSError, zipfile.BadZipFile, EOFError) as erro:
                 resumo.ilegiveis += 1
                 log.warning("arquivo ilegível na pré-validação", extra={"arquivo": c.origem, "motivo": str(erro)})
                 continue
-
-            linha = _linha(c, cnpj, competencia, contado, v, finalidade)
+            if abertura is None:
+                resumo.nao_sao_da_cat42 += 1
+                continue
+            cnpj, competencia, finalidade = abertura
+            if cnpj[:8] != raiz_cnpj:
+                resumo.de_outra_empresa += 1
+                log.warning("arquivo da CAT 42 de outra empresa, fora da pré-validação",
+                            extra={"arquivo": c.origem, "cnpj": cnpj})
+                continue
+            anterior = vistos.get((cnpj, competencia))
+            if anterior is not None and not _substitui(finalidade, anterior["finalidade"]):
+                repetidos.append(_repetido(c, cnpj, competencia, finalidade))
+                log.info("arquivo repetido na pré-validação",
+                         extra={"arquivo": c.origem, "primeiro": anterior["candidato"].origem})
+                continue
+            c = _com_nome_unico(c, cnpj, competencia, nomes)
+            tarefa = {"candidato": c, "cnpj": cnpj, "competencia": competencia, "finalidade": finalidade,
+                      "substitui": anterior, "substituido": False}
             if anterior is not None:
-                # a substituição vence o original lido antes: ele sai dos totais
-                _descontar(resumo, anterior, por_regra_do_arquivo.pop(anterior["nome"], {}))
-                anterior["repetido"] = anterior["substituido"] = True
-                descartados.add(anterior["nome"])
-                resumo.repetidos += 1
-                resumo.substituidos += 1
+                # a substituição vence o original, lido antes ou ainda em leitura
+                anterior["substituido"] = True
                 log.info("arquivo substituído na pré-validação",
-                         extra={"arquivo": anterior["origem"], "substituto": c.origem})
-            vistos[(cnpj, competencia)] = linha
-            linhas_de_arquivo.append(linha)
-            por_regra_do_arquivo[c.nome] = {r.codigo: n for r, n in v.por_regra.items()}
-            _somar(resumo, cnpj, competencia, contado.bytes, v)
-            ocorrencias = [_ocorrencia(c.nome, cnpj, competencia, o, v.por_regra[o.regra]) for o in v.exemplos]
-            if ocorrencias:
-                escritor_oc.write_table(pa.Table.from_pylist(ocorrencias, schema=ESQUEMA_OCORRENCIAS))
-            if v.saldos:
-                escritor_saldos.write_table(pa.Table.from_pylist([
-                    {"nome": c.nome, "cnpj": cnpj, "competencia": competencia, "codigo": codigo,
-                     "qtd_ini": qi, "icms_tot_ini": vi, "qtd_fim": qf, "icms_tot_fim": vf}
-                    for codigo, (qi, vi, qf, vf) in v.saldos.items()], schema=ESQUEMA_SALDOS_DO_CLIENTE))
-            andamento.arquivos += 1
-            andamento.bytes += contado.bytes
-            if avisar is not None:
-                avisar(andamento)
-            log.info("arquivo do cliente pré-validado", extra={
-                "arquivo": c.origem, "cnpj": cnpj, "competencia": competencia, "erros": v.erros,
-                "avisos": v.avisos, "linhas": v.linhas})
+                         extra={"arquivo": anterior["candidato"].origem, "substituto": c.origem})
+            vistos[(cnpj, competencia)] = tarefa
+            tarefas.append(tarefa)
+            if pool is None:
+                try:
+                    concluir(tarefa, _validar_local(c.local))
+                except (OSError, zipfile.BadZipFile, EOFError) as erro:
+                    concluir(tarefa, erro=erro)
+            else:
+                pendentes[pool.submit(_validar_local, c.local)] = tarefa
+                # não deixa a fila crescer: cada resultado traz os saldos do arquivo
+                while len(pendentes) >= 2 * processos:
+                    _conferir(deve_parar)
+                    colher(espera=1.0)
+                colher(espera=0)
+        while pendentes:
+            _conferir(deve_parar)
+            colher(espera=1.0)
+
+        descartados = {tarefa["candidato"].nome for tarefa in tarefas
+                       if tarefa["substituido"] and not tarefa.get("ilegivel")}
         escritor_saldos.close()
         _sem_os_descartados(destino, rascunho_saldos, caminho_saldos, descartados)
+        linhas_de_arquivo = list(repetidos)
+        for tarefa in tarefas:
+            if tarefa.get("ilegivel"):
+                continue
+            linha = tarefa["linha"]
+            if tarefa["substituido"]:
+                linha["repetido"] = linha["substituido"] = True
+                resumo.substituidos += 1
+            else:
+                v = tarefa["validacao"]
+                _somar(resumo, tarefa["cnpj"], tarefa["competencia"], linha["bytes"], v)
+            linhas_de_arquivo.append(linha)
+        resumo.repetidos = sum(1 for l in linhas_de_arquivo if l["repetido"])
         _continuidade(destino, caminho_saldos, escritor_oc, linhas_de_arquivo, resumo)
         escritor_oc.close()
         _sem_os_descartados(destino, rascunho_oc, caminho_ocorrencias, descartados)
     except ApuracaoCancelada:
+        if pool is not None:
+            pool.shutdown(wait=True, cancel_futures=True)
         escritor_oc.close()
         escritor_saldos.close()
         for alvo in (caminho_arquivos, caminho_ocorrencias, caminho_saldos):
@@ -306,9 +417,11 @@ def pre_validar(
                 os.remove(alvo)
         raise
     finally:
+        if pool is not None:
+            pool.shutdown(wait=True, cancel_futures=True)
         escritor_oc.close()
         escritor_saldos.close()
-        for rascunho in (rascunho_oc, rascunho_saldos):
+        for rascunho in (rascunho_oc, rascunho_saldos, *aninhados):
             if os.path.isfile(rascunho):
                 os.remove(rascunho)
 
@@ -322,11 +435,12 @@ def pre_validar(
         else:
             resumo.sem_ocorrencia += 1
     pq.write_table(pa.Table.from_pylist(
-        sorted(linhas_de_arquivo, key=lambda l: (l["cnpj"], l["competencia"], l["repetido"])),
+        sorted(linhas_de_arquivo, key=lambda l: (l["cnpj"], l["competencia"], l["repetido"], l["origem"])),
         schema=ESQUEMA_ARQUIVOS_DO_CLIENTE), caminho_arquivos)
     log.info("pré-validação dos arquivos do cliente concluída", extra={
         "arquivos": resumo.arquivos, "com_erro": resumo.com_erro, "repetidos": resumo.repetidos,
-        "de_outra_empresa": resumo.de_outra_empresa, "nao_sao_da_cat42": resumo.nao_sao_da_cat42})
+        "substituidos": resumo.substituidos, "de_outra_empresa": resumo.de_outra_empresa,
+        "nao_sao_da_cat42": resumo.nao_sao_da_cat42, "processos": processos})
     return resumo
 
 
@@ -349,11 +463,6 @@ def _com_nome_unico(c: Candidato, cnpj: str, competencia: str, nomes: dict[str, 
     return replace(c, nome=novo)
 
 
-def _com_a_primeira(primeira: bytes, resto) -> Iterator[bytes]:
-    yield primeira
-    yield from resto
-
-
 def _sem_os_descartados(destino: str, rascunho: str, final: str, descartados: set[str]) -> None:
     """Copia o rascunho para o arquivo final, sem as linhas dos arquivos substituídos."""
     if not descartados:
@@ -369,23 +478,6 @@ def _sem_os_descartados(destino: str, rascunho: str, final: str, descartados: se
     os.remove(rascunho)
 
 
-def _descontar(resumo: ResumoDaPreValidacao, linha: dict, por_regra: dict[str, int]) -> None:
-    """Tira dos totais o arquivo que uma substituição venceu."""
-    resumo.arquivos -= 1
-    resumo.linhas -= linha["linhas"]
-    resumo.bytes -= linha["bytes"]
-    resumo.erros -= linha["erros"]
-    resumo.avisos -= linha["avisos"]
-    resumo.itens_recompostos -= linha["itens_recompostos"]
-    resumo.itens_que_fecham -= linha["itens_que_fecham"]
-    for codigo, n in por_regra.items():
-        arquivos, ocorrencias = resumo.por_regra.get(codigo, (0, 0))
-        if arquivos <= 1:
-            resumo.por_regra.pop(codigo, None)
-        else:
-            resumo.por_regra[codigo] = (arquivos - 1, ocorrencias - n)
-
-
 def _repetido(c: Candidato, cnpj: str, competencia: str, finalidade: str = "") -> dict:
     return {"nome": c.nome, "origem": c.origem, "cnpj": cnpj, "competencia": competencia, "repetido": True,
             "finalidade": finalidade, "substituido": False,
@@ -394,11 +486,11 @@ def _repetido(c: Candidato, cnpj: str, competencia: str, finalidade: str = "") -
             "itens_que_fecham": 0, "maior_diferenca_de_valor": Decimal(0)}
 
 
-def _linha(c: Candidato, cnpj: str, competencia: str, contado: _Contado, v, finalidade: str = "") -> dict:
+def _linha(c: Candidato, cnpj: str, competencia: str, tamanho: int, sha: str, v, finalidade: str = "") -> dict:
     reg = v.por_registro
     return {"nome": c.nome, "origem": c.origem, "cnpj": cnpj, "competencia": competencia, "repetido": False,
             "finalidade": finalidade, "substituido": False,
-            "linhas": v.linhas, "bytes": contado.bytes, "sha256": contado.hash.hexdigest(),
+            "linhas": v.linhas, "bytes": tamanho, "sha256": sha,
             "participantes": reg.get("0150", 0), "itens": reg.get("0200", 0), "saldos": reg.get("1050", 0),
             "eletronicos": reg.get("1100", 0), "nao_eletronicos": reg.get("1200", 0),
             "erros": v.erros, "avisos": v.avisos, "itens_recompostos": v.itens_recompostos,

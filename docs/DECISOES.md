@@ -5,6 +5,37 @@
 
 ---
 
+## 2026-09-16 — Base grande: CSV pelo DuckDB e arquivos digitais em paralelo
+
+**CSV.** A Ficha 3 de uma loja do Amigão (1,17 milhão de linhas) levava 60 s
+para virar CSV, escrita linha a linha pelo módulo `csv`; o dossiê de uma base
+do tamanho da BOA faz uma por filial. Agora o DuckDB escreve o corpo e o Python
+só o cabeçalho com o BOM. Os bytes são os mesmos — `;`, aspas só onde precisa,
+CRLF, vírgula decimal, `Sim`/`Não` —, e um teste compara as duas escritas para
+que não divirjam.
+
+**Arquivos digitais.** Escrever e pré-validar um arquivo é Python puro e não
+depende dos outros: num perfil de 12 arquivos do Amigão, 48% do tempo era
+pré-validação e 40% escrita. A etapa 7 passa a separar em disco, por
+estabelecimento e mês, o que cada arquivo lê, e cada processo filho monta o
+seu; os 12 arquivos caíram de 15,8 s para 7,9 s com o mesmo SHA-256. A
+pré-validação dos arquivos do cliente segue a mesma ideia: o processo principal
+lê só a primeira linha de cada arquivo e decide ali o que é repetido,
+substituição e nome; a leitura inteira vai a um filho, e os totais são somados
+no fim, só com os arquivos que valem. O zip aninhado fica no disco até o fim,
+porque um filho pode estar lendo dele. Sessenta prévias do Amigão, metade soltas e metade
+num zip: 41,2 s com um processo, 10,0 s com seis, o mesmo resumo e as mesmas
+linhas.
+
+Quantos processos: `CAT_PROCESSOS_DO_ARQUIVO_DIGITAL`, e 0 escolhe núcleos
+menos 4, entre 1 e 8, para deixar folga à API e ao Postgres. Com 1 nada muda do
+que era. Os testes rodam as duas formas e exigem o mesmo resultado. Quando o
+módulo principal não se reimporta num processo novo (script lido da entrada
+padrão), cai para um processo com aviso no log; um filho que morre (memória)
+vira erro que manda definir 1.
+
+---
+
 ## 2026-09-16 — Série no 1200 e a substituição entre arquivos do cliente
 
 **Série.** O 1200 saía sem SER: a série era lida no C100 e não chegava à

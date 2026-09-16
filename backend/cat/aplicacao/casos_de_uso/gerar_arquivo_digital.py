@@ -48,6 +48,7 @@ from cat.infraestrutura.analitico.razao import ARQUIVO_FICHA3
 from cat.infraestrutura.analitico.suportado import ApuracaoCancelada
 from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import ArquivoDoLoteDB, ExecucaoDB, LoteDB, ProjetoDB
+from cat.config import obter_config
 from cat.log import contexto, obter_log
 
 log = obter_log(__name__)
@@ -199,7 +200,8 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
 
     fontes = Fontes(apuracao=apuracao.pasta_de_trabalho, razao=razao.pasta_de_trabalho,
                     movimentacao=movimentos.pasta_de_trabalho, efds=efds)
-    resumo = gerar(fontes, destino, venda_a_consumidor=venda, avisar=andou, deve_parar=parar)
+    resumo = gerar(fontes, destino, venda_a_consumidor=venda, avisar=andou, deve_parar=parar,
+                   processos=obter_config().processos_para_arquivos)
 
     segundos = round(time.time() - inicio, 1)
     execucao.situacao = "concluida"

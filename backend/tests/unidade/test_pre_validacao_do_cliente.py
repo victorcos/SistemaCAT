@@ -180,3 +180,35 @@ class TestSubstituicao:
         destino.mkdir()
         r = pre_validar([str(lote / "a_substituto.txt"), str(lote / "b_original.txt")], str(destino), CNPJ[:8])
         assert (r.arquivos, r.repetidos, r.substituidos) == (1, 1, 0)
+
+
+class TestEmParalelo:
+    def test_com_processos_o_resultado_e_o_mesmo(self, fontes, tmp_path):
+        """Zip, zip aninhado, cópia, outra empresa e uma substituição: lidos por
+        dois processos, o que sai é o que sai lendo um arquivo por vez."""
+        from cat.dominio.cat42.arquivo_digital import Finalidade  # noqa: PLC0415
+        substituto = so_saldo(2, 16, 40, 16, 40)
+        substituto.abertura = Abertura(2024, 2, "LOJA DE TESTE", CNPJ, IE_SP, "3552205", Finalidade.SUBSTITUICAO)
+        substituto.saldos.append(Saldo("SEM_CADASTRO", D(1), D(1), D(1), D(1)))
+        caminho = tmp_path / "lote" / "fev_substituto.txt"
+        caminho.write_bytes(conteudo(substituto))
+        lote = [*fontes, str(caminho)]
+
+        def rodar(pasta: str, processos: int):
+            destino = tmp_path / pasta
+            destino.mkdir()
+            r = pre_validar(lote, str(destino), CNPJ[:8], processos=processos)
+            arquivos = arquivos_do_cliente(str(destino), por_pagina=200)["linhas"]
+            oc = {l["nome"]: sorted((o["regra"], o["item"] or "", o["mensagem"])
+                                    for o in ocorrencias(str(destino), l["nome"], por_pagina=200)["linhas"])
+                  for l in arquivos}
+            saldos = sorted(tuple(map(str, x.values()))
+                            for x in pq.read_table(destino / "saldos_do_cliente.parquet").to_pylist())
+            assert not [n for n in os.listdir(destino) if n.startswith(".")]
+            return serializar(r), arquivos, oc, saldos
+
+        um = rodar("um", 1)
+        dois = rodar("dois", 2)
+        assert um == dois
+        s = um[0]
+        assert (s["arquivos"], s["substituidos"], s["com_erro"]) == (3, 1, 1)

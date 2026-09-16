@@ -24,6 +24,7 @@ from cat.infraestrutura.analitico.pre_validacao_do_cliente import Andamento, pre
 from cat.infraestrutura.analitico.suportado import ApuracaoCancelada
 from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import ArquivoDoLoteDB, ExecucaoDB, LoteDB, ProjetoDB
+from cat.config import obter_config
 from cat.log import contexto, obter_log
 
 log = obter_log(__name__)
@@ -128,7 +129,8 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
         diario.base["andamento"] = {"arquivos": a.arquivos, "bytes": a.bytes}
         diario.salvar_de_vez_em_quando()
 
-    resumo = pre_validar(fontes, destino, raiz, avisar=andou, deve_parar=parar)
+    resumo = pre_validar(fontes, destino, raiz, avisar=andou, deve_parar=parar,
+                         processos=obter_config().processos_para_arquivos)
 
     segundos = round(time.time() - inicio, 1)
     execucao.situacao = "concluida"
