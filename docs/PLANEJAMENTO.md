@@ -1,197 +1,165 @@
 # PLANEJAMENTO — Sistema CAT
 
-> Histórico do que já foi levantado e o que vem pela frente.
-> Atualizado a cada entrega. As escolhas de arquitetura ficam em DECISOES.md.
+> O que existe, o que falta e em que ordem. Atualizado a cada entrega.
+> O porquê de cada escolha fica em DECISOES.md; as rotas, em CONTRATOS.md.
 
 ---
 
 ## Onde estamos
 
-**Etapa 1 em andamento.** O leiaute da CAT 42 está decifrado e a fórmula do
-ressarcimento validada em mais de 1,8 milhão de linhas reais. A primeira fatia
-vertical está no ar: domínio de acesso, autenticação com escopo por empresa,
-log estruturado e a tela de login, com 46 testes passando.
+**As oito etapas da CAT 42 estão no ar (v0.52.0), e o trabalho do Amigão passou
+por todas.** Da pasta com EFD, XML e relatórios do ERP até o pacote de entrega
+com o arquivo digital pré-validado e o manifesto com SHA-256, pela tela, com
+fila, cancelamento, histórico e aprovação de quem responde pelo negócio.
+
+A API é C# (.NET 10) e o trabalho pesado é Python com DuckDB, num motor sem
+rota pública (DECISOES, 13/09/2026). O front é React. Postgres guarda cadastro,
+execuções e histórico; os dados de cada execução ficam em parquet no disco local.
+
+O que o piloto deixou claro é que **o sistema calcula e o Amigão ainda não tem
+dado para pedir**: todo o ressarcimento apurado é de lojas de MS, e as 234
+competências de São Paulo saem como prévia porque o relatório de saídas que
+chegou não tem as lojas paulistas (ver "Dados que faltam").
 
 ---
 
-## O que já foi apurado
+## O roteiro no sistema
 
-### Regra fiscal
+| # | Etapa | O que faz | Desde |
+|---|---|---|---|
+| 1 | Importar base de dados | Classifica cada arquivo do lote (EFD, XML, relatório, arquivo digital), separa o de outra empresa, lê zip sem extrair | v0.9 |
+| 2 | Conferir documentos | EFD × XML × relatório do cliente: pendentes, não escrituradas e conferidas, em xlsx e CSV | v0.13 |
+| 3 | Extrair movimentos | C170, C190/C850, 0200 e bloco H, cada movimento marcado pela conferência, na data de entrada/saída | v0.18 |
+| 4 | Apurar o ICMS suportado | Cascata de quatro fontes com procedência; XML vence o ERP | v0.41 |
+| 5 | Montar o razão dos itens | Ficha 3 por estabelecimento e mercadoria, custo médio móvel, saída sem item vinda do relatório do cliente | v0.42 |
+| 6 | Apurar ressarcimento e complemento | Por estabelecimento e mês, separados, com os saldos do 1050 e o que trava cada competência | v0.45 |
+| 7 | Gerar o arquivo digital | 0000 a 1200 no leiaute, pré-validação que recompõe a Ficha 3, envio só do que está limpo e prévia do resto | v0.47 |
+| 8 | Relatórios e entrega | Relatório de todas as competências, dossiê só do que vai à SEFAZ, manifesto; conclui com aprovação de revisor ou gestor | v0.50 |
 
-Os dois manuais oficiais da SEFAZ-SP foram localizados e lidos. O leiaute do
-arquivo digital e o Sistema de Apuração estão destrinchados em `DOMINIO.md`, com
-as fórmulas de ressarcimento e complemento, os cinco enquadramentos legais e as
-regras que costumam pegar quem implementa.
+Fora do roteiro: **pré-validar o arquivo que o cliente já transmitiu** (v0.48),
+para auditoria de quem gera a CAT 42 com outra ferramenta.
 
-### Validação em dados reais
+Em volta: login com Argon2id e escopo por empresa, gestão de usuários com as
+três salvaguardas, acesso às empresas, histórico do trabalho com sucessão,
+cadastro do trabalho editável com aviso de base fora do período (v0.51).
 
-Duas empresas do Grupo Plurix foram processadas de ponta a ponta.
+---
 
-| | BOA | Casa Avenida |
+## O que foi medido contra dado real
+
+| O quê | Contra | Resultado |
 |---|---|---|
-| Volume lido | 119,82 GB | 99,99 GB |
-| Linhas | 400.381.153 | 305.684.649 |
-| Tempo | 711 s | 634 s |
-| Filiais | 27 | 43 |
-| Período | 01/2021 a 12/2025 | 06/2018 a 12/2025 |
-
-A fórmula `ressarcimento = max(0, enquadramento − ICMS efetivo)` confere em
-99,63% das linhas. As exceções divergem em no máximo um centavo, por
-arredondamento da origem.
-
-### Achados que viram funcionalidade
-
-**Baixas sem enquadramento.** Linhas de CFOP 5927 de itens que tinham ICMS-ST em
-estoque, mas sem enquadramento legal preenchido. Na BOA são 40.371 linhas e
-R$ 181.302,55; na Casa Avenida, 114.343 linhas e R$ 521.509,98. A proporção é
-muito diferente entre as duas, 15% contra 74%, o que sugere regra de negócio
-distinta ou falha de geração. **Pendente de confirmação com a origem.**
-
-**Cadastro de produto é limpo.** Na BOA, 24.730 itens distintos, 98,1% com código
-de barras, 100% com NCM e CEST, e zero divergência de código de barras entre as
-21 filiais. O de-para interno já vem pronto do ERP do cliente.
-
-**Sortimento pouco sobreposto entre empresas.** No cruzamento BOA contra Casa
-Avenida, 34,5% casam por código de barras e 59,5% simplesmente não existem na
-outra empresa. Só 5,6% exigem julgamento.
+| Fórmula do ressarcimento | Ficha 3 da BOA e da Casa Avenida, 706 milhões de linhas | 99,63% das linhas; o resto, 1 centavo de arredondamento |
+| Razão do item | Ficha 3 da BOA, uma filial e um mês | 550.862 linhas, 100% em saldo e ressarcimento, R$ 0,00 de diferença |
+| ICMS suportado | Book do Superpão | ICMS + ST + FECOP em 100% de 1.242.621 linhas |
+| Leiaute do arquivo digital | 7 arquivos que a SEFAZ aceitou da BOA (2021 a 2024) | registro a registro; nenhum erro de pré-validação nos aceitos |
+| Pré-validação | Arquivos da BOA | recompõe 100% das quantidades e 99,99% dos valores a 5 centavos |
+| Leitura da EFD | 7.036 EFD reais, seis versões de leiaute | sem falha |
+| Conferência | 37,9 milhões de documentos do Amigão | três listas, validada também com relatório do cliente simulado |
 
 ---
 
-## Roteiro
+## O que vem pela frente
 
-### Etapa 1 — Fundação
+Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 
-Objetivo: ter onde apoiar tudo o mais.
+### 1. Fechar o piloto do Amigão
 
-- [ ] Domínio da CAT 42 em código, com as duas fórmulas e os enquadramentos
-- [ ] Testes de unidade do cálculo, rodando em milissegundos sem arquivo grande
-- [x] Log estruturado, conforme ARQUITETURA.md seção 12
-- [x] Postgres com migrações versionadas (Alembic)
-- [ ] Modelo de dados: empresa, estabelecimento, projeto, usuário, alocação,
-      atividade, execução — *empresa, usuário e alocação prontos; projeto,
-      atividade e execução entram na etapa 2*
-- [x] Gestão de usuários com as três salvaguardas
-- [x] Autenticação com escopo por empresa
-- [x] Tela de login
-- [x] Tela de gestão de usuários e troca obrigatória de senha
+- [ ] **Aprovar a entrega.** Só revisor ou gestor aprova; o dev não conta como
+      responsável pelo negócio. Depende do Pedro, do Rafael ou do Vinícius.
+- [ ] **Dados que faltam**, a pedir ao cliente:
+  - relatório de saídas (ou XML dos cupons) das 22 lojas de São Paulo — sem ele
+    o pedido paulista é zero por falta de dado, não de direito;
+  - EFD de antes de 01/2021, para valorar a abertura pelas entradas anteriores
+    (item 3.3.8 do manual); hoje 400 mil fichas abrem sem ICMS;
+  - os arquivos de 2023 em diante que o OneDrive não baixou.
 
-### Etapa 2 — Ingestão
+### 2. De-para de produtos
 
-Objetivo: transformar pacote bruto do cliente em base consultável.
+Ainda não existe no sistema. As fontes se juntam hoje pelo documento e pelo
+código do item do cliente (o da EFD e o do relatório do ERP); não há tabela que
+case o produto por código de barras, NCM e CEST ou descrição quando os códigos
+não coincidem.
 
-- [x] Leitura de remessa em zip, sem extrair para disco
-- [ ] Leitura em fluxo de rar, incluindo aninhados
-- [ ] Parser da Ficha 3 e do arquivo digital CAT 5
-- [ ] Gravação em parquet, particionada por empresa e competência
-- [ ] Registro de cada execução em banco, com hash dos arquivos gerados
-- [ ] Manifesto de origem por empresa
+- [ ] **Comparar com a CAT 42 da Advertising Operations** (`D:\Backup pc
+      Pedro\PROJETOS 2\CAT 42 - Advertising Operations`), principalmente o
+      de-para, e corrigir o que for possível aqui. Pedido de 16/09/2026.
+- [ ] Cascata determinística: código de barras; NCM com CEST e descrição; descrição.
+- [ ] Similaridade textual com o denominador certo e ao menos dois termos
+      distintivos em comum.
+- [ ] Fila de julgamento com as candidatas, e o de-para aprovado guardado para
+      não repagar o mesmo item.
 
-### Etapa 3 — Apuração e conferência
+### 3. O que a apuração ainda não calcula
 
-Objetivo: o produto que o cliente enxerga.
+- [ ] **Confronto dos enquadramentos 2 e 4** (ICMS da operação própria da
+      entrada). Hoje é contado e trava a competência; no piloto, 52
+      competências e as 393 transferências 6409.
+- [ ] Crédito da operação própria do art. 271: a coluna existe, zerada, até o
+      confronto acima.
+- [ ] No arquivo digital: ECF_FAB, 0205 (quem não escritura EFD) e fato gerador
+      presumido sem documento (CHV 0, item 999).
 
-- [ ] Recálculo independente do ressarcimento, para conferir o que veio pronto
-- [ ] Detecção das anomalias já identificadas, começando pelas baixas sem
-      enquadramento
-- [ ] Relatórios em Excel, com quebra acima de 900 mil linhas
-- [x] Histórico de movimentação: itens da EFD (C170), analítico (C190/C850),
-      cadastro (0200) e inventário (bloco H), cada movimento marcado pela
-      conferência — *etapa 3 no ar; item de saída vem do XML, etapa seguinte*
-- [ ] Consulta de movimentação por item
+### 4. Leitura e desempenho
 
-### Etapa 4 — De-para
-
-Objetivo: casar produto com custo baixo e sem invenção.
-
-- [ ] Cascata determinística: código de barras, depois NCM com CEST e descrição,
-      depois descrição
-- [ ] Similaridade textual com o denominador correto e mínimo de dois termos
-      distintivos em comum
-- [ ] Fila de julgamento, com candidatas, para o agente decidir
-- [ ] Persistência do de-para aprovado, para não repagar o mesmo item
-
-### Etapa 5 — Front
-
-Objetivo: sair do terminal.
-
-- [x] Obter o logotipo nas versões positiva e negativa (PNG em alta; vetor ainda ajudaria)
-
-- [ ] API com as rotas de projeto, execução e consulta
-- [ ] React com tabela virtualizada, para o detalhe de milhão de linhas
-- [ ] Acompanhamento de processo longo
-- [ ] Tela de revisão do de-para
-
-### Etapa 6 — Demais frentes
-
-- [ ] Quebra de SPED ICMS-IPI, portando o indexador por offset
-- [ ] Nota fiscal em XML, ampliando o leitor para o nível de item
-- [ ] Pré-validação do arquivo antes do envio à SEFAZ
+- [ ] **Movimentos em paralelo por arquivo.** A etapa 3 leu os 12 GB do Amigão
+      em 44 min, um arquivo por vez; a escrita e a pré-validação dos arquivos
+      digitais já dividem por processo (DECISOES, 16/09/2026).
+- [ ] Leitura de rar e 7z. O lote reconhece como compactado, mas só o zip é
+      lido por dentro.
+- [ ] Consulta de movimentação por item, na tela.
 
 ---
 
 ## Riscos conhecidos
 
-**A anomalia das baixas sem enquadramento não está explicada.** Enquanto não
-houver confirmação da origem, nenhum número derivado dela deve ser apresentado ao
-cliente como definitivo.
+**Baixa em 5.927 sem enquadramento na origem.** A BOA transmitiu parte das
+5.927 no enquadramento 0; na Casa Avenida a proporção é outra (15% contra 74%).
+O sistema segue o manual (5.927 é enquadramento 2). Enquanto a origem não
+explicar, número derivado das baixas das duas não vai ao cliente como definitivo.
 
-**Não temos as regras de crítica do validador da SEFAZ.** Sem elas, a
-pré-validação será uma aproximação. Um lote de rejeições reais vale mais que a
-norma.
+**A pré-validação não é o validador da SEFAZ.** Foi calibrada contra arquivos
+aceitos, não contra rejeições. Um lote de rejeições reais vale mais que a norma.
 
-**Espaço em disco.** A razão de expansão é de cerca de nove vezes. Trabalhando do
-compactado cabem dezenas de empresas no drive Z; descompactando, cerca de dez. O
-drive Y está em 100% de uso.
+**Venda a consumidor final é escolha do trabalho.** O manual põe o cupom no
+enquadramento 1; a BOA transmitiu no 0 e a SEFAZ aceitou. A escolha muda o
+complemento inteiro (R$ 1,53 milhão no piloto) e fica registrada no histórico.
+
+**Espaço e rede.** A razão de expansão da base é de cerca de nove vezes, e as
+unidades de rede perdem gravação longa: tudo se grava no disco local e só o
+pacote pronto vai à rede, conferido pelo SHA-256 do manifesto.
 
 ---
 
 ## Histórico
 
-**2026-09-09** — Análise da CAT já existente nas empresas BOA e Casa Avenida.
-Leiaute decifrado, manuais oficiais localizados, fórmula validada. Extração de
-CFOP 5927 e movimentação por item entregues nas duas empresas. De-para
-sistemático medido e desenhado.
+**2026-09-09** — Análise da CAT já existente na BOA e na Casa Avenida: leiaute
+decifrado, manuais oficiais localizados, fórmula validada. Arquitetura, modelo
+de usuários e estrutura de pastas definidos.
 
-**2026-09-09** — Definição da arquitetura, do modelo de usuários e da estrutura de
-pastas. Projeto criado.
+**2026-09-10** — Repositório no GitHub com versionamento. Identidade visual da
+BMS. Login com Argon2id, gestão de usuários, papel dev auditável. Razão do item
+no domínio, importação de remessa e cadastro de trabalho. Roteiro do trabalho na
+tela.
 
-**2026-09-10** — Repositório publicado no GitHub e regra de versionamento
-estabelecida.
+**2026-09-11** — Etapa 2, conferência de documentos, validada em 37,9 milhões
+de documentos. Etapa 3, histórico de movimentação. Instalação a um comando.
 
-**2026-09-10** — Identidade visual definida a partir da marca BMS. Cores
-extraídas do logotipo por amostragem, contraste conferido, tokens criados.
+**2026-09-12** — Front reconstruído no desenho novo. Histórico do trabalho,
+sucessão, acesso às empresas, CSV ao lado do xlsx, cancelar carregamentos.
 
-**2026-09-10** — Primeira fatia vertical entregue: domínio de acesso, caso de uso
-de autenticação, JWT com bcrypt, log estruturado, API e tela de login. 46 testes,
-sendo 35 de unidade rodando em 0,07 s sem banco.
+**2026-09-13 e 14** — API migrada para C#, com o motor Python atrás de canal
+interno (v0.28 a v0.35). ICMS suportado em cascata, relatório do cliente como
+fonte, enquadramento pelo modelo do documento, razão confrontado com a Ficha 3
+real da BOA a 100%.
 
-**2026-09-10** — Senha migrada de bcrypt para Argon2id, com pimenta opcional e
-reprocessamento transparente no login. 70 testes.
+**2026-09-15** — Etapa 4 com rodada e tela, primeira rodada real (8,76 milhões
+de itens em 33 min). Etapa 5, razão dos itens, com unidade de conversão e
+fichas de estoque negativo fora do total.
 
-**2026-09-10** — Gestão de usuários com as três salvaguardas, bloqueio em dois
-níveis e migração para Postgres com Alembic. 122 testes.
-
-**2026-09-10** — Papel dev com bypass auditável do escopo de empresa. Rotas
-passam a exigir capacidade em vez de papel. 135 testes.
-
-**2026-09-10** — Front da gestão de usuários: moldura da aplicação, lista com
-ações, cadastro, e a troca obrigatória de senha que fechava o ciclo da senha
-provisória.
-
-**2026-09-10** — Logotipos oficiais recebidos em alta resolução com
-transparência. Paleta corrigida: o laranja estava em `#EE8633` e o oficial é
-`#FF7F00`.
-
-**2026-09-10** — Razão do item (Ficha 3) no domínio, com custo médio ponderado
-móvel. Importação de remessa, pré-cadastro de empresa a partir do SPED e
-cadastro de projeto, com tela. Validado contra 7.036 arquivos reais de EFD
-ICMS/IPI, seis versões de leiaute, sem falha.
-
-**2026-09-10** — Tela de trabalhos com cartões por projeto e página de detalhe
-com o roteiro de processamento da CAT em sete etapas.
-
-**2026-09-11** — Conferência de documentos (etapa 2) com três listas —
-pendentes, não escrituradas e conferidas — validada em base real de 37,9
-milhões de documentos e em três cenários simulados com relatório do cliente.
-Etapa 3, histórico de movimentação, no ar: a EFD não tem item de saída
-(NF-e própria sem C170, SAT sem C810), e a etapa diz isso com número.
+**2026-09-16** — Etapas 6, 7 e 8: apuração do período, arquivo digital com
+pré-validação, relatórios e entrega com aprovação. Pré-validação do arquivo do
+cliente. Revisão da etapa 7 contra os arquivos aceitos da BOA. Lapidação:
+cadastro editável, pendências por assunto, abertura pelas entradas anteriores,
+uso e consumo fora da ficha, série no 1200, substituição entre arquivos do
+cliente, CSV pelo DuckDB e arquivos digitais em paralelo.
