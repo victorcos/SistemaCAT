@@ -28,6 +28,9 @@ class Config(BaseSettings):
     # O trabalhador da fila de execuções (workers/fila.py) sobe com o motor.
     # Os testes desligam e esvaziam a fila na hora, para não depender de tempo.
     fila_automatica: bool = True
+    # cada rodada da fila num processo filho: a memória volta ao sistema quando
+    # ela acaba, e o filho que morre não leva o motor (workers/fila.py)
+    rodadas_em_processo: bool = True
 
     log_nivel: str = "INFO"
 

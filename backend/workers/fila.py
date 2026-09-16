@@ -20,11 +20,21 @@ mesma linha.
 **Ao subir, o que estava "rodando" vira falha com motivo.** Só um trabalhador
 roda por banco, então uma linha "rodando" quando ele sobe é uma rodada que o
 reinício interrompeu. Melhor dizer isso na tela do que deixar a barra parada.
+
+**Cada rodada num processo próprio.** A etapa 4 do Amigão lê 20 GB de relatório
+em Python, e o que o Python solta ele não devolve ao sistema: o motor chegou a
+12 GB e a apuração caiu por falta de memória duas vezes (#55 e #56, 16/09/2026),
+na fase que vem depois da leitura. Num processo filho, a memória volta inteira
+quando a rodada acaba, e o filho que morre por falta dela não leva o motor
+junto: a execução vira falha com o motivo. `CAT_RODADAS_EM_PROCESSO=false` volta
+a rodar dentro do motor, que é o que os testes usam.
 """
 
 from __future__ import annotations
 
+import multiprocessing
 import threading
+from collections.abc import Callable
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -40,6 +50,7 @@ from cat.aplicacao.casos_de_uso import (
     pre_validar_arquivos,
 )
 from cat.aplicacao.casos_de_uso.historico_do_projeto import registrar_de_etapa
+from cat.config import obter_config
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import ExecucaoDB
@@ -62,6 +73,9 @@ EXECUTORES = {
 }
 
 MOTIVO_INTERRUPCAO = "Interrompida: o motor reiniciou durante a rodada. Rode de novo."
+MOTIVO_PROCESSO = ("O processo da rodada terminou sem concluir (código {codigo}). Costuma ser falta de "
+                   "memória na máquina; veja o log do motor e rode de novo.")
+SEGUNDOS_ENTRE_CONFERENCIAS = 5.0
 
 _parar = threading.Event()
 _linha: threading.Thread | None = None
@@ -96,6 +110,9 @@ def processar_uma() -> int | None:
         _falhar(execucao_id, f"Etapa desconhecida para o motor: {etapa}.")
         return execucao_id
     log.info("execução retirada da fila", extra={"execucao_id": execucao_id, "etapa": etapa})
+    if obter_config().rodadas_em_processo and _processos_viaveis():
+        rodar_em_processo(execucao_id, etapa)
+        return execucao_id
     # o executor grava a própria falha; isto é a rede de segurança para o que escapar dele
     try:
         executar(execucao_id)
@@ -103,6 +120,55 @@ def processar_uma() -> int | None:
         log.exception("execução terminou em exceção não tratada", extra={"execucao_id": execucao_id})
         _falhar(execucao_id, "Falha não tratada no motor. Veja o log.")
     return execucao_id
+
+
+def _processos_viaveis() -> bool:
+    from cat.infraestrutura.analitico.arquivo_digital import _processos_viaveis as viaveis  # noqa: PLC0415
+    return viaveis()
+
+
+def _rodar_etapa(etapa: str, execucao_id: int) -> None:
+    """O que o processo filho faz: log como o do motor, e a etapa."""
+    from cat.log import configurar  # noqa: PLC0415
+    configurar(obter_config().log_nivel)
+    EXECUTORES[etapa](execucao_id)
+
+
+def rodar_em_processo(execucao_id: int, etapa: str,
+                      alvo: Callable[[str, int], None] = _rodar_etapa) -> int | None:
+    """Roda a etapa num processo filho e espera. Devolve o código de saída.
+
+    O executor grava sozinho a conclusão ou a falha. O que ele não consegue
+    gravar — o processo morto pelo sistema — fica a cargo daqui.
+    """
+    filho = multiprocessing.get_context("spawn").Process(
+        target=alvo, args=(etapa, execucao_id), name=f"cat-{etapa}-{execucao_id}", daemon=False)
+    try:
+        filho.start()
+    except OSError as erro:
+        log.exception("não deu para abrir o processo da rodada; roda dentro do motor",
+                      extra={"execucao_id": execucao_id, "erro": str(erro)})
+        alvo(etapa, execucao_id)
+        return 0
+    log.info("rodada em processo próprio", extra={"execucao_id": execucao_id, "etapa": etapa, "pid": filho.pid})
+    while filho.is_alive():
+        filho.join(SEGUNDOS_ENTRE_CONFERENCIAS)
+        if _parar.is_set() and filho.is_alive():
+            # o motor está saindo: a linha "rodando" vira falha quando ele voltar
+            log.warning("motor saindo com rodada em curso; o processo dela é encerrado",
+                        extra={"execucao_id": execucao_id, "pid": filho.pid})
+            filho.terminate()
+            filho.join(SEGUNDOS_ENTRE_CONFERENCIAS)
+            return filho.exitcode
+    if filho.exitcode != 0:
+        log.error("processo da rodada terminou sem concluir",
+                  extra={"execucao_id": execucao_id, "etapa": etapa, "codigo": filho.exitcode})
+        _falhar(execucao_id, MOTIVO_PROCESSO.format(codigo=filho.exitcode))
+    else:
+        # saiu bem e não gravou fim: a rede de segurança de sempre
+        _falhar(execucao_id, "A rodada terminou sem gravar o resultado. Veja o log do motor.",
+                so_se_em_curso=True)
+    return filho.exitcode
 
 
 def processar_pendentes() -> list[int]:
@@ -139,10 +205,19 @@ def recuperar_interrompidas() -> int:
     return len(orfas)
 
 
-def _falhar(execucao_id: int, motivo: str) -> None:
+def _falhar(execucao_id: int, motivo: str, so_se_em_curso: bool = False) -> None:
     with Sessao() as sessao:
         execucao = sessao.get(ExecucaoDB, execucao_id)
         if execucao is None or execucao.situacao in ("concluida", "falhou", "cancelada"):
+            return
+        if so_se_em_curso and execucao.situacao not in ("rodando", "cancelando"):
+            return
+        if execucao.situacao == "cancelando":
+            execucao.situacao = "cancelada"
+            execucao.passo = "Cancelada"
+            execucao.terminada_em = datetime.now(timezone.utc)
+            sessao.commit()
+            log.warning("rodada cancelada terminou fora do ponto seguro", extra={"execucao_id": execucao_id})
             return
         execucao.situacao = "falhou"
         execucao.erro = motivo

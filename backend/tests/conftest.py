@@ -24,6 +24,8 @@ os.environ.setdefault(
 os.environ.setdefault("CAT_MOTOR_SEGREDO", "segredo-do-canal-so-de-teste")
 # a fila roda na hora, chamada pelo teste (tests/integracao/cadastro.py: rodar_fila)
 os.environ.setdefault("CAT_FILA_AUTOMATICA", "false")
+# os testes trocam executores e leem o banco na mesma conexão: a rodada fica no processo
+os.environ.setdefault("CAT_RODADAS_EM_PROCESSO", "false")
 os.environ.setdefault("CAT_LOG_NIVEL", "WARNING")
 
 # O disco precisa ser isolado tanto quanto o banco. Sem isto, a execução
