@@ -5,6 +5,45 @@
 
 ---
 
+## 2026-09-16 — Revisão da etapa 7: o que se conferiu e o que se corrigiu
+
+**Como se conferiu.** Sete arquivos CAT 42 que a SEFAZ aceitou da IRMAOS BOA
+(2021 a 2024) medidos registro a registro contra o gerador, e a Ficha 3, os
+saldos e as 234 prévias do piloto do Amigão (execuções 48 a 50) lidos de volta.
+O gerador já fazia igual à BOA no que decide o arquivo: CRLF e Latin-1; 1050
+só de item movimentado no mês (nos sete arquivos, nenhum 1050 sem 1100); 0150
+com os fornecedores das NF-e e o próprio estabelecimento; todos os CFOPs de
+devolução que aparecem lá (1202, 1411, 5202, 5411, 6411) no conjunto de
+devoluções; na Ficha 3 do Amigão de SP, nenhuma quantidade com mais de 3 casas,
+nenhum nº de item acima de 999 e nenhuma linha repetida.
+
+**O que se corrigiu.**
+
+| Defeito | Onde pesava | Correção |
+|---|---|---|
+| A alíquota do confronto (enq. 1 e 3) era a do cadastro do **fim do período** | 23.065 itens do Amigão mudam de alíquota em 2021 (12% → 13,3% em fevereiro): a venda de janeiro confrontava com a de dezembro, e o VL_CONFR ia errado para o arquivo | razão usa a alíquota do 0200 do **mês da saída**; a mais recente só onde o mês não traz. Resumo conta `saidas_com_aliquota_do_mes` |
+| O 0200 do arquivo de janeiro saía com descrição e alíquota de dezembro | o manual pede a última ocorrência **do período**, que é o mês | 0200 do `itens_da_efd` do mês, campo a campo; a **unidade** fica a mais recente, que é a da ficha convertida (mudar de unidade no meio quebraria o saldo) |
+| A data do movimento era a **emissão** (DT_DOC) | 5,55% das entradas do Amigão entraram em mês diferente do emitido: custo médio deslocado e DATA do 1100 fora do mês | a movimentação usa a data de entrada/saída (DT_E_S); a emissão só quando a EFD não a informa. A conferência com o XML continua pela emissão |
+| O 0150 só olhava a EFD do mês | 127 das 234 prévias travavam: a nota escriturada em outro mês cita participante que só está no 0150 de outro mês | procura na EFD do mês e, sem ele, na mais recente do estabelecimento |
+| ICMS negativo com estoque positivo caía na trava "saldo negativo", com texto de ficha retirada | 813 saldos de fichas válidas do Amigão: devolução de compra sobre abertura sem ICMS (item 3.3.8) | trava própria, `valor_negativo`, com o que fazer certo |
+| Entrada sem ICMS suportado ia como `0,00` sem ninguém saber | 95.904 entradas de SP do Amigão (7%) | contada por arquivo e no resumo (`entradas_sem_icms`), com aviso no log e na tela. Não trava: zero pode ser verdade |
+| Falha no meio de um arquivo deixava `.corpo`/`.cabeca` na pasta | — | rascunhos apagados, com log |
+| O recorte por trava usava `LIKE`, em que `_` casa qualquer letra | — | código inteiro |
+| Pré-validação do cliente: dois arquivos com o mesmo nome misturavam as ocorrências | outra ferramenta pode chamar todo mês de `CAT42.txt` | o segundo ganha `(<CNPJ> <aaaa-mm>)` no nome |
+
+**Para valer no Amigão**, as etapas 3 a 7 rodam de novo: a data de entrada muda
+a movimentação, e a alíquota do mês muda o razão.
+
+**O que continua aberto.** O 1200 sai sem SER (a série é lida no C100 e não
+chega à movimentação); ECF_FAB, 0205 e o fato gerador sem documento (CHV 0,
+item 999); entre dois arquivos do cliente do mesmo mês, vale o primeiro lido, e
+não a substituição (COD_FIN 02); na Ficha 3 do Amigão entram entradas de uso e
+consumo (1407, 1556, 2556, 2557 — 91 linhas) e o 5929 (lançamento de cupom
+também registrado em ECF) não é tratado como duplicidade; a abertura sem ICMS
+(item 3.3.8) segue sendo a causa do complemento inflado e do ICMS negativo.
+
+---
+
 ## 2026-09-16 — Pré-validar o que o cliente já transmitiu
 
 **Decisão do Victor.** A pré-validação da etapa 7 vale **também para o arquivo

@@ -32,7 +32,7 @@ import os
 import shutil
 import zipfile
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
 import pyarrow as pa
@@ -210,6 +210,7 @@ def pre_validar(
     caminho_saldos = os.path.join(destino, ARQUIVO_SALDOS_DO_CLIENTE)
     linhas_de_arquivo: list[dict] = []
     vistos: dict[tuple[str, str], str] = {}
+    nomes: dict[str, tuple[str, str]] = {}
 
     escritor_oc = pq.ParquetWriter(caminho_ocorrencias, ESQUEMA_OCORRENCIAS)
     escritor_saldos = pq.ParquetWriter(caminho_saldos, ESQUEMA_SALDOS_DO_CLIENTE)
@@ -236,6 +237,7 @@ def pre_validar(
                                  extra={"arquivo": c.origem, "primeiro": vistos[(cnpj, competencia)]})
                         continue
                     vistos[(cnpj, competencia)] = c.origem
+                    c = _com_nome_unico(c, cnpj, competencia, nomes)
                     contado = _Contado(_com_a_primeira(primeira, bruto))
                     v = validar(contado)
             except (OSError, zipfile.BadZipFile, EOFError) as erro:
@@ -289,6 +291,25 @@ def pre_validar(
         "arquivos": resumo.arquivos, "com_erro": resumo.com_erro, "repetidos": resumo.repetidos,
         "de_outra_empresa": resumo.de_outra_empresa, "nao_sao_da_cat42": resumo.nao_sao_da_cat42})
     return resumo
+
+
+def _com_nome_unico(c: Candidato, cnpj: str, competencia: str, nomes: dict[str, tuple[str, str]]) -> Candidato:
+    """O nome é a chave das ocorrências na tela e na planilha.
+
+    A BOA nomeia pelo CNPJ e mês, mas outra ferramenta pode chamar todo mês de
+    `CAT42.txt` em pastas diferentes — e aí as ocorrências de janeiro e de
+    fevereiro se misturariam. O segundo nome igual ganha o estabelecimento e o
+    mês entre parênteses.
+    """
+    dono = (cnpj, competencia)
+    if nomes.setdefault(c.nome, dono) == dono:
+        return c
+    base, extensao = os.path.splitext(c.nome)
+    novo = f"{base} ({cnpj} {competencia}){extensao}"
+    nomes[novo] = dono
+    log.info("nome de arquivo repetido na pré-validação, desambiguado",
+             extra={"arquivo": c.origem, "nome": c.nome, "novo_nome": novo})
+    return replace(c, nome=novo)
 
 
 def _com_a_primeira(primeira: bytes, resto) -> Iterator[bytes]:

@@ -88,6 +88,16 @@ class DocumentoEscriturado:
     participante: str = ""
     operacao: Operacao = Operacao.SAIDA
     emitente: Emitente = Emitente.PROPRIA
+    # DT_E_S do C100. `data` é a emissão, que é o que a conferência com o XML
+    # compara; a Ficha 3 e o arquivo digital pedem a data da entrada ou da
+    # saída. No Amigão, 5,55% das entradas entraram em mês diferente do emitido
+    data_entrada_saida: date | None = None
+
+    @property
+    def data_da_operacao(self) -> date | None:
+        """A data que a ficha usa: a da entrada ou da saída, e a emissão quando
+        a EFD não a informa (a saída própria costuma vir sem DT_E_S)."""
+        return self.data_entrada_saida or self.data
 
     @property
     def situacao_rotulo(self) -> str:
@@ -159,6 +169,7 @@ def ler_c100(campos: list[str]) -> DocumentoEscriturado:
         participante=_texto(campos, 4),
         operacao=Operacao.ENTRADA if _texto(campos, 2) == "0" else Operacao.SAIDA,
         emitente=Emitente.PROPRIA if _texto(campos, 3) == "0" else Emitente.TERCEIROS,
+        data_entrada_saida=_data(_texto(campos, 11)),
     )
 
 

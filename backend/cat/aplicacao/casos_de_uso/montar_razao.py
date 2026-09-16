@@ -291,6 +291,9 @@ def _anotar_pendencias(diario: Diario, r) -> None:
     for n, texto in avisos:
         if n:
             diario.anotar("aviso", f"{milhar(n)} {texto}.")
+    if r.saidas_com_aliquota_do_mes:
+        diario.anotar("info", f"{milhar(r.saidas_com_aliquota_do_mes)} saídas confrontadas com a alíquota do "
+                              "cadastro do próprio mês, diferente da do fim do período.")
     c = r.conferencia
     if c.get("com_estoque"):
         fecham = c["batem"] + c["proximas"]

@@ -120,3 +120,21 @@ class TestCancelar:
         with pytest.raises(ApuracaoCancelada):
             pre_validar(fontes, str(destino), CNPJ[:8], deve_parar=lambda: True)
         assert not os.path.exists(destino / ARQUIVO_ARQUIVOS_DO_CLIENTE)
+
+
+class TestNomes:
+    def test_mesmo_nome_em_pastas_diferentes_nao_mistura_as_ocorrencias(self, tmp_path):
+        """Outra ferramenta pode chamar todo mês de CAT42.txt."""
+        lote = tmp_path / "lote"
+        for mes, saldo in ((1, (10, 20, 10, 20)), (2, (16, 40, 16, 40))):
+            pasta = lote / f"mes{mes}"
+            pasta.mkdir(parents=True)
+            (pasta / "CAT42.txt").write_bytes(conteudo(so_saldo(mes, *saldo)))
+        destino = tmp_path / "execucao"
+        destino.mkdir()
+        pre_validar([str(lote / "mes1" / "CAT42.txt"), str(lote / "mes2" / "CAT42.txt")], str(destino), CNPJ[:8])
+        nomes = {l["competencia"]: l["nome"] for l in arquivos_do_cliente(str(destino))["linhas"]}
+        assert nomes == {"2024-01": "CAT42.txt", "2024-02": f"CAT42 ({CNPJ} 2024-02).txt"}
+        # fevereiro abre com 16 e janeiro fechou com 10: o aviso é só de fevereiro
+        assert ocorrencias(str(destino), "CAT42.txt")["total"] == 0
+        assert ocorrencias(str(destino), nomes["2024-02"])["linhas"][0]["regra"] == "saldo_inicial_diferente_do_anterior"

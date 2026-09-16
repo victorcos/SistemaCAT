@@ -429,6 +429,16 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoArquivoDigital; r
         </section>
       )}
 
+      {(resumo.entradas_sem_icms ?? 0) > 0 && (
+        <section className="rounded-cartao border border-borda bg-superficie-vidro px-5 py-4">
+          <p className="m-0 text-[13px] leading-relaxed text-texto">
+            <strong className="font-mono">{numero(resumo.entradas_sem_icms ?? 0)}</strong> entradas vão com ICMS_TOT
+            zero. O arquivo passa assim, mas o ressarcimento fica menor se o imposto existia e não foi achado:
+            confira as pendências do ICMS suportado na etapa 4.
+          </p>
+        </section>
+      )}
+
       {(resumo.por_regra ?? []).length > 0 && (
         <Cartao className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-3">
@@ -605,6 +615,9 @@ function Arquivos({ execucaoId, total, rodape }: { execucaoId: number; total: nu
                     {numero(a.eletronicos + a.nao_eletronicos)}
                     {a.linhas_sem_documento > 0 && (
                       <span className="block text-[11px] text-atencao">{numero(a.linhas_sem_documento)} sem documento</span>
+                    )}
+                    {(a.entradas_sem_icms ?? 0) > 0 && (
+                      <span className="block text-[11px] text-texto-fraco">{numero(a.entradas_sem_icms ?? 0)} entradas sem ICMS</span>
                     )}
                   </span>
                   <span className="text-right font-mono text-xs">

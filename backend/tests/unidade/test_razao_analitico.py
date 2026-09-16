@@ -28,7 +28,7 @@ from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_ITENS,
     ARQUIVO_MOVIMENTOS,
 )
-from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO
+from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO, ARQUIVO_ITENS_DA_EFD
 from cat.infraestrutura.analitico.razao import (
     ARQUIVO_CONFERENCIA_INVENTARIO,
     ARQUIVO_FICHA3,
@@ -379,6 +379,48 @@ class TestPendencias:
             montar(fontes, str(destino), deve_parar=lambda: True)
         assert not (destino / ARQUIVO_FICHA3).exists()
         assert not (destino / ARQUIVO_FICHAS).exists()
+
+
+def gravar_itens_do_mes(fontes, linhas: list[dict]) -> None:
+    gravar(os.path.join(fontes.movimentacao, ARQUIVO_ITENS_DA_EFD), [
+        ("cnpj", pa.string()), ("competencia", pa.date32()), ("arquivo", pa.string()),
+        ("codigo", pa.string()), ("unidade", pa.string()), ("aliq_icms", pa.decimal128(9, 4)),
+    ], linhas)
+
+
+class TestAliquotaDoMes:
+    """O confronto usa a alíquota do 0200 do mês da saída, não a do fim do período."""
+
+    def test_a_venda_de_janeiro_confronta_com_a_aliquota_de_janeiro(self, fontes, tmp_path):
+        # o cadastro mais recente diz 18%; o de janeiro dizia 12%
+        gravar_itens_do_mes(fontes, [
+            {"cnpj": A, "competencia": date(2021, 1, 1), "arquivo": "efd_01.txt", "codigo": "X",
+             "unidade": "UN", "aliq_icms": d(12)},
+            {"cnpj": A, "competencia": date(2021, 2, 1), "arquivo": "efd_02.txt", "codigo": "X",
+             "unidade": "UN", "aliq_icms": d(18)},
+        ])
+        destino = tmp_path / "aliq_do_mes"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+        venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
+        # 20 x 12% = 2,40; suportado baixado 5,00 -> ressarcimento 2,60
+        assert venda["icms_efetivo"] == d("2.40")
+        assert venda["ressarcimento"] == d("2.6")
+        # a transferência e a venda saíram em janeiro com a alíquota de janeiro
+        assert r.saidas_com_aliquota_do_mes == 2
+        assert serializar(r)["saidas_com_aliquota_do_mes"] == 2
+
+    def test_mes_sem_aliquota_fica_com_a_mais_recente(self, fontes, tmp_path):
+        gravar_itens_do_mes(fontes, [
+            {"cnpj": A, "competencia": date(2021, 1, 1), "arquivo": "efd_01.txt", "codigo": "X",
+             "unidade": "UN", "aliq_icms": None},
+        ])
+        destino = tmp_path / "aliq_vazia"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+        venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
+        assert venda["icms_efetivo"] == d("3.60")
+        assert r.saidas_com_aliquota_do_mes == 0
 
 
 class TestATela:

@@ -256,8 +256,14 @@ linhas, quantidade, suportado baixado, confronto, ressarcimento e complemento),
 `por_competencia`, `saidas_por_origem` (`efd`, `relatorio`), `pendencias` e
 `relatorios` (`arquivos`, `so_de_entradas`, `recusados`, `linhas`), `retiradas`
 (`fichas`, `linhas`, `ressarcimento`, `complemento` das fichas com estoque
-negativo, fora do total), `conversao` e `conferencia_inventario`. Enquanto
-roda, `andamento` com `linhas`, `total` e `fichas`.
+negativo, fora do total), `conversao`, `saidas_com_aliquota_do_mes` (saídas
+confrontadas com a alíquota do 0200 do próprio mês, diferente da do fim do
+período) e `conferencia_inventario`. Enquanto roda, `andamento` com `linhas`,
+`total` e `fichas`.
+
+A alíquota do confronto (enquadramentos 1 e 3) é a do 0200 da EFD do **mês da
+saída**; só quando o mês não traz alíquota vale a do cadastro mais recente. A
+unidade é sempre a do cadastro mais recente.
 
 Cada linha da ficha: `numero`, `data`, `especie` (`entrada`/`saida`),
 `devolucao`, `cfop`, `documento`, `origem`, `enquadramento` (nulo em entrada,
@@ -330,17 +336,26 @@ pré-validação.
 
 O resumo (`versao: 1`) traz `competencias` (de SP), `competencias_fora_de_sp`,
 `arquivos`, `para_envio`, `previas`, `linhas`, `bytes`, `por_registro`,
-`linhas_sem_documento`, `erros`, `avisos`, `itens_recompostos`,
+`linhas_sem_documento`, `entradas_sem_icms` (1100/1200 de entrada escritos
+com ICMS_TOT zero — não trava, avisa), `erros`, `avisos`, `itens_recompostos`,
 `itens_que_fecham`, `ressarcimento_para_envio`, `complemento_para_envio`,
 `venda_a_consumidor`, `por_trava` e `por_regra` (código, rótulo, severidade, o
 que fazer, arquivos, ocorrências).
 
 Cada arquivo traz `destino`, `apta`, `motivos` (da etapa 6), `travas` (desta),
-contagem por registro, `linhas_sem_documento`, `erros`, `avisos`, `bytes` e
+contagem por registro, `linhas_sem_documento`, `entradas_sem_icms`,
+`saldos_negativos`, `valores_negativos`, `erros`, `avisos`, `bytes` e
 `sha256`. As travas: `nao_apta`, `sem_documento`, `saida_indefinida`,
-`devolucao_sem_venda`, `confronto_pendente`, `saldo_negativo`,
+`devolucao_sem_venda`, `confronto_pendente`, `saldo_negativo` (quantidade
+negativa no 1050), `valor_negativo` (quantidade positiva e ICMS negativo),
 `item_sem_cadastro`, `participante_sem_cadastro`, `sem_abertura` e
-`pre_validacao`.
+`pre_validacao`. O recorte `so` por trava compara o código inteiro.
+
+De onde vem o cadastro: o 0200 é o da EFD do mês do arquivo (descrição, código
+de barras, NCM, alíquota, CEST), com o mais recente onde o mês não diz, e a
+unidade sempre a do mais recente, que é a da ficha. O 0150 é o da EFD do mês e,
+quando o participante não está lá, o da EFD mais recente do estabelecimento
+que o tenha.
 
 ## 12. Pré-validação dos arquivos do cliente
 
@@ -361,7 +376,10 @@ de etapas concluídas.
 Lê do lote o tipo `cat42_arquivo_digital` (o TXT solto, reconhecido pelo
 `0000|mmaaaa|` sem `|` no começo) e os zips, com um nível de zip aninhado.
 Arquivo de outra raiz de CNPJ fica de fora e contado; o mesmo estabelecimento e
-mês lido duas vezes fica como `repetido`, sem ler de novo.
+mês lido duas vezes fica como `repetido`, sem ler de novo. Dois arquivos
+diferentes com o mesmo nome (outra ferramenta pode chamar todo mês de
+`CAT42.txt`) não se misturam: o segundo ganha `(<CNPJ> <aaaa-mm>)` no nome,
+que é a chave das ocorrências.
 
 O resumo (`versao: 1`) traz `fontes`, `arquivos`, `sem_ocorrencia`, `com_erro`,
 `com_aviso`, `repetidos`, `de_outra_empresa`, `nao_sao_da_cat42`, `ilegiveis`,

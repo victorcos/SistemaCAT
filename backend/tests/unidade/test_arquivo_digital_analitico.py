@@ -32,6 +32,7 @@ from cat.infraestrutura.analitico.arquivo_digital import (
     serializar,
 )
 from cat.infraestrutura.analitico.movimentacao import ARQUIVO_ITENS
+from cat.infraestrutura.analitico.movimentos import ARQUIVO_ITENS_DA_EFD
 from cat.infraestrutura.analitico.razao import ARQUIVO_FICHA3, ESQUEMA_FICHA3
 from cat.infraestrutura.analitico.suportado import ApuracaoCancelada
 
@@ -233,3 +234,96 @@ class TestDecisoes:
             gerar(fontes, str(destino), deve_parar=lambda: True)
         assert not os.path.exists(destino / PASTA_ENVIO)
         assert not os.path.exists(destino / ARQUIVO_ARQUIVOS)
+
+
+def acrescentar(caminho, linhas: list[dict]) -> None:
+    tabela = pq.read_table(caminho)
+    pq.write_table(pa.Table.from_pylist(tabela.to_pylist() + linhas, schema=tabela.schema), caminho)
+
+
+class TestRevisao:
+    """O que a revisão da etapa 7 corrigiu, com o piloto do Amigão como origem."""
+
+    def test_o_0200_leva_o_cadastro_do_mes_com_a_unidade_da_ficha(self, fontes, tmp_path):
+        # em janeiro o item tinha outra descrição, 12% e estava cadastrado em caixa
+        gravar(os.path.join(fontes.movimentacao, ARQUIVO_ITENS_DA_EFD), pa.schema([
+            ("cnpj", pa.string()), ("competencia", pa.date32()), ("arquivo", pa.string()), ("codigo", pa.string()),
+            ("descricao", pa.string()), ("codigo_barras", pa.string()), ("unidade", pa.string()),
+            ("ncm", pa.string()), ("aliq_icms", pa.decimal128(9, 4)), ("cest", pa.string())]), [
+            {"cnpj": SP, "competencia": date(2024, 1, 1), "arquivo": "efd_01.txt", "codigo": "1002140",
+             "descricao": "IOGURTE 170G ANTIGO", "codigo_barras": "", "unidade": "CX", "ncm": "04032000",
+             "aliq_icms": D(12), "cest": "1702200"},
+        ])
+        destino = tmp_path / "do_mes"
+        destino.mkdir()
+        gerar(fontes, str(destino))
+        janeiro = registros(destino / PASTA_ENVIO / f"CAT5_SP_{SP}_1_2024.txt")
+        # descrição e alíquota do mês; o código de barras vazio no mês vem do mais
+        # recente; a unidade é a da ficha, não a do mês
+        assert "0200|1002140|IOGURTE 170G ANTIGO|07891024183007|UN1|04032000|12,00|1702200" in janeiro
+        # fevereiro não tem 0200 do mês: fica com o mais recente
+        fevereiro = registros(destino / PASTA_PREVIAS / f"CAT5_SP_{SP}_2_2024_PREVIA.txt")
+        assert "0200|1002140|IOGURTE 170G|07891024183007|UN1|04032000|18,00|1702200" in fevereiro
+
+    def test_participante_cadastrado_so_em_outro_mes(self, fontes, tmp_path):
+        # a EFD de janeiro perdeu o F1; a de fevereiro o tem
+        janeiro = fontes.efds[0][0]
+        conteudo = open(janeiro, "rb").read().replace(b"|0150|F1|", b"|0150|F9|")
+        open(janeiro, "wb").write(conteudo)
+        fevereiro = os.path.join(os.path.dirname(janeiro), "efd_sp_2024_02.txt")
+        open(fevereiro, "wb").write(
+            (f"|0000|017|0|01022024|29022024|LOJA DE TESTE|{SP}||SP|{IE_SP}|3552205||A|1|\r\n"
+             f"|0150|F1|FORNECEDOR DE IOGURTE|1058|{FORNECEDOR}|||3506300||RUA|1||CENTRO|\r\n"
+             "|0990|3|\r\n").encode("latin-1"))
+        fontes.efds.append((fevereiro, SP, date(2024, 2, 1)))
+        destino = tmp_path / "outro_mes"
+        destino.mkdir()
+        r = gerar(fontes, str(destino))
+        assert not any(t["codigo"] == "participante_sem_cadastro" for t in serializar(r)["por_trava"])
+        linhas = registros(destino / PASTA_ENVIO / f"CAT5_SP_{SP}_1_2024.txt")
+        assert [l.split("|")[1] for l in linhas if l.startswith("0150")] == ["F1", SP]
+
+    def test_icms_negativo_com_estoque_positivo_tem_trava_propria(self, fontes, tmp_path):
+        acrescentar(os.path.join(fontes.apuracao, ARQUIVO_SALDOS), [
+            {"cnpj": SP, "competencia": "2024-01", "codigo": "999", "qtd_ini": D(5), "icms_tot_ini": D(0),
+             "qtd_fim": D(3), "icms_tot_fim": D("-2.00"), "retirada": False}])
+        destino = tmp_path / "valor_negativo"
+        destino.mkdir()
+        r = gerar(fontes, str(destino))
+        travas = {t["codigo"] for t in serializar(r)["por_trava"]}
+        assert "valor_negativo" in travas and "saldo_negativo" not in travas
+        janeiro = arquivos(str(destino), so="valor_negativo")["linhas"]
+        assert [(a["competencia"], a["valores_negativos"], a["saldos_negativos"]) for a in janeiro] == [
+            ("2024-01", 1, 0)]
+
+    def test_entrada_com_icms_zero_e_contada(self, fontes, tmp_path):
+        caminho = os.path.join(fontes.razao, ARQUIVO_FICHA3)
+        acrescentar(caminho, [linha_da_ficha(
+            cnpj=SP, codigo="1002140", numero=2, data=date(2024, 1, 4), especie="entrada", cfop="2152",
+            quantidade=D(1), icms_suportado=D(0), chave=chave(FORNECEDOR, "55", 3), numero_item=1,
+            modelo="55", participante="F1", numero_documento="3")])
+        destino = tmp_path / "sem_icms"
+        destino.mkdir()
+        r = gerar(fontes, str(destino))
+        assert serializar(r)["entradas_sem_icms"] == 1
+        # a entrada com R$ 30 e a venda não contam
+        assert arquivos(str(destino), busca="2024-01")["linhas"][0]["entradas_sem_icms"] == 1
+
+    def test_recorte_por_trava_e_pelo_codigo_inteiro(self, gerado):
+        destino, _ = gerado
+        # "sem_documento" existe; um código parecido, com "_" coringa no LIKE, não
+        assert arquivos(str(destino), so="sem_documento")["total"] == 1
+        assert arquivos(str(destino), so="item_sem_cadastro")["total"] == 0
+
+    def test_falha_no_meio_nao_deixa_rascunho(self, fontes, tmp_path, monkeypatch):
+        import cat.infraestrutura.analitico.arquivo_digital as modulo
+
+        def quebra(_):
+            raise RuntimeError("disco cheio")
+
+        monkeypatch.setattr(modulo, "validar", quebra)
+        destino = tmp_path / "quebrada"
+        destino.mkdir()
+        with pytest.raises(RuntimeError):
+            gerar(fontes, str(destino))
+        assert not [n for n in os.listdir(destino) if n.startswith(".CAT5_")]

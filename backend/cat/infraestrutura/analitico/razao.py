@@ -92,7 +92,7 @@ from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_ITENS,
     ARQUIVO_MOVIMENTOS,
 )
-from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO
+from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO, ARQUIVO_ITENS_DA_EFD
 from cat.infraestrutura.analitico.suportado import (
     ARQUIVO_SUPORTADO,
     ApuracaoCancelada,
@@ -371,6 +371,9 @@ class ResumoDaMontagem:
     linhas_convertidas: int = 0
     linhas_unidade_sem_fator: int = 0
     abertura_sem_fator: int = 0
+    # saídas confrontadas com a alíquota do 0200 do próprio mês, diferente da
+    # do fim do período — antes da revisão da etapa 7, usava-se a do fim
+    saidas_com_aliquota_do_mes: int = 0
     conferencia: dict = field(default_factory=dict)
 
 
@@ -414,6 +417,9 @@ def montar(
         resumo.relatorio_sem_estabelecimento = info["sem_estabelecimento"]
         resumo.relatorio_trocado_pela_efd = info["trocado_pela_efd"]
         resumo.abertura_sem_fator = info["abertura_sem_fator"]
+        resumo.saidas_com_aliquota_do_mes = con.execute(
+            "SELECT count(*) FROM lancamentos WHERE especie = 'saida' AND NOT devolucao "
+            "AND aliquota_do_mes_diferente").fetchone()[0]
         aberturas = {(c, k): q for c, k, q in con.execute(
             "SELECT cnpj, codigo, quantidade FROM abertura").fetchall()}
         total = con.execute("SELECT count(*) FROM lancamentos").fetchone()[0]
@@ -664,6 +670,19 @@ def _preparar(con, fontes: Fontes) -> dict:
             FROM read_parquet('{_escapar(itens)}')""")
     else:
         con.execute("CREATE OR REPLACE TABLE unid (cnpj VARCHAR, codigo VARCHAR, unidade VARCHAR, aliq_icms DECIMAL(9, 4))")
+    # A alíquota do confronto é a do mês da saída, não a do fim do período: no
+    # Amigão, 23 mil itens mudaram de alíquota dentro de 2021 (12% para 13,3% em
+    # fevereiro). A unidade continua a mais recente — é nela que a ficha inteira
+    # é contada, e mudar de unidade no meio da ficha quebraria o saldo.
+    itens_do_mes = os.path.join(fontes.movimentacao, ARQUIVO_ITENS_DA_EFD)
+    if os.path.isfile(itens_do_mes):
+        con.execute(f"""CREATE OR REPLACE TABLE aliq_mes AS
+            SELECT cnpj, codigo, competencia, aliq_icms
+            FROM read_parquet('{_escapar(itens_do_mes)}')
+            WHERE aliq_icms IS NOT NULL
+            QUALIFY row_number() OVER (PARTITION BY cnpj, codigo, competencia ORDER BY arquivo DESC) = 1""")
+    else:
+        con.execute("CREATE OR REPLACE TABLE aliq_mes (cnpj VARCHAR, codigo VARCHAR, competencia DATE, aliq_icms DECIMAL(9, 4))")
     if os.path.isfile(conversoes):
         con.execute(f"""CREATE OR REPLACE TABLE conv AS
             SELECT cnpj, codigo, upper(trim(unidade)) AS unidade, fator
@@ -680,7 +699,9 @@ def _preparar(con, fontes: Fontes) -> dict:
 
     con.execute(f"""
         CREATE OR REPLACE TABLE lancamentos AS
-        SELECT l.*, u.aliq_icms AS aliquota, u.unidade AS unidade_estoque,
+        SELECT l.*, coalesce(am.aliq_icms, u.aliq_icms) AS aliquota, u.unidade AS unidade_estoque,
+               (am.aliq_icms IS NOT NULL AND u.aliq_icms IS NOT NULL
+                AND am.aliq_icms <> u.aliq_icms) AS aliquota_do_mes_diferente,
                {_FATOR.format(t="l")} AS fator, {_SEM_FATOR.format(t="l")} AS sem_fator
         FROM (
             SELECT s.cnpj, s.codigo, s.data, replace(s.cfop, '.', '') AS cfop, s.cst_icms, s.modelo,
@@ -706,6 +727,8 @@ def _preparar(con, fontes: Fontes) -> dict:
             FROM {saidas} s
         ) l
         LEFT JOIN unid u ON u.cnpj = l.cnpj AND u.codigo = l.codigo
+        LEFT JOIN aliq_mes am ON am.cnpj = l.cnpj AND am.codigo = l.codigo
+                             AND am.competencia = date_trunc('month', l.data)::DATE
         LEFT JOIN conv cv ON cv.cnpj = l.cnpj AND cv.codigo = l.codigo AND cv.unidade = upper(trim(l.unidade))
         WHERE l.codigo IN (SELECT codigo FROM codigos)
           AND l.cnpj IN (SELECT cnpj FROM estabs)
@@ -1130,5 +1153,6 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
             "linhas_convertidas": resumo.linhas_convertidas,
             "linhas_sem_fator": resumo.linhas_unidade_sem_fator,
         },
+        "saidas_com_aliquota_do_mes": resumo.saidas_com_aliquota_do_mes,
         "conferencia_inventario": resumo.conferencia,
     }

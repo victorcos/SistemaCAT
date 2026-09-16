@@ -171,6 +171,21 @@ class TestExtracao:
             ("537861", date(2021, 4, 30), Decimal("50.00000"), Decimal("100.00")),
         ]
 
+    def test_a_data_do_movimento_e_a_da_entrada_ou_saida_nao_a_emissao(self, tmp_path):
+        """A Ficha 3 e o DATA do 1100 pedem a data da operação. A nota emitida em
+        abril e escriturada em maio entra em maio; a saída própria sem DT_E_S
+        fica com a emissão."""
+        emitida_antes = C100_ENTRADA.replace("|01052021|01052021|", "|28042021|03052021|")
+        saida_sem_dt_e_s = (C100_SAIDA.replace("|02052021|02052021|", "|02052021||")
+                            .replace("|C100|1|0|C001|55|00|001|44624|", "|C100|1|0|C001|55|00|001|44625|"))
+        efd = escrever(tmp_path, "efd.txt", [CABECALHO, ITEM_A_V2, emitida_antes, C170_1,
+                                             saida_sem_dt_e_s, C170_1.replace("|1403|", "|5405|")])
+        destino = str(tmp_path / "s")
+        extrair_movimentos([efd], destino)
+        linhas = _linhas(f"{destino}/_movimentos_brutos.parquet",
+                         "SELECT operacao, data FROM r ORDER BY operacao")
+        assert linhas == [("entrada", date(2021, 5, 3)), ("saida", date(2021, 5, 2))]
+
     def test_item_antes_do_documento_e_orfao_e_fica_no_log(self, tmp_path):
         quebrado = escrever(tmp_path, "quebrado.txt", [CABECALHO, C170_1, C100_ENTRADA, C170_2])
         progresso = extrair_movimentos([quebrado], str(tmp_path / "s"))

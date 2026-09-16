@@ -202,7 +202,9 @@ class _Contexto:
         return {
             **self.base,
             "chave": d.chave, "modelo": d.modelo, "situacao": d.situacao,
-            "numero_documento": d.numero, "data": d.data,
+            # a data da entrada ou da saída, não a emissão: é a que posiciona o
+            # movimento na Ficha 3 e vai no DATA do 1100
+            "numero_documento": d.numero, "data": d.data_da_operacao,
             "operacao": d.operacao.value, "emitente": d.emitente.value,
             "participante": d.participante,
         }

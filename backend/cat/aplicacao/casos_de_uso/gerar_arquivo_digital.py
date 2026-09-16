@@ -233,6 +233,10 @@ def _anotar(diario: Diario, r) -> None:
     if r.linhas_sem_documento:
         diario.anotar("aviso", f"{milhar(r.linhas_sem_documento)} linhas da Ficha 3 sem documento para o "
                                "arquivo — a venda de PDV do relatório não tem chave nem nº do item.")
+    if r.entradas_sem_icms:
+        diario.anotar("aviso", f"{milhar(r.entradas_sem_icms)} entradas escritas com ICMS_TOT zero: o arquivo passa, "
+                               "mas o ressarcimento fica menor se o imposto existia. Conferir as pendências "
+                               "da etapa 4.")
     for t in serializar(r)["por_trava"]:
         diario.anotar("aviso", f"{milhar(t['arquivos'])} arquivos com «{t['rotulo'].lower()}».")
     if r.itens_recompostos:

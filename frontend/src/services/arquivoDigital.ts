@@ -35,6 +35,10 @@ export interface ArquivoGerado {
   eletronicos: number;
   nao_eletronicos: number;
   linhas_sem_documento: number;
+  /** entradas escritas com ICMS_TOT zero: o arquivo passa, o ressarcimento pode sair menor */
+  entradas_sem_icms?: number;
+  saldos_negativos?: number;
+  valores_negativos?: number;
   erros: number;
   avisos: number;
   itens_recompostos: number;
@@ -67,6 +71,7 @@ export interface ResumoDoArquivoDigital {
   bytes?: number;
   por_registro?: Record<string, number>;
   linhas_sem_documento?: number;
+  entradas_sem_icms?: number;
   erros?: number;
   avisos?: number;
   itens_recompostos?: number;

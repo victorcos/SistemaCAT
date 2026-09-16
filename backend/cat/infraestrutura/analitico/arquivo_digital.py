@@ -10,7 +10,7 @@ decidir, arquivo a arquivo, se ele vai para o envio ou sai como prévia.
 |---|---|
 | 0000 | o 0000 da EFD do estabelecimento no mês: nome, IE, município |
 | 0150 | o 0150 da mesma EFD, só os participantes citados, mais o próprio estabelecimento |
-| 0200 | o cadastro de itens da etapa 3 (`itens.parquet`, a última ocorrência de cada código) |
+| 0200 | o 0200 da EFD do mês (`itens_da_efd.parquet`); a unidade é a do cadastro mais recente (`itens.parquet`), que é a da ficha |
 | 1050 | os saldos da etapa 6 (`saldos.parquet`), campo a campo |
 | 1100 | a linha da Ficha 3 (etapa 5) com chave de 44 dígitos e nº do item |
 | 1200 | a linha da Ficha 3 com modelo não eletrônico, número e nº do item |
@@ -71,6 +71,7 @@ from cat.dominio.sped.participante import ParticipanteDaEfd, ler_participante
 from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO, ARQUIVO_SALDOS
 from cat.infraestrutura.analitico.confronto import _abrir, _escapar, _limpar
 from cat.infraestrutura.analitico.movimentacao import ARQUIVO_ITENS
+from cat.infraestrutura.analitico.movimentos import ARQUIVO_ITENS_DA_EFD
 from cat.infraestrutura.analitico.razao import ARQUIVO_FICHA3
 from cat.infraestrutura.analitico.suportado import ApuracaoCancelada, _leitura
 from cat.log import obter_log
@@ -108,10 +109,12 @@ ESQUEMA_ARQUIVOS = pa.schema([
     ("eletronicos", pa.int64()),
     ("nao_eletronicos", pa.int64()),
     ("linhas_sem_documento", pa.int64()),
+    ("entradas_sem_icms", pa.int64()),         # 1100/1200 de entrada com ICMS_TOT 0,00
     ("saidas_indefinidas", pa.int64()),
     ("devolucoes_sem_venda", pa.int64()),
     ("confronto_pendente", pa.int64()),
-    ("saldos_negativos", pa.int32()),
+    ("saldos_negativos", pa.int32()),          # quantidade negativa
+    ("valores_negativos", pa.int32()),         # quantidade positiva, ICMS negativo
     ("itens_sem_cadastro", pa.int32()),
     ("participantes_sem_cadastro", pa.int32()),
     ("erros", pa.int64()),
@@ -171,6 +174,9 @@ class ResumoDoArquivoDigital:
     bytes: int = 0
     por_registro: dict = field(default_factory=dict)
     linhas_sem_documento: int = 0
+    # entrada escrita com ICMS_TOT zero: o arquivo passa, mas o ressarcimento sai
+    # menor se o imposto existia e a etapa 4 não o achou
+    entradas_sem_icms: int = 0
     erros: int = 0
     avisos: int = 0
     itens_recompostos: int = 0
@@ -192,23 +198,34 @@ class CadastroDoMes:
     ie: str = ""
     cod_mun: str = ""
     participantes: dict[str, ParticipanteDaEfd] = field(default_factory=dict)
+    # o 0150 de todas as EFD do estabelecimento, a mais recente vencendo. A nota
+    # escriturada fora do mês cita participante que só está no 0150 de outro
+    # mês: no piloto do Amigão, 127 arquivos travavam por isso
+    de_outros_meses: dict[str, ParticipanteDaEfd] = field(default_factory=dict)
+
+    def participante(self, codigo: str) -> ParticipanteDaEfd | None:
+        return self.participantes.get(codigo) or self.de_outros_meses.get(codigo)
 
 
 def ler_cadastros(efds: list[tuple[str, str, date]], alvo: set[tuple[str, str]],
                   resumo: ResumoDoArquivoDigital, deve_parar: DeveParar | None = None
                   ) -> dict[tuple[str, str], CadastroDoMes]:
-    """O 0000 e o 0150 de cada EFD que interessa, lendo só o bloco 0.
+    """O 0000 e o 0150 das EFD dos estabelecimentos que geram arquivo, lendo só o bloco 0.
 
     O bloco 0 fica no começo do arquivo e termina no 0990: não há por que
-    atravessar os GB do bloco C para achar o nome da loja.
+    atravessar os GB do bloco C para achar o nome da loja. Lê-se o de todos os
+    meses do estabelecimento, não só dos que geram arquivo, para achar o
+    participante que o mês do arquivo não cadastrou.
     """
     cadastros: dict[tuple[str, str], CadastroDoMes] = {}
-    for caminho, cnpj, competencia in efds:
-        chave = (cnpj, competencia.strftime("%Y-%m"))
-        if chave not in alvo:
+    do_estabelecimento: dict[str, dict[str, ParticipanteDaEfd]] = {}
+    cnpjs = {cnpj for cnpj, _ in alvo}
+    for caminho, cnpj, competencia in sorted(efds, key=lambda e: (e[2], e[0])):
+        if cnpj not in cnpjs:
             continue
+        chave = (cnpj, competencia.strftime("%Y-%m"))
         _conferir(deve_parar)
-        cad = cadastros.setdefault(chave, CadastroDoMes())
+        cad = cadastros.setdefault(chave, CadastroDoMes()) if chave in alvo else CadastroDoMes()
         try:
             with open(caminho, "rb") as f:
                 for bruto in f:
@@ -222,10 +239,13 @@ def ler_cadastros(efds: list[tuple[str, str, date]], alvo: set[tuple[str, str]],
                     elif bruto.startswith(b"|0990|") or bruto[:2] in (b"|B", b"|C", b"|D", b"|E", b"|H"):
                         break
             resumo.efds_lidas += 1
+            do_estabelecimento.setdefault(cnpj, {}).update(cad.participantes)
         except (OSError, ArquivoNaoReconhecido) as erro:
             resumo.efds_ilegiveis += 1
             log.warning("EFD ilegível para o cadastro do arquivo digital",
                         extra={"arquivo": caminho, "cnpj": cnpj, "motivo": str(erro)})
+    for (cnpj, _), cad in cadastros.items():
+        cad.de_outros_meses = do_estabelecimento.get(cnpj, {})
     return cadastros
 
 
@@ -243,6 +263,7 @@ def gerar(
     saldos = os.path.join(fontes.apuracao, ARQUIVO_SALDOS)
     ficha3 = os.path.join(fontes.razao, ARQUIVO_FICHA3)
     itens = os.path.join(fontes.movimentacao, ARQUIVO_ITENS)
+    itens_do_mes = os.path.join(fontes.movimentacao, ARQUIVO_ITENS_DA_EFD)
     for obrigatorio in (apuracao, saldos, ficha3):
         if not os.path.isfile(obrigatorio):
             raise FileNotFoundError(f"{os.path.basename(obrigatorio)} não está em {os.path.dirname(obrigatorio)}.")
@@ -257,7 +278,7 @@ def gerar(
     escritor = pq.ParquetWriter(caminho_arquivos, ESQUEMA_ARQUIVOS)
     escritor_oc = pq.ParquetWriter(caminho_ocorrencias, ESQUEMA_OCORRENCIAS)
     try:
-        alvo = _preparar(con, apuracao, saldos, ficha3, itens, resumo)
+        alvo = _preparar(con, apuracao, saldos, ficha3, itens, itens_do_mes, resumo)
         cadastros = ler_cadastros(fontes.efds, {(c, m) for c, m, *_ in alvo}, resumo, deve_parar)
         andamento = Andamento(total=len(alvo))
         for cnpj, competencia, apta, motivos, ressarc, compl in alvo:
@@ -294,7 +315,7 @@ def gerar(
     return resumo
 
 
-def _preparar(con, apuracao: str, saldos: str, ficha3: str, itens: str,
+def _preparar(con, apuracao: str, saldos: str, ficha3: str, itens: str, itens_do_mes: str,
               resumo: ResumoDoArquivoDigital) -> list[tuple]:
     """Tabelas de trabalho só com as competências de SP, e a lista delas."""
     con.execute(f"""
@@ -333,6 +354,23 @@ def _preparar(con, apuracao: str, saldos: str, ficha3: str, itens: str,
     else:
         con.execute("CREATE OR REPLACE TABLE cadastro (cnpj VARCHAR, codigo VARCHAR, descricao VARCHAR, "
                     "codigo_barras VARCHAR, unidade VARCHAR, ncm VARCHAR, aliq_icms DECIMAL(9, 4), cest VARCHAR)")
+    # O manual pede no 0200 a "última ocorrência do período" — o período do
+    # arquivo é o mês. O cadastro mais recente punha a descrição e a alíquota de
+    # dezembro no arquivo de janeiro (no Amigão, 23 mil itens mudam de alíquota
+    # em 2021). A unidade fica fora daqui de propósito: ver `_itens`.
+    if os.path.isfile(itens_do_mes):
+        con.execute(f"""
+            CREATE OR REPLACE TABLE cadastro_do_mes AS
+            SELECT cnpj, strftime(competencia, '%Y-%m') AS competencia, codigo,
+                   nullif(trim(descricao), '') AS descricao, nullif(trim(codigo_barras), '') AS codigo_barras,
+                   nullif(trim(ncm), '') AS ncm, aliq_icms, nullif(trim(cest), '') AS cest
+            FROM read_parquet('{_escapar(itens_do_mes)}')
+            WHERE (cnpj, strftime(competencia, '%Y-%m')) IN (SELECT cnpj, competencia FROM alvo)
+            QUALIFY row_number() OVER (PARTITION BY cnpj, competencia, codigo ORDER BY arquivo DESC) = 1
+        """)
+    else:
+        con.execute("CREATE OR REPLACE TABLE cadastro_do_mes (cnpj VARCHAR, competencia VARCHAR, codigo VARCHAR, "
+                    "descricao VARCHAR, codigo_barras VARCHAR, ncm VARCHAR, aliq_icms DECIMAL(9, 4), cest VARCHAR)")
     alvo = con.execute("SELECT * FROM alvo ORDER BY cnpj, competencia").fetchall()
     resumo.competencias = len(alvo)
     return alvo
@@ -347,13 +385,34 @@ class _Contagem:
     devolucoes_sem_venda: int = 0
     confronto_pendente: int = 0
     saldos_negativos: int = 0
+    valores_negativos: int = 0
+    entradas_sem_icms: int = 0
     itens_sem_cadastro: int = 0
     participantes_sem_cadastro: int = 0
 
 
-def _um_arquivo(con, destino: str, cnpj: str, competencia: str, apta: bool, motivos: str,
-                ressarcimento, complemento, cadastro: CadastroDoMes | None,
-                venda: VendaAConsumidor, resumo: ResumoDoArquivoDigital) -> tuple[dict, list[dict]]:
+_RASCUNHOS = (".corpo", ".corpo2", ".cabeca")
+
+
+def _um_arquivo(con, destino: str, cnpj: str, competencia: str, *resto) -> tuple[dict, list[dict]]:
+    """Escreve e pré-valida um arquivo. Se algo quebra no meio, os rascunhos não
+    ficam na pasta da execução para alguém achar que são arquivo."""
+    ano, mes = int(competencia[:4]), int(competencia[5:7])
+    rascunho = os.path.join(destino, f".{nome_do_arquivo(cnpj, ano, mes)}")
+    try:
+        return _escrever(con, destino, cnpj, competencia, *resto)
+    except BaseException:
+        for sufixo in _RASCUNHOS:
+            if os.path.isfile(rascunho + sufixo):
+                os.remove(rascunho + sufixo)
+        log.error("arquivo digital interrompido no meio; rascunhos apagados",
+                  extra={"cnpj": cnpj, "competencia": competencia})
+        raise
+
+
+def _escrever(con, destino: str, cnpj: str, competencia: str, apta: bool, motivos: str,
+              ressarcimento, complemento, cadastro: CadastroDoMes | None,
+              venda: VendaAConsumidor, resumo: ResumoDoArquivoDigital) -> tuple[dict, list[dict]]:
     ano, mes = int(competencia[:4]), int(competencia[5:7])
     nome_final = nome_do_arquivo(cnpj, ano, mes)
     corpo = os.path.join(destino, f".{nome_final}.corpo")
@@ -390,14 +449,17 @@ def _um_arquivo(con, destino: str, cnpj: str, competencia: str, apta: bool, moti
     for codigo, qi, vi, qf, vf in con.execute(
             "SELECT codigo, qtd_ini, icms_tot_ini, qtd_fim, icms_tot_fim FROM saldos "
             "WHERE cnpj = ? AND competencia = ? ORDER BY codigo", [cnpj, competencia]).fetchall():
-        if min(qi, vi, qf, vf) < 0:
+        if min(qi, qf) < 0:
             n.saldos_negativos += 1
+            continue
+        if min(vi, vf) < 0:
+            n.valores_negativos += 1
             continue
         saldos.append(Saldo(codigo, qi, vi, qf, vf))
         citados_itens.add(codigo)
 
     participantes = _participantes(cnpj, cad, citados_participantes, n)
-    itens = _itens(con, cnpj, citados_itens, n)
+    itens = _itens(con, cnpj, competencia, citados_itens, n)
     abertura = Abertura(ano, mes, cad.nome, cnpj, cad.ie, cad.cod_mun)
     with open(cabeca, "wb") as saida:
         for registro in [abertura, *participantes, *itens, *saldos]:
@@ -434,9 +496,11 @@ def _um_arquivo(con, destino: str, cnpj: str, competencia: str, apta: bool, moti
         "linhas": linhas_escritas, "bytes": tamanho, "sha256": sha,
         "participantes": len(participantes), "itens": len(itens), "saldos": len(saldos),
         "eletronicos": n.eletronicos, "nao_eletronicos": n.nao_eletronicos,
-        "linhas_sem_documento": n.sem_documento, "saidas_indefinidas": n.indefinidas,
+        "linhas_sem_documento": n.sem_documento, "entradas_sem_icms": n.entradas_sem_icms,
+        "saidas_indefinidas": n.indefinidas,
         "devolucoes_sem_venda": n.devolucoes_sem_venda, "confronto_pendente": n.confronto_pendente,
-        "saldos_negativos": n.saldos_negativos, "itens_sem_cadastro": n.itens_sem_cadastro,
+        "saldos_negativos": n.saldos_negativos, "valores_negativos": n.valores_negativos,
+        "itens_sem_cadastro": n.itens_sem_cadastro,
         "participantes_sem_cadastro": n.participantes_sem_cadastro,
         "erros": v.erros, "avisos": v.avisos,
         "itens_recompostos": v.itens_recompostos, "itens_que_fecham": v.itens_que_fecham,
@@ -493,7 +557,10 @@ def _registro_da_linha(l: dict, venda: VendaAConsumidor, n: _Contagem) -> tuple 
                                           participante=l["participante"] or "")
     if registro is not None:
         try:
-            return registro, juntar(registro.campos())
+            escrito = registro, juntar(registro.campos())
+            if entrada and not devolucao and icms == 0:
+                n.entradas_sem_icms += 1
+            return escrito
         except ValorInvalido as erro:
             log.warning("linha da Ficha 3 que o leiaute recusa", extra={
                 "cnpj": l["cnpj"], "codigo": l["codigo"], "data": str(l["data"]), "motivo": str(erro)})
@@ -502,12 +569,14 @@ def _registro_da_linha(l: dict, venda: VendaAConsumidor, n: _Contagem) -> tuple 
 
 
 def _participantes(cnpj: str, cad: CadastroDoMes, citados: set[str], n: _Contagem) -> list[Participante]:
-    """Os citados, pelo 0150 da EFD do mês, e o próprio estabelecimento."""
+    """Os citados, pelo 0150 da EFD do mês (ou da mais recente do estabelecimento
+    que o tenha), e o próprio estabelecimento."""
     saida: list[Participante] = []
     vistos: set[str] = set()
-    proprio = next((p for p in cad.participantes.values() if so_digitos(p.cnpj) == cnpj), None)
+    proprio = next((p for grupo in (cad.participantes, cad.de_outros_meses) for p in grupo.values()
+                    if so_digitos(p.cnpj) == cnpj), None)
     for codigo in sorted(citados | ({proprio.codigo} if proprio else set())):
-        p = cad.participantes.get(codigo)
+        p = cad.participante(codigo)
         if p is None:
             n.participantes_sem_cadastro += 1
             continue
@@ -520,17 +589,27 @@ def _participantes(cnpj: str, cad: CadastroDoMes, citados: set[str], n: _Contage
     return saida
 
 
-def _itens(con, cnpj: str, citados: set[str], n: _Contagem) -> list[Item]:
+def _itens(con, cnpj: str, competencia: str, citados: set[str], n: _Contagem) -> list[Item]:
+    """O 0200 de cada item citado: o cadastro do mês, campo a campo, e o mais
+    recente onde o mês não diz.
+
+    A unidade é sempre a do cadastro mais recente, mesmo quando a do mês é
+    outra: é nela que o razão converteu a ficha inteira (0220), e o QTD do
+    1050 e do 1100 só faz sentido na unidade do 0200 que os acompanha.
+    """
     if not citados:
         return []
     # dez mil códigos num INSERT por linha levam segundos; como tabela, nada
     con.register("citados", pa.table({"codigo": sorted(citados)}))
     try:
         linhas = con.execute("""
-            SELECT c.codigo, k.descricao, k.codigo_barras, k.unidade, k.ncm, k.aliq_icms, k.cest
-            FROM citados c LEFT JOIN cadastro k ON k.cnpj = ? AND k.codigo = c.codigo
+            SELECT c.codigo, coalesce(m.descricao, k.descricao), coalesce(m.codigo_barras, k.codigo_barras),
+                   k.unidade, coalesce(m.ncm, k.ncm), coalesce(m.aliq_icms, k.aliq_icms), coalesce(m.cest, k.cest)
+            FROM citados c
+            LEFT JOIN cadastro k ON k.cnpj = ? AND k.codigo = c.codigo
+            LEFT JOIN cadastro_do_mes m ON m.cnpj = ? AND m.competencia = ? AND m.codigo = c.codigo
             ORDER BY c.codigo
-        """, [cnpj]).fetchall()
+        """, [cnpj, cnpj, competencia]).fetchall()
     finally:
         con.unregister("citados")
     itens = []
@@ -550,6 +629,7 @@ def _travas(apta: bool, cad: CadastroDoMes, n: _Contagem, v: Validacao) -> list[
         (n.devolucoes_sem_venda > 0, TravaDoArquivo.DEVOLUCAO_SEM_VENDA),
         (n.confronto_pendente > 0, TravaDoArquivo.CONFRONTO_PENDENTE),
         (n.saldos_negativos > 0, TravaDoArquivo.SALDO_NEGATIVO),
+        (n.valores_negativos > 0, TravaDoArquivo.VALOR_NEGATIVO),
         (n.itens_sem_cadastro > 0, TravaDoArquivo.ITEM_SEM_CADASTRO),
         (n.participantes_sem_cadastro > 0, TravaDoArquivo.PARTICIPANTE_SEM_CADASTRO),
         (not cad.nome, TravaDoArquivo.SEM_ABERTURA),
@@ -565,6 +645,7 @@ def _somar(resumo: ResumoDoArquivoDigital, pronto: bool, linhas: int, tamanho: i
     resumo.linhas += linhas
     resumo.bytes += tamanho
     resumo.linhas_sem_documento += n.sem_documento
+    resumo.entradas_sem_icms += n.entradas_sem_icms
     resumo.erros += v.erros
     resumo.avisos += v.avisos
     resumo.itens_recompostos += v.itens_recompostos
@@ -604,7 +685,8 @@ def arquivos(destino: str, so: str | None = None, busca: str | None = None,
     `so` recorta: `envio`, `previa` ou o código de uma trava.
     """
     recortes = {ENVIO: "destino = 'envio'", PREVIA: "destino = 'previa'"}
-    recortes.update({t.codigo: f"travas LIKE '%{t.codigo}%'" for t in TravaDoArquivo})
+    # código inteiro, não LIKE: no LIKE o "_" de "item_sem_cadastro" casa qualquer letra
+    recortes.update({t.codigo: f"list_contains(string_split(travas, ','), '{t.codigo}')" for t in TravaDoArquivo})
     if so and so not in recortes:
         raise ValueError(f"Recorte desconhecido: {so}.")
     pagina = max(1, int(pagina))
@@ -701,6 +783,7 @@ def serializar(resumo: ResumoDoArquivoDigital) -> dict:
         "bytes": resumo.bytes,
         "por_registro": dict(sorted(resumo.por_registro.items())),
         "linhas_sem_documento": resumo.linhas_sem_documento,
+        "entradas_sem_icms": resumo.entradas_sem_icms,
         "erros": resumo.erros,
         "avisos": resumo.avisos,
         "itens_recompostos": resumo.itens_recompostos,

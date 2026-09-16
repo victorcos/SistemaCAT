@@ -404,7 +404,12 @@ class TravaDoArquivo(Enum):
                            "O COD_LEGAL da devolução é o da venda: falta a nota referenciada.")
     CONFRONTO_PENDENTE = ("Saída enquadrada sem valor de confronto",
                           "Enquadramentos 2 e 4 dependem do ICMS da operação própria da entrada.")
-    SALDO_NEGATIVO = ("Saldo negativo no 1050", "Ficha retirada por estoque negativo: falta movimento.")
+    SALDO_NEGATIVO = ("Estoque negativo no 1050", "Ficha retirada por estoque negativo: falta movimento.")
+    # quantidade positiva e ICMS negativo: a devolução de compra tirou mais
+    # imposto do que o estoque guardava. No Amigão, 813 saldos — quase sempre
+    # abertura sem ICMS suportado (item 3.3.8 do manual do sistema)
+    VALOR_NEGATIVO = ("ICMS negativo no 1050 com estoque positivo",
+                      "Devolução de compra maior que o ICMS em estoque: em geral a abertura veio sem imposto.")
     ITEM_SEM_CADASTRO = ("Item sem cadastro (0200) na EFD", "Importar a EFD do mês ou conferir o código.")
     PARTICIPANTE_SEM_CADASTRO = ("Participante sem cadastro (0150) na EFD", "Importar a EFD do mês do estabelecimento.")
     SEM_ABERTURA = ("Estabelecimento sem EFD no mês para o 0000", "O nome, a IE e o município vêm do 0000 da EFD.")
