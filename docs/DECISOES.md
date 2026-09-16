@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-09-16 — Sufixo só entre descrições compatíveis
+
+Na primeira chamada do de-para sobre o Amigão (97 s, 72 estabelecimentos), o sufixo
+propôs `1024078 → 102407` com "sufixo 8, repetido em 4 pares": num catálogo
+numérico grande, código + um dígito coincide por acaso. O sufixo passa a valer
+só entre pares de descrição compatível, e a repetição conta só esses pares. Na
+Advertising, 41 pares em vez de 46 — os kits seguem ligados pela regra do kit — e
+o ressarcimento de R$ 274.950,74 para R$ 274.878,90.
+
+---
+
 ## 2026-09-16 — O que a CAT 42 da Advertising ensinou: XML, de-para, art. 271 e X.949
 
 **De onde veio.** A CAT 42 que a RVZ entregou para a Advertising Operations

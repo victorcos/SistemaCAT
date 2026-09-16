@@ -36,6 +36,9 @@ vende); os outros viram pares `origem → destino` com o fator acumulado.
   do kit, com fator. Tratado como sufixo, o kit virava unidade com fator 1;
 * GTIN não liga kit a unidade — são embalagens diferentes do mesmo produto, e
   o fator não sai do GTIN;
+* sufixo também só liga descrições compatíveis: num catálogo numérico grande,
+  "código + um dígito" coincide por acaso (no Amigão, `1024078` e `102407`,
+  "repetido em 4 pares"). O mesmo código com e sem espaços liga sempre;
 * GTIN só liga descrições compatíveis (metade das palavras em comum): o 0200
   da Advertising trazia no `1114` ("GRECIN 5 PRETO") o GTIN do `1050` ("GRECIN
   TONS DE GRISALHO"), e o GTIN sozinho juntava seis produtos num;
@@ -232,6 +235,9 @@ def _por_sufixo(itens: dict[str, ItemParaCasar]) -> list[_Ligacao]:
                 pares.setdefault(sufixo, []).append((longo, normal[base_n]))
     ligacoes = []
     for sufixo, lista in pares.items():
+        # a repetição só conta entre pares que falam do mesmo produto
+        lista = [(longo, base) for longo, base in lista
+                 if descricoes_compativeis(itens[longo].descricao, itens[base].descricao)]
         if len(lista) < MINIMO_DE_PARES_DO_SUFIXO:
             continue
         for longo, base in lista:

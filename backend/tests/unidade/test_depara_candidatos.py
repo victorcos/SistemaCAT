@@ -86,6 +86,14 @@ class TestPares:
         assert "X0046E1FBP" not in pares
         assert all(p.destino != "X0046E1FBP" for p in pares.values())
 
+    def test_sufixo_que_coincide_em_produtos_diferentes_nao_liga(self):
+        """Código numérico denso: 1024078 e 102407 são produtos diferentes."""
+        itens = []
+        for base, nome_a, nome_b in (("102407", "LEITE UHT 1L", "PAPEL TOALHA 2UN"), ("270105", "ARROZ 5KG", "SABAO PO 1KG"),
+                                     ("274461", "CAFE 500G", "BISCOITO 200G"), ("283452", "OLEO 900ML", "DETERGENTE 500ML")):
+            itens += [item(base, saidas=5, descricao=nome_a), item(base + "8", entradas=5, descricao=nome_b)]
+        assert propor(itens) == []
+
     def test_sufixo_isolado_nao_basta(self):
         so_um = [item("1012", saidas=5), item("101208", entradas=5, descricao="OUTRA COISA", ncm="1")]
         assert propor(so_um) == []
