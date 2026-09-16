@@ -5,6 +5,23 @@
 
 ---
 
+## 2026-09-16 — O motor abre processos de verdade
+
+**O que se viu.** A primeira rodada da v0.53 no Amigão (#57) correu dentro do
+servidor do motor, sem processo filho. A checagem `_processos_viaveis()` exigia
+que o `__main__` tivesse arquivo ou nome de módulo — e o servidor do uvicorn nasce
+de um `spawn`, com um `__main__` que não tem nenhum dos dois. O motor caía no
+"um processo só" com aviso no log, e o mesmo valia para a etapa 7 e para a
+pré-validação em paralelo da v0.52: o ganho medido existia nos testes e nos
+scripts, não no motor.
+
+**A regra certa.** O `spawn` refaz o `__main__` pelo nome, pelo arquivo ou não
+refaz. Só quebra quando o `__main__` diz ter um arquivo que não existe (o
+script lido da entrada padrão). Um teste abre, de dentro de um processo nascido
+de `spawn`, um pool — que é exatamente o que o motor faz.
+
+---
+
 ## 2026-09-16 — Sufixo só entre descrições compatíveis
 
 Na primeira chamada do de-para sobre o Amigão (97 s, 72 estabelecimentos), o sufixo

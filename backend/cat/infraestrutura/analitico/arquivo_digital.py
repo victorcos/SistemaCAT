@@ -433,16 +433,24 @@ PASTA_PARTICOES = ".particoes"
 
 
 def _processos_viaveis() -> bool:
-    """Se um processo novo consegue reimportar o módulo principal.
+    """Se um processo novo consegue preparar o módulo principal.
 
-    No Windows o processo filho nasce do zero e reimporta o `__main__`. O motor
-    sobe como módulo (`-m uvicorn`) e os testes pelo pytest, e aí funciona; um
-    script lido da entrada padrão não tem arquivo para reimportar, e o pool
-    quebraria no primeiro arquivo.
+    O `spawn` refaz o `__main__` no filho: pelo nome, quando ele veio de `-m`;
+    pelo arquivo, quando veio de um script; e não refaz nada quando o
+    `__main__` não tem nem um nem outro. Só quebra quando o `__main__` diz ter
+    um arquivo que não existe — o script lido da entrada padrão (`<stdin>`).
+
+    Antes da v0.53.2 esta checagem exigia arquivo ou nome, e o motor caía nela:
+    o servidor do uvicorn nasce de um `spawn`, com um `__main__` sem arquivo.
+    Resultado: a etapa 7, a pré-validação e a rodada em processo próprio
+    rodavam, no motor, num processo só — só os testes e os scripts viam o
+    paralelismo.
     """
     principal = sys.modules.get("__main__")
+    if getattr(principal, "__spec__", None) is not None:
+        return True
     arquivo = getattr(principal, "__file__", None)
-    return getattr(principal, "__spec__", None) is not None or (arquivo is not None and os.path.isfile(arquivo))
+    return arquivo is None or os.path.isfile(arquivo)
 
 # (tabela, colunas de partição): o que cada arquivo lê, separado por arquivo
 _PARTICIONADAS = (("linhas", ("cnpj", "competencia")), ("saldos", ("cnpj", "competencia")),
