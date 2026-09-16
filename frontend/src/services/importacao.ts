@@ -73,9 +73,18 @@ export interface Etapa {
   acessivel: boolean;
 }
 
+/** De quando é a base importada; `fora_do_periodo` são as EFD fora do período do cadastro. */
+export interface BaseDoTrabalho {
+  efds: number;
+  primeira: string | null;
+  ultima: string | null;
+  fora_do_periodo: number;
+}
+
 export interface ProjetoDetalhe {
   projeto: Projeto;
   etapas: Etapa[];
+  base?: BaseDoTrabalho;
 }
 
 /**
@@ -170,6 +179,17 @@ export const opcoesDeVendaAConsumidor = () =>
   chamar<OpcaoDeVendaAConsumidor[]>("/venda-a-consumidor");
 
 /** Devolve o cartão do trabalho já com a escolha nova. */
+/** Nome e período; o que não vier fica como está. A API grava o evento com o de e o para. */
+export const alterarCadastro = (
+  projetoId: number,
+  cadastro: { nome?: string; competencia_ini?: string; competencia_fim?: string },
+) =>
+  chamar<Projeto>(`/projetos/${projetoId}/cadastro`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cadastro),
+  });
+
 export const definirVendaAConsumidor = (projetoId: number, valor: string) =>
   chamar<Projeto>(`/projetos/${projetoId}/venda-a-consumidor`, {
     method: "PUT",

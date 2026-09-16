@@ -88,3 +88,7 @@ export const PODE_EXCLUIR_TRABALHO: Papel[] = ["dev", "gestor"];
  *  técnica não substitui responsável pelo negócio. A tela usa isto só para
  *  mostrar o botão; quem recusa de verdade é a API. */
 export const PODE_APROVAR_ENTREGA: Papel[] = ["revisor", "gestor"];
+
+/** Papéis que escrevem: criam e mudam trabalho, rodam etapa. Espelha
+ *  Papel.pode_escrever no domínio; só "leitura" fica de fora. */
+export const PODE_ESCREVER: Papel[] = ["dev", "gestor", "analista", "revisor"];

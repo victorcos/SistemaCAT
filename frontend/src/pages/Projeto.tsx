@@ -6,13 +6,14 @@ import { Campo, CampoSenha } from "@/components/ui/Campo";
 import { Carregando } from "@/components/ui/Carregando";
 import { Etiqueta, type TomDeEtiqueta } from "@/components/ui/Etiqueta";
 import { Modal } from "@/components/ui/Modal";
+import { EditarCadastro } from "@/components/shared/EditarCadastro";
 import {
   Barra,
   CabecalhoDePagina,
   Secao,
   Voltar,
 } from "@/components/ui/Pagina";
-import { IconeApagar, IconeArquivoDigital, IconeConfirma, IconeHistorico } from "@/constants/icons";
+import { IconeApagar, IconeArquivoDigital, IconeConfirma, IconeEditar, IconeHistorico } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
 import {
   TOM_DO_STATUS,
@@ -120,7 +121,8 @@ const TOM_DA_SITUACAO: Record<string, TomDeEtiqueta> = {
 /* ------------------------------------------------------------------ */
 
 export default function Projeto() {
-  const { podeExcluirTrabalho, administraUsuarios } = useAuth();
+  const { podeExcluirTrabalho, administraUsuarios, podeEscrever } = useAuth();
+  const [editando, setEditando] = useState(false);
   const { id } = useParams<{ id: string }>();
   const [d, setD] = useState<ProjetoDetalhe | null>(null);
   const [erro, setErro] = useState<ErroApi | null>(null);
@@ -199,6 +201,13 @@ export default function Projeto() {
                 {periodo(p.competencia_ini, p.competencia_fim)}
               </dd>
             </div>
+            {podeEscrever && (
+              <div>
+                <Botao variante="fantasma" tamanho="sm" icone={IconeEditar} onClick={() => setEditando(true)}>
+                  Editar cadastro
+                </Botao>
+              </div>
+            )}
             {administraUsuarios && p.criado_por && (
               <div>
                 <dt className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-texto-fraco">
@@ -218,6 +227,33 @@ export default function Projeto() {
           </span>
         </div>
       </CabecalhoDePagina>
+
+      {d.base && d.base.fora_do_periodo > 0 && (
+        <Aviso
+          tom="atencao"
+          titulo={`${numero(d.base.fora_do_periodo)} de ${numero(d.base.efds)} EFD importadas estão fora do período do trabalho`}
+          acao={
+            podeEscrever ? (
+              <Botao tamanho="sm" variante="secundario" icone={IconeEditar} onClick={() => setEditando(true)}>
+                Editar cadastro
+              </Botao>
+            ) : undefined
+          }
+        >
+          A base vai de {periodo(d.base.primeira, d.base.ultima)} e o trabalho está cadastrado para{" "}
+          {periodo(p.competencia_ini, p.competencia_fim)}. Confira o cadastro ou a base importada: o relatório da entrega
+          sai com os dois períodos.
+        </Aviso>
+      )}
+
+      {editando && (
+        <EditarCadastro
+          projeto={p}
+          aberto={editando}
+          aoFechar={() => setEditando(false)}
+          aoSalvar={() => detalharProjeto(p.id).then(setD).catch((x) => setErro(comoErro(x)))}
+        />
+      )}
 
       {parado && (
         <Aviso

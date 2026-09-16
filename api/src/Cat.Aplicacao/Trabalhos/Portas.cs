@@ -48,6 +48,13 @@ public interface IRepositorioDeTrabalhos
     Task RegistrarEvento(int projetoId, string tipo, string texto, object? dados, Usuario por, DateTimeOffset agora,
         CancellationToken cancelar);
 
+    /// <summary>O nome e o período novos e o evento que os registra, numa transação.</summary>
+    Task AlterarCadastro(int projetoId, string nome, DateOnly ini, DateOnly fim, string texto, object dados, Usuario por,
+        DateTimeOffset agora, CancellationToken cancelar);
+
+    /// <summary>As competências das EFD importadas no trabalho, com quantas EFD em cada.</summary>
+    Task<IReadOnlyList<(DateOnly Competencia, int Efds)>> CompetenciasDaBase(int projetoId, CancellationToken cancelar);
+
     /// <summary>A escolha nova e o evento que a registra, numa transação.</summary>
     Task DefinirVendaAConsumidor(int projetoId, string valor, object dados, Usuario por, DateTimeOffset agora,
         CancellationToken cancelar);

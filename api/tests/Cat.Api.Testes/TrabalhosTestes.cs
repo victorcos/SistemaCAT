@@ -533,4 +533,88 @@ public sealed class TrabalhosTestes(BancoDeTeste banco, MotorInternoFalso _motor
         Assert.Equal(HttpStatusCode.NotFound, r.StatusCode);
         Assert.Equal("Trabalho não encontrado.", await Detalhe(r));
     }
+
+    // ------------------------------------------------------------------ cadastro do trabalho
+    private static HttpRequestMessage Cadastro(int projeto, object corpo) =>
+        new(HttpMethod.Patch, $"/api/projetos/{projeto}/cadastro") { Content = JsonContent.Create(corpo) };
+
+    [Fact]
+    public async Task Cadastro_muda_nome_e_periodo_com_evento_de_e_para()
+    {
+        var (_, _, token) = await Pessoa("gestor");
+        var c = Cliente(token: token);
+        var projeto = await Projeto(c, await Empresa(c), "Ressarcimento ST 2025");
+
+        var r = await c.SendAsync(Cadastro(projeto, new
+        {
+            nome = "Ressarcimento ST 2021", competencia_ini = "2021-01-01", competencia_fim = "2021-12-31",
+        }));
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        var p = await Json(r);
+        Assert.Equal("Ressarcimento ST 2021", p.GetProperty("nome").GetString());
+        Assert.Equal("2021-01-01", p.GetProperty("competencia_ini").GetString());
+        Assert.Equal("2021-12-31", p.GetProperty("competencia_fim").GetString());
+
+        var texto = await banco.Escalar<string>(
+            $"SELECT texto FROM evento_do_projeto WHERE projeto_id = {projeto} AND tipo = 'parametro_alterado'");
+        Assert.Contains("«Ressarcimento ST 2025» → «Ressarcimento ST 2021»", texto);
+        Assert.Contains("05/2021 a 05/2021 → 01/2021 a 12/2021", texto);
+        var dados = await banco.Escalar<string>(
+            $"SELECT dados::text FROM evento_do_projeto WHERE projeto_id = {projeto} AND tipo = 'parametro_alterado'");
+        Assert.Contains("\"de\"", dados);
+        Assert.Contains("2021-12-31", dados);
+
+        // só o período: o nome fica
+        r = await c.SendAsync(Cadastro(projeto, new { competencia_fim = "2021-06-30" }));
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal("Ressarcimento ST 2021", (await Json(r)).GetProperty("nome").GetString());
+    }
+
+    [Fact]
+    public async Task Cadastro_recusa_sem_mudanca_invertido_nome_curto_e_repetido()
+    {
+        var (_, _, token) = await Pessoa("gestor");
+        var c = Cliente(token: token);
+        var empresa = await Empresa(c);
+        var projeto = await Projeto(c, empresa, "Trabalho A");
+        await Projeto(c, empresa, "Trabalho B");
+
+        var r = await c.SendAsync(Cadastro(projeto, new { nome = "Trabalho A" }));
+        Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
+        Assert.Equal("Nada mudou no cadastro do trabalho.", await Detalhe(r));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity,
+            (await c.SendAsync(Cadastro(projeto, new { competencia_ini = "2021-06-01", competencia_fim = "2021-01-01" }))).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await c.SendAsync(Cadastro(projeto, new { nome = " x " }))).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await c.SendAsync(Cadastro(projeto, new { competencia_ini = "01/2021" }))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await c.SendAsync(Cadastro(projeto, new { nome = "Trabalho B" }))).StatusCode);
+
+        // quem só lê não mexe no cadastro
+        var (_, _, leitura) = await Pessoa("leitura", [empresa]);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await Cliente(token: leitura).SendAsync(Cadastro(projeto, new { nome = "Outro" }))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Detalhe_diz_de_quando_e_a_base_e_quanto_cai_fora_do_periodo()
+    {
+        var (_, _, token) = await Pessoa("gestor");
+        var c = Cliente(token: token);
+        var projeto = await Projeto(c, await Empresa(c));      // período 05/2021
+
+        var vazio = (await Json(await c.GetAsync($"/api/projetos/{projeto}"))).GetProperty("base");
+        Assert.Equal(0, vazio.GetProperty("efds").GetInt32());
+        Assert.Equal(JsonValueKind.Null, vazio.GetProperty("primeira").ValueKind);
+
+        await banco.Comando($"INSERT INTO lote (projeto_id, pasta, total_arquivos, arquivos_uteis, bytes_totais) VALUES ({projeto}, 'Z:/base', 3, 3, 30)");
+        foreach (var (nome, competencia) in new[] { ("efd_04.txt", "2021-04-01"), ("efd_05.txt", "2021-05-01"), ("efd_05b.txt", "2021-05-01") })
+            await banco.Comando($"INSERT INTO arquivo_do_lote (lote_id, caminho, nome, tamanho, tipo, competencia) SELECT id, 'Z:/base/{nome}', '{nome}', 10, 'sped_icms_ipi', '{competencia}' FROM lote WHERE projeto_id = {projeto}");
+        await banco.Comando($"INSERT INTO arquivo_do_lote (lote_id, caminho, nome, tamanho, tipo, competencia) SELECT id, 'Z:/base/rel.txt', 'rel.txt', 10, 'gerencial_movimento', '2020-01-01' FROM lote WHERE projeto_id = {projeto}");
+
+        var b = (await Json(await c.GetAsync($"/api/projetos/{projeto}"))).GetProperty("base");
+        Assert.Equal(3, b.GetProperty("efds").GetInt32());
+        Assert.Equal("2021-04-01", b.GetProperty("primeira").GetString());
+        Assert.Equal("2021-05-01", b.GetProperty("ultima").GetString());
+        // só a EFD de abril; o relatório não é base de período
+        Assert.Equal(1, b.GetProperty("fora_do_periodo").GetInt32());
+    }
 }

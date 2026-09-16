@@ -131,6 +131,56 @@ public sealed class Trabalhos(
     }
 
     /// <summary>
+    /// Nome e período do trabalho. O que não vem fica como está; o que muda vira
+    /// evento com o de e o para, e nada mudando é recusa, não evento vazio.
+    /// </summary>
+    public async Task<ProjetoComEtapas> AlterarCadastro(int projetoId, string? nome, DateOnly? ini, DateOnly? fim, Usuario por,
+        CancellationToken cancelar)
+    {
+        var projeto = await repositorio.BuscarProjeto(projetoId, cancelar) ?? throw new ProjetoNaoEncontrado();
+        Escopo.Exigir(por, projeto.EmpresaId, log);
+        var novoNome = nome?.Trim() ?? projeto.Nome;
+        if (novoNome.Length < CadastroDoTrabalho.TamanhoMinimoDoNome)
+            throw new DadoInvalido($"O nome do trabalho precisa de pelo menos {CadastroDoTrabalho.TamanhoMinimoDoNome} caracteres.");
+        var novoIni = ini ?? projeto.CompetenciaIni;
+        var novoFim = fim ?? projeto.CompetenciaFim;
+        if (novoFim < novoIni)
+            throw new CompetenciasInvertidas();
+        if (novoNome == projeto.Nome && novoIni == projeto.CompetenciaIni && novoFim == projeto.CompetenciaFim)
+            throw new CadastroSemMudanca();
+        if (novoNome != projeto.Nome && await repositorio.ProjetoRepetido(projeto.EmpresaId, projeto.Frente, novoNome, cancelar))
+            throw new ProjetoRepetido();
+
+        var texto = CadastroDoTrabalho.Frase(projeto.Nome, projeto.CompetenciaIni, projeto.CompetenciaFim, novoNome, novoIni, novoFim);
+        var dados = new Dictionary<string, object>
+        {
+            ["parametro"] = "cadastro",
+            ["de"] = new Dictionary<string, string>
+            {
+                ["nome"] = projeto.Nome, ["competencia_ini"] = projeto.CompetenciaIni.ToString("yyyy-MM-dd"),
+                ["competencia_fim"] = projeto.CompetenciaFim.ToString("yyyy-MM-dd"),
+            },
+            ["para"] = new Dictionary<string, string>
+            {
+                ["nome"] = novoNome, ["competencia_ini"] = novoIni.ToString("yyyy-MM-dd"),
+                ["competencia_fim"] = novoFim.ToString("yyyy-MM-dd"),
+            },
+        };
+        await repositorio.AlterarCadastro(projetoId, novoNome, novoIni, novoFim, texto, dados, por, relogio.GetUtcNow(), cancelar);
+        log.Aviso("cadastro do trabalho alterado", new
+        {
+            projeto_id = projetoId, por_usuario_id = por.Id, nome_de = projeto.Nome, nome_para = novoNome,
+            ini_de = projeto.CompetenciaIni, ini_para = novoIni, fim_de = projeto.CompetenciaFim, fim_para = novoFim,
+        });
+        return ComEtapas((await repositorio.BuscarProjeto(projetoId, cancelar))!);
+    }
+
+    /// <summary>De quando é a base importada, contra o período do cadastro.</summary>
+    public async Task<BaseDoTrabalho> BaseDoTrabalho(ProjetoLido projeto, CancellationToken cancelar) =>
+        CadastroDoTrabalho.Resumir(await repositorio.CompetenciasDaBase(projeto.Id, cancelar),
+            projeto.CompetenciaIni, projeto.CompetenciaFim);
+
+    /// <summary>
     /// Como o trabalho enquadra a venda a consumidor final. Muda o razão e a
     /// apuração: o que já foi montado com a escolha antiga continua como está, e
     /// a tela do razão avisa que ele precisa rodar de novo.

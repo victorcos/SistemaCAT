@@ -164,6 +164,35 @@ public sealed class TrabalhoRepositorio(CatDbContext banco) : IRepositorioDeTrab
 
     private sealed record UltimaRodada(int Id, int ProjetoId, string Etapa, string Situacao, bool Aprovada);
 
+    public async Task AlterarCadastro(int projetoId, string nome, DateOnly ini, DateOnly fim, string texto, object dados,
+        Usuario por, DateTimeOffset agora, CancellationToken cancelar)
+    {
+        await using var transacao = await banco.Database.BeginTransactionAsync(cancelar);
+        await banco.Projetos.Where(p => p.Id == projetoId)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Nome, nome)
+                .SetProperty(p => p.CompetenciaIni, ini)
+                .SetProperty(p => p.CompetenciaFim, fim), cancelar);
+        banco.Eventos.Add(new EventoLinha
+        {
+            ProjetoId = projetoId, Tipo = Dominio.Projeto.TipoDeEvento.ParametroAlterado, Texto = texto,
+            Dados = JsonSerializer.Serialize(dados, Json),
+            AutorId = por.Id,
+            AutorNome = string.IsNullOrEmpty(por.NomeExibicao) ? "Sistema" : por.NomeExibicao,
+            CriadoEm = Utc(agora),
+        });
+        await banco.SaveChangesAsync(cancelar);
+        await transacao.CommitAsync(cancelar);
+        banco.ChangeTracker.Clear();
+    }
+
+    public async Task<IReadOnlyList<(DateOnly Competencia, int Efds)>> CompetenciasDaBase(int projetoId, CancellationToken cancelar) =>
+        (await (from a in banco.ArquivosDoLote.AsNoTracking()
+                join l in banco.Lotes.AsNoTracking() on a.LoteId equals l.Id
+                where l.ProjetoId == projetoId && a.Tipo == "sped_icms_ipi" && a.Competencia != null
+                group a by a.Competencia into g
+                select new { Competencia = g.Key, Efds = g.Count() }).ToListAsync(cancelar))
+        .Select(x => (x.Competencia!.Value, x.Efds)).ToList();
+
     public async Task DefinirVendaAConsumidor(int projetoId, string valor, object dados, Usuario por,
         DateTimeOffset agora, CancellationToken cancelar)
     {

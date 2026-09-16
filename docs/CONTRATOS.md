@@ -423,3 +423,14 @@ situação e o que falta), Por filial, Por mês, Pendências e Trilha. O dossiê
 cada estabelecimento com competência pronta leva os TXT de envio (SHA-256
 conferido contra o da etapa 7), `ficha3_<CNPJ>.csv`, `saldos_1050_<CNPJ>.xlsx`,
 `apuracao_<CNPJ>.xlsx` e `pre_validacao_<CNPJ>.xlsx`, só daquelas competências.
+
+## 14. Cadastro do trabalho
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `PATCH` | `/api/projetos/{id}/cadastro` | `{"nome", "competencia_ini", "competencia_fim"}`, todos opcionais (datas `AAAA-MM-DD`); o que não vem fica. Quem escreve (403 a leitura). 409 se nada muda ou o nome já existe na frente e empresa; 422 nome curto, data inválida ou final antes da inicial. Grava o evento `parametro_alterado` com `parametro: cadastro`, `de` e `para`, e devolve o cartão do trabalho |
+
+O detalhe do trabalho (`GET /api/projetos/{id}`) traz `base`: `efds` (EFD
+importadas), `primeira` e `ultima` competência, e `fora_do_periodo` (quantas EFD
+caem fora do período do cadastro, comparando mês, não dia). A tela do trabalho
+avisa quando `fora_do_periodo` é maior que zero.

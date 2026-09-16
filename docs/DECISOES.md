@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-09-16 — O cadastro do trabalho muda, e a base fora do período aparece
+
+**O que o piloto mostrou.** O trabalho do Amigão nasceu como "Ressarcimento ST
+2025", de 01/2025 a 12/2025, e as 884 EFD importadas eram todas de 2021. Nada
+avisava: a importação aceita a base, e não havia como corrigir o cadastro sem
+ir ao banco.
+
+**Decisão do Victor.** O trabalho é de 2021: recadastrar. Para isso o cadastro
+passou a ser editável pela API (`PATCH /api/projetos/{id}/cadastro`), por quem
+escreve, sempre com evento no histórico — o de e o para do nome e do período.
+Nada mudando é recusa, não evento vazio.
+
+**E a divergência passa a aparecer.** O detalhe do trabalho diz de quando é a
+base e quantas EFD caem fora do período (comparando o mês, não o dia gravado).
+A tela avisa e oferece a edição. No Amigão, antes do recadastro: 884 de 884
+fora; depois: nenhuma.
+
+---
+
 ## 2026-09-16 — Etapa 8: relatórios e entrega
 
 **Decisões do Victor.** A etapa produz **relatório e dossiê**; o relatório

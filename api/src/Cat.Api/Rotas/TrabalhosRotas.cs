@@ -28,7 +28,10 @@ public static class TrabalhosRotas
     public sealed record EtapaDto(
         string Chave, string Nome, string Descricao, string Situacao, string SituacaoRotulo, bool Implementada, bool Acessivel);
 
-    public sealed record ProjetoDetalheDto(ProjetoDto Projeto, IReadOnlyList<EtapaDto> Etapas);
+    public sealed record ProjetoDetalheDto(ProjetoDto Projeto, IReadOnlyList<EtapaDto> Etapas, BaseDto Base);
+
+    /// <summary>De quando é a base importada; `fora_do_periodo` são as EFD fora do período do cadastro.</summary>
+    public sealed record BaseDto(int Efds, DateOnly? Primeira, DateOnly? Ultima, int ForaDoPeriodo);
 
     public sealed record OQueSeraApagadoDto(string Projeto, string Empresa, int Lotes, int Arquivos, int Execucoes);
 
@@ -41,6 +44,8 @@ public static class TrabalhosRotas
     private sealed record ConfirmacaoDeExclusao(string? Senha);
 
     private sealed record PedidoVendaAConsumidor(string? Valor);
+
+    private sealed record PedidoDeCadastro(string? Nome, string? CompetenciaIni, string? CompetenciaFim);
 
     public sealed record OpcaoDto(string Valor, string Rotulo, string Explicacao);
 
@@ -64,13 +69,17 @@ public static class TrabalhosRotas
                 await Traduzir(async () =>
                 {
                     var p = await caso.Detalhar(projetoId, http.UsuarioAtual(), http.RequestAborted);
-                    return Results.Json(new ProjetoDetalheDto(Projeto(p), p.Etapas.Select(Etapa).ToList()));
+                    var b = await caso.BaseDoTrabalho(p.Projeto, http.RequestAborted);
+                    return Results.Json(new ProjetoDetalheDto(Projeto(p), p.Etapas.Select(Etapa).ToList(),
+                        new BaseDto(b.Efds, b.Primeira, b.Ultima, b.ForaDoPeriodo)));
                 }))
             .ExigirUsuario();
 
         // as duas leituras da venda a consumidor final: a tela mostra as duas, com o porquê
         api.MapGet("/venda-a-consumidor", () =>
             Results.Json(VendaAConsumidor.Todas.Select(v => new OpcaoDto(v.Valor, v.Rotulo, v.Explicacao)).ToList()));
+        api.MapPatch("/projetos/{projetoId:int}/cadastro", AlterarCadastro)
+            .ExigirCapacidade(Capacidades.PodeEscrever, "pode_escrever", "alterar o cadastro do trabalho");
         api.MapPut("/projetos/{projetoId:int}/venda-a-consumidor", DefinirVendaAConsumidor)
             .ExigirCapacidade(Capacidades.PodeEscrever, "pode_escrever", "mudar o enquadramento da venda a consumidor");
 
@@ -135,6 +144,29 @@ public static class TrabalhosRotas
                 http.UsuarioAtual(), http.RequestAborted);
             return Results.Json(Projeto(p), statusCode: StatusCodes.Status201Created);
         });
+    }
+
+    private static async Task<IResult> AlterarCadastro(int projetoId, HttpContext http, Trabalhos caso)
+    {
+        var (pedido, recusa) = await CorpoJson.Ler<PedidoDeCadastro>(http);
+        if (recusa is not null)
+            return recusa;
+        DateOnly? ini = null, fim = null;
+        if (pedido!.CompetenciaIni is not null)
+        {
+            if (!Data(pedido.CompetenciaIni, out var d))
+                return CorpoJson.Recusar("Competência inicial e final são datas no formato AAAA-MM-DD.");
+            ini = d;
+        }
+        if (pedido.CompetenciaFim is not null)
+        {
+            if (!Data(pedido.CompetenciaFim, out var d))
+                return CorpoJson.Recusar("Competência inicial e final são datas no formato AAAA-MM-DD.");
+            fim = d;
+        }
+        return await Traduzir(async () =>
+            Results.Json(Projeto(await caso.AlterarCadastro(projetoId, pedido.Nome, ini, fim, http.UsuarioAtual(),
+                http.RequestAborted))));
     }
 
     private static async Task<IResult> DefinirVendaAConsumidor(int projetoId, HttpContext http, Trabalhos caso)
@@ -209,7 +241,7 @@ public static class TrabalhosRotas
         EmpresaJaCadastrada or ProjetoRepetido => StatusCodes.Status409Conflict,
         DadoInvalido or RaizNaoConfere or FrenteDesconhecida or CompetenciasInvertidas
             or VendaAConsumidorDesconhecida => StatusCodes.Status422UnprocessableEntity,
-        MesmaVendaAConsumidor => StatusCodes.Status409Conflict,
+        MesmaVendaAConsumidor or CadastroSemMudanca => StatusCodes.Status409Conflict,
         MotorIndisponivel => StatusCodes.Status502BadGateway,
         _ => null,
     };
