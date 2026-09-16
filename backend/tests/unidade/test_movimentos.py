@@ -183,8 +183,8 @@ class TestExtracao:
         destino = str(tmp_path / "s")
         extrair_movimentos([efd], destino)
         linhas = _linhas(f"{destino}/_movimentos_brutos.parquet",
-                         "SELECT operacao, data FROM r ORDER BY operacao")
-        assert linhas == [("entrada", date(2021, 5, 3)), ("saida", date(2021, 5, 2))]
+                         "SELECT operacao, data, serie FROM r ORDER BY operacao")
+        assert linhas == [("entrada", date(2021, 5, 3), "001"), ("saida", date(2021, 5, 2), "001")]
 
     def test_item_antes_do_documento_e_orfao_e_fica_no_log(self, tmp_path):
         quebrado = escrever(tmp_path, "quebrado.txt", [CABECALHO, C170_1, C100_ENTRADA, C170_2])

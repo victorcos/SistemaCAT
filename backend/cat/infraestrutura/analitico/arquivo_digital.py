@@ -331,12 +331,14 @@ def _preparar(con, apuracao: str, saldos: str, ficha3: str, itens: str, itens_do
         JOIN alvo a ON a.cnpj = s.cnpj AND a.competencia = s.competencia
     """)
     # ordenada por arquivo: cada consulta de um mês lê um trecho contíguo
+    # razão de antes da v0.52 não guarda a série: o 1200 sai sem SER, como saía
+    serie = "f.serie" if "serie" in pq.read_schema(ficha3).names else "NULL::VARCHAR"
     con.execute(f"""
         CREATE OR REPLACE TABLE linhas AS
         SELECT f.cnpj, strftime(f.data, '%Y-%m') AS competencia, f.codigo, f.numero, f.data, f.especie,
                f.devolucao, f.cfop, f.enquadramento, f.enquadramento_indefinido, f.quantidade,
                f.icms_suportado, f.icms_efetivo, f.chave, f.numero_item, f.modelo, f.participante,
-               f.numero_documento
+               f.numero_documento, {serie} AS serie
         FROM read_parquet('{_escapar(ficha3)}') f
         JOIN alvo a ON a.cnpj = f.cnpj AND a.competencia = strftime(f.data, '%Y-%m')
         ORDER BY f.cnpj, competencia, f.data, f.chave, f.numero_item, f.codigo, f.numero
@@ -554,7 +556,7 @@ def _registro_da_linha(l: dict, venda: VendaAConsumidor, n: _Contagem) -> tuple 
         registro = DocumentoEletronico(**base, chave=chave)
     elif not chave and item and l["numero_documento"] and modelo and modelo not in MODELOS_ELETRONICOS:
         registro = DocumentoNaoEletronico(**base, modelo=modelo, numero_documento=l["numero_documento"],
-                                          participante=l["participante"] or "")
+                                          participante=l["participante"] or "", serie=l.get("serie") or "")
     if registro is not None:
         try:
             escrito = registro, juntar(registro.campos())

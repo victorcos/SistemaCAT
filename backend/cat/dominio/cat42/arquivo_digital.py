@@ -213,6 +213,11 @@ def so_digitos(valor: str | None) -> str:
     return re.sub(r"\D", "", valor or "")
 
 
+def sem_mascara(valor: str | None) -> str:
+    """Série e subsérie vão sem máscara: `U-2` vira `U2` (item de formato do manual)."""
+    return re.sub(r"[^0-9A-Za-z]", "", valor or "")
+
+
 def linha(campos: list[str]) -> str:
     """O manual: sem `|` no início nem no fim, salvo campo vazio na ponta."""
     return "|".join(campos)
@@ -354,7 +359,7 @@ class DocumentoNaoEletronico(Operacao):
 
     def campos(self) -> list[str]:
         return ["1200", texto(self.participante, 60), texto(self.modelo, 2), texto(self.ecf_fab, 21),
-                texto(self.serie, 3), so_digitos(self.numero_documento)[-9:], self._item(),
+                sem_mascara(self.serie)[:3], so_digitos(self.numero_documento)[-9:], self._item(),
                 self.ind_oper.value, data(self.data), so_digitos(self.cfop), texto(self.codigo, 60),
                 numero(self.quantidade, 3, "QTD"), *self._valores()]
 

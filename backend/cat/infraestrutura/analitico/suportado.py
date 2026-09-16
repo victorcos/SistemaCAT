@@ -109,6 +109,7 @@ ESQUEMA_SUPORTADO = pa.schema([
     ("numero_documento", pa.string()),
     ("modelo", pa.string()),
     ("participante", pa.string()),
+    ("serie", pa.string()),
     # o razão da etapa 5 lê daqui: sem data não há posição na ficha, e sem
     # CFOP não se sabe que a entrada é devolução de venda
     ("data", pa.date32()),
@@ -385,12 +386,15 @@ def apurar(
 
     tem_retido = os.path.isfile(retido)
     tem_cadastro = os.path.isfile(cadastro)
+    # movimentação de antes da v0.52 não tem a série: fica vazia
+    tem_serie = "serie" in pq.read_schema(movimentos).names
     con = _abrir(destino)
     try:
         con.execute(f"""
             CREATE OR REPLACE VIEW entradas AS
             SELECT m.cnpj, m.competencia, m.chave, m.numero_documento, m.modelo,
-                   m.participante, m.data, m.cfop, m.numero_item,
+                   m.participante, {'m.serie' if tem_serie else 'NULL::VARCHAR'} AS serie,
+                   m.data, m.cfop, m.numero_item,
                    m.codigo, m.descricao, m.cst_icms,
                    m.quantidade, m.valor_icms, m.valor_st, m.bc_st,
                    {'r.informado' if tem_retido else 'NULL'} AS informado,
@@ -563,7 +567,7 @@ class _Lote:
 
     def acrescentar(self, d: dict, i: int, r) -> None:
         for coluna in ("cnpj", "competencia", "chave", "numero_documento", "modelo",
-                       "participante", "data", "cfop", "numero_item", "codigo",
+                       "participante", "serie", "data", "cfop", "numero_item", "codigo",
                        "descricao", "cst_icms", "quantidade", "bc_st"):
             self.colunas[coluna].append(d[coluna][i])
         self.colunas["suportado"].append(r.valor)

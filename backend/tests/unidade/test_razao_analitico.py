@@ -522,3 +522,20 @@ class TestAberturaValorada:
         destino.mkdir()
         r = montar(fontes, str(destino))
         assert (r.periodo_inicio, r.periodo_fim, len(ficha(destino))) == ("2021-01-01", "2021-12-31", 4)
+
+
+class TestSerieDaLinha:
+    def test_a_serie_do_suportado_vai_para_a_ficha(self, fontes, tmp_path):
+        caminho = os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO)
+        linhas = pq.read_table(caminho).to_pylist()
+        for l in linhas:
+            l["serie"] = "3"
+        esquema = pq.read_schema(caminho).append(pa.field("serie", pa.string()))
+        pq.write_table(pa.Table.from_pylist(linhas, schema=esquema), caminho)
+        destino = tmp_path / "serie"
+        destino.mkdir()
+        montar(fontes, str(destino))
+        por_cfop = {l["cfop"]: l["serie"] for l in ficha(destino)}
+        assert por_cfop["1403"] == "3"
+        # a venda do relatório não tem série; a transferência da EFD de teste também não
+        assert por_cfop["5405"] == ""

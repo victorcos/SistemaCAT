@@ -327,3 +327,18 @@ class TestRevisao:
         with pytest.raises(RuntimeError):
             gerar(fontes, str(destino))
         assert not [n for n in os.listdir(destino) if n.startswith(".CAT5_")]
+
+
+class TestSerieDo1200:
+    def test_nota_sem_chave_vai_no_1200_com_a_serie_sem_mascara(self, fontes, tmp_path):
+        acrescentar(os.path.join(fontes.razao, ARQUIVO_FICHA3), [linha_da_ficha(
+            cnpj=SP, codigo="1002140", numero=2, data=date(2024, 1, 4), especie="entrada", cfop="1403",
+            quantidade=D(1), icms_suportado=D(0), numero_item=2, modelo="01", participante="F1",
+            numero_documento="4455", serie="U-2")])
+        destino = tmp_path / "serie"
+        destino.mkdir()
+        gerar(fontes, str(destino))
+        todos = [os.path.join(p, n) for p in (destino / PASTA_ENVIO, destino / PASTA_PREVIAS) for n in os.listdir(p)
+                 if "_1_2024" in n]
+        linhas = registros(todos[0])
+        assert "1200|F1|01||U2|4455|002|0|04012024|1403|1002140|1,000|0,00||" in linhas

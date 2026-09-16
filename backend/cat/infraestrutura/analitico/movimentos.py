@@ -73,6 +73,8 @@ _DOCUMENTO = [
     ("modelo", pa.string()),
     ("situacao", pa.string()),
     ("numero_documento", pa.string()),
+    # o SER do 1200 no arquivo digital: nota sem chave se identifica por série e número
+    ("serie", pa.string()),
     ("data", pa.date32()),
     ("operacao", pa.string()),
     ("emitente", pa.string()),
@@ -204,7 +206,7 @@ class _Contexto:
             "chave": d.chave, "modelo": d.modelo, "situacao": d.situacao,
             # a data da entrada ou da saída, não a emissão: é a que posiciona o
             # movimento na Ficha 3 e vai no DATA do 1100
-            "numero_documento": d.numero, "data": d.data_da_operacao,
+            "numero_documento": d.numero, "serie": d.serie, "data": d.data_da_operacao,
             "operacao": d.operacao.value, "emitente": d.emitente.value,
             "participante": d.participante,
         }

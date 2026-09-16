@@ -177,6 +177,7 @@ ESQUEMA_FICHA3 = pa.schema([
     ("modelo", pa.string()),
     ("participante", pa.string()),
     ("numero_documento", pa.string()),
+    ("serie", pa.string()),
 ])
 
 ESQUEMA_FICHAS = pa.schema([
@@ -649,6 +650,11 @@ def _preparar(con, fontes: Fontes) -> dict:
     """Monta a tabela `lancamentos` e a `abertura`. Tudo em SQL, nada calculado."""
     mov = f"read_parquet('{_escapar(os.path.join(fontes.movimentacao, ARQUIVO_MOVIMENTOS))}')"
     sup = f"read_parquet('{_escapar(os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO))}')"
+    # etapas de antes da v0.52 não guardam a série do documento: vai vazia
+    serie_mov = "serie" if "serie" in pq.read_schema(
+        os.path.join(fontes.movimentacao, ARQUIVO_MOVIMENTOS)).names else "NULL::VARCHAR"
+    serie_sup = "s.serie" if "serie" in pq.read_schema(
+        os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO)).names else "NULL::VARCHAR"
     itens = os.path.join(fontes.movimentacao, ARQUIVO_ITENS)
     conversoes = os.path.join(fontes.movimentacao, ARQUIVO_CONVERSOES)
     inventario = os.path.join(fontes.movimentacao, ARQUIVO_INVENTARIO)
@@ -671,7 +677,7 @@ def _preparar(con, fontes: Fontes) -> dict:
                quantidade, valor, coalesce(valor_icms, 0) + coalesce(valor_st, 0) AS suportado,
                coalesce(nullif(chave, ''), numero_documento) AS documento, chave,
                false AS pdv, 'efd' AS origem,
-               numero_item, participante, numero_documento
+               numero_item, participante, numero_documento, {serie_mov} AS serie
         FROM {mov} WHERE operacao = 'saida'
     """)
 
@@ -715,7 +721,8 @@ def _preparar(con, fontes: Fontes) -> dict:
                    chave, pdv, 'relatorio' AS origem,
                    -- o relatório não traz nº do item nem código de participante:
                    -- a linha calcula a ficha, mas não vira registro do arquivo digital
-                   NULL::INTEGER AS numero_item, '' AS participante, numero_documento
+                   NULL::INTEGER AS numero_item, '' AS participante, numero_documento,
+                   NULL::VARCHAR AS serie
             FROM rel_com_cnpj
             WHERE cnpj IS NOT NULL
               AND NOT (length(chave) = 44
@@ -779,7 +786,7 @@ def _preparar(con, fontes: Fontes) -> dict:
                    CASE WHEN replace(s.cfop, '.', '') IN ({lista(_DEVOLUCAO_DE_VENDA)}) THEN 'saida' ELSE 'entrada' END AS especie,
                    replace(s.cfop, '.', '') IN ({lista(_DEVOLUCAO_DE_VENDA)}) AS devolucao,
                    1 AS prioridade,
-                   s.chave, s.numero_item, s.participante, s.numero_documento
+                   s.chave, s.numero_item, s.participante, s.numero_documento, {serie_sup} AS serie
             FROM {sup} s
             LEFT JOIN unidade_das_entradas ue
               ON ue.cnpj = s.cnpj AND ue.chave = s.chave AND ue.numero_documento = s.numero_documento
@@ -790,7 +797,7 @@ def _preparar(con, fontes: Fontes) -> dict:
                    CASE WHEN s.cfop IN ({lista(_DEVOLUCAO_DE_COMPRA)}) THEN 'entrada' ELSE 'saida' END,
                    s.cfop IN ({lista(_DEVOLUCAO_DE_COMPRA)}),
                    2,
-                   s.chave, s.numero_item, s.participante, s.numero_documento
+                   s.chave, s.numero_item, s.participante, s.numero_documento, s.serie
             FROM {saidas} s
         ) l
         LEFT JOIN unid u ON u.cnpj = l.cnpj AND u.codigo = l.codigo
@@ -1045,10 +1052,10 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
 
 
 def _documento(linha: dict) -> tuple:
-    """(chave, nº do item, modelo, participante, número) — o que o arquivo digital pede."""
+    """(chave, nº do item, modelo, participante, número, série) — o que o arquivo digital pede."""
     return ((linha.get("chave") or "").strip(), linha.get("numero_item"),
             (linha.get("modelo") or "").strip(), (linha.get("participante") or "").strip(),
-            (linha.get("numero_documento") or "").strip())
+            (linha.get("numero_documento") or "").strip(), (linha.get("serie") or "").strip())
 
 
 def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
@@ -1125,6 +1132,7 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conve
     lote["modelo"].append(doc[2])
     lote["participante"].append(doc[3])
     lote["numero_documento"].append(doc[4])
+    lote["serie"].append(doc[5] if len(doc) > 5 else "")
 
 
 # ---------------------------------------------------------------------------
