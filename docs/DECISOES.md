@@ -31,8 +31,20 @@ nenhum nº de item acima de 999 e nenhuma linha repetida.
 | O recorte por trava usava `LIKE`, em que `_` casa qualquer letra | — | código inteiro |
 | Pré-validação do cliente: dois arquivos com o mesmo nome misturavam as ocorrências | outra ferramenta pode chamar todo mês de `CAT42.txt` | o segundo ganha `(<CNPJ> <aaaa-mm>)` no nome |
 
-**Para valer no Amigão**, as etapas 3 a 7 rodam de novo: a data de entrada muda
-a movimentação, e a alíquota do mês muda o razão.
+**Piloto da correção (execução 51, só a etapa 7, sobre o razão 48 e a apuração
+49 — em 7 min 16 s).** Participante sem cadastro: de 127 arquivos para
+**nenhum** (o 0150 ganhou os 230 que faltavam). Dos 707.676 registros 0200,
+9.541 mudaram de alíquota, 47.770 de descrição, 17.199 de CEST, 8.868 de código
+de barras e 3.986 de NCM; nenhum de unidade (ex.: a mussarela da loja 004265
+sai com 12% em janeiro de 2021, e não com os 18% de dezembro). 95.904 entradas
+contadas com ICMS_TOT zero. A recomposição segue fechando 707.607 de 707.607
+itens. O ICMS negativo com estoque positivo não aparece em SP: os 813 casos são
+das lojas do PR e do MS. Seguem as 234 prévias, todas por `nao_apta` da etapa
+6; 12 com `confronto_pendente` (as 393 transferências 6409, enquadramento 4) e
+10 com `saldo_negativo`.
+
+**Para valer por inteiro no Amigão**, as etapas 3 a 6 rodam de novo: a data de
+entrada muda a movimentação, e a alíquota do mês muda o razão.
 
 **O que continua aberto.** O 1200 sai sem SER (a série é lida no C100 e não
 chega à movimentação); ECF_FAB, 0205 e o fato gerador sem documento (CHV 0,
