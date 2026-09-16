@@ -50,6 +50,8 @@ export interface ConferenciaComInventario {
 
 export interface ResumoDoRazao {
   versao?: number;
+  /** a escolha do trabalho com que este razão foi montado; ausente nos de antes dela */
+  venda_a_consumidor?: string;
   periodo_inicio?: string;
   periodo_fim?: string;
   abertura_em?: string | null;

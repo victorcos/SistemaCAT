@@ -22,6 +22,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from cat.dominio.cat42.enquadramento import VendaAConsumidor
 from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_CONVERSOES,
     ARQUIVO_ITENS,
@@ -69,6 +70,7 @@ def fontes(tmp_path):
         ("cst_icms", pa.string()), ("modelo", pa.string()), ("quantidade", pa.decimal128(20, 5)),
         ("valor", pa.decimal128(18, 2)), ("valor_icms", pa.decimal128(18, 2)),
         ("valor_st", pa.decimal128(18, 2)), ("chave", pa.string()), ("numero_documento", pa.string()),
+        ("participante", pa.string()),
     ], [
         # entrada: aparece também aqui, mas o razão lê a da apuração
         {"cnpj": A, "competencia": date(2021, 1, 1), "operacao": "entrada", "codigo": "X",
@@ -105,7 +107,7 @@ def fontes(tmp_path):
         ("cnpj", pa.string()), ("codigo", pa.string()), ("data", pa.date32()), ("cfop", pa.string()),
         ("cst_icms", pa.string()), ("modelo", pa.string()), ("quantidade", pa.decimal128(18, 5)),
         ("suportado", pa.decimal128(18, 6)), ("chave", pa.string()), ("numero_documento", pa.string()),
-        ("numero_item", pa.int32()),
+        ("numero_item", pa.int32()), ("participante", pa.string()),
     ], [
         {"cnpj": A, "codigo": "X", "data": date(2021, 1, 5), "cfop": "1403", "cst_icms": "060",
          "modelo": "55", "quantidade": d(10), "suportado": d(20), "chave": "4" * 44,
@@ -189,6 +191,46 @@ class TestAsFontes:
         destino.mkdir()
         r = montar(fontes, str(destino))
         assert r.saidas_por_origem == {"efd": 1}
+
+
+class TestVendaAConsumidor:
+    """A escolha do trabalho: o cupom no enquadramento 1 (o manual) ou no 0 (a BOA)."""
+
+    def test_o_padrao_e_o_enquadramento_1(self, montado):
+        destino, r = montado
+        assert r.venda_a_consumidor == "enquadramento_1"
+        assert serializar(r)["venda_a_consumidor"] == "enquadramento_1"
+
+    def test_no_zero_o_cupom_nao_gera_ressarcimento(self, fontes, tmp_path):
+        destino = tmp_path / "no_zero"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP"},
+                   venda_a_consumidor=VendaAConsumidor.DEMAIS_SAIDAS)
+        venda = [l for l in ficha(destino) if l["origem"] == "relatorio"][0]
+        assert venda["enquadramento"] == 0 and venda["icms_efetivo"] is None
+        assert venda["ressarcimento"] == 0 and venda["complemento"] == 0
+        # o saldo não muda: o enquadramento decide o confronto, não a baixa
+        assert venda["saldo_quantidade"] == d(13)
+        assert r.ressarcimento == 0 and r.venda_a_consumidor == "demais_saidas"
+
+
+class TestDocumentoDaLinha:
+    """O que o arquivo digital vai pedir de cada linha: chave e nº do item (1100)."""
+
+    def test_entrada_e_saida_da_efd_levam_chave_e_item(self, montado):
+        destino, _ = montado
+        linhas = ficha(destino)
+        entrada, transferencia, devolucao = linhas[0], linhas[1], linhas[3]
+        assert (entrada["chave"], entrada["numero_item"], entrada["modelo"]) == ("4" * 44, 1, "55")
+        assert (transferencia["chave"], transferencia["numero_item"],
+                transferencia["numero_documento"]) == (CHAVE_TRANSF, 1, "11")
+        assert devolucao["chave"] == "6" * 44 and devolucao["numero_item"] == 1
+
+    def test_venda_do_relatorio_nao_tem_item(self, montado):
+        destino, _ = montado
+        venda = ficha(destino)[2]
+        assert venda["origem"] == "relatorio"
+        assert venda["chave"] == "" and venda["numero_item"] is None
 
 
 def trocar_unidade_da_entrada(fontes, unidade: str) -> None:

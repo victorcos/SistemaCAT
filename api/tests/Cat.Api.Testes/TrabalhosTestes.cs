@@ -236,8 +236,11 @@ public sealed class TrabalhosTestes(BancoDeTeste banco, MotorInternoFalso _motor
         Assert.Equal(
             ["id", "empresa_id", "empresa", "cnpj_matriz", "cnpj_matriz_formatado", "uf", "frente", "frente_rotulo", "nome",
              "competencia_ini", "competencia_fim", "status", "status_rotulo", "pre_cadastro", "etapas_feitas", "etapas_totais",
-             "criado_por", "criado_por_id", "responsavel", "responsavel_id", "comentarios"],
+             "criado_por", "criado_por_id", "responsavel", "responsavel_id", "comentarios", "venda_a_consumidor",
+             "venda_a_consumidor_rotulo"],
             p.EnumerateObject().Select(x => x.Name));
+        // trabalho novo nasce como o manual manda, e como todo razão antigo foi montado
+        Assert.Equal("enquadramento_1", p.GetProperty("venda_a_consumidor").GetString());
         Assert.Equal("Trabalho com história", p.GetProperty("nome").GetString());
         Assert.Equal("EMPRESA DO CARTAO", p.GetProperty("empresa").GetString());
         Assert.Equal("CAT 42 — ressarcimento de ICMS-ST", p.GetProperty("frente_rotulo").GetString());
@@ -351,6 +354,43 @@ public sealed class TrabalhosTestes(BancoDeTeste banco, MotorInternoFalso _motor
         Assert.Equal(2, cartao.GetProperty("etapas_feitas").GetInt32());
         var etapa = (await Json(await c.GetAsync($"/api/projetos/{projeto}"))).GetProperty("etapas")[0];
         Assert.Equal(["chave", "nome", "descricao", "situacao", "situacao_rotulo", "implementada", "acessivel"], etapa.EnumerateObject().Select(p => p.Name));
+    }
+
+    [Fact]
+    public async Task Venda_a_consumidor_muda_por_trabalho_e_fica_no_historico()
+    {
+        var (_, nome, token) = await Pessoa("analista");
+        var c = Cliente(token: token);
+        var empresa = await Empresa(c);
+        var projeto = await Projeto(c, empresa);
+
+        var opcoes = await Json(await c.GetAsync("/api/venda-a-consumidor"));
+        Assert.Equal(["enquadramento_1", "demais_saidas"], opcoes.EnumerateArray().Select(o => o.GetProperty("valor").GetString()));
+
+        var r = await c.PutAsJsonAsync($"/api/projetos/{projeto}/venda-a-consumidor", new { valor = "demais_saidas" });
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        var cartao = await Json(r);
+        Assert.Equal("demais_saidas", cartao.GetProperty("venda_a_consumidor").GetString());
+        Assert.StartsWith("Demais saídas (0)", cartao.GetProperty("venda_a_consumidor_rotulo").GetString());
+        Assert.Equal("demais_saidas", await banco.Escalar<string>($"SELECT venda_a_consumidor FROM projeto WHERE id = {projeto}"));
+
+        // o evento diz de onde para onde, e quem mudou
+        Assert.Equal("enquadramento_1", await banco.Escalar<string>(
+            $"SELECT dados->>'de' FROM evento_do_projeto WHERE projeto_id = {projeto} AND tipo = 'parametro_alterado'"));
+        Assert.Equal(nome.ToUpperInvariant(), await banco.Escalar<string>(
+            $"SELECT autor_nome FROM evento_do_projeto WHERE projeto_id = {projeto} AND tipo = 'parametro_alterado'"));
+
+        // a mesma escolha de novo é conflito, e valor desconhecido é recusa
+        r = await c.PutAsJsonAsync($"/api/projetos/{projeto}/venda-a-consumidor", new { valor = "demais_saidas" });
+        Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
+        r = await c.PutAsJsonAsync($"/api/projetos/{projeto}/venda-a-consumidor", new { valor = "enquadramento_9" });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, r.StatusCode);
+        Assert.Contains("enquadramento_1, demais_saidas", await Detalhe(r));
+
+        // quem não enxerga a empresa não muda
+        var (_, _, outro) = await Pessoa("analista");
+        r = await Cliente(token: outro).PutAsJsonAsync($"/api/projetos/{projeto}/venda-a-consumidor", new { valor = "enquadramento_1" });
+        Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
     }
 
     [Fact]

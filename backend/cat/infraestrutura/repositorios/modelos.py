@@ -165,6 +165,12 @@ class ProjetoDB(Base):
     # desligamento e troca de carteira acontecem no meio de uma apuração que
     # dura meses, e a sucessão fica registrada no histórico.
     responsavel_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    # como a venda a consumidor final entra no razão: "enquadramento_1" (o
+    # manual) ou "demais_saidas" (como a BOA transmitiu). Ver
+    # cat.dominio.cat42.enquadramento.VendaAConsumidor
+    venda_a_consumidor: Mapped[str] = mapped_column(
+        String(20), default="enquadramento_1", server_default="enquadramento_1", nullable=False
+    )
 
     empresa: Mapped[EmpresaDB] = relationship(lazy="joined")
     autor: Mapped["UsuarioDB | None"] = relationship(

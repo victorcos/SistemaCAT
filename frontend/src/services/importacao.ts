@@ -58,6 +58,9 @@ export interface Projeto {
   responsavel: string | null;
   responsavel_id: number | null;
   comentarios: number;
+  /** como o cupom entra no razão: "enquadramento_1" (o manual) ou "demais_saidas" (como a BOA) */
+  venda_a_consumidor: string;
+  venda_a_consumidor_rotulo: string;
 }
 
 export interface Etapa {
@@ -156,6 +159,23 @@ export const listarProjetos = () => chamar<Projeto[]>("/projetos");
 
 export const detalharProjeto = (id: number) =>
   chamar<ProjetoDetalhe>(`/projetos/${id}`);
+
+export interface OpcaoDeVendaAConsumidor {
+  valor: string;
+  rotulo: string;
+  explicacao: string;
+}
+
+export const opcoesDeVendaAConsumidor = () =>
+  chamar<OpcaoDeVendaAConsumidor[]>("/venda-a-consumidor");
+
+/** Devolve o cartão do trabalho já com a escolha nova. */
+export const definirVendaAConsumidor = (projetoId: number, valor: string) =>
+  chamar<Projeto>(`/projetos/${projetoId}/venda-a-consumidor`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ valor }),
+  });
 
 export interface OQueSeraApagado {
   projeto: string;

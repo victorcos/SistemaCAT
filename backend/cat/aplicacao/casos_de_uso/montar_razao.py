@@ -42,6 +42,7 @@ from cat.aplicacao.casos_de_uso.rodada import (
     nome_de,
     reais,
 )
+from cat.dominio.cat42.enquadramento import VendaAConsumidor
 from cat.dominio.lote import TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.razao import (
@@ -212,8 +213,10 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     fontes = Fontes(movimentacao=movimentos.pasta_de_trabalho,
                     apuracao=apuracao.pasta_de_trabalho,
                     saidas_do_relatorio=caminho_saidas)
+    venda = venda_a_consumidor_do_projeto(execucao.projeto_id, sessao)
+    diario.anotar("info", f"Venda a consumidor final: {venda.rotulo.lower()} (escolha do trabalho).")
     resumo = montar(fontes, destino, uf_por_cnpj=_ufs(execucao.projeto_id, sessao),
-                    avisar=lancado, deve_parar=parar)
+                    avisar=lancado, deve_parar=parar, venda_a_consumidor=venda)
 
     segundos = round(time.time() - inicio, 1)
     execucao.situacao = "concluida"
@@ -235,6 +238,13 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
         dados={"execucao_id": execucao.id, "fichas": resumo.fichas, "linhas": resumo.linhas,
                "ressarcimento": str(resumo.ressarcimento), "segundos": segundos},
         autor_id=execucao.criada_por)
+
+
+def venda_a_consumidor_do_projeto(projeto_id: int, sessao: Session) -> VendaAConsumidor:
+    """A escolha do trabalho. Valor que o domínio não conhece não vira padrão
+    calado: falha, porque decide o enquadramento de quase todo o movimento."""
+    valor = sessao.scalar(select(ProjetoDB.venda_a_consumidor).where(ProjetoDB.id == projeto_id))
+    return VendaAConsumidor.de(valor)
 
 
 def _ufs(projeto_id: int, sessao: Session) -> dict[str, str]:

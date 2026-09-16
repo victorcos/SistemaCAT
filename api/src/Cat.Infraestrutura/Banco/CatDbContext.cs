@@ -105,6 +105,7 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
             e.Property(x => x.CriadoEm).HasColumnName("criado_em");
             e.Property(x => x.CriadoPor).HasColumnName("criado_por");
             e.Property(x => x.ResponsavelId).HasColumnName("responsavel_id");
+            e.Property(x => x.VendaAConsumidor).HasColumnName("venda_a_consumidor");
         });
 
         modelo.Entity<EventoLinha>(e =>
@@ -254,6 +255,7 @@ public sealed class ProjetoLinha
     public DateTime CriadoEm { get; set; }
     public int? CriadoPor { get; set; }
     public int? ResponsavelId { get; set; }
+    public string VendaAConsumidor { get; set; } = Dominio.Projeto.VendaAConsumidor.Enquadramento1;
 }
 
 public sealed class EventoLinha

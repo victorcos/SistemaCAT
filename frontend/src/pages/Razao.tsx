@@ -14,6 +14,7 @@ import {
   zero,
 } from "@/components/shared/Rodada";
 import { TrabalhoParado } from "@/components/shared/TrabalhoParado";
+import { EscolhaDaVendaAConsumidor } from "@/components/shared/VendaAConsumidor";
 import { Aviso } from "@/components/ui/Aviso";
 import { Botao, BotaoLink } from "@/components/ui/Botao";
 import { Busca, Segmentado } from "@/components/ui/Filtros";
@@ -218,6 +219,16 @@ export default function Razao() {
       </CabecalhoDePagina>
 
       <TrabalhoParado status={p?.status} projetoId={projetoId} />
+
+      {p && (
+        <EscolhaDaVendaAConsumidor
+          projeto={p}
+          // razão de antes da escolha existir foi montado como o manual manda
+          usadaNoRazao={resultado ? (resumo?.venda_a_consumidor ?? "enquadramento_1") : undefined}
+          bloqueada={rodando || !anda}
+          aoMudar={(novo) => setProjeto((d) => (d ? { ...d, projeto: novo } : d))}
+        />
+      )}
 
       {erro && <Aviso titulo={erro.message} codigo={erro.requisicaoId} aoFechar={() => setErro(null)} />}
 

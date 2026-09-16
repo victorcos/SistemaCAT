@@ -45,7 +45,43 @@ suposta.
 
 from __future__ import annotations
 
+from enum import Enum
+
 from cat.dominio.cat42.razao import EnquadramentoLegal
+
+
+class VendaAConsumidor(str, Enum):
+    """Como o trabalho enquadra a venda a consumidor final. É escolha do
+    trabalho, não do sistema (decisão do Victor, 16/09/2026).
+
+    O manual põe a venda a consumidor final no enquadramento 1, que confronta
+    o suportado com a alíquota vezes o preço de venda: dá ressarcimento quando
+    se vendeu abaixo da base presumida e **complemento** quando se vendeu acima.
+
+    Os arquivos que a IRMAOS BOA transmitiu fazem outra coisa: o cupom (CF-e
+    SAT, CFOP 5.405) vai com COD_LEGAL **0**, na Ficha 3 e no arquivo, e só a
+    perda (5.927) entra no enquadramento 2. Não há complemento. Medido em três
+    arquivos reais, 2022 a 2024.
+
+    As duas leituras mudam o valor do pedido — no piloto do Amigão, o
+    complemento inteiro vem do enquadramento 1 —, e por isso o razão guarda
+    qual delas usou.
+    """
+
+    ENQUADRAMENTO_1 = "enquadramento_1"
+    DEMAIS_SAIDAS = "demais_saidas"
+
+    @property
+    def rotulo(self) -> str:
+        return {
+            VendaAConsumidor.ENQUADRAMENTO_1: "Enquadramento 1: pede ressarcimento e recolhe complemento",
+            VendaAConsumidor.DEMAIS_SAIDAS: "Demais saídas (0): só as perdas e as interestaduais",
+        }[self]
+
+    @classmethod
+    def de(cls, valor: str | None) -> "VendaAConsumidor":
+        """O valor gravado no trabalho; vazio é o do manual."""
+        return cls(valor) if valor else cls.ENQUADRAMENTO_1
 
 # Baixa de estoque: perecimento, deterioração, roubo, furto, extravio. O manual
 # manda uma única nota por período, um item por mercadoria.
@@ -122,12 +158,17 @@ def classificar(
     cst_icms: str = "",
     consumidor_final: bool | None = None,
     modelo: str = "",
+    venda_a_consumidor: VendaAConsumidor = VendaAConsumidor.ENQUADRAMENTO_1,
 ) -> EnquadramentoLegal | None:
     """O enquadramento desta saída, ou `None` quando não dá para saber.
 
     `consumidor_final` é a informação que o CFOP não carrega. Quando vem,
     decide entre o enquadramento 1 e o 0. Quando não vem, as vendas comuns
     ficam indefinidas de propósito.
+
+    `venda_a_consumidor` é a escolha do trabalho. Em `DEMAIS_SAIDAS` a venda
+    comum é 0 dos dois lados — consumidor ou contribuinte que revende —, e
+    deixa de haver o que perguntar sobre quem comprou.
 
     A ordem das regras é de força: o que o manual fixa vem antes do que o CFOP
     sugere, e o que o CFOP sugere vem antes do que se poderia supor.
@@ -152,8 +193,13 @@ def classificar(
         # segue para revenda: não é saída a consumidor
         return EnquadramentoLegal.DEMAIS_SAIDAS
 
-    # 3. o que depende de quem comprou. O modelo do documento responde por
-    # quase todo o movimento, e responde por definição, não por suposição
+    # 3. o que depende de quem comprou — a menos que o trabalho não peça o
+    # enquadramento 1: aí consumidor e revendedor caem os dois no 0
+    if venda_a_consumidor is VendaAConsumidor.DEMAIS_SAIDAS:
+        return EnquadramentoLegal.DEMAIS_SAIDAS
+
+    # o modelo do documento responde por quase todo o movimento, e responde por
+    # definição, não por suposição
     if consumidor_final is None:
         consumidor_final = consumidor_final_pelo_modelo(modelo)
     if consumidor_final is True:

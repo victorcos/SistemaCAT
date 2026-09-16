@@ -64,3 +64,4 @@ class TipoDeEvento(str, Enum):
     ETAPA_CONCLUIDA = "etapa_concluida"
     ETAPA_FALHOU = "etapa_falhou"
     PLANILHA_BAIXADA = "planilha_baixada"
+    PARAMETRO_ALTERADO = "parametro_alterado"

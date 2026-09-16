@@ -131,6 +131,30 @@ public sealed class Trabalhos(
     }
 
     /// <summary>
+    /// Como o trabalho enquadra a venda a consumidor final. Muda o razão e a
+    /// apuração: o que já foi montado com a escolha antiga continua como está, e
+    /// a tela do razão avisa que ele precisa rodar de novo.
+    /// </summary>
+    public async Task<ProjetoComEtapas> DefinirVendaAConsumidor(int projetoId, string valor, Usuario por,
+        CancellationToken cancelar)
+    {
+        var projeto = await repositorio.BuscarProjeto(projetoId, cancelar) ?? throw new ProjetoNaoEncontrado();
+        Escopo.Exigir(por, projeto.EmpresaId, log);
+        var nova = VendaAConsumidor.Buscar(valor) ?? throw new VendaAConsumidorDesconhecida(valor);
+        var atual = VendaAConsumidor.DoBanco(projeto.VendaAConsumidor);
+        if (nova.Valor == atual.Valor)
+            throw new MesmaVendaAConsumidor(atual);
+
+        await repositorio.DefinirVendaAConsumidor(projetoId, nova.Valor,
+            new Dictionary<string, object> { ["parametro"] = "venda_a_consumidor", ["de"] = atual.Valor, ["para"] = nova.Valor },
+            por, relogio.GetUtcNow(), cancelar);
+        // muda o valor do pedido: fica em aviso, para se achar no log sem filtro
+        log.Aviso("venda a consumidor do trabalho alterada",
+            new { projeto_id = projetoId, de = atual.Valor, para = nova.Valor, por_usuario_id = por.Id });
+        return ComEtapas((await repositorio.BuscarProjeto(projetoId, cancelar))!);
+    }
+
+    /// <summary>
     /// A importação conclui quando entrou base, não quando o projeto nasceu: o
     /// cadastro lê uma amostra do SPED e não traz base nenhuma. Cada etapa de
     /// processamento conclui com uma rodada terminada; enquanto roda, aparece

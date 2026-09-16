@@ -75,6 +75,7 @@ import pyarrow.parquet as pq
 
 from cat.dominio.cat42.enquadramento import (
     CFOP_DEVOLUCAO,
+    VendaAConsumidor,
     classificar,
 )
 from cat.dominio.cat42.razao import (
@@ -164,6 +165,14 @@ ESQUEMA_FICHA3 = pa.schema([
     ("saldo_valor", pa.decimal128(30, 15)),
     ("ressarcimento", pa.decimal128(30, 15)),
     ("complemento", pa.decimal128(30, 15)),
+    # o documento da linha, como o arquivo digital pede: o 1100 leva chave e nº
+    # do item; o 1200, participante, modelo e número. Vazio quando a fonte não
+    # traz — a venda de PDV do relatório não tem chave nem nº do item
+    ("chave", pa.string()),
+    ("numero_item", pa.int32()),
+    ("modelo", pa.string()),
+    ("participante", pa.string()),
+    ("numero_documento", pa.string()),
 ])
 
 ESQUEMA_FICHAS = pa.schema([
@@ -332,6 +341,9 @@ class Andamento:
 @dataclass
 class ResumoDaMontagem:
     periodo_inicio: str = ""
+    # a escolha do trabalho com que o razão foi montado: muda o enquadramento
+    # da venda a consumidor, e por isso o que vem depois precisa saber qual foi
+    venda_a_consumidor: str = VendaAConsumidor.ENQUADRAMENTO_1.value
     periodo_fim: str = ""
     abertura_em: str | None = None
     codigos_com_st: int = 0
@@ -380,6 +392,7 @@ def montar(
     descricoes: dict[tuple[str, str], str] | None = None,
     avisar: Callable[[Andamento], None] | None = None,
     deve_parar: DeveParar | None = None,
+    venda_a_consumidor: VendaAConsumidor = VendaAConsumidor.ENQUADRAMENTO_1,
 ) -> ResumoDaMontagem:
     """Percorre os lançamentos de cada (estabelecimento, mercadoria) e grava a ficha.
 
@@ -390,7 +403,7 @@ def montar(
     uf_por_cnpj = uf_por_cnpj or {}
     ficha3 = os.path.join(destino, ARQUIVO_FICHA3)
     fichas = os.path.join(destino, ARQUIVO_FICHAS)
-    resumo = ResumoDaMontagem()
+    resumo = ResumoDaMontagem(venda_a_consumidor=venda_a_consumidor.value)
     con = _abrir(destino)
     try:
         info = _preparar(con, fontes)
@@ -410,7 +423,7 @@ def montar(
             ORDER BY cnpj, codigo, data, prioridade, origem, documento
         """).to_arrow_reader(LINHAS_POR_LOTE)
         _percorrer(leitor, aberturas, ficha3, fichas, resumo, total,
-                   uf_por_cnpj, descricoes or {}, avisar, deve_parar)
+                   uf_por_cnpj, descricoes or {}, avisar, deve_parar, venda_a_consumidor)
         # conexão nova para a conferência: a do percurso ainda segura o leitor
         # (a lição do índice da etapa 4). O banco é em arquivo, as tabelas ficam
         del leitor
@@ -585,7 +598,8 @@ def _preparar(con, fontes: Fontes) -> dict:
         SELECT cnpj, codigo, data, replace(cfop, '.', '') AS cfop, cst_icms, modelo, unidade,
                quantidade, valor, coalesce(valor_icms, 0) + coalesce(valor_st, 0) AS suportado,
                coalesce(nullif(chave, ''), numero_documento) AS documento, chave,
-               false AS pdv, 'efd' AS origem
+               false AS pdv, 'efd' AS origem,
+               numero_item, participante, numero_documento
         FROM {mov} WHERE operacao = 'saida'
     """)
 
@@ -626,7 +640,10 @@ def _preparar(con, fontes: Fontes) -> dict:
                    NULL::VARCHAR AS unidade,
                    quantidade, valor, suportado,
                    coalesce(nullif(chave, ''), 'relatorio|' || unidade || '|' || numero_documento) AS documento,
-                   chave, pdv, 'relatorio' AS origem
+                   chave, pdv, 'relatorio' AS origem,
+                   -- o relatório não traz nº do item nem código de participante:
+                   -- a linha calcula a ficha, mas não vira registro do arquivo digital
+                   NULL::INTEGER AS numero_item, '' AS participante, numero_documento
             FROM rel_com_cnpj
             WHERE cnpj IS NOT NULL
               AND NOT (length(chave) = 44
@@ -673,7 +690,8 @@ def _preparar(con, fontes: Fontes) -> dict:
                    false AS pdv, 'efd' AS origem,
                    CASE WHEN replace(s.cfop, '.', '') IN ({lista(_DEVOLUCAO_DE_VENDA)}) THEN 'saida' ELSE 'entrada' END AS especie,
                    replace(s.cfop, '.', '') IN ({lista(_DEVOLUCAO_DE_VENDA)}) AS devolucao,
-                   1 AS prioridade
+                   1 AS prioridade,
+                   s.chave, s.numero_item, s.participante, s.numero_documento
             FROM {sup} s
             LEFT JOIN unidade_das_entradas ue
               ON ue.cnpj = s.cnpj AND ue.chave = s.chave AND ue.numero_documento = s.numero_documento
@@ -683,7 +701,8 @@ def _preparar(con, fontes: Fontes) -> dict:
                    s.quantidade, s.valor, s.suportado, s.documento, s.pdv, s.origem,
                    CASE WHEN s.cfop IN ({lista(_DEVOLUCAO_DE_COMPRA)}) THEN 'entrada' ELSE 'saida' END,
                    s.cfop IN ({lista(_DEVOLUCAO_DE_COMPRA)}),
-                   2
+                   2,
+                   s.chave, s.numero_item, s.participante, s.numero_documento
             FROM {saidas} s
         ) l
         LEFT JOIN unid u ON u.cnpj = l.cnpj AND u.codigo = l.codigo
@@ -724,10 +743,11 @@ def _preparar(con, fontes: Fontes) -> dict:
 # ---------------------------------------------------------------------------
 # o percurso, ficha a ficha
 # ---------------------------------------------------------------------------
-def _enquadrar(linha: dict) -> tuple[EnquadramentoLegal | None, bool]:
+def _enquadrar(linha: dict, venda_a_consumidor: VendaAConsumidor) -> tuple[EnquadramentoLegal | None, bool]:
     enq = classificar(linha["cfop"] or "", linha["cst_icms"] or "",
                       consumidor_final=True if linha["pdv"] else None,
-                      modelo=linha["modelo"] or "")
+                      modelo=linha["modelo"] or "",
+                      venda_a_consumidor=venda_a_consumidor)
     return enq, enq is None
 
 
@@ -751,7 +771,8 @@ def _confronto(enq: EnquadramentoLegal, linha: dict) -> tuple[Decimal | None, bo
 
 
 def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: ResumoDaMontagem,
-               total: int, uf_por_cnpj: dict, descricoes: dict, avisar, deve_parar) -> None:
+               total: int, uf_por_cnpj: dict, descricoes: dict, avisar, deve_parar,
+               venda_a_consumidor: VendaAConsumidor = VendaAConsumidor.ENQUADRAMENTO_1) -> None:
     escritor = pq.ParquetWriter(ficha3, ESQUEMA_FICHA3)
     escritor_fichas = pq.ParquetWriter(fichas, ESQUEMA_FICHAS)
     lote: dict[str, list] = {c: [] for c in ESQUEMA_FICHA3.names}
@@ -759,7 +780,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
     estabelecimentos: set[str] = set()
     atual: tuple[str, str] | None = None
     movimentos: list[Movimento] = []
-    extras: list[tuple] = []   # (indefinido, faltou alíquota, conversão) por movimento
+    extras: list[tuple] = []   # (indefinido, faltou alíquota, conversão, documento) por movimento
     andamento = Andamento(total=total)
     vistos: set[tuple[str, str]] = set()
 
@@ -777,9 +798,9 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         sem_aliq = indef = sem_fator = 0
         for ln in linhas:
             m = ln.movimento
-            indefinido, faltou, conversao = indice[id(m)]
+            indefinido, faltou, conversao, doc = indice[id(m)]
             competencia = m.data.isoformat()[:7]
-            _acrescentar(lote, cnpj, codigo, ln, indefinido, conversao, retirada)
+            _acrescentar(lote, cnpj, codigo, ln, indefinido, conversao, retirada, doc)
             sem_fator += conversao[2]
             resumo.linhas_convertidas += conversao[1] != 1
             resumo.linhas_unidade_sem_fator += conversao[2]
@@ -863,12 +884,13 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                     if atual is not None:
                         fechar(atual)
                     atual, movimentos, extras = chave, [], []
-                m, indefinido, faltou, pendente, conversao = _movimento(linha, len(movimentos), resumo)
+                m, indefinido, faltou, pendente, conversao = _movimento(
+                    linha, len(movimentos), resumo, venda_a_consumidor)
                 if m is None:
                     continue
                 resumo.confronto_pendente += pendente
                 movimentos.append(m)
-                extras.append((indefinido, faltou, conversao))
+                extras.append((indefinido, faltou, conversao, _documento(linha)))
                 andamento.linhas += 1
             if avisar is not None:
                 andamento.fichas = resumo.fichas
@@ -889,7 +911,15 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
     resumo.estabelecimentos = len(estabelecimentos)
 
 
-def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem):
+def _documento(linha: dict) -> tuple:
+    """(chave, nº do item, modelo, participante, número) — o que o arquivo digital pede."""
+    return ((linha.get("chave") or "").strip(), linha.get("numero_item"),
+            (linha.get("modelo") or "").strip(), (linha.get("participante") or "").strip(),
+            (linha.get("numero_documento") or "").strip())
+
+
+def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
+               venda_a_consumidor: VendaAConsumidor = VendaAConsumidor.ENQUADRAMENTO_1):
     """Converte um lançamento em `Movimento`. Devolve (movimento, indefinido,
     faltou alíquota, confronto pendente, (unidade de origem, fator, sem fator))."""
     especie = Especie.ENTRADA if linha["especie"] == "entrada" else Especie.SAIDA
@@ -904,7 +934,7 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem):
     quantidade = quantidade * fator
     enq, indefinido, faltou, pendente, efetivo = EnquadramentoLegal.DEMAIS_SAIDAS, False, False, False, None
     if especie is Especie.SAIDA and not linha["devolucao"]:
-        classificado, indefinido = _enquadrar(linha)
+        classificado, indefinido = _enquadrar(linha, venda_a_consumidor)
         if classificado is not None:
             enq = classificado
             efetivo, faltou, pendente = _confronto(enq, linha)
@@ -930,7 +960,7 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem):
 
 
 def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conversao: tuple,
-                 retirada: bool) -> None:
+                 retirada: bool, doc: tuple = ("", None, "", "", "")) -> None:
     m = ln.movimento
     lote["cnpj"].append(cnpj)
     lote["codigo"].append(codigo)
@@ -957,6 +987,11 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conve
     lote["saldo_valor"].append(ln.saldo_valor.quantize(_Q15))
     lote["ressarcimento"].append(ln.ressarcimento.quantize(_Q15))
     lote["complemento"].append(ln.complemento.quantize(_Q15))
+    lote["chave"].append(doc[0])
+    lote["numero_item"].append(doc[1])
+    lote["modelo"].append(doc[2])
+    lote["participante"].append(doc[3])
+    lote["numero_documento"].append(doc[4])
 
 
 # ---------------------------------------------------------------------------
@@ -1047,6 +1082,7 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
                "3": "Isenção ou não incidência", "4": "Outro estado",
                "0": "Demais saídas", "indefinido": "Indefinido"}
     return {
+        "venda_a_consumidor": resumo.venda_a_consumidor,
         "periodo_inicio": resumo.periodo_inicio,
         "periodo_fim": resumo.periodo_fim,
         "abertura_em": resumo.abertura_em,

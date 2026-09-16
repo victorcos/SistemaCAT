@@ -5,6 +5,48 @@
 
 ---
 
+## 2026-09-16 — A venda a consumidor final é escolha do trabalho
+
+**O que o arquivo real mostrou.** Antes de escrever o gerador da etapa 7, três
+arquivos CAT 42 que a IRMAOS BOA transmitiu (2022 a 2024, de 24 a 77 MB) foram
+medidos registro a registro. O formato bate com o leiaute. O enquadramento,
+não: a venda de cupom (CF-e SAT, CFOP 5.405) vai com **COD_LEGAL 0**, no
+arquivo e na Ficha 3 (coluna `ENQ0_DEMAIS_SAIDAS`). Só a perda (5.927) entra
+no enquadramento 2, com valor de confronto. Não há complemento.
+
+| Operação no arquivo real | COD_LEGAL | VL_CONFR |
+|---|---|---|
+| 5.405 em CF-e SAT (97% das linhas) | 0 | vazio |
+| 5.927 em NF-e | 2 (e parte em 0) | preenchido no 2 |
+| 1.411 devolução de venda | 0 | vazio |
+
+O sistema punha o cupom no **1**, pelo modelo do documento (decisão de
+14/09/2026), que é o que o manual diz. No piloto do Amigão, o R$ 1,53 milhão de
+complemento vem inteiro desse enquadramento.
+
+**Decisão do Victor.** A escolha é **por trabalho**: `projeto.venda_a_consumidor`
+vale `enquadramento_1` (o manual: ressarcimento e complemento) ou
+`demais_saidas` (como a BOA: só a perda e a interestadual geram ressarcimento).
+Todo trabalho existente ficou no enquadramento 1, que é como o razão já vinha
+montando.
+
+- A regra mora no domínio (`VendaAConsumidor`, em `cat42/enquadramento.py`, e o
+  espelho em `Cat.Dominio/Projeto`). Em `demais_saidas`, a venda comum é 0 dos
+  dois lados — consumidor ou revendedor —, e a NF-e modelo 55 deixa de ser
+  indefinida: não há mais o que perguntar sobre quem comprou.
+- O que o manual fixa não muda: 5.927 segue no 2, saída para outro estado no 4,
+  isenção no 3.
+- O razão grava no resumo qual escolha usou, e a tela do razão avisa quando o
+  último montado usou a outra. Mudar pede confirmação e fica no histórico
+  (`parametro_alterado`, com `de` e `para`).
+
+**A Ficha 3 passa a guardar o documento de cada linha** — chave, nº do item,
+modelo, participante e número —, que é o que o 1100 e o 1200 exigem. A venda de
+PDV do relatório fica sem chave e sem nº do item: calcula a ficha, mas não vira
+registro do arquivo.
+
+---
+
 ## 2026-09-16 — Etapa 6: o período fecha por estabelecimento e mês
 
 **Decisões do Victor.** Ressarcimento e complemento **separados** (o líquido é

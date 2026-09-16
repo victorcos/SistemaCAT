@@ -17,7 +17,7 @@ public sealed record ProjetoLido(
     int Id, int EmpresaId, string Empresa, string? CnpjMatriz, string? Uf, bool PreCadastro,
     string Frente, string Nome, DateOnly CompetenciaIni, DateOnly CompetenciaFim, string Status,
     string? CriadoPor, int? CriadoPorId, string? Responsavel, int? ResponsavelId, int Comentarios,
-    bool TemBase, IReadOnlyDictionary<string, string> UltimaSituacaoPorEtapa);
+    bool TemBase, IReadOnlyDictionary<string, string> UltimaSituacaoPorEtapa, string VendaAConsumidor);
 
 public sealed record NovoProjeto(
     int EmpresaId, string Frente, string Nome, DateOnly CompetenciaIni, DateOnly CompetenciaFim, string? Observacao);
@@ -46,6 +46,10 @@ public interface IRepositorioDeTrabalhos
     /// o fato aconteceu, e perder a anotação dele é ruim, não fatal.
     /// </summary>
     Task RegistrarEvento(int projetoId, string tipo, string texto, object? dados, Usuario por, DateTimeOffset agora,
+        CancellationToken cancelar);
+
+    /// <summary>A escolha nova e o evento que a registra, numa transação.</summary>
+    Task DefinirVendaAConsumidor(int projetoId, string valor, object dados, Usuario por, DateTimeOffset agora,
         CancellationToken cancelar);
 
     Task<OQueSeraApagado?> ResumirExclusao(int projetoId, CancellationToken cancelar);

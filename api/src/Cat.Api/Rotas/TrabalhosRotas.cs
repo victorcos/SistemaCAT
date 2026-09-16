@@ -22,7 +22,8 @@ public static class TrabalhosRotas
         int Id, int EmpresaId, string Empresa, string? CnpjMatriz, string? CnpjMatrizFormatado, string? Uf,
         string Frente, string FrenteRotulo, string Nome, DateOnly CompetenciaIni, DateOnly CompetenciaFim,
         string Status, string StatusRotulo, bool PreCadastro, int EtapasFeitas, int EtapasTotais,
-        string? CriadoPor, int? CriadoPorId, string? Responsavel, int? ResponsavelId, int Comentarios);
+        string? CriadoPor, int? CriadoPorId, string? Responsavel, int? ResponsavelId, int Comentarios,
+        string VendaAConsumidor, string VendaAConsumidorRotulo);
 
     public sealed record EtapaDto(
         string Chave, string Nome, string Descricao, string Situacao, string SituacaoRotulo, bool Implementada, bool Acessivel);
@@ -38,6 +39,10 @@ public static class TrabalhosRotas
         int? EmpresaId, string? Frente, string? Nome, string? CompetenciaIni, string? CompetenciaFim, string? Observacao);
 
     private sealed record ConfirmacaoDeExclusao(string? Senha);
+
+    private sealed record PedidoVendaAConsumidor(string? Valor);
+
+    public sealed record OpcaoDto(string Valor, string Rotulo, string Explicacao);
 
     public static void MapearTrabalhos(this IEndpointRouteBuilder rotas)
     {
@@ -62,6 +67,12 @@ public static class TrabalhosRotas
                     return Results.Json(new ProjetoDetalheDto(Projeto(p), p.Etapas.Select(Etapa).ToList()));
                 }))
             .ExigirUsuario();
+
+        // as duas leituras da venda a consumidor final: a tela mostra as duas, com o porquê
+        api.MapGet("/venda-a-consumidor", () =>
+            Results.Json(VendaAConsumidor.Todas.Select(v => new OpcaoDto(v.Valor, v.Rotulo, v.Explicacao)).ToList()));
+        api.MapPut("/projetos/{projetoId:int}/venda-a-consumidor", DefinirVendaAConsumidor)
+            .ExigirCapacidade(Capacidades.PodeEscrever, "pode_escrever", "mudar o enquadramento da venda a consumidor");
 
         api.MapGet("/projetos/{projetoId:int}/exclusao", async (int projetoId, HttpContext http, ExcluirTrabalho caso) =>
                 await Traduzir(async () =>
@@ -126,6 +137,18 @@ public static class TrabalhosRotas
         });
     }
 
+    private static async Task<IResult> DefinirVendaAConsumidor(int projetoId, HttpContext http, Trabalhos caso)
+    {
+        var (pedido, recusa) = await CorpoJson.Ler<PedidoVendaAConsumidor>(http);
+        if (recusa is not null)
+            return recusa;
+        if (pedido!.Valor is not { Length: > 0 })
+            return CorpoJson.Recusar("Informe a escolha para a venda a consumidor.");
+        return await Traduzir(async () =>
+            Results.Json(Projeto(await caso.DefinirVendaAConsumidor(projetoId, pedido.Valor, http.UsuarioAtual(),
+                http.RequestAborted))));
+    }
+
     private static async Task<IResult> Excluir(int projetoId, HttpContext http, ExcluirTrabalho caso)
     {
         var (pedido, recusa) = await CorpoJson.Ler<ConfirmacaoDeExclusao>(http);
@@ -155,7 +178,8 @@ public static class TrabalhosRotas
             p.Id, p.EmpresaId, p.Empresa, p.CnpjMatriz, Cnpj.Tentar(p.CnpjMatriz)?.Formatado, p.Uf,
             p.Frente, Frentes.Rotulo(p.Frente), p.Nome, p.CompetenciaIni, p.CompetenciaFim,
             p.Status, StatusDoProjeto.Rotulo(p.Status), p.PreCadastro, feitas, totais,
-            p.CriadoPor, p.CriadoPorId, p.Responsavel, p.ResponsavelId, p.Comentarios);
+            p.CriadoPor, p.CriadoPorId, p.Responsavel, p.ResponsavelId, p.Comentarios,
+            VendaAConsumidor.DoBanco(p.VendaAConsumidor).Valor, VendaAConsumidor.DoBanco(p.VendaAConsumidor).Rotulo);
     }
 
     private static EtapaDto Etapa(EtapaDoProjeto e) => new(
@@ -184,7 +208,8 @@ public static class TrabalhosRotas
         ProjetoNaoEncontrado or EmpresaNaoEncontrada => StatusCodes.Status404NotFound,
         EmpresaJaCadastrada or ProjetoRepetido => StatusCodes.Status409Conflict,
         DadoInvalido or RaizNaoConfere or FrenteDesconhecida or CompetenciasInvertidas
-            => StatusCodes.Status422UnprocessableEntity,
+            or VendaAConsumidorDesconhecida => StatusCodes.Status422UnprocessableEntity,
+        MesmaVendaAConsumidor => StatusCodes.Status409Conflict,
         MotorIndisponivel => StatusCodes.Status502BadGateway,
         _ => null,
     };

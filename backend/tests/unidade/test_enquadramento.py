@@ -11,6 +11,7 @@ import pytest
 from cat.dominio.cat42.enquadramento import (
     CFOP_DEVOLUCAO,
     CFOP_TRANSFERENCIA,
+    VendaAConsumidor,
     classificar,
     consumidor_final_pelo_modelo,
     e_devolucao,
@@ -115,6 +116,37 @@ class TestModeloDoDocumento:
     def test_o_manual_ainda_vence_o_modelo(self):
         assert classificar("5927", modelo="65") is E.FATO_GERADOR_NAO_REALIZADO
         assert classificar("6102", modelo="65") is E.OUTRO_ESTADO
+
+
+class TestVendaAConsumidorEEscolhaDoTrabalho:
+    """O trabalho diz se pede o enquadramento 1. A BOA transmitiu o cupom no 0:
+    só a perda e a interestadual geram ressarcimento, e não há complemento."""
+
+    O_ZERO = VendaAConsumidor.DEMAIS_SAIDAS
+
+    def test_o_padrao_e_o_do_manual(self):
+        assert classificar("5405", modelo="59") is E.CONSUMIDOR_FINAL
+        assert VendaAConsumidor.de(None) is VendaAConsumidor.ENQUADRAMENTO_1
+        assert VendaAConsumidor.de("") is VendaAConsumidor.ENQUADRAMENTO_1
+
+    @pytest.mark.parametrize("modelo", ["59", "65", "02", "2D"])
+    def test_cupom_vai_para_o_zero(self, modelo):
+        assert classificar("5405", modelo=modelo, venda_a_consumidor=self.O_ZERO) is E.DEMAIS_SAIDAS
+
+    def test_nfe_deixa_de_ser_indefinida(self):
+        """Consumidor ou revendedor, os dois caem no 0: não há o que perguntar."""
+        assert classificar("5102", modelo="55", venda_a_consumidor=self.O_ZERO) is E.DEMAIS_SAIDAS
+        assert classificar("5102", modelo="55", consumidor_final=True,
+                           venda_a_consumidor=self.O_ZERO) is E.DEMAIS_SAIDAS
+
+    def test_o_que_o_manual_fixa_nao_muda(self):
+        assert classificar("5927", modelo="55", venda_a_consumidor=self.O_ZERO) is E.FATO_GERADOR_NAO_REALIZADO
+        assert classificar("6102", modelo="65", venda_a_consumidor=self.O_ZERO) is E.OUTRO_ESTADO
+        assert classificar("5102", "040", venda_a_consumidor=self.O_ZERO) is E.ISENCAO_OU_NAO_INCIDENCIA
+
+    def test_valor_desconhecido_e_recusado(self):
+        with pytest.raises(ValueError):
+            VendaAConsumidor.de("enquadramento_9")
 
 
 class TestEntradaMalFormada:

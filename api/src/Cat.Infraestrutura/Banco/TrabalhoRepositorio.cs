@@ -148,7 +148,28 @@ public sealed class TrabalhoRepositorio(CatDbContext banco) : IRepositorioDeTrab
             l.p.Id, l.p.EmpresaId, l.Empresa, l.CnpjMatriz, l.Uf, l.PreCadastro, l.p.Frente, l.p.Nome,
             l.p.CompetenciaIni, l.p.CompetenciaFim, l.p.Status, l.Autor, l.p.CriadoPor, l.Responsavel, l.p.ResponsavelId,
             comentarios.GetValueOrDefault(l.p.Id), comBase.Contains(l.p.Id),
-            ultimas.Where(u => u.Key.ProjetoId == l.p.Id).ToDictionary(u => u.Key.Etapa, u => u.Value))).ToList();
+            ultimas.Where(u => u.Key.ProjetoId == l.p.Id).ToDictionary(u => u.Key.Etapa, u => u.Value),
+            l.p.VendaAConsumidor)).ToList();
+    }
+
+    public async Task DefinirVendaAConsumidor(int projetoId, string valor, object dados, Usuario por,
+        DateTimeOffset agora, CancellationToken cancelar)
+    {
+        await using var transacao = await banco.Database.BeginTransactionAsync(cancelar);
+        await banco.Projetos.Where(p => p.Id == projetoId)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.VendaAConsumidor, valor), cancelar);
+        banco.Eventos.Add(new EventoLinha
+        {
+            ProjetoId = projetoId, Tipo = Dominio.Projeto.TipoDeEvento.ParametroAlterado,
+            Texto = "Venda a consumidor final: " + Dominio.Projeto.VendaAConsumidor.DoBanco(valor).Rotulo,
+            Dados = JsonSerializer.Serialize(dados, Json),
+            AutorId = por.Id,
+            AutorNome = string.IsNullOrEmpty(por.NomeExibicao) ? "Sistema" : por.NomeExibicao,
+            CriadoEm = Utc(agora),
+        });
+        await banco.SaveChangesAsync(cancelar);
+        await transacao.CommitAsync(cancelar);
+        banco.ChangeTracker.Clear();
     }
 
     // ---------------------------------------------------------------- exclusão
