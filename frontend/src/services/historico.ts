@@ -24,7 +24,9 @@ export type TipoDeEvento =
   | "etapa_iniciada"
   | "etapa_concluida"
   | "etapa_falhou"
-  | "planilha_baixada";
+  | "planilha_baixada"
+  | "parametro_alterado"
+  | "entrega_aprovada";
 
 export interface EventoDoProjeto {
   id: number;
@@ -77,9 +79,9 @@ export type Familia = "tudo" | "comentarios" | "situacao" | "arquivos" | "etapas
 
 export const FAMILIA: Record<Exclude<Familia, "tudo">, TipoDeEvento[]> = {
   comentarios: ["comentario"],
-  situacao: ["status", "sucessao", "criado"],
+  situacao: ["status", "sucessao", "criado", "parametro_alterado"],
   arquivos: ["lote_importado", "lote_removido"],
-  etapas: ["etapa_iniciada", "etapa_concluida", "etapa_falhou", "planilha_baixada"],
+  etapas: ["etapa_iniciada", "etapa_concluida", "etapa_falhou", "planilha_baixada", "entrega_aprovada"],
 };
 
 export const daFamilia = (e: EventoDoProjeto, f: Familia) =>

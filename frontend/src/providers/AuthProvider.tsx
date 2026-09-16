@@ -8,7 +8,7 @@ import {
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ROTAS } from "@/constants/routes";
-import { ADMINISTRA_USUARIOS, PODE_EXCLUIR_TRABALHO } from "@/constants/roles";
+import { ADMINISTRA_USUARIOS, PODE_APROVAR_ENTREGA, PODE_EXCLUIR_TRABALHO } from "@/constants/roles";
 import { entrar as entrarNaApi, quemSouEu } from "@/services/auth";
 import { aoExpirarSessao, lerToken, limparToken } from "@/services/sessao";
 import type { Usuario } from "@/types/auth";
@@ -23,6 +23,7 @@ interface Contexto {
   definirUsuario: (u: Usuario) => void;
   administraUsuarios: boolean;
   podeExcluirTrabalho: boolean;
+  podeAprovarEntrega: boolean;
 }
 
 export const ContextoDeAuth = createContext<Contexto | null>(null);
@@ -89,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       administraUsuarios: !!usuario && ADMINISTRA_USUARIOS.includes(usuario.papel),
       podeExcluirTrabalho:
         !!usuario && PODE_EXCLUIR_TRABALHO.includes(usuario.papel),
+      podeAprovarEntrega: !!usuario && PODE_APROVAR_ENTREGA.includes(usuario.papel),
     }),
     [usuario, verificando, entrar, sair],
   );

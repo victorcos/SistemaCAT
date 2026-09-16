@@ -327,22 +327,27 @@ def _acrescentar(lote: dict, c: CompetenciaApurada, d: dict) -> None:
 
 
 def _somar(resumo: ResumoDoPeriodo, c: CompetenciaApurada) -> None:
+    # soma o que a competência grava, já com 2 casas: o pedido é por competência,
+    # e o total tem de ser a soma das linhas da planilha e do arquivo — somar
+    # sem arredondar dava um centavo de diferença no piloto (66.681,16 x ,15)
+    ressarcimento = c.ressarcimento.quantize(_Q2)
+    complemento = c.complemento.quantize(_Q2)
     resumo.competencias += 1
     resumo.itens += c.itens
     resumo.linhas += c.linhas
-    resumo.ressarcimento += c.ressarcimento
-    resumo.complemento += c.complemento
-    resumo.credito_operacao_propria += c.credito_operacao_propria
+    resumo.ressarcimento += ressarcimento
+    resumo.complemento += complemento
+    resumo.credito_operacao_propria += c.credito_operacao_propria.quantize(_Q2)
     if c.apta:
         resumo.aptas += 1
-        resumo.ressarcimento_apto += c.ressarcimento
-        resumo.complemento_apto += c.complemento
+        resumo.ressarcimento_apto += ressarcimento
+        resumo.complemento_apto += complemento
     mes = resumo.por_competencia.setdefault(c.competencia, {
         "competencias": 0, "aptas": 0, "ressarcimento": Decimal(0), "complemento": Decimal(0)})
     mes["competencias"] += 1
     mes["aptas"] += c.apta
-    mes["ressarcimento"] += c.ressarcimento
-    mes["complemento"] += c.complemento
+    mes["ressarcimento"] += ressarcimento
+    mes["complemento"] += complemento
     for motivo in c.motivos:
         resumo.por_motivo[motivo.value] = resumo.por_motivo.get(motivo.value, 0) + 1
 

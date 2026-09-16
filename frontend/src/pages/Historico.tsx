@@ -84,6 +84,11 @@ const APARENCIA: Record<TipoDeEvento, { icone: Icone; classe: string }> = {
   etapa_concluida: { icone: IconeConfirma, classe: "bg-sucesso-fundo text-sucesso" },
   etapa_falhou: { icone: IconeErro, classe: "bg-erro-fundo text-erro" },
   planilha_baixada: { icone: IconeArquivo, classe: "bg-superficie-alt text-texto-suave" },
+  parametro_alterado: {
+    icone: IconeTrocar,
+    classe: "bg-laranja-500/14 text-laranja-700 escuro:text-laranja-300",
+  },
+  entrega_aprovada: { icone: IconeConfirma, classe: "bg-sucesso-fundo text-sucesso" },
 };
 
 const PADRAO = { icone: IconeComentario, classe: "bg-superficie-alt text-texto-suave" };

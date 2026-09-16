@@ -172,7 +172,8 @@ public sealed class Trabalhos(
                 continue;
             if (situacao == "concluida")
                 concluidas.Add(etapa);
-            else if (Execucoes.EmCurso(situacao) && emAndamento is null)
+            // a entrega montada que espera o revisor ainda está andando
+            else if ((Execucoes.EmCurso(situacao) || situacao == Execucoes.AguardandoAprovacao) && emAndamento is null)
                 emAndamento = etapa;
         }
         return new ProjetoComEtapas(p, Etapas.Montar(concluidas, emAndamento));

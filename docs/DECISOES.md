@@ -5,6 +5,59 @@
 
 ---
 
+## 2026-09-16 — Etapa 8: relatórios e entrega
+
+**Decisões do Victor.** A etapa produz **relatório e dossiê**; o relatório
+mostra **toda** competência, pronta ou não, e o dossiê leva **só** o que vai à
+SEFAZ — prévia nunca entra no pacote do pedido; **gerar não conclui**: um
+revisor ou gestor aprova, e é a aprovação que fecha a etapa; o pacote é
+**baixado pela tela** — copiar para a rede fica com quem baixou, conferindo o
+SHA-256 pelo manifesto.
+
+**O que sai.** `relatorio_da_entrega.xlsx` (Resumo, Filial x competência, Por
+filial, Por mês, Pendências e Trilha das execuções), `dossie/<CNPJ>/` só dos
+estabelecimentos com competência pronta (TXT de envio, Ficha 3 em CSV, saldos
+do 1050, apuração e pré-validação daquelas competências), e `MANIFESTO.txt`
+com tamanho e SHA-256 de cada arquivo e de onde cada número saiu. Tudo num zip.
+
+**O TXT do dossiê é o que foi pré-validado.** A cópia é conferida pelo
+SHA-256 que a etapa 7 gravou; se não bate, a montagem falha em vez de levar
+arquivo que ninguém conferiu.
+
+**Pendências numa língua só.** Cada etapa grava o resumo com nomes próprios. O
+domínio (`cat42/entrega.py`) traduz o que existe — documentos a cobrar,
+entradas sem suportado, saídas sem alíquota, confronto pendente, fichas
+retiradas, abertura sem ICMS, motivos da etapa 6, travas e regras da etapa 7 —
+em gravidade (trava, atenção, informação), quantidade, de quê e o que fazer.
+"Não apta" da etapa 7 não entra: repete, arquivo a arquivo, os motivos da 6.
+
+**Quem aprova.** Revisor e gestor (`Capacidades.PodeAprovarEntrega`). Dev não:
+conta técnica não substitui responsável pelo negócio, a mesma razão de ele não
+contar como gestor. Analista monta e não aprova. Aprovação vai em coluna da
+execução (`aprovada_por`, `aprovada_em`, migração `b8d3e61f2a47`), não no
+resumo — o resumo é do motor, a aprovação é da API — e vira o evento
+`entrega_aprovada` no histórico. Recusa: rodada que não concluiu, entrega já
+aprovada, entrega superada por outra mais nova, arquivo digital gerado de novo
+depois dela, trabalho parado.
+
+**Recusa antes da fila** a entrega de um arquivo digital feito sobre apuração
+velha: o pacote levaria números que a etapa 6 já não mostra.
+
+**Piloto (execução 52, Amigão).** 0,9 s. 775 competências no relatório — 234
+prévias de SP e 541 fora de SP —, nenhum estabelecimento no dossiê, 26
+pendências (16 travam, 7 pedem atenção, 3 informam). O pacote leva o relatório
+e o manifesto. Dois acertos que o piloto mostrou: o relatório passou a dizer o
+**período apurado** (dos dados) ao lado do **período do cadastro** — o trabalho
+está cadastrado como 2025 e os dados são de 2021 —, e a etapa 6 passou a somar
+o total com as competências já arredondadas (dava R$ 66.681,16 no resumo e
+R$ 66.681,15 somando as competências).
+
+**O que fica para a lapidação.** O Victor, como dev, não aprova — a entrega do
+piloto espera um gestor; a Ficha 3 do dossiê em CSV pode levar minutos numa
+base do tamanho da BOA; e o `PLANEJAMENTO.md` ainda descreve o roteiro antigo.
+
+---
+
 ## 2026-09-16 — Revisão da etapa 7: o que se conferiu e o que se corrigiu
 
 **Como se conferiu.** Sete arquivos CAT 42 que a SEFAZ aceitou da IRMAOS BOA

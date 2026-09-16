@@ -28,6 +28,8 @@ export {
   CircleStop as IconeParar,
   ChartColumnBig as IconeApuracao,
   FileCheck2 as IconeArquivoDigital,
+  PackageCheck as IconeEntrega,
+  BadgeCheck as IconeAprovar,
 
   // navegação e controles
   House as IconeInicio,

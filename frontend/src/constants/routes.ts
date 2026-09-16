@@ -21,6 +21,7 @@ export const ROTAS = {
   apuracao: (id: number | string) => `/projetos/${id}/apuracao`,
   arquivoDigital: (id: number | string) => `/projetos/${id}/arquivo-digital`,
   preValidacao: (id: number | string) => `/projetos/${id}/pre-validacao`,
+  entrega: (id: number | string) => `/projetos/${id}/entrega`,
   historico: (id: number | string) => `/projetos/${id}/historico`,
 } as const;
 

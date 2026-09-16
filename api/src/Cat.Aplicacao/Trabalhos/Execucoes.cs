@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Cat.Aplicacao.Log;
 using Cat.Dominio.Acesso;
+using Cat.Dominio.Projeto;
 using Microsoft.Extensions.Logging;
 
 namespace Cat.Aplicacao.Trabalhos;
@@ -8,7 +9,7 @@ namespace Cat.Aplicacao.Trabalhos;
 public sealed record ExecucaoLida(
     int Id, int ProjetoId, string Etapa, string Situacao, string? Passo, double Fracao, int ArquivosTotais,
     int ArquivosLidos, long BytesLidos, long Documentos, string? Erro, DateTimeOffset IniciadaEm,
-    DateTimeOffset? TerminadaEm, JsonElement? Resumo);
+    DateTimeOffset? TerminadaEm, JsonElement? Resumo, string? AprovadaPor = null, DateTimeOffset? AprovadaEm = null);
 
 public sealed record PlanilhaPronta(string Caminho, string Nome, string Tipo);
 
@@ -28,12 +29,25 @@ public sealed record PedidoDeArquivos(string? So, string? Busca, int Pagina, int
 
 public sealed record PedidoDeOcorrencias(string Nome, int Pagina, int PorPagina);
 
+/// <param name="So">no_dossie, fora_do_dossie, com_previa, fora_de_sp</param>
+public sealed record PedidoDeEstabelecimentos(string? So, string? Busca, int Pagina, int PorPagina);
+
 public interface IRepositorioDeExecucoes
 {
     Task<ExecucaoLida?> Buscar(int id, CancellationToken cancelar);
 
     /// <summary>As mais recentes primeiro.</summary>
     Task<IReadOnlyList<ExecucaoLida>> Listar(int projetoId, string etapa, int limite, CancellationToken cancelar);
+
+    /// <summary>A última rodada da etapa que concluiu, ou nulo.</summary>
+    Task<int?> UltimaConcluida(int projetoId, string etapa, CancellationToken cancelar);
+
+    /// <summary>
+    /// Grava quem aprovou e quando, e o evento na linha do tempo, juntos. Falso se
+    /// outra pessoa aprovou no meio do caminho: só grava sobre entrega sem aprovação.
+    /// </summary>
+    Task<bool> AprovarEntrega(int execucaoId, int projetoId, Usuario por, string texto, object dados,
+        DateTimeOffset agora, CancellationToken cancelar);
 }
 
 public sealed class ExecucaoNaoEncontrada() : RecusaDeRegra("Execução não encontrada.");
@@ -50,6 +64,7 @@ public sealed class Execucoes(
     IRepositorioDeTrabalhos trabalhos,
     IRepositorioDeExecucoes execucoes,
     IMotor motor,
+    TimeProvider relogio,
     ILogger<Execucoes> log)
 {
     public const string Conferencia = "conferencia";
@@ -58,6 +73,13 @@ public sealed class Execucoes(
     public const string Razao = "razao";
     public const string Apuracao = "apuracao";
     public const string ArquivoDigital = "arquivo_digital";
+    public const string Entrega = "entrega";
+
+    /// <summary>
+    /// A entrega montada e ainda não aprovada. Não é situação gravada: é como o
+    /// roteiro lê a rodada concluída da entrega sem aprovação.
+    /// </summary>
+    public const string AguardandoAprovacao = "aguardando_aprovacao";
 
     /// <summary>
     /// Fora do roteiro de propósito: pré-validar o que o cliente já transmitiu não
@@ -70,7 +92,7 @@ public sealed class Execucoes(
     /// do trabalho e a consulta que o alimenta liam cada uma a sua, e a etapa
     /// nova que entrasse numa e não na outra ficaria para sempre "pendente".
     /// </summary>
-    public static readonly IReadOnlyList<string> DeProcessamento = [Conferencia, Movimentos, Suportado, Razao, Apuracao, ArquivoDigital];
+    public static readonly IReadOnlyList<string> DeProcessamento = [Conferencia, Movimentos, Suportado, Razao, Apuracao, ArquivoDigital, Entrega];
 
     /// <summary>Ainda não terminou: inclui o pedido de parar que a rodada não atendeu ainda.</summary>
     public static bool EmCurso(string situacao) => situacao is "na_fila" or "rodando" or "cancelando";
@@ -172,6 +194,58 @@ public sealed class Execucoes(
         var e = await Detalhar(execucaoId, PreValidacao, usuario, cancelar);
         return await motor.ArquivosDoCliente(e.Id, pedido, cancelar);
     }
+
+    /// <summary>Os estabelecimentos da entrega: os do dossiê primeiro.</summary>
+    public async Task<JsonElement> EstabelecimentosDaEntrega(int execucaoId, PedidoDeEstabelecimentos pedido, Usuario usuario,
+        CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, Entrega, usuario, cancelar);
+        return await motor.EstabelecimentosDaEntrega(e.Id, pedido, cancelar);
+    }
+
+    /// <summary>
+    /// Aprovar a entrega, que é o que conclui a etapa 8. Quem pode é capacidade do
+    /// papel, conferida na rota; o que a entrega precisa estar é regra do domínio.
+    /// </summary>
+    public async Task<ExecucaoLida> AprovarEntrega(int execucaoId, string? observacao, Usuario por, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, Entrega, por, cancelar);
+        var projeto = await trabalhos.BuscarProjeto(e.ProjetoId, cancelar) ?? throw new ProjetoNaoEncontrado("Trabalho não encontrado.");
+        var ultima = (await execucoes.Listar(e.ProjetoId, Entrega, 1, cancelar)).FirstOrDefault()?.Id ?? e.Id;
+        var arquivoUsado = Inteiro(e.Resumo, "arquivo_digital_execucao_id");
+        var ultimoArquivo = await execucoes.UltimaConcluida(e.ProjetoId, ArquivoDigital, cancelar);
+        Dominio.Projeto.Entrega.ValidarAprovacao(new EntregaParaAprovar(
+            e.Id, e.Situacao, e.AprovadaEm, e.AprovadaPor, ultima, arquivoUsado, ultimoArquivo,
+            StatusDoProjeto.DoBanco(projeto.Status)));
+        var nota = Dominio.Projeto.Entrega.ValidarObservacao(observacao);
+
+        var paraEnvio = Inteiro(e.Resumo, "para_envio") ?? 0;
+        var ressarcimento = Texto(e.Resumo, "ressarcimento_para_envio") ?? "0.00";
+        var texto = $"Entrega aprovada · {paraEnvio} competências para envio" + (nota is null ? "" : $" · {nota}");
+        var dados = new Dictionary<string, object?>
+        {
+            ["execucao_id"] = e.Id, ["etapa"] = Entrega, ["para_envio"] = paraEnvio,
+            ["ressarcimento_para_envio"] = ressarcimento, ["observacao"] = nota,
+        };
+        if (!await execucoes.AprovarEntrega(e.Id, e.ProjetoId, por, texto, dados, relogio.GetUtcNow(), cancelar))
+        {
+            var agora = await execucoes.Buscar(e.Id, cancelar) ?? throw new ExecucaoNaoEncontrada();
+            throw new EntregaJaAprovada(agora.AprovadaPor, agora.AprovadaEm ?? relogio.GetUtcNow());
+        }
+        // conclui a última etapa do trabalho: aviso, para se achar no log sem filtro
+        log.Aviso("entrega aprovada",
+            new { execucao_id = e.Id, projeto_id = e.ProjetoId, por_usuario_id = por.Id, para_envio = paraEnvio,
+                  ressarcimento_para_envio = ressarcimento });
+        return await execucoes.Buscar(e.Id, cancelar) ?? throw new ExecucaoNaoEncontrada();
+    }
+
+    private static int? Inteiro(JsonElement? resumo, string campo) =>
+        resumo is { ValueKind: JsonValueKind.Object } r && r.TryGetProperty(campo, out var v) && v.ValueKind == JsonValueKind.Number
+            ? v.GetInt32() : null;
+
+    private static string? Texto(JsonElement? resumo, string campo) =>
+        resumo is { ValueKind: JsonValueKind.Object } r && r.TryGetProperty(campo, out var v) && v.ValueKind == JsonValueKind.String
+            ? v.GetString() : null;
 
     public async Task<PlanilhaPronta> Planilha(int execucaoId, string etapaDaRota, string? etapaExigida, string qual,
         string? modelos, string? classificacoes, string formato, Usuario usuario, CancellationToken cancelar)

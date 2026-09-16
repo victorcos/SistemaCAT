@@ -39,6 +39,7 @@ from cat.aplicacao.casos_de_uso import (
     conferir_documentos,
     extrair_movimentos,
     gerar_arquivo_digital,
+    montar_entrega,
     montar_razao,
     planilhas,
     pre_validar_arquivos,
@@ -55,6 +56,7 @@ from cat.config import obter_config
 from cat.dominio.comum.cnpj import Cnpj
 from cat.infraestrutura.analitico import apuracao as analitico_apuracao
 from cat.infraestrutura.analitico import arquivo_digital as analitico_arquivo_digital
+from cat.infraestrutura.analitico import entrega as analitico_entrega
 from cat.infraestrutura.analitico import pre_validacao_do_cliente as analitico_pre_validacao
 from cat.infraestrutura.analitico import razao as analitico_razao
 from cat.infraestrutura.analitico import suportado as analitico_suportado
@@ -320,6 +322,8 @@ PREPARADORES = {
                                   "Já existe uma geração do arquivo digital em andamento neste trabalho."),
     pre_validar_arquivos.ETAPA: (pre_validar_arquivos.preparar, pre_validar_arquivos.NadaParaPreValidar,
                                  "Já existe uma pré-validação dos arquivos do cliente em andamento neste trabalho."),
+    montar_entrega.ETAPA: (montar_entrega.preparar, montar_entrega.NadaParaEntregar,
+                           "Já existe uma montagem da entrega em andamento neste trabalho."),
 }
 
 # "cancelando" ainda está em curso: a rodada só para no próximo ponto seguro, e
@@ -593,6 +597,30 @@ def arquivos_do_cliente(pedido: PedidoDeArquivos, sessao: Annotated[Session, Dep
         raise HTTPException(status.HTTP_409_CONFLICT, "A pré-validação ainda não terminou.")
     with contexto(etapa=pre_validar_arquivos.ETAPA, execucao_id=execucao.id):
         return _traduzir_leitura(lambda: analitico_pre_validacao.arquivos_do_cliente(
+            execucao.pasta_de_trabalho or "", pedido.so, pedido.busca, pedido.pagina, pedido.por_pagina))
+
+
+# ---------------------------------------------------------------------------
+# Entrega: os estabelecimentos do pacote
+# ---------------------------------------------------------------------------
+class PedidoDeEstabelecimentos(BaseModel):
+    execucao_id: int
+    so: str | None = None
+    busca: str | None = Field(default=None, max_length=100)
+    pagina: int = Field(default=1, ge=1)
+    por_pagina: int = Field(default=analitico_entrega.POR_PAGINA_PADRAO, ge=1)
+
+
+@router.post("/entrega/estabelecimentos", dependencies=[Depends(exigir_segredo)])
+def estabelecimentos_da_entrega(pedido: PedidoDeEstabelecimentos,
+                                sessao: Annotated[Session, Depends(obter_sessao)]) -> dict:
+    execucao = sessao.get(ExecucaoDB, pedido.execucao_id)
+    if execucao is None or execucao.etapa != montar_entrega.ETAPA:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Entrega não encontrada.")
+    if execucao.situacao != "concluida":
+        raise HTTPException(status.HTTP_409_CONFLICT, "A montagem da entrega ainda não terminou.")
+    with contexto(etapa=montar_entrega.ETAPA, execucao_id=execucao.id):
+        return _traduzir_leitura(lambda: analitico_entrega.estabelecimentos(
             execucao.pasta_de_trabalho or "", pedido.so, pedido.busca, pedido.pagina, pedido.por_pagina))
 
 

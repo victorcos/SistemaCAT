@@ -65,3 +65,5 @@ class TipoDeEvento(str, Enum):
     ETAPA_FALHOU = "etapa_falhou"
     PLANILHA_BAIXADA = "planilha_baixada"
     PARAMETRO_ALTERADO = "parametro_alterado"
+    # a etapa 8 só conclui quando um revisor ou gestor aprova o pacote gerado
+    ENTREGA_APROVADA = "entrega_aprovada"

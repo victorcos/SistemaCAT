@@ -3,6 +3,7 @@ using Cat.Api.Infra;
 using Cat.Aplicacao.Log;
 using Cat.Aplicacao.Trabalhos;
 using Cat.Dominio.Acesso;
+using Cat.Dominio.Projeto;
 using Cat.Infraestrutura.Configuracao;
 
 namespace Cat.Api.Rotas;
@@ -13,7 +14,9 @@ public static class ExecucoesRotas
     public sealed record ExecucaoDto(
         int Id, int ProjetoId, string Etapa, string Situacao, string? Passo, double Fracao, int ArquivosTotais,
         int ArquivosLidos, long BytesLidos, long Documentos, string? Erro, string IniciadaEm, string? TerminadaEm,
-        JsonElement? Resumo);
+        JsonElement? Resumo, string? AprovadaPor, string? AprovadaEm);
+
+    private sealed record PedidoDeAprovacao(string? Observacao);
 
     public static void MapearExecucoes(this IEndpointRouteBuilder rotas)
     {
@@ -24,6 +27,35 @@ public static class ExecucoesRotas
         Etapa(api, Execucoes.Razao, "razao", detalheExigeEtapa: true, "montar o razão");
         Etapa(api, Execucoes.Apuracao, "apuracao", detalheExigeEtapa: true, "apurar ressarcimento e complemento");
         Etapa(api, Execucoes.ArquivoDigital, "arquivo-digital", detalheExigeEtapa: true, "gerar o arquivo digital");
+        Etapa(api, Execucoes.Entrega, "entrega", detalheExigeEtapa: true, "montar a entrega");
+
+        api.MapGet("/entrega/{execucaoId:int}/estabelecimentos", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                {
+                    var q = http.Request.Query;
+                    var pedido = new PedidoDeEstabelecimentos(
+                        q["so"].FirstOrDefault() is { Length: > 0 } s ? s : null,
+                        q["busca"].FirstOrDefault() is { Length: > 0 } b ? b : null,
+                        Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 50));
+                    return Results.Json(await caso.EstabelecimentosDaEntrega(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
+                }))
+            .ExigirUsuario();
+
+        // aprovar é o que conclui a etapa 8: revisor ou gestor, nunca quem só monta
+        api.MapPost("/entrega/{execucaoId:int}/aprovar", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                {
+                    string? observacao = null;
+                    if (http.Request.ContentLength is > 0)
+                    {
+                        var (corpo, recusa) = await CorpoJson.Ler<PedidoDeAprovacao>(http);
+                        if (recusa is not null)
+                            return recusa;
+                        observacao = corpo!.Observacao;
+                    }
+                    return Results.Json(Dto(await caso.AprovarEntrega(execucaoId, observacao, http.UsuarioAtual(), http.RequestAborted)));
+                }))
+            .ExigirCapacidade(Capacidades.PodeAprovarEntrega, "pode_aprovar_entrega", "aprovar a entrega");
 
         api.MapGet("/arquivo-digital/{execucaoId:int}/arquivos", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>
@@ -185,7 +217,8 @@ public static class ExecucoesRotas
     private static ExecucaoDto Dto(ExecucaoLida e) => new(
         e.Id, e.ProjetoId, e.Etapa, e.Situacao, e.Passo, e.Fracao, e.ArquivosTotais, e.ArquivosLidos, e.BytesLidos,
         e.Documentos, e.Erro, AuthRotas.IsoComoPython(e.IniciadaEm),
-        e.TerminadaEm is { } t ? AuthRotas.IsoComoPython(t) : null, e.Resumo);
+        e.TerminadaEm is { } t ? AuthRotas.IsoComoPython(t) : null, e.Resumo,
+        e.AprovadaPor, e.AprovadaEm is { } a ? AuthRotas.IsoComoPython(a) : null);
 
     private static async Task<IResult> Traduzir(Func<Task<IResult>> operacao)
     {
@@ -208,6 +241,15 @@ public static class ExecucoesRotas
         catch (Exception erro) when (erro is ProjetoNaoEncontrado or ExecucaoNaoEncontrada)
         {
             return CorpoJson.Recusar(erro.Message, StatusCodes.Status404NotFound);
+        }
+        catch (Exception erro) when (erro is EntregaNaoMontada or EntregaJaAprovada or EntregaSuperada
+                                         or EntregaDesatualizada or TrabalhoParadoNaoEntrega)
+        {
+            return CorpoJson.Recusar(erro.Message, StatusCodes.Status409Conflict);
+        }
+        catch (ObservacaoDaEntregaLongaDemais erro)
+        {
+            return CorpoJson.Recusar(erro.Message, StatusCodes.Status422UnprocessableEntity);
         }
     }
 }

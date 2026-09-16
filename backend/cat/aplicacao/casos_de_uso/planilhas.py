@@ -16,6 +16,7 @@ from cat.aplicacao.casos_de_uso import (
     conferir_documentos,
     extrair_movimentos,
     gerar_arquivo_digital,
+    montar_entrega,
     montar_razao,
     pre_validar_arquivos,
 )
@@ -32,6 +33,7 @@ from cat.infraestrutura.analitico.movimentacao import (
 from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO
 from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO, ARQUIVO_SALDOS
 from cat.infraestrutura.analitico.arquivo_digital import ARQUIVO_ARQUIVOS, ARQUIVO_OCORRENCIAS
+from cat.infraestrutura.analitico.entrega import ARQUIVO_PACOTE, ARQUIVO_RELATORIO
 from cat.infraestrutura.analitico.pre_validacao_do_cliente import ARQUIVO_ARQUIVOS_DO_CLIENTE
 from cat.infraestrutura.analitico.razao import (
     ARQUIVO_CONFERENCIA_INVENTARIO,
@@ -110,6 +112,11 @@ PLANILHAS = {
         "arquivos": ("arquivos_do_cliente.xlsx", ARQUIVO_ARQUIVOS_DO_CLIENTE, gerar_arquivos_do_cliente),
         "ocorrencias": ("pre_validacao_do_cliente.xlsx", ARQUIVO_OCORRENCIAS, gerar_ocorrencias),
     },
+    # montados na rodada, não a pedido: o download serve o que a entrega escreveu
+    montar_entrega.ETAPA: {
+        "relatorio": (ARQUIVO_RELATORIO, ARQUIVO_RELATORIO, lambda *a, **k: _ja_montado()),
+        "pacote": (ARQUIVO_PACOTE, ARQUIVO_PACOTE, lambda *a, **k: _ja_montado()),
+    },
 }
 
 NAO_TERMINOU = {
@@ -120,6 +127,7 @@ NAO_TERMINOU = {
     apurar_periodo.ETAPA: "A apuração do período ainda não terminou.",
     gerar_arquivo_digital.ETAPA: "A geração do arquivo digital ainda não terminou.",
     pre_validar_arquivos.ETAPA: "A pré-validação ainda não terminou.",
+    montar_entrega.ETAPA: "A montagem da entrega ainda não terminou.",
 }
 
 
@@ -127,6 +135,11 @@ class PlanilhaRecusada(Exception):
     def __init__(self, status: int, mensagem: str) -> None:
         self.status = status
         super().__init__(mensagem)
+
+
+def _ja_montado() -> int:
+    """Só chega aqui o pedido em outro formato: o arquivo pronto é servido sem gerar."""
+    raise PlanilhaRecusada(404, "Este arquivo da entrega só sai no formato em que foi montado.")
 
 
 @dataclass(frozen=True)
@@ -168,7 +181,7 @@ def gerar(execucao: ExecucaoDB, etapa_da_rota: str, qual: str,
         if etapa_da_rota == extrair_movimentos.ETAPA:
             raise PlanilhaRecusada(410, "Os arquivos desta extração não estão mais em disco. Rode de novo.")
         if etapa_da_rota in (apurar_suportado.ETAPA, montar_razao.ETAPA, apurar_periodo.ETAPA,
-                             gerar_arquivo_digital.ETAPA, pre_validar_arquivos.ETAPA):
+                             gerar_arquivo_digital.ETAPA, pre_validar_arquivos.ETAPA, montar_entrega.ETAPA):
             raise PlanilhaRecusada(410, "Os arquivos desta apuração não estão mais em disco. Rode de novo.")
         motivo = ("Esta conferência é de uma versão anterior e não tem esta lista."
                   if os.path.isdir(pasta) else "Os arquivos desta conferência não estão mais em disco.")

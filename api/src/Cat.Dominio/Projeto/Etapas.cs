@@ -99,8 +99,11 @@ public static class Etapas
             "envio; as outras saem como prévia.",
             Implementada: true),
         new("entrega", "Relatórios e entrega",
-            "Planilhas de conferência por filial e competência, e o dossiê que " +
-            "acompanha o pedido."),
+            "O relatório executivo com todas as competências — prontas ou não, com o " +
+            "que falta —, o dossiê de cada estabelecimento com o que vai à SEFAZ e o " +
+            "manifesto com o SHA-256 de cada arquivo. Conclui quando um revisor ou " +
+            "gestor aprova.",
+            Implementada: true),
     ];
 
     /// <summary>

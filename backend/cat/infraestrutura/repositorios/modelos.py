@@ -318,3 +318,7 @@ class ExecucaoDB(Base):
     )
     terminada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criada_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    # só a etapa 8 usa: a entrega conclui quando um revisor ou gestor aprova o
+    # pacote. Quem grava é a API; o motor só lê
+    aprovada_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    aprovada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -215,6 +215,50 @@ class TestFluxo:
         assert z.status_code == 200 and z.json()["tipo"] == "application/zip"
         assert planilha(cliente, "arquivo_digital", gerado["id"], "arquivos", formato="zip").status_code == 404
 
+    def test_a_entrega_leva_o_relatorio_e_nenhum_dossie_sem_competencia_pronta(self, cliente, projeto_id, razao):
+        """Etapa 8: a única competência é prévia, então o pacote leva o relatório
+        e o manifesto, sem dossiê — e a rodada conclui aguardando aprovação."""
+        if not execucoes(projeto_id, "apuracao"):
+            rodar(cliente, "apuracao", projeto_id)
+        if not execucoes(projeto_id, "arquivo_digital"):
+            rodar(cliente, "arquivo_digital", projeto_id)
+        entrega = rodar(cliente, "entrega", projeto_id)
+        assert entrega["passo"] == "Aguardando aprovação"
+        r = entrega["resumo"]
+        assert (r["competencias"], r["para_envio"], r["previas"], r["estabelecimentos_no_dossie"]) == (1, 0, 1, 0)
+        assert r["arquivos_no_pacote"] == 2                 # manifesto e relatório
+        assert r["arquivo_digital_execucao_id"] and r["apuracao_execucao_id"] and r["razao_execucao_id"]
+        assert any(p["gravidade"] == "trava" for p in r["pendencias"])
+
+        e = cliente.post("/interno/entrega/estabelecimentos", headers=SEGREDO,
+                         json={"execucao_id": entrega["id"], "so": "fora_do_dossie"})
+        assert e.status_code == 200, e.text
+        assert [l["cnpj"] for l in e.json()["linhas"]] == [CNPJ]
+
+        relatorio = planilha(cliente, "entrega", entrega["id"], "relatorio")
+        assert relatorio.status_code == 200 and relatorio.content[:2] == b"PK"
+        pacote = planilha(cliente, "entrega", entrega["id"], "pacote")
+        assert pacote.status_code == 200 and pacote.json()["tipo"] == "application/zip"
+        assert planilha(cliente, "entrega", entrega["id"], "relatorio", formato="csv").status_code == 404
+
+    def test_a_entrega_recusa_arquivo_digital_de_apuracao_velha(self, cliente, projeto_id, razao):
+        if not execucoes(projeto_id, "arquivo_digital"):
+            if not execucoes(projeto_id, "apuracao"):
+                rodar(cliente, "apuracao", projeto_id)
+            rodar(cliente, "arquivo_digital", projeto_id)
+        rodar(cliente, "apuracao", projeto_id)          # mais nova que a do arquivo digital
+        try:
+            r = iniciar(cliente, "entrega", projeto_id, "raz_analista")
+            assert r.status_code == 422
+            assert "Gere o arquivo digital de novo" in r.json()["detail"]
+        finally:
+            rodar(cliente, "arquivo_digital", projeto_id)
+
+    def test_estabelecimentos_so_de_entrega(self, cliente, projeto_id, razao):
+        movimentos = execucoes(projeto_id, "movimentos")[0]
+        r = cliente.post("/interno/entrega/estabelecimentos", headers=SEGREDO, json={"execucao_id": movimentos["id"]})
+        assert r.status_code == 404
+
     def test_o_arquivo_digital_recusa_razao_de_outra_escolha(self, cliente, projeto_id, razao):
         if not execucoes(projeto_id, "apuracao"):
             rodar(cliente, "apuracao", projeto_id)

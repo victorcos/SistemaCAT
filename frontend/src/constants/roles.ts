@@ -82,3 +82,9 @@ export const enxergaTodasAsEmpresas = (papel: Papel) =>
  *  desfazem meses de trabalho de uma vez. A tela usa isto só para esconder o
  *  botão; quem recusa de verdade é a API. */
 export const PODE_EXCLUIR_TRABALHO: Papel[] = ["dev", "gestor"];
+
+/** Papéis que aprovam a entrega. Espelha Papel.pode_aprovar_entrega no
+ *  domínio: quem responde pelo que sai do escritório. Dev fica de fora — conta
+ *  técnica não substitui responsável pelo negócio. A tela usa isto só para
+ *  mostrar o botão; quem recusa de verdade é a API. */
+export const PODE_APROVAR_ENTREGA: Papel[] = ["revisor", "gestor"];

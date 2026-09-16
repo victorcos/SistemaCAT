@@ -98,6 +98,15 @@ const DESTINOS: Record<
       padrao: "Gerar o arquivo digital",
     },
   },
+  entrega: {
+    rota: ROTAS.entrega,
+    rotulos: {
+      concluida: "Ver a entrega aprovada e baixar o pacote",
+      // montada e à espera do revisor também aparece em andamento
+      em_andamento: "Acompanhar, conferir e aprovar a entrega",
+      padrao: "Montar a entrega",
+    },
+  },
 };
 
 const TOM_DA_SITUACAO: Record<string, TomDeEtiqueta> = {

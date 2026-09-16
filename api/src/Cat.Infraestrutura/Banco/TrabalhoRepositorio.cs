@@ -138,11 +138,11 @@ public sealed class TrabalhoRepositorio(CatDbContext banco) : IRepositorioDeTrab
         // a última rodada de cada etapa, pela ordem de criação — é a que diz onde o trabalho está
         var execucoes = await banco.Execucoes.AsNoTracking()
             .Where(x => ids.Contains(x.ProjetoId) && Execucoes.DeProcessamento.Contains(x.Etapa))
-            .Select(x => new { x.Id, x.ProjetoId, x.Etapa, x.Situacao })
+            .Select(x => new UltimaRodada(x.Id, x.ProjetoId, x.Etapa, x.Situacao, x.AprovadaEm != null))
             .ToListAsync(cancelar);
         var ultimas = execucoes
             .GroupBy(x => (x.ProjetoId, x.Etapa))
-            .ToDictionary(g => g.Key, g => g.MaxBy(x => x.Id)!.Situacao);
+            .ToDictionary(g => g.Key, g => Situacao(g.MaxBy(x => x.Id)!));
 
         return linhas.Select(l => new ProjetoLido(
             l.p.Id, l.p.EmpresaId, l.Empresa, l.CnpjMatriz, l.Uf, l.PreCadastro, l.p.Frente, l.p.Nome,
@@ -151,6 +151,18 @@ public sealed class TrabalhoRepositorio(CatDbContext banco) : IRepositorioDeTrab
             ultimas.Where(u => u.Key.ProjetoId == l.p.Id).ToDictionary(u => u.Key.Etapa, u => u.Value),
             l.p.VendaAConsumidor)).ToList();
     }
+
+    /// <summary>
+    /// A entrega só conclui com a aprovação: montada e não aprovada, o roteiro a
+    /// lê como aguardando, que não é situação gravada — a linha da execução diz
+    /// "concluida" porque a rodada terminou.
+    /// </summary>
+    private static string Situacao(UltimaRodada ultima) =>
+        ultima.Etapa == Execucoes.Entrega && ultima.Situacao == "concluida" && !ultima.Aprovada
+            ? Execucoes.AguardandoAprovacao
+            : ultima.Situacao;
+
+    private sealed record UltimaRodada(int Id, int ProjetoId, string Etapa, string Situacao, bool Aprovada);
 
     public async Task DefinirVendaAConsumidor(int projetoId, string valor, object dados, Usuario por,
         DateTimeOffset agora, CancellationToken cancelar)

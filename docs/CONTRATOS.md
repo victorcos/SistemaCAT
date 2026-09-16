@@ -388,3 +388,38 @@ O resumo (`versao: 1`) traz `fontes`, `arquivos`, `sem_ocorrencia`, `com_erro`,
 Além das regras de cada arquivo, uma que só se vê com o conjunto:
 `saldo_inicial_diferente_do_anterior` (aviso), quando o saldo inicial de um item
 não é o final da última competência em que ele apareceu.
+
+## 13. Relatórios e entrega (etapa 8)
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `POST` | `/api/projetos/{id}/entrega` | põe a montagem na fila (202). 422 sem arquivo digital, ou com apuração mais nova que a usada pelo arquivo digital |
+| `GET` | `/api/projetos/{id}/entrega` | as rodadas, mais recente primeiro |
+| `GET` | `/api/entrega/{execucao}` | uma rodada, com o resumo, `aprovada_por` (nome) e `aprovada_em` |
+| `POST` | `/api/entrega/{execucao}/cancelar` | como nas outras rodadas |
+| `POST` | `/api/entrega/{execucao}/aprovar` | `{"observacao": "..."}` opcional (até 500). Só revisor ou gestor (403 aos outros, dev incluído). 409 se a rodada não concluiu, já foi aprovada, há entrega mais nova, o arquivo digital foi gerado de novo depois dela ou o trabalho está parado; 422 observação longa. Grava `aprovada_por`/`aprovada_em` na execução e o evento `entrega_aprovada` |
+| `GET` | `/api/entrega/{execucao}/estabelecimentos` | uma página: `so` (`no_dossie`, `fora_do_dossie`, `com_previa`, `fora_de_sp`), `busca`, `pagina`, `por_pagina` |
+| `GET` | `/api/entrega/{execucao}/planilhas/pacote?formato=zip` | o pacote: `MANIFESTO.txt`, `relatorio_da_entrega.xlsx` e `dossie/<CNPJ>/…` |
+| `GET` | `/api/entrega/{execucao}/planilhas/relatorio` | só o relatório (xlsx; outro formato é 404) |
+
+**A etapa conclui com a aprovação.** A rodada termina como `concluida`, com o
+passo `Aguardando aprovação`; no roteiro do trabalho a etapa aparece
+`em_andamento` até alguém aprovar a última entrega montada. Toda execução
+passa a trazer `aprovada_por` e `aprovada_em` (nulos fora da entrega).
+
+O resumo (`versao: 1`) traz `competencias`, `competencias_de_sp`, `para_envio`,
+`previas`, `fora_de_sp`, `sem_arquivo`, `estabelecimentos`,
+`estabelecimentos_no_dossie`, `ressarcimento`, `complemento`,
+`ressarcimento_para_envio`, `complemento_para_envio`, `arquivos_no_dossie`,
+`arquivos_no_pacote`, `bytes_do_pacote`, `sha256_do_pacote`, `por_gravidade`
+(`trava`, `atencao`, `informacao`), `pendencias` (etapa, nome da etapa,
+código, rótulo, quantidade, unidade, gravidade, o que fazer) e o id de cada
+execução usada (`arquivo_digital_execucao_id`, `apuracao_execucao_id`,
+`razao_execucao_id`, `st_suportado_execucao_id`, `movimentos_execucao_id`,
+`conferencia_execucao_id`).
+
+O relatório tem as abas Resumo, Filial x competência (toda competência, com a
+situação e o que falta), Por filial, Por mês, Pendências e Trilha. O dossiê de
+cada estabelecimento com competência pronta leva os TXT de envio (SHA-256
+conferido contra o da etapa 7), `ficha3_<CNPJ>.csv`, `saldos_1050_<CNPJ>.xlsx`,
+`apuracao_<CNPJ>.xlsx` e `pre_validacao_<CNPJ>.xlsx`, só daquelas competências.

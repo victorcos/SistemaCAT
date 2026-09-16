@@ -179,6 +179,8 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
             e.Property(x => x.IniciadaEm).HasColumnName("iniciada_em");
             e.Property(x => x.TerminadaEm).HasColumnName("terminada_em");
             e.Property(x => x.CriadaPor).HasColumnName("criada_por");
+            e.Property(x => x.AprovadaPor).HasColumnName("aprovada_por");
+            e.Property(x => x.AprovadaEm).HasColumnName("aprovada_em");
         });
     }
 }
@@ -323,4 +325,7 @@ public sealed class ExecucaoLinha
     public DateTime IniciadaEm { get; set; }
     public DateTime? TerminadaEm { get; set; }
     public int? CriadaPor { get; set; }
+    /// <summary>Só a entrega: quem aprovou o pacote e quando. Grava a API; o motor só lê.</summary>
+    public int? AprovadaPor { get; set; }
+    public DateTime? AprovadaEm { get; set; }
 }

@@ -75,7 +75,8 @@ public sealed class MotorDeExecucoesFalso : IAsyncLifetime
             Pedidos.Enqueue(pedido);
             return AoPedirCompetencias(pedido);
         });
-        foreach (var rota in new[] { "arquivo_digital/arquivos", "arquivo_digital/ocorrencias", "pre_validacao/arquivos" })
+        foreach (var rota in new[] { "arquivo_digital/arquivos", "arquivo_digital/ocorrencias", "pre_validacao/arquivos",
+                     "entrega/estabelecimentos" })
             _app.MapPost($"/interno/{rota}", async (HttpContext http) =>
             {
                 if (http.Request.Headers["X-Cat-Motor-Segredo"] != Segredo)
@@ -188,6 +189,7 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
     [InlineData("apuracao", "apuracao")]
     [InlineData("arquivo-digital", "arquivo_digital")]
     [InlineData("pre-validacao", "pre_validacao")]
+    [InlineData("entrega", "entrega")]
     public async Task Pedir_repassa_ao_motor_e_devolve_a_execucao_da_fila(string segmento, string etapa)
     {
         var (quem, _, c) = await Pessoa("dev");
@@ -203,7 +205,7 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
         Assert.Equal(HttpStatusCode.Accepted, r.StatusCode);
         var d = await Json(r);
         Assert.Equal(["id", "projeto_id", "etapa", "situacao", "passo", "fracao", "arquivos_totais", "arquivos_lidos", "bytes_lidos",
-                      "documentos", "erro", "iniciada_em", "terminada_em", "resumo"], d.EnumerateObject().Select(x => x.Name));
+                      "documentos", "erro", "iniciada_em", "terminada_em", "resumo", "aprovada_por", "aprovada_em"], d.EnumerateObject().Select(x => x.Name));
         Assert.Equal("na_fila", d.GetProperty("situacao").GetString());
         Assert.Equal(etapa, d.GetProperty("etapa").GetString());
         Assert.EndsWith("+00:00", d.GetProperty("iniciada_em").GetString());
@@ -562,5 +564,100 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
         // e ela não entra no roteiro do trabalho
         var etapas = (await Json(await c.GetAsync($"/api/projetos/{projeto}"))).GetProperty("etapas");
         Assert.DoesNotContain("pre_validacao", etapas.EnumerateArray().Select(e => e.GetProperty("chave").GetString()));
+    }
+
+    // ------------------------------------------------------------------ entrega (etapa 8)
+    private Task<int> Entrega(int projeto, int arquivoDigital, string situacao = "concluida") =>
+        Execucao(projeto, "entrega", situacao,
+            $"{{\"arquivo_digital_execucao_id\": {arquivoDigital}, \"para_envio\": 2, \"ressarcimento_para_envio\": \"10.00\"}}");
+
+    private static async Task<string?> SituacaoDaEtapa(HttpClient c, int projeto, string chave) =>
+        (await Json(await c.GetAsync($"/api/projetos/{projeto}"))).GetProperty("etapas").EnumerateArray()
+            .Single(e => e.GetProperty("chave").GetString() == chave).GetProperty("situacao").GetString();
+
+    [Fact]
+    public async Task Estabelecimentos_da_entrega_repassam_e_so_valem_na_rota_da_entrega()
+    {
+        var (_, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var arquivo = await Execucao(projeto, "arquivo_digital");
+        var entrega = await Entrega(projeto, arquivo);
+        motor.AoPedirArquivoDigital = (rota, p) => Results.Json(new { rota, so = p.GetProperty("so").GetString(), total = 1 });
+
+        var r = await c.GetAsync($"/api/entrega/{entrega}/estabelecimentos?so=no_dossie&pagina=2");
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        var corpo = await Json(r);
+        Assert.Equal("entrega/estabelecimentos", corpo.GetProperty("rota").GetString());
+        Assert.Equal("no_dossie", corpo.GetProperty("so").GetString());
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/entrega/{arquivo}/estabelecimentos")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Entrega_so_conclui_a_etapa_com_a_aprovacao_de_revisor_ou_gestor()
+    {
+        var (_, _, dev) = await Pessoa("dev");
+        var (empresa, projeto) = await Trabalho(dev);
+        var arquivo = await Execucao(projeto, "arquivo_digital");
+        var entrega = await Entrega(projeto, arquivo);
+
+        // montada e sem aprovação: a etapa anda, não conclui
+        Assert.Equal("em_andamento", await SituacaoDaEtapa(dev, projeto, "entrega"));
+
+        // quem monta não aprova; a conta técnica também não
+        var (_, _, analista) = await Pessoa("analista", [empresa]);
+        Assert.Equal(HttpStatusCode.Forbidden, (await analista.PostAsync($"/api/entrega/{entrega}/aprovar", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await dev.PostAsync($"/api/entrega/{entrega}/aprovar", null)).StatusCode);
+
+        var (revisorId, _, revisor) = await Pessoa("revisor", [empresa]);
+        var r = await revisor.PostAsJsonAsync($"/api/entrega/{entrega}/aprovar", new { observacao = "Conferido com o cliente" });
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        var aprovada = await Json(r);
+        Assert.False(string.IsNullOrEmpty(aprovada.GetProperty("aprovada_por").GetString()));
+        Assert.False(string.IsNullOrEmpty(aprovada.GetProperty("aprovada_em").GetString()));
+        Assert.Equal(revisorId, await banco.Escalar<int>($"SELECT aprovada_por FROM execucao WHERE id = {entrega}"));
+
+        Assert.Equal("concluida", await SituacaoDaEtapa(dev, projeto, "entrega"));
+        var evento = await banco.Escalar<string>(
+            $"SELECT texto FROM evento_do_projeto WHERE projeto_id = {projeto} AND tipo = 'entrega_aprovada'");
+        Assert.Contains("Conferido com o cliente", evento);
+
+        // de novo não
+        r = await revisor.PostAsync($"/api/entrega/{entrega}/aprovar", null);
+        Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
+        Assert.Contains("já foi aprovada", await Detalhe(r));
+    }
+
+    [Fact]
+    public async Task Aprovacao_recusa_entrega_superada_de_arquivo_velho_ou_em_curso()
+    {
+        var (_, _, gestor) = await Pessoa("gestor");
+        var (_, projeto) = await Trabalho(gestor);
+        var arquivo = await Execucao(projeto, "arquivo_digital");
+        var velha = await Entrega(projeto, arquivo);
+        var nova = await Entrega(projeto, arquivo);
+
+        var r = await gestor.PostAsync($"/api/entrega/{velha}/aprovar", null);
+        Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
+        Assert.Contains($"#{nova}", await Detalhe(r));
+
+        await Execucao(projeto, "arquivo_digital");      // gerado de novo depois da entrega
+        r = await gestor.PostAsync($"/api/entrega/{nova}/aprovar", null);
+        Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
+        Assert.Contains("Monte a entrega de novo", await Detalhe(r));
+
+        var rodando = await Entrega(projeto, arquivo, situacao: "rodando");
+        Assert.Equal(HttpStatusCode.Conflict, (await gestor.PostAsync($"/api/entrega/{rodando}/aprovar", null)).StatusCode);
+        Assert.Equal("em_andamento", await SituacaoDaEtapa(gestor, projeto, "entrega"));
+    }
+
+    [Fact]
+    public async Task Aprovacao_com_observacao_longa_demais_e_recusada()
+    {
+        var (_, _, gestor) = await Pessoa("gestor");
+        var (_, projeto) = await Trabalho(gestor);
+        var entrega = await Entrega(projeto, await Execucao(projeto, "arquivo_digital"));
+        var r = await gestor.PostAsJsonAsync($"/api/entrega/{entrega}/aprovar", new { observacao = new string('x', 501) });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, r.StatusCode);
+        Assert.Equal(0L, await banco.Escalar<long>($"SELECT count(*) FROM execucao WHERE id = {entrega} AND aprovada_em IS NOT NULL"));
     }
 }

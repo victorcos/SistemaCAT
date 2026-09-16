@@ -34,6 +34,14 @@ public static class Capacidades
     public static bool PodeExcluirTrabalho(this Papel papel) => papel is Papel.Dev or Papel.Gestor;
 
     /// <summary>
+    /// Aprovar a entrega é de quem responde pelo que sai do escritório: o revisor,
+    /// que existe para isso, e o gestor. Dev fica de fora de propósito — conta
+    /// técnica não substitui responsável pelo negócio, a mesma razão de
+    /// <see cref="ContaComoGestor"/>. Analista monta a entrega e não aprova a própria.
+    /// </summary>
+    public static bool PodeAprovarEntrega(this Papel papel) => papel is Papel.Revisor or Papel.Gestor;
+
+    /// <summary>
     /// Gestor responde pela carteira inteira; dev precisa reproduzir problema
     /// em qualquer cliente. A diferença entre os dois está em
     /// <see cref="Usuario.AcessaPorExcecao"/>.
