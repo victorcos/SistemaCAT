@@ -60,13 +60,16 @@ class Config(BaseSettings):
     # partes são Python puro, uma por arquivo: num perfil de 12 arquivos do
     # Amigão, 48% do tempo era pré-validação e 40% escrita. Zero escolhe pelo
     # processador, deixando folga para a API e o Postgres; 1 lê um por vez.
+    # O teto de 4 é pela memória, não pelo processador: cada filho pode passar
+    # de 1 GB, e a máquina de desenvolvimento já ficou com 4 GB livres com o
+    # motor, o Excel e o WSL abertos (suportado #55, 16/09/2026).
     processos_do_arquivo_digital: int = 0
 
     @property
     def processos_para_arquivos(self) -> int:
         if self.processos_do_arquivo_digital > 0:
             return self.processos_do_arquivo_digital
-        return max(1, min(8, (os.cpu_count() or 2) - 4))
+        return max(1, min(4, (os.cpu_count() or 2) - 4))
 
     @property
     def raiz_de_trabalho(self) -> str:

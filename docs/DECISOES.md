@@ -28,7 +28,9 @@ num zip: 41,2 s com um processo, 10,0 s com seis, o mesmo resumo e as mesmas
 linhas.
 
 Quantos processos: `CAT_PROCESSOS_DO_ARQUIVO_DIGITAL`, e 0 escolhe núcleos
-menos 4, entre 1 e 8, para deixar folga à API e ao Postgres. Com 1 nada muda do
+menos 4, entre 1 e 4, para deixar folga à API e ao Postgres — o teto é pela
+memória: cada filho pode passar de 1 GB, e a apuração do suportado do Amigão
+(#55) falhou por falta de memória com a máquina em 4 GB livres. Com 1 nada muda do
 que era. Os testes rodam as duas formas e exigem o mesmo resultado. Quando o
 módulo principal não se reimporta num processo novo (script lido da entrada
 padrão), cai para um processo com aviso no log; um filho que morre (memória)
