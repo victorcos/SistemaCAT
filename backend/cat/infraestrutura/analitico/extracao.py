@@ -32,6 +32,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from cat.dominio.cat42.conferencia import Origem
+from cat.dominio.notafiscal.xml import BYTES_DO_PROTOCOLO, CSTAT_AUTORIZADOS, cstat_do_fim
 from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido, ler_cabecalho
 from cat.dominio.sped.fiscais import PREFIXOS, DocumentoEscriturado, ler_documento
 from cat.infraestrutura.arquivos.xml_compactado import contar_xml, conteudos_de_xml
@@ -98,6 +99,16 @@ class Progresso:
 
 
 Aviso = Callable[[Progresso], None]
+
+
+@dataclass
+class ProgressoDaPasta(Progresso):
+    """O de sempre, mais o que a leitura dos documentos do cliente deixou de fora."""
+
+    # XML de uma chave que já tinha vindo em outro arquivo (solto e no zip, dois zips)
+    xml_repetidos: int = 0
+    # XML com protocolo que não autoriza a nota (uso denegado): não é documento
+    xml_nao_autorizados: int = 0
 
 
 class _Escritor:
@@ -269,29 +280,44 @@ def _por_que_sem_chave(bruto: str | None, numero_doc: str | None) -> SemChave:
 
 
 def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
-                  avisar: Aviso | None = None) -> Progresso:
+                  avisar: Aviso | None = None) -> ProgressoDaPasta:
     """Escreve um parquet com a chave de cada documento que o cliente entregou.
 
     XML e relatório gerencial entram no mesmo arquivo porque, para o confronto,
     fazem o mesmo papel: dizem que o documento existe. Qual das duas fontes o
     trouxe fica na coluna `origem`, que é o que permite explicar depois de onde
     a informação veio.
+
+    Uma linha por chave: a repetição é contada. Do XML se lê o começo (a chave)
+    e o fim (o protocolo): nota de uso denegado não é documento, e sai da lista
+    mesmo que outra cópia, sem protocolo, tenha entrado antes.
     """
     from cat.dominio.gerencial.campos import Especie
     from cat.infraestrutura.arquivos.gerencial import Leitura
 
-    progresso = Progresso(arquivos_totais=contar_xml(xmls) + len(relatorios))
+    progresso = ProgressoDaPasta(arquivos_totais=contar_xml(xmls) + len(relatorios))
     escritor = _Escritor(destino, ESQUEMA_PASTA)
     vistas: set[str] = set()
+    negadas: set[str] = set()
 
-    # o XML de dentro de zip chega com o começo já lido; o solto, sem conteúdo
-    for caminho, inicio in conteudos_de_xml(xmls, limite=BYTES_DE_XML, recusados=progresso.recusados):
-        if inicio is not None and _RE_NAO_E_NOTA.search(inicio):
-            # evento, inutilização e CT-e vêm misturados no zip do portal
+    # o XML de dentro de zip chega inteiro; do solto se lê o começo e o fim
+    for caminho, conteudo in conteudos_de_xml(xmls, recusados=progresso.recusados):
+        inicio, fim = _inicio_e_fim(caminho, conteudo)
+        if conteudo is not None and _RE_NAO_E_NOTA.search(inicio):
+            # evento, inutilização e CT-e vêm misturados no zip do portal; o
+            # solto já foi separado pelo lote
             progresso.arquivos_lidos += 1
             continue
         chave = _chave_do_xml(caminho, inicio)
-        if chave and chave not in vistas:
+        cstat = cstat_do_fim(fim)
+        if chave and cstat is not None and cstat not in CSTAT_AUTORIZADOS:
+            negadas.add(chave)
+            progresso.xml_nao_autorizados += 1
+            log.warning("XML com protocolo que não autoriza a nota",
+                        extra={"arquivo": os.path.basename(caminho), "chave": chave, "cstat": cstat})
+        elif chave in vistas:
+            progresso.xml_repetidos += 1
+        elif chave:
             vistas.add(chave)
             escritor.acrescentar({"chave": chave, "origem": Origem.XML.value,
                                   "arquivo": os.path.basename(caminho)})
@@ -338,10 +364,53 @@ def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
             avisar(progresso)
 
     escritor.fechar()
+    if negadas & vistas:
+        progresso.documentos -= _tirar_chaves(destino, negadas)
     log.info("documentos da pasta extraídos",
              extra={"xmls": len(xmls), "relatorios": len(relatorios),
-                    "chaves": escritor.total})
+                    "chaves": progresso.documentos, "xml_repetidos": progresso.xml_repetidos,
+                    "xml_nao_autorizados": progresso.xml_nao_autorizados})
     return progresso
+
+
+def _inicio_e_fim(caminho: str, conteudo: bytes | None) -> tuple[bytes, bytes]:
+    """O começo (a chave) e o fim (o protocolo) do XML; do solto, duas leituras curtas."""
+    if conteudo is not None:
+        return conteudo[:BYTES_DE_XML], conteudo[-BYTES_DO_PROTOCOLO:]
+    try:
+        with open(caminho, "rb") as f:
+            inicio = f.read(BYTES_DE_XML)
+            if len(inicio) < BYTES_DE_XML:
+                return inicio, inicio[-BYTES_DO_PROTOCOLO:]
+            tamanho = f.seek(0, os.SEEK_END)
+            f.seek(max(BYTES_DE_XML, tamanho - BYTES_DO_PROTOCOLO))
+            return inicio, (inicio + f.read())[-BYTES_DO_PROTOCOLO:]
+    except OSError as erro:
+        log.warning("XML ilegível na leitura da pasta",
+                    extra={"arquivo": os.path.basename(caminho), "motivo": str(erro)})
+        return b"", b""
+
+
+def _tirar_chaves(caminho: str, chaves: set[str]) -> int:
+    """Regrava o parquet da pasta sem as chaves dadas. Devolve quantas linhas saíram."""
+    import duckdb  # noqa: PLC0415
+
+    provisorio = caminho + ".negadas"
+    os.replace(caminho, provisorio)
+    origem = provisorio.replace("'", "''")
+    con = duckdb.connect()
+    try:
+        con.register("negadas", pa.table({"chave": pa.array(sorted(chaves), pa.string())}))
+        antes = con.execute(f"SELECT count(*) FROM read_parquet('{origem}')").fetchone()[0]
+        con.execute(f"""
+            COPY (SELECT p.* FROM read_parquet('{origem}') p ANTI JOIN negadas n ON n.chave = p.chave)
+            TO '{caminho.replace("'", "''")}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        """)
+        depois = con.execute(f"SELECT count(*) FROM read_parquet('{caminho.replace("'", "''")}')").fetchone()[0]
+    finally:
+        con.close()
+    os.remove(provisorio)
+    return antes - depois
 
 
 def _relatar_sem_chave(nome: str, motivos: "Counter[SemChave]",

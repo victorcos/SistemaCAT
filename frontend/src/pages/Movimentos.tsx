@@ -275,10 +275,17 @@ function Resultado({
             ({numero(resumo.movimentos_do_xml ?? 0)} movimentos), e ficou ao lado de{" "}
             {numero(resumo.itens_pareados_com_xml ?? 0)} item(ns) do C170, onde os valores dele
             vencem na apuração do suportado.
-            {(resumo.xml_repetidos ?? 0) + (resumo.xml_nao_sao_documento ?? 0) > 0 &&
-              ` Fora da conta: ${numero(resumo.xml_repetidos ?? 0)} repetido(s) e ${numero(
-                resumo.xml_nao_sao_documento ?? 0,
-              )} que não são documento (evento, inutilização).`}
+            {(resumo.xml_repetidos ?? 0) +
+              (resumo.xml_nao_sao_documento ?? 0) +
+              (resumo.xml_nao_autorizados ?? 0) >
+              0 &&
+              ` Fora da conta: ${numero(resumo.xml_repetidos ?? 0)} repetido(s)${
+                resumo.xml_copias_trocadas
+                  ? ` (em ${numero(resumo.xml_copias_trocadas)}, a cópia autorizada ficou no lugar da sem protocolo)`
+                  : ""
+              }, ${numero(resumo.xml_nao_sao_documento ?? 0)} que não são documento (evento, inutilização) e ${numero(
+                resumo.xml_nao_autorizados ?? 0,
+              )} de uso denegado.`}
           </Aviso>
         )}
 

@@ -80,6 +80,7 @@ const APARENCIA: Record<TipoDeEvento, { icone: Icone; classe: string }> = {
   },
   lote_importado: { icone: IconeEnviar, classe: "bg-info-fundo text-info" },
   lote_removido: { icone: IconeArquivo, classe: "bg-erro-fundo text-erro" },
+  lote_reclassificado: { icone: IconeTrocar, classe: "bg-info-fundo text-info" },
   etapa_iniciada: { icone: IconeArquivo, classe: "bg-superficie-alt text-texto-suave" },
   etapa_concluida: { icone: IconeConfirma, classe: "bg-sucesso-fundo text-sucesso" },
   etapa_falhou: { icone: IconeErro, classe: "bg-erro-fundo text-erro" },
@@ -501,7 +502,7 @@ function LinhaDoTempo({ e, ultima }: { e: EventoDoProjeto; ultima: boolean }) {
           </p>
         )}
 
-        {e.tipo === "lote_importado" && (
+        {(e.tipo === "lote_importado" || e.tipo === "lote_reclassificado") && (
           <div className="mt-2 flex flex-wrap gap-2">
             {typeof e.dados.arquivos === "number" && (
               <Etiqueta tom="info">{numero(e.dados.arquivos)} arquivos</Etiqueta>

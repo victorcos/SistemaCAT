@@ -263,6 +263,8 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     resumo = confrontar(caminho_efd, caminho_pasta, destino,
                         anterior=_pendencias_anteriores(execucao, sessao))
     resumo.efd_originais_substituidas = len(substituidas)
+    resumo.xml_repetidos = passo_pasta.xml_repetidos
+    resumo.xml_nao_autorizados = passo_pasta.xml_nao_autorizados
 
     execucao.situacao = "concluida"
     execucao.passo = "Concluída"

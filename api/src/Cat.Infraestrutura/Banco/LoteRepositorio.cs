@@ -1,5 +1,6 @@
 using Cat.Aplicacao.Trabalhos;
 using Cat.Dominio.Acesso;
+using Cat.Dominio.Lote;
 using Microsoft.EntityFrameworkCore;
 
 namespace Cat.Infraestrutura.Banco;
@@ -73,6 +74,47 @@ public sealed class LoteRepositorio(CatDbContext banco) : IRepositorioDeLotes
 
         var contagens = arquivos.GroupBy(a => a.Tipo).Select(g => (g.Key, g.Count())).ToList();
         return Lido(lote, contagens);
+    }
+
+    public async Task<Reclassificacao> Reclassificar(int projetoId, IReadOnlyList<ArquivoInspecionado> arquivos,
+        CancellationToken cancelar)
+    {
+        var porCaminho = arquivos.ToDictionary(a => a.Caminho, StringComparer.Ordinal);
+        var caminhos = porCaminho.Keys.ToList();
+
+        await using var transacao = await banco.Database.BeginTransactionAsync(cancelar);
+        var linhas = await banco.ArquivosDoLote
+            .Where(a => caminhos.Contains(a.Caminho) && banco.Lotes.Any(l => l.Id == a.LoteId && l.ProjetoId == projetoId))
+            .ToListAsync(cancelar);
+        foreach (var linha in linhas)
+        {
+            var a = porCaminho[linha.Caminho];
+            linha.Tipo = a.Tipo;
+            linha.Cnpj = a.Cnpj;
+            linha.Competencia = a.Competencia;
+            linha.Uf = string.IsNullOrEmpty(a.Uf) ? null : a.Uf;
+            linha.Detalhe = string.IsNullOrEmpty(a.Detalhe) ? null : a.Detalhe;
+            linha.Retificadora = a.Retificadora;
+        }
+        await banco.SaveChangesAsync(cancelar);
+
+        // o que a CAT lê e o período de cada lote tocado, como no registro
+        var tocados = linhas.GroupBy(l => l.LoteId).OrderByDescending(g => g.Count()).Select(g => g.Key).ToList();
+        foreach (var loteId in tocados)
+        {
+            var dele = await banco.ArquivosDoLote.AsNoTracking().Where(a => a.LoteId == loteId)
+                .Select(a => new { a.Tipo, a.Competencia }).ToListAsync(cancelar);
+            var uteis = dele.Where(a => TiposDeArquivo.Buscar(a.Tipo).AlimentaACat).ToList();
+            var competencias = uteis.Where(a => a.Competencia is not null).Select(a => a.Competencia!.Value)
+                .Distinct().Order().ToList();
+            await banco.Lotes.Where(l => l.Id == loteId).ExecuteUpdateAsync(s => s
+                .SetProperty(l => l.ArquivosUteis, uteis.Count)
+                .SetProperty(l => l.CompetenciaIni, competencias.Count > 0 ? competencias[0] : (DateOnly?)null)
+                .SetProperty(l => l.CompetenciaFim, competencias.Count > 0 ? competencias[^1] : (DateOnly?)null), cancelar);
+        }
+        await transacao.CommitAsync(cancelar);
+        banco.ChangeTracker.Clear();
+        return new Reclassificacao(linhas.Count, tocados);
     }
 
     public Task<int?> ProjetoDoLote(int loteId, CancellationToken cancelar) =>

@@ -58,6 +58,7 @@ public static class TipoDeEvento
     public const string Sucessao = "sucessao";
     public const string LoteImportado = "lote_importado";
     public const string LoteRemovido = "lote_removido";
+    public const string LoteReclassificado = "lote_reclassificado";
     public const string EtapaIniciada = "etapa_iniciada";
     public const string EtapaConcluida = "etapa_concluida";
     public const string EtapaFalhou = "etapa_falhou";
@@ -73,6 +74,7 @@ public static class TipoDeEvento
         [Sucessao] = "Responsável alterado",
         [LoteImportado] = "Arquivos importados",
         [LoteRemovido] = "Lote removido",
+        [LoteReclassificado] = "Arquivos reclassificados",
         [EtapaIniciada] = "Etapa iniciada",
         [EtapaConcluida] = "Etapa concluída",
         [EtapaFalhou] = "Etapa falhou",

@@ -60,6 +60,8 @@ class TipoDeEvento(str, Enum):
     SUCESSAO = "sucessao"
     LOTE_IMPORTADO = "lote_importado"
     LOTE_REMOVIDO = "lote_removido"
+    # arquivo já importado que a classificação de hoje reconhece como outro tipo
+    LOTE_RECLASSIFICADO = "lote_reclassificado"
     ETAPA_INICIADA = "etapa_iniciada"
     ETAPA_CONCLUIDA = "etapa_concluida"
     ETAPA_FALHOU = "etapa_falhou"

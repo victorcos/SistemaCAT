@@ -268,7 +268,11 @@ function Resultado({
             <Metrica
               rotulo="Não escrituradas"
               valor={resumo.nao_escrituradas}
-              nota="saíram da análise"
+              nota={
+                resumo.xml_repetidos
+                  ? `saíram da análise · ${numero(resumo.xml_repetidos)} XML repetido(s) lido(s) uma vez`
+                  : "saíram da análise"
+              }
             />
           </Metricas>
         </div>

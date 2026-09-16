@@ -165,6 +165,8 @@ class ArquivoInspecionado(BaseModel):
     hash_conteudo: str | None = None
     # já está neste trabalho: a API não o registra de novo
     ja_no_trabalho: bool = False
+    # o tipo gravado no trabalho; diferente de `tipo`, a API reclassifica
+    tipo_no_trabalho: str | None = None
 
 
 class LoteInspecionado(BaseModel):
@@ -208,6 +210,7 @@ def inspecionar_lote(
                 cnpj=a.cnpj, competencia=a.competencia, uf=a.uf, detalhe=a.detalhe,
                 motivo=a.motivo, retificadora=a.retificadora,
                 hash_conteudo=a.hash_conteudo, ja_no_trabalho=a.caminho in ja,
+                tipo_no_trabalho=ja.get(a.caminho),
             )
             for a in resumo.arquivos
         ],

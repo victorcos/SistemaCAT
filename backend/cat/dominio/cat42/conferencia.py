@@ -130,6 +130,13 @@ class ResumoDaConferencia:
     # do mesmo estabelecimento e período no lote
     efd_originais_substituidas: int = 0
 
+    # XML de chave que já tinha vindo em outro arquivo (solto e dentro do zip,
+    # em dois zips): uma linha por chave, o resto contado
+    xml_repetidos: int = 0
+    # XML com protocolo de uso denegado (cStat 301/302/303): não é documento, e
+    # a chave sai da lista da pasta
+    xml_nao_autorizados: int = 0
+
     # pendências cuja chave apareceu mais de uma vez na EFD. Uma parcela
     # pequena é legítima — a mesma nota escriturada em duas filiais. Uma
     # parcela grande é o mesmo arquivo importado duas vezes.
@@ -165,6 +172,12 @@ class ResumoDaConferencia:
     @property
     def avisos(self) -> list[str]:
         avisos: list[str] = []
+        if self.xml_nao_autorizados:
+            avisos.append(
+                f"{_numero(self.xml_nao_autorizados)} XML da pasta têm protocolo de uso denegado "
+                "(a SEFAZ não autorizou a nota). Não contam como documento entregue nem como "
+                "nota não escriturada."
+            )
         if not self.origens:
             avisos.append(
                 "Nenhum XML nem relatório do cliente no lote. Sem documento "

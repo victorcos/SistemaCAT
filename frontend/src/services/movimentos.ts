@@ -48,6 +48,9 @@ export interface ResumoDaMovimentacao {
   xml_repetidos?: number;
   xml_nao_sao_documento?: number;
   xml_ilegiveis?: number;
+  /** v0.55: uso denegado fora; cópia autorizada no lugar da sem protocolo. */
+  xml_nao_autorizados?: number;
+  xml_copias_trocadas?: number;
   saidas_completadas_pelo_xml?: number;
   entradas_completadas_pelo_xml?: number;
   movimentos_do_xml?: number;

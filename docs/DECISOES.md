@@ -5,6 +5,40 @@
 
 ---
 
+## 2026-09-16 — A mesma nota em vários XML, a nota denegada e o lote que muda de tipo
+
+**A pergunta do Victor:** como a v0.54 trata a duplicidade de XML, no caso de
+reimportar a pasta de um lote antigo. Medido na Advertising, três coisas.
+
+**1. Reimportar não reclassificava.** Arquivo com o caminho já no trabalho era
+"já importado" e ficava com o tipo de quando entrou: o zip de 2026-09-15
+continuava `compactado` e o evento continuava `xml_outro`, e a importação
+recusava com 409. Agora a inspeção devolve o tipo gravado, e o registro atualiza
+onde está o arquivo cujo tipo mudou — sem lote novo, sem remover o lote antigo.
+Remover e importar de novo continua possível, mas não é mais o caminho.
+
+**2. Nota denegada.** O sistema não olhava o `cStat` do protocolo. Na
+Advertising, 16 notas com uso denegado (301/302); 15 entraram na contingência
+(R$ 130,83 de multa) e contavam como documento entregue na conferência. Agora
+só 100 e 150 autorizam; a denegada sai das etapas 2 e 3 com todas as cópias,
+contada e avisada. O XML sem protocolo (do ERP) e o CF-e continuam valendo.
+
+**3. Cópias da mesma chave.** Das 179.417 XML que o lote da Advertising deixa
+entrar (os 12 zips idênticos já ficam de fora pelo hash), 28.407 chaves estão em
+mais de um arquivo: 29.306 arquivos a mais. Em 22.726 os bytes diferem — só a
+declaração `<?xml ...?>` — e nenhuma cópia diverge no que se lê. Mesmo assim, a
+regra passou a ser explícita: a cópia com protocolo autorizado vence a sem
+protocolo; entre iguais, a primeira na ordem do caminho. O parquet é gravado em
+fluxo, então a cópia melhor que chega depois é gravada também, com `leitura`
+maior, e uma passada no fim deixa uma por chave — só quando houve troca ou nota
+denegada. A etapa 2, que descartava a repetida sem dizer, agora conta.
+
+**Na Advertising, depois da regra:** etapa 2 em 19,7 s, 119.714 chaves (as 16
+denegadas fora), 29.306 repetidos; etapa 3 em 96 s, 119.713 notas e 132.446
+itens, nenhuma cópia trocada (todas tinham protocolo).
+
+---
+
 ## 2026-09-16 — XML dentro de zip, sem extrair
 
 **O caso.** A Advertising entregou 357.948 XML em 26 zips — e 290 mil deles em

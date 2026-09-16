@@ -37,10 +37,20 @@ O grupo do ICMS muda de nome conforme o CST (`ICMS00`, `ICMS10`, `ICMS60`,
 
 O CST sai como na EFD: origem mais os dois dígitos (`060`), ou origem mais o
 CSOSN do Simples (`0500`) — o domínio do suportado compara só os dois últimos.
+
+## O protocolo
+
+O `nfeProc` traz, depois da nota, o `protNFe` com o `cStat` da SEFAZ. Só 100
+(autorizado) e 150 (autorizado fora de prazo) são operação que existe; 301, 302
+e 303 são uso denegado — na Advertising, 16 notas, 15 delas contadas como não
+escrituradas antes desta regra. A NF-e sem protocolo (o XML que o ERP gera antes
+de transmitir) e o CF-e não têm `cStat`: valem, mas perdem para a cópia
+autorizada da mesma chave.
 """
 
 from __future__ import annotations
 
+import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import date
@@ -52,6 +62,13 @@ ZERO = Decimal(0)
 _SEM_GTIN = frozenset({"", "SEM GTIN", "SEMGTIN"})
 
 MODELO_CFE_SAT = "59"
+
+# cStat do protocolo que diz que a nota existe: autorizado e autorizado fora de prazo
+CSTAT_AUTORIZADOS = frozenset({"100", "150"})
+
+# o protNFe fica no fim do nfeProc: estes bytes finais bastam para achá-lo
+BYTES_DO_PROTOCOLO = 4096
+_RE_CSTAT = re.compile(rb"<cStat>\s*(\d{3})\s*</cStat>")
 
 
 class XmlIlegivel(ValueError):
@@ -106,6 +123,26 @@ class DocumentoXml:
     itens: tuple[ItemDoXml, ...]
     # indFinal: True consumidor final, False operação normal, None quando o XML não diz
     consumidor_final: bool | None = None
+    # cStat do protNFe; None sem protocolo (XML do ERP) e no CF-e
+    cstat: str | None = None
+
+    @property
+    def autorizado(self) -> bool | None:
+        """True autorizado, False denegado ou recusado, None quando o XML não diz."""
+        return None if self.cstat is None else self.cstat in CSTAT_AUTORIZADOS
+
+
+def cstat_do_fim(fim: bytes) -> str | None:
+    """O cStat do protocolo, a partir dos bytes finais do XML. None sem protocolo.
+
+    Para a etapa 2, que lê só o começo e o fim de cada arquivo. O `cStat` só
+    aparece no `infProt`; procura-se depois do último `<infProt`.
+    """
+    inicio = fim.rfind(b"<infProt")
+    if inicio < 0:
+        return None
+    achado = _RE_CSTAT.search(fim, inicio)
+    return achado.group(1).decode("ascii") if achado else None
 
 
 def ler_documento_xml(conteudo: bytes) -> DocumentoXml | None:
@@ -118,7 +155,7 @@ def ler_documento_xml(conteudo: bytes) -> DocumentoXml | None:
         if nome == "NFe":
             inf = _filho(no, "infNFe")
             if inf is not None:
-                return _nfe(inf)
+                return _nfe(inf, _cstat(raiz))
         elif nome == "CFe":
             inf = _filho(no, "infCFe")
             if inf is not None:
@@ -149,7 +186,13 @@ def _raiz(conteudo: bytes) -> ET.Element:
 # ---------------------------------------------------------------------------
 # NF-e e NFC-e
 # ---------------------------------------------------------------------------
-def _nfe(inf: ET.Element) -> DocumentoXml:
+def _cstat(raiz: ET.Element) -> str | None:
+    prot = _achar(raiz, "infProt")
+    cstat = _texto(prot, "cStat") if prot is not None else ""
+    return cstat or None
+
+
+def _nfe(inf: ET.Element, cstat: str | None = None) -> DocumentoXml:
     ide = _filho(inf, "ide")
     emissao = _texto(ide, "dhEmi") or _texto(ide, "dEmi")
     modelo = _texto(ide, "mod")
@@ -166,6 +209,7 @@ def _nfe(inf: ET.Element) -> DocumentoXml:
         emissao=_data(emissao),
         itens=tuple(_item(det) for det in _filhos(inf, "det")),
         consumidor_final=consumidor,
+        cstat=cstat,
     )
 
 

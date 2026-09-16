@@ -134,3 +134,23 @@ class TestDepoisDeRegistrado:
         assert len(corpo["arquivos"]) == 2
         assert all(a["ja_no_trabalho"] for a in corpo["arquivos"])
         assert tem_base(projeto_id)
+
+    def test_diz_o_tipo_gravado_para_a_api_reclassificar(
+        self, cliente, projeto_id, pasta_com_base
+    ):
+        # o arquivo importado antes de a classificação mudar guarda o tipo antigo
+        if not tem_base(projeto_id):
+            criar_lote(projeto_id=projeto_id, pasta=pasta_com_base)
+        from cat.infraestrutura.repositorios.banco import Sessao
+        from cat.infraestrutura.repositorios.modelos import ArquivoDoLoteDB, LoteDB
+        with Sessao() as s:
+            arquivo = s.query(ArquivoDoLoteDB).join(LoteDB).filter(
+                LoteDB.projeto_id == projeto_id).order_by(ArquivoDoLoteDB.caminho).first()
+            arquivo.tipo = TipoDeArquivo.COMPACTADO.value
+            s.commit()
+            mudado = arquivo.caminho
+        corpo = inspecionar(cliente, projeto_id, pasta_com_base).json()
+        por_caminho = {a["caminho"]: a for a in corpo["arquivos"]}
+        assert por_caminho[mudado]["tipo_no_trabalho"] == "compactado"
+        assert por_caminho[mudado]["tipo"] != "compactado"
+        assert all(a["tipo_no_trabalho"] == a["tipo"] for c, a in por_caminho.items() if c != mudado)

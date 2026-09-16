@@ -231,6 +231,8 @@ def _somar_xml(resumo: ResumoDaMovimentacao, do_xml: ProgressoDoXml) -> None:
     resumo.xml_repetidos = do_xml.repetidos
     resumo.xml_nao_sao_documento = do_xml.nao_sao_documento
     resumo.xml_ilegiveis = do_xml.ilegiveis
+    resumo.xml_nao_autorizados = do_xml.nao_autorizados
+    resumo.xml_copias_trocadas = do_xml.copias_trocadas
 
 
 def _serializar(resumo: ResumoDaMovimentacao, progresso: ProgressoDeItens,

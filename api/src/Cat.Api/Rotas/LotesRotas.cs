@@ -26,7 +26,8 @@ public static class LotesRotas
     public sealed record ResumoDto(
         string Pasta, int TotalArquivos, int ArquivosUteis, long BytesTotais, int DeOutraEmpresa, bool Serve,
         DateOnly? CompetenciaIni, DateOnly? CompetenciaFim, IReadOnlyList<string> Cnpjs, IReadOnlyList<ContagemDto> Contagens,
-        IReadOnlyList<string> Avisos, IReadOnlyList<ArquivoDto> Amostra, int JaNoTrabalho, int Copias);
+        IReadOnlyList<string> Avisos, IReadOnlyList<ArquivoDto> Amostra, int JaNoTrabalho, int Copias,
+        int Reclassificados);
 
     public sealed record LoteDto(
         int Id, int ProjetoId, string Pasta, int TotalArquivos, int ArquivosUteis, long BytesTotais,
@@ -34,6 +35,12 @@ public static class LotesRotas
         IReadOnlyList<ContagemDto> Contagens);
 
     public sealed record LoteApagadoDto(string Pasta, int Arquivos, int ConferenciasInvalidadas);
+
+    /// <summary>O lote como na lista, mais se foi criado agora e quantos arquivos já no trabalho mudaram de tipo.</summary>
+    public sealed record LoteRegistradoDto(
+        int Id, int ProjetoId, string Pasta, int TotalArquivos, int ArquivosUteis, long BytesTotais,
+        DateOnly? CompetenciaIni, DateOnly? CompetenciaFim, string? Observacao, string CriadoEm,
+        IReadOnlyList<ContagemDto> Contagens, bool Criado, int Reclassificados);
 
     private sealed record PastaEntrada(string? Pasta, string? Observacao);
 
@@ -90,9 +97,16 @@ public static class LotesRotas
         var (pedido, recusa) = await LerPasta(http);
         if (recusa is not null)
             return recusa;
-        return await Traduzir(async () => Results.Json(
-            Lote(await caso.Registrar(projetoId, pedido!.Pasta!, pedido.Observacao, http.UsuarioAtual(), http.RequestAborted)),
-            statusCode: StatusCodes.Status201Created));
+        return await Traduzir(async () =>
+        {
+            var r = await caso.Registrar(projetoId, pedido!.Pasta!, pedido.Observacao, http.UsuarioAtual(), http.RequestAborted);
+            var l = Lote(r.Lote);
+            // nada novo, só tipo atualizado: não há lote criado, e a resposta diz isso
+            return Results.Json(new LoteRegistradoDto(l.Id, l.ProjetoId, l.Pasta, l.TotalArquivos, l.ArquivosUteis,
+                    l.BytesTotais, l.CompetenciaIni, l.CompetenciaFim, l.Observacao, l.CriadoEm, l.Contagens,
+                    r.Criado, r.Reclassificados),
+                statusCode: r.Criado ? StatusCodes.Status201Created : StatusCodes.Status200OK);
+        });
     }
 
     /// <summary>
@@ -140,7 +154,7 @@ public static class LotesRotas
             r.Competencias.Count > 0 ? r.Competencias[0] : null, r.Competencias.Count > 0 ? r.Competencias[^1] : null,
             r.Cnpjs.Take(20).ToList(),
             Contagens(r.Arquivos.GroupBy(a => a.Tipo).Select(g => (g.Key, g.Count()))),
-            r.Avisos, amostra, r.Arquivos.Count(a => a.JaNoTrabalho), r.Copias);
+            r.Avisos, amostra, r.Arquivos.Count(a => a.JaNoTrabalho), r.Copias, r.Arquivos.Count(a => a.Reclassificado));
     }
 
     public static LoteDto Lote(LoteLido l) => new(

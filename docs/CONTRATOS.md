@@ -97,8 +97,9 @@ evento entrando enquanto se lê, offset repete linha e pula linha.
 
 `tipo` é um destes, e `rotulo_do_tipo` já vem traduzido — a tela não reescreve
 nenhum: `criado`, `comentario`, `status`, `sucessao`, `lote_importado`,
-`lote_removido`, `etapa_iniciada`, `etapa_concluida`, `etapa_falhou`,
-`planilha_baixada`. Tipo desconhecido (versão mais nova gravando) chega como
+`lote_removido`, `lote_reclassificado` (v0.55: `dados.arquivos`, `dados.lotes`,
+`dados.uteis` e `dados.trocas` = `[{de, para, arquivos}]`), `etapa_iniciada`,
+`etapa_concluida`, `etapa_falhou`, `planilha_baixada`. Tipo desconhecido (versão mais nova gravando) chega como
 comentário em vez de sumir da linha do tempo.
 
 `e_comentario` é o que separa o que a pessoa escreveu do que o sistema
@@ -462,6 +463,36 @@ do zip — e de um nível de zip dentro dele — sem extrair; a barra conta um p
 XML de dentro, e `arquivo` vira `lote.zip > nota.xml`. Evento de cancelamento
 dentro do zip vai para `chaves_canceladas.parquet`. O zip `xml_compactado`
 também é fonte da pré-validação dos arquivos do cliente.
+
+### Arquivo já no trabalho com outro tipo (v0.55)
+
+`POST /interno/lotes/inspecionar` devolve, em cada arquivo já no trabalho,
+`tipo_no_trabalho` (o tipo gravado). Na API:
+
+* `POST /api/projetos/{id}/lotes/inspecionar` ganha `reclassificados`: quantos
+  arquivos já no trabalho são reconhecidos hoje como outro tipo;
+* `POST /api/projetos/{id}/lotes` atualiza esses arquivos onde estão (tipo,
+  CNPJ, competência, UF, detalhe, retificadora), refaz `arquivos_uteis` e o
+  período dos lotes tocados e grava `lote_reclassificado`. A resposta é o lote
+  mais `criado` e `reclassificados`: 201 com o lote novo quando havia arquivo
+  novo; 200 com o lote onde mais arquivos mudaram quando nada era novo. 409
+  "Todos os arquivos desta pasta já estão neste trabalho" só quando nada é novo
+  e nada mudou de tipo.
+
+### Cópias e notas não autorizadas (v0.55)
+
+A mesma chave em mais de um XML (solto e no zip, em dois zips) é lida uma vez.
+Nas etapas 2 e 3, nota com protocolo cujo `cStat` não é 100 nem 150 (uso
+denegado) sai com todas as cópias. Na etapa 3, a cópia com protocolo autorizado
+vence a sem protocolo; entre iguais, a primeira na ordem do caminho.
+`itens_do_xml.parquet` ganha `protocolo` (o `cStat`, vazio sem protocolo) e
+`leitura` (a ordem do arquivo lido).
+
+* resumo da conferência (etapa 2): `xml_repetidos`, `xml_nao_autorizados`, e
+  aviso quando há nota denegada;
+* resumo da etapa 3: `xml_nao_autorizados` e `xml_copias_trocadas`, além do
+  `xml_repetidos` que já existia, e aviso quando há nota denegada. A nota
+  denegada não completa a EFD nem entra na contingência.
 
 `movimentos.parquet` ganha colunas:
 

@@ -10,9 +10,16 @@ namespace Cat.Aplicacao.Trabalhos;
 
 public sealed record ArquivoInspecionado(
     string Nome, string Caminho, long Tamanho, string Tipo, string? Cnpj, DateOnly? Competencia, string Uf,
-    string Detalhe, string Motivo, bool Retificadora, string? HashConteudo, bool JaNoTrabalho)
+    string Detalhe, string Motivo, bool Retificadora, string? HashConteudo, bool JaNoTrabalho,
+    string? TipoNoTrabalho = null)
 {
     public bool AlimentaACat => TiposDeArquivo.Buscar(Tipo).AlimentaACat;
+
+    /// <summary>
+    /// Já está no trabalho com outro tipo: a classificação mudou desde a importação
+    /// (o zip que virou <c>xml_compactado</c> e o evento que virou <c>xml_cancelamento</c> na v0.54).
+    /// </summary>
+    public bool Reclassificado => JaNoTrabalho && TipoNoTrabalho is not null && TipoNoTrabalho != Tipo;
 }
 
 /// <summary>O que o motor leu da pasta. Os avisos vêm prontos: dependem do que só a leitura sabe.</summary>
@@ -27,6 +34,12 @@ public sealed record LoteLido(
 
 public sealed record LoteRemovido(string Pasta, int Arquivos, int ConferenciasInvalidadas);
 
+/// <summary>O que o registro fez: o lote criado ou, se nada era novo, o lote onde mais arquivos mudaram de tipo.</summary>
+public sealed record LoteRegistrado(LoteLido Lote, bool Criado, int Reclassificados);
+
+/// <param name="Lotes">os lotes com arquivo reclassificado, o de mais arquivos primeiro</param>
+public sealed record Reclassificacao(int Arquivos, IReadOnlyList<int> Lotes);
+
 public interface IRepositorioDeLotes
 {
     /// <summary>Mais recentes primeiro, com a contagem por tipo de cada um.</summary>
@@ -37,6 +50,13 @@ public interface IRepositorioDeLotes
         Usuario por, DateTimeOffset agora, CancellationToken cancelar);
 
     Task<int?> ProjetoDoLote(int loteId, CancellationToken cancelar);
+
+    /// <summary>
+    /// Regrava tipo, CNPJ, competência, UF, detalhe e finalidade dos arquivos que já estão no
+    /// trabalho, pelo caminho, e refaz a contagem do que a CAT lê e o período de cada lote tocado.
+    /// </summary>
+    Task<Reclassificacao> Reclassificar(int projetoId, IReadOnlyList<ArquivoInspecionado> arquivos,
+        CancellationToken cancelar);
 
     /// <summary>Tira os arquivos e o lote. Os arquivos em disco não são tocados.</summary>
     Task<LoteRemovido> Remover(int loteId, CancellationToken cancelar);
@@ -84,7 +104,7 @@ public sealed class Lotes(
         return await motor.InspecionarLote(projetoId, pasta, cancelar);
     }
 
-    public async Task<LoteLido> Registrar(int projetoId, string pasta, string? observacao, Usuario por,
+    public async Task<LoteRegistrado> Registrar(int projetoId, string pasta, string? observacao, Usuario por,
         CancellationToken cancelar)
     {
         await Projeto(projetoId, por, cancelar);
@@ -99,12 +119,23 @@ public sealed class Lotes(
         if (!inspecao.Serve)
             throw new NadaParaACat();
         // arquivo que já está no trabalho não entra de novo: o mesmo SPED
-        // contado duas vezes dobraria movimento na apuração
+        // contado duas vezes dobraria movimento na apuração. Mas, se a
+        // classificação de hoje diz outro tipo, ele é atualizado onde está
         var novos = inspecao.Arquivos.Where(a => !a.JaNoTrabalho).ToList();
-        if (novos.Count == 0)
+        var mudaram = inspecao.Arquivos.Where(a => a.Reclassificado).ToList();
+        if (novos.Count == 0 && mudaram.Count == 0)
             throw new TudoJaNoTrabalho();
 
         var agora = relogio.GetUtcNow();
+        Reclassificacao? reclassificacao = null;
+        if (mudaram.Count > 0)
+            reclassificacao = await ReclassificarArquivos(projetoId, inspecao.Pasta, mudaram, por, agora, cancelar);
+        if (novos.Count == 0)
+        {
+            var principal = (await lotes.Listar(projetoId, cancelar)).First(l => l.Id == reclassificacao!.Lotes[0]);
+            return new LoteRegistrado(principal, Criado: false, reclassificacao!.Arquivos);
+        }
+
         var lote = await lotes.Criar(projetoId, inspecao.Pasta, novos, observacao, por, agora, cancelar);
         var repetidos = inspecao.Arquivos.Count - novos.Count;
         await Registrar(projetoId, TipoDeEvento.LoteImportado,
@@ -117,7 +148,30 @@ public sealed class Lotes(
         log.Info("lote registrado",
             new { lote_id = lote.Id, projeto_id = projetoId, arquivos = lote.TotalArquivos, uteis = lote.ArquivosUteis,
                   bytes = lote.BytesTotais, repetidos_ignorados = repetidos });
-        return lote;
+        return new LoteRegistrado(lote, Criado: true, reclassificacao?.Arquivos ?? 0);
+    }
+
+    private async Task<Reclassificacao> ReclassificarArquivos(int projetoId, string pasta,
+        IReadOnlyList<ArquivoInspecionado> mudaram, Usuario por, DateTimeOffset agora, CancellationToken cancelar)
+    {
+        var feita = await lotes.Reclassificar(projetoId, mudaram, cancelar);
+        var trocas = mudaram.GroupBy(a => (De: a.TipoNoTrabalho!, Para: a.Tipo))
+            .OrderByDescending(g => g.Count())
+            .Select(g => new Dictionary<string, object?>
+            {
+                ["de"] = g.Key.De, ["para"] = g.Key.Para, ["arquivos"] = g.Count(),
+            }).ToList();
+        await Registrar(projetoId, TipoDeEvento.LoteReclassificado,
+            $"{feita.Arquivos.ToString("#,0", CultureInfo.GetCultureInfo("pt-BR"))} arquivo(s) de {pasta}",
+            new Dictionary<string, object?>
+            {
+                ["pasta"] = pasta, ["arquivos"] = feita.Arquivos, ["lotes"] = feita.Lotes,
+                ["uteis"] = mudaram.Count(a => a.AlimentaACat), ["trocas"] = trocas,
+            }, por, agora, cancelar);
+        log.Info("arquivos reclassificados no trabalho",
+            new { projeto_id = projetoId, pasta, arquivos = feita.Arquivos, lotes = feita.Lotes,
+                  trocas = string.Join("; ", trocas.Select(t => $"{t["de"]} -> {t["para"]}: {t["arquivos"]}")) });
+        return feita;
     }
 
     public async Task<IReadOnlyList<LoteLido>> Listar(int projetoId, Usuario usuario, CancellationToken cancelar)

@@ -21,6 +21,7 @@ export type TipoDeEvento =
   | "sucessao"
   | "lote_importado"
   | "lote_removido"
+  | "lote_reclassificado"
   | "etapa_iniciada"
   | "etapa_concluida"
   | "etapa_falhou"
@@ -80,7 +81,7 @@ export type Familia = "tudo" | "comentarios" | "situacao" | "arquivos" | "etapas
 export const FAMILIA: Record<Exclude<Familia, "tudo">, TipoDeEvento[]> = {
   comentarios: ["comentario"],
   situacao: ["status", "sucessao", "criado", "parametro_alterado"],
-  arquivos: ["lote_importado", "lote_removido"],
+  arquivos: ["lote_importado", "lote_removido", "lote_reclassificado"],
   etapas: ["etapa_iniciada", "etapa_concluida", "etapa_falhou", "planilha_baixada", "entrega_aprovada"],
 };
 

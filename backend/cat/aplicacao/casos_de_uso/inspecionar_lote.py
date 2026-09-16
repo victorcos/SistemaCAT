@@ -268,10 +268,12 @@ def existentes_do_projeto(projeto_id: int, sessao: Session) -> tuple[ArquivoExis
 
 def inspecionar_do_projeto(
     projeto_id: int, pasta: str, sessao: Session
-) -> tuple[ResumoDoLote, set[str]]:
+) -> tuple[ResumoDoLote, dict[str, str]]:
     """Inspeciona a pasta para um trabalho que existe.
 
-    Devolve o resumo e os caminhos que já estão no trabalho. É a entrada que o
+    Devolve o resumo e os caminhos que já estão no trabalho, cada um com o tipo
+    gravado — quando a classificação de hoje diz outro tipo (o zip que virou
+    `xml_compactado` na v0.54), a API atualiza o arquivo. É a entrada que o
     canal interno usa: a API em C# manda só o trabalho e a pasta, e o motor
     busca aqui a raiz do CNPJ e o que já foi importado — inclusive os hashes,
     que decidem o que é cópia.
@@ -281,4 +283,4 @@ def inspecionar_do_projeto(
         raise ProjetoInexistente(projeto_id)
     existentes = existentes_do_projeto(projeto_id, sessao)
     resumo = inspecionar_pasta(pasta, projeto.empresa.cnpj_raiz, existentes=existentes)
-    return resumo, {e.caminho for e in existentes}
+    return resumo, {e.caminho: e.tipo for e in existentes}

@@ -28,11 +28,11 @@ public sealed class MotorDeLotesFalso : IAsyncLifetime
     public ConcurrentQueue<long> BytesDeRemessa { get; } = new();
 
     public static object Arquivo(string nome, string tipo, string? competencia = "2025-01-01", bool ja = false,
-        bool retificadora = false, string? hash = null, long tamanho = 100) => new
+        bool retificadora = false, string? hash = null, long tamanho = 100, string? noTrabalho = null) => new
     {
         nome, caminho = $"Z:/base/{nome}", tamanho, tipo, cnpj = "77665544000105", competencia, uf = "SP",
-        detalhe = "", motivo = tipo == "desconhecido" ? "sem cabeçalho" : "", retificadora, hash_conteudo = hash,
-        ja_no_trabalho = ja,
+        detalhe = tipo == "xml_compactado" ? "3577 XML" : "", motivo = tipo == "desconhecido" ? "sem cabeçalho" : "",
+        retificadora, hash_conteudo = hash, ja_no_trabalho = ja || noTrabalho is not null, tipo_no_trabalho = noTrabalho,
     };
 
     public async Task InitializeAsync()
@@ -59,6 +59,14 @@ public sealed class MotorDeLotesFalso : IAsyncLifetime
                 "Z:/ja-no-trabalho" => [Arquivo("efd.txt", "sped_icms_ipi", ja: true)],
                 "Z:/metade" => [Arquivo("efd.txt", "sped_icms_ipi", ja: true), Arquivo("junho.txt", "sped_icms_ipi", "2025-06-01")],
                 "Z:/grande" => Enumerable.Range(0, 1500).Select(i => Arquivo($"nota{i:0000}.xml", "xml_nfe", tamanho: 10)).ToArray(),
+                // antes da v0.54: o zip era só compactado
+                "Z:/antes" => [Arquivo("efd.txt", "sped_icms_ipi"), Arquivo("portal.zip", "compactado", null)],
+                // a mesma pasta lida hoje: o zip é de XML, e a EFD não mudou
+                "Z:/hoje" => [Arquivo("efd.txt", "sped_icms_ipi", noTrabalho: "sped_icms_ipi"),
+                              Arquivo("portal.zip", "xml_compactado", null, noTrabalho: "compactado")],
+                "Z:/hoje-com-novo" => [Arquivo("efd.txt", "sped_icms_ipi", noTrabalho: "sped_icms_ipi"),
+                                       Arquivo("portal.zip", "xml_compactado", null, noTrabalho: "compactado"),
+                                       Arquivo("fevereiro.txt", "sped_icms_ipi", "2025-02-01")],
                 _ => [
                     Arquivo("efd_jan.txt", "sped_icms_ipi", "2025-01-01", hash: "abc123"),
                     Arquivo("efd_mar_retif.txt", "sped_icms_ipi", "2025-03-01", retificadora: true),
@@ -192,7 +200,7 @@ public sealed class LotesTestes(BancoDeTeste banco, MotorDeLotesFalso motor) : I
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         var corpo = await Json(r);
         Assert.Equal(["pasta", "total_arquivos", "arquivos_uteis", "bytes_totais", "de_outra_empresa", "serve", "competencia_ini",
-                      "competencia_fim", "cnpjs", "contagens", "avisos", "amostra", "ja_no_trabalho", "copias"],
+                      "competencia_fim", "cnpjs", "contagens", "avisos", "amostra", "ja_no_trabalho", "copias", "reclassificados"],
             corpo.EnumerateObject().Select(p => p.Name));
         Assert.Equal(4, corpo.GetProperty("total_arquivos").GetInt32());
         Assert.Equal(2, corpo.GetProperty("arquivos_uteis").GetInt32());
@@ -257,7 +265,10 @@ public sealed class LotesTestes(BancoDeTeste banco, MotorDeLotesFalso motor) : I
         Assert.Equal(HttpStatusCode.Created, r.StatusCode);
         var lote = await Json(r);
         Assert.Equal(["id", "projeto_id", "pasta", "total_arquivos", "arquivos_uteis", "bytes_totais", "competencia_ini",
-                      "competencia_fim", "observacao", "criado_em", "contagens"], lote.EnumerateObject().Select(p => p.Name));
+                      "competencia_fim", "observacao", "criado_em", "contagens", "criado", "reclassificados"],
+            lote.EnumerateObject().Select(p => p.Name));
+        Assert.True(lote.GetProperty("criado").GetBoolean());
+        Assert.Equal(0, lote.GetProperty("reclassificados").GetInt32());
         Assert.Equal(4, lote.GetProperty("total_arquivos").GetInt32());
         Assert.Equal(2, lote.GetProperty("arquivos_uteis").GetInt32());
         // o período é o do que a CAT lê: a Contribuições de 2021 na pasta não conta
@@ -309,6 +320,52 @@ public sealed class LotesTestes(BancoDeTeste banco, MotorDeLotesFalso motor) : I
 
         Assert.Equal(1, lote.GetProperty("total_arquivos").GetInt32());
         Assert.Equal(1, await banco.Escalar<int>($"SELECT (dados->>'repetidos_ignorados')::int FROM evento_do_projeto WHERE projeto_id = {projeto} AND tipo = 'lote_importado'"));
+    }
+
+    [Fact]
+    public async Task Arquivo_ja_no_trabalho_com_outro_tipo_e_atualizado_sem_lote_novo()
+    {
+        var (_, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var antes = await Json(await Registrar(c, projeto, "Z:/antes"));
+        var id = antes.GetProperty("id").GetInt32();
+        Assert.Equal(1, antes.GetProperty("arquivos_uteis").GetInt32());
+
+        var inspecao = await Json(await Inspecionar(c, projeto, "Z:/hoje"));
+        Assert.Equal(2, inspecao.GetProperty("ja_no_trabalho").GetInt32());
+        Assert.Equal(1, inspecao.GetProperty("reclassificados").GetInt32());
+
+        var r = await Registrar(c, projeto, "Z:/hoje");
+
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        var lote = await Json(r);
+        Assert.Equal(id, lote.GetProperty("id").GetInt32());
+        Assert.False(lote.GetProperty("criado").GetBoolean());
+        Assert.Equal(1, lote.GetProperty("reclassificados").GetInt32());
+        Assert.Equal(2, lote.GetProperty("arquivos_uteis").GetInt32());
+        Assert.Equal(1, await banco.Escalar<long>($"SELECT count(*) FROM lote WHERE projeto_id = {projeto}"));
+        Assert.Equal("xml_compactado", await banco.Escalar<string>($"SELECT tipo FROM arquivo_do_lote WHERE lote_id = {id} AND nome = 'portal.zip'"));
+        Assert.Equal("3577 XML", await banco.Escalar<string>($"SELECT detalhe FROM arquivo_do_lote WHERE lote_id = {id} AND nome = 'portal.zip'"));
+        Assert.Equal("1 arquivo(s) de Z:/hoje", await banco.Escalar<string>($"SELECT texto FROM evento_do_projeto WHERE projeto_id = {projeto} AND tipo = 'lote_reclassificado'"));
+        Assert.Equal("compactado", await banco.Escalar<string>($"SELECT dados->'trocas'->0->>'de' FROM evento_do_projeto WHERE projeto_id = {projeto} AND tipo = 'lote_reclassificado'"));
+    }
+
+    [Fact]
+    public async Task Com_arquivo_novo_o_lote_e_criado_e_o_antigo_atualizado_junto()
+    {
+        var (_, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var id = (await Json(await Registrar(c, projeto, "Z:/antes"))).GetProperty("id").GetInt32();
+
+        var r = await Registrar(c, projeto, "Z:/hoje-com-novo");
+
+        Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        var lote = await Json(r);
+        Assert.NotEqual(id, lote.GetProperty("id").GetInt32());
+        Assert.True(lote.GetProperty("criado").GetBoolean());
+        Assert.Equal(1, lote.GetProperty("reclassificados").GetInt32());
+        Assert.Equal(1, lote.GetProperty("total_arquivos").GetInt32());
+        Assert.Equal("xml_compactado", await banco.Escalar<string>($"SELECT tipo FROM arquivo_do_lote WHERE lote_id = {id} AND nome = 'portal.zip'"));
     }
 
     [Fact]

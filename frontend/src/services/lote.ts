@@ -49,6 +49,8 @@ export interface ResumoDoLote {
   avisos: string[];
   amostra: ArquivoDoLote[];
   ja_no_trabalho: number;
+  /** Já no trabalho, mas reconhecidos hoje como outro tipo: são atualizados ao importar. */
+  reclassificados: number;
 }
 
 export interface Lote {
@@ -72,12 +74,18 @@ export const inspecionarPasta = (projetoId: number, pasta: string) =>
     headers: { "Content-Type": "application/json" },
   });
 
+/** O lote criado, ou, se nada era novo, o lote em que mais arquivos mudaram de tipo. */
+export interface LoteRegistrado extends Lote {
+  criado: boolean;
+  reclassificados: number;
+}
+
 export const registrarLote = (
   projetoId: number,
   pasta: string,
   observacao: string | null,
 ) =>
-  chamar<Lote>(`/projetos/${projetoId}/lotes`, {
+  chamar<LoteRegistrado>(`/projetos/${projetoId}/lotes`, {
     method: "POST",
     body: JSON.stringify({ pasta, observacao }),
     headers: { "Content-Type": "application/json" },

@@ -28,7 +28,8 @@ import {
   registrarLote,
   removerLote,
   type Contagem,
-  type Lote as LoteRegistrado,
+  type Lote,
+  type LoteRegistrado,
   type ResumoDoLote,
 } from "@/services/lote";
 import type { ErroApi } from "@/types/erro";
@@ -48,7 +49,7 @@ export default function Lote() {
   const confirmar = useConfirm();
 
   const [detalhe, setDetalhe] = useState<ProjetoDetalhe | null>(null);
-  const [lotes, setLotes] = useState<LoteRegistrado[]>([]);
+  const [lotes, setLotes] = useState<Lote[]>([]);
   const [pasta, setPasta] = useState("");
   const [observacao, setObservacao] = useState("");
   const [resumo, setResumo] = useState<ResumoDoLote | null>(null);
@@ -84,7 +85,7 @@ export default function Lote() {
     setErro(null);
   }
 
-  async function remover(l: LoteRegistrado) {
+  async function remover(l: Lote) {
     const ok = await confirmar({
       icone: IconeApagar,
       tom: "perigo",
@@ -158,11 +159,18 @@ export default function Lote() {
       {registrado && (
         <Aviso
           tom="sucesso"
-          titulo="Lote registrado"
+          titulo={registrado.criado ? "Lote registrado" : "Arquivos reclassificados"}
           aoFechar={() => setRegistrado(null)}
         >
-          {numero(registrado.total_arquivos)} arquivo(s),{" "}
-          {numero(registrado.arquivos_uteis)} que a CAT 42 lê, {tamanho(registrado.bytes_totais)}.
+          {registrado.criado && (
+            <>
+              {numero(registrado.total_arquivos)} arquivo(s),{" "}
+              {numero(registrado.arquivos_uteis)} que a CAT 42 lê,{" "}
+              {tamanho(registrado.bytes_totais)}.{" "}
+            </>
+          )}
+          {registrado.reclassificados > 0 &&
+            `${numero(registrado.reclassificados)} arquivo(s) que já estavam no trabalho foram reconhecidos como outro tipo e atualizados. Para que entrem na conta, rode de novo da conferência em diante.`}
         </Aviso>
       )}
 
@@ -373,6 +381,8 @@ function ConferenciaDaPasta({
           <Aviso tom="atencao">
             {numero(resumo.ja_no_trabalho)} arquivo(s) já estão neste trabalho e não entram de
             novo. O mesmo SPED contado duas vezes dobraria movimento na apuração.
+            {resumo.reclassificados > 0 &&
+              ` Destes, ${numero(resumo.reclassificados)} são reconhecidos hoje como outro tipo (zip de XML, evento de cancelamento) e têm o tipo atualizado ao importar.`}
           </Aviso>
         )}
       </div>
@@ -410,10 +420,12 @@ function ConferenciaDaPasta({
         <Botao
           onClick={aoImportar}
           carregando={ocupado}
-          disabled={!resumo.serve || novos === 0}
+          disabled={!resumo.serve || (novos === 0 && resumo.reclassificados === 0)}
           className="shadow-acao"
         >
-          Importar {numero(novos)} arquivo(s)
+          {novos === 0 && resumo.reclassificados > 0
+            ? `Atualizar ${numero(resumo.reclassificados)} arquivo(s)`
+            : `Importar ${numero(novos)} arquivo(s)`}
         </Botao>
         <Botao variante="fantasma" onClick={aoCancelar} disabled={ocupado}>
           Cancelar

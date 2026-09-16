@@ -30,6 +30,9 @@ export interface ResumoDaConferencia {
   sem_documento: number;
   sem_documento_cobravel: number;
   documentos_na_pasta: number;
+  /** v0.55: XML de chave repetida e de uso denegado. Opcionais: rodada antiga não tem. */
+  xml_repetidos?: number;
+  xml_nao_autorizados?: number;
   valor_conferido: string;
   valor_sem_documento: string;
   sem_chave_na_efd: number;
