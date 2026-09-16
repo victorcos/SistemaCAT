@@ -7,10 +7,13 @@
 
 ## Onde estamos
 
-**As oito etapas da CAT 42 estão no ar (v0.53.0), e o trabalho do Amigão passou
-por todas.** Desde a v0.53, a etapa 3 lê o item do XML, o razão aplica o
-de-para aprovado e confronta os enquadramentos 2 e 4 com o crédito do art. 271 —
-correções que vieram da comparação com a CAT 42 da Advertising (DECISOES). Da pasta com EFD, XML e relatórios do ERP até o pacote de entrega
+**As oito etapas da CAT 42 estão no ar (v0.54.0), e o trabalho do Amigão passou
+por todas** (de novo em 16/09/2026, da etapa 4 à 8, em 59 min). Desde a v0.53, a
+etapa 3 lê o item do XML, o razão aplica o de-para aprovado e confronta os
+enquadramentos 2 e 4 com o crédito do art. 271; na v0.54, a nota cancelada na
+SEFAZ sai da movimentação, a não escriturada ganha a contingência do art. 527 e o
+XML dentro de zip é lido sem extrair — correções que vieram da comparação com a
+CAT 42 da Advertising (DECISOES). Da pasta com EFD, XML e relatórios do ERP até o pacote de entrega
 com o arquivo digital pré-validado e o manifesto com SHA-256, pela tela, com
 fila, cancelamento, histórico e aprovação de quem responde pelo negócio.
 
