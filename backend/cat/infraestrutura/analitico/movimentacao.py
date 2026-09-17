@@ -326,6 +326,8 @@ def _resumir_contingencia(con, p, r: ResumoDaMovimentacao) -> None:
     r.multa_nao_escrituradas_saidas = _dec(c["multa_saidas"])
     r.contingencia_por_ano = [Fatia(rotulo=ano, documentos=n, valor=_dec(v), codigo=ano)
                               for ano, n, v in c["por_ano"]]
+    r.contingencia_itens_de_nota_vizinha = c["de_nota_vizinha"]
+    r.contingencia_itens_sem_referencia = c["sem_referencia"]
 
 
 def _resumir(con, p, conferencia_usada: bool) -> ResumoDaMovimentacao:

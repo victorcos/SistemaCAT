@@ -426,7 +426,7 @@ function Resultado({
       {resumo.multa_nao_escrituradas_entradas !== undefined && (
         <Secao
           titulo="Notas não escrituradas"
-          sub="XML do estabelecimento, de mês com EFD, que a EFD não tem e que não está cancelado. Não entra na ficha. A contingência é a multa do art. 527 do RICMS/SP — 10% do valor nas entradas, 75% do ICMS destacado nas saídas —, sem SELIC."
+          sub="XML do estabelecimento, de mês com EFD, que a EFD não tem e que não está cancelado. Não entra na ficha. A contingência é a multa do art. 527 do RICMS/SP — 10% do valor nas entradas, 75% do ICMS nas saídas —, sem SELIC. A base é a do XML; sem ela, o valor por unidade da nota mais próxima do mesmo produto."
           acao={
             <BaixarPlanilha
               aoBaixar={(formato) => aoBaixar("contingencia", formato)}

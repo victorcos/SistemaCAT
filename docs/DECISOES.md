@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-09-17 — A base da multa sem valor no XML vem da nota vizinha
+
+**A pergunta que estava aberta.** Na Advertising, a saída não escriturada é
+quase toda CST x60 em 5.949/6.949, sem ICMS destacado: com a base do XML, a
+multa de 75% dava R$ 32,57. A RVZ aplicou 18% sobre o valor.
+
+**A decisão do Victor:** vale o XML; quando o XML não traz a base, pega-se uma
+nota anterior ou posterior do mesmo produto, o valor por unidade dela, e
+calcula-se a base da nota apurada. Como ficou:
+
+* a base é o valor do item na entrada e o ICMS destacado na saída;
+* sem ela (zero ou vazia), vale a nota **mais próxima em data** do mesmo
+  estabelecimento, operação e código que traga a base, entre todos os XML do
+  estabelecimento — escriturados ou não —, fora cancelada e devolução (a
+  devolução carrega o valor da operação de origem). No empate, a anterior;
+* base = valor por unidade da referência × quantidade da nota apurada;
+* cada item leva `origem_da_base` (xml, nota anterior, nota posterior, sem
+  referência), a nota de referência, a data e o valor por unidade — a planilha
+  mostra de onde veio cada número;
+* sem nota nenhuma do produto com a base, o item fica com base zero, contado.
+
+**Na Advertising:** 2.238 itens de saída sem ICMS, todos com referência — venda
+6.108 do mesmo código, mediana de 0 dia de distância e máximo de 7. ICMS das
+saídas R$ 50.643,67, multa R$ 37.985,16 (a RVZ: ICMS R$ 69.962,86 a 18% sobre o
+valor, multa R$ 52.472,14 antes da SELIC). Entradas: todas com valor no XML,
+multa R$ 89.463,60.
+
+---
+
 ## 2026-09-17 — O de-para da Advertising pelo sistema, contra o da RVZ
 
 **Como se testou.** A Advertising entrou no sistema como um trabalho de verdade

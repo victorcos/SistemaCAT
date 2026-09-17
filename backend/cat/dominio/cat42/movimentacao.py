@@ -88,6 +88,9 @@ class ResumoDaMovimentacao:
     multa_nao_escrituradas_entradas: Decimal = ZERO
     multa_nao_escrituradas_saidas: Decimal = ZERO
     contingencia_por_ano: list[Fatia] = field(default_factory=list)
+    # itens sem a base no XML: com a da nota mais próxima do produto, e sem nota nenhuma
+    contingencia_itens_de_nota_vizinha: int = 0
+    contingencia_itens_sem_referencia: int = 0
 
     # ---- movimentos: as linhas de item ----
     movimentos: int = 0
@@ -161,6 +164,13 @@ class ResumoDaMovimentacao:
                 "RICMS/SP (10% do valor nas entradas, 75% do ICMS nas saídas), sem SELIC. "
                 "Não entram na ficha; a planilha traz nota a nota."
             )
+            if self.contingencia_itens_de_nota_vizinha or self.contingencia_itens_sem_referencia:
+                avisos.append(
+                    f"Na contingência, {_numero(self.contingencia_itens_de_nota_vizinha)} item(ns) sem a base "
+                    "no XML (ICMS na saída, valor na entrada) levaram o valor por unidade da nota mais próxima "
+                    f"do mesmo produto; {_numero(self.contingencia_itens_sem_referencia)} não têm nota nenhuma "
+                    "do produto com a base e ficaram com base zero."
+                )
         if self.documentos_cancelados_na_sefaz:
             avisos.append(
                 f"{_numero(self.documentos_cancelados_na_sefaz)} documento(s) estão cancelados na "

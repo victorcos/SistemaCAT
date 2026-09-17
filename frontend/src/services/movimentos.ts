@@ -68,6 +68,9 @@ export interface ResumoDaMovimentacao {
   multa_nao_escrituradas_entradas?: string;
   multa_nao_escrituradas_saidas?: string;
   contingencia_por_ano?: Fatia[];
+  /** v0.55.3: itens sem base no XML, com a da nota mais próxima do produto, e sem nota nenhuma. */
+  contingencia_itens_de_nota_vizinha?: number;
+  contingencia_itens_sem_referencia?: number;
 }
 
 export interface ExecucaoDeMovimentos extends Omit<Execucao, "resumo"> {

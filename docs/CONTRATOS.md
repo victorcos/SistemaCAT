@@ -563,8 +563,15 @@ estabelecimento), `modelo`, `numero_documento`, `serie`, `chave`, `emitente`,
 `cst_icms`, `valor`, `valor_icms`, `base_da_multa`, `percentual`, `multa`,
 `fundamento`, `arquivo`.
 
-Multa do art. 527 do RICMS/SP, sem SELIC: entrada, 10% do `valor`; saída, 75%
-do `valor_icms` destacado no XML.
+Multa do art. 527 do RICMS/SP, sem SELIC: entrada, 10% do valor; saída, 75%
+do ICMS. A base é a do XML; sem ela, o valor por unidade da nota mais próxima
+do mesmo estabelecimento, operação e código (fora cancelada e devolução) × a
+quantidade (v0.55.3). Colunas a mais: `quantidade`, `origem_da_base` (`xml`,
+`nota anterior`, `nota posterior`, `sem referência`), `unitario_de_referencia`,
+`chave_de_referencia`, `emissao_de_referencia`; `base_da_multa` é a base usada.
+O resumo ganha `contingencia_itens_de_nota_vizinha` e
+`contingencia_itens_sem_referencia`; `valor_nao_escriturado_entradas` e
+`icms_nao_escriturado_saidas` passam a somar a base usada.
 
 O resumo ganha `nao_escrituradas_entradas`, `nao_escrituradas_saidas`
 (documentos), `valor_nao_escriturado_entradas`, `icms_nao_escriturado_saidas`,
