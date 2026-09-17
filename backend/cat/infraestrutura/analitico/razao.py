@@ -61,7 +61,10 @@ e uma única baixa vira centenas de milhões. No piloto de 15/09/2026, 99,99% do
 ressarcimento vinha de 4.037 fichas assim.
 
 Decisão do Victor, 15/09/2026: essas fichas **saem do total até os dados
-chegarem**. Continuam gravadas e marcadas (`retirada`), para consulta e
+chegarem**. Desde 17/09/2026 elas não saem mais: a ficha abre com a
+quantidade que faltaria, sem ICMS suportado, e fica marcada (`ficou_negativo`,
+`abertura_por_saldo_negativo`). Continuam gravadas e marcadas (`retirada`,
+hoje sempre falso), para consulta e
 download, mas não somam ressarcimento, complemento, enquadramento nem
 competência.
 
@@ -226,6 +229,8 @@ ESQUEMA_FICHAS = pa.schema([
     ("complemento", pa.decimal128(30, 15)),
     ("credito_operacao_propria", pa.decimal128(30, 15)),
     ("ficou_negativo", pa.bool_()),
+    # quantidade aberta para cobrir o estoque negativo, sem ICMS suportado
+    ("abertura_por_saldo_negativo", pa.decimal128(24, 6)),
     # fora do total até os dados chegarem; o ressarcimento dela não é confiável
     ("retirada", pa.bool_()),
     ("saidas_sem_aliquota", pa.int32()),
@@ -421,6 +426,9 @@ class ResumoDaMontagem:
     quantidade_negativa: int = 0
     fichas_retiradas: int = 0
     linhas_retiradas: int = 0
+    # fichas que abriram com o que faltava para o estoque não ficar negativo
+    fichas_abertas_por_negativo: int = 0
+    quantidade_aberta_por_negativo: Decimal = Decimal(0)
     ressarcimento_retirado: Decimal = Decimal(0)
     complemento_retirado: Decimal = Decimal(0)
     linhas_convertidas: int = 0
@@ -1007,11 +1015,21 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         razao = RazaoDoItem(codigo, SaldoInicial(qtd_abertura, valor_abertura))
         razao.lancar_varios(movimentos)
         linhas = razao.apurar()
+        # Estoque negativo não tira mais a ficha do total (decisão do Victor,
+        # 17/09/2026): ela abre com a quantidade que faltaria, sem ICMS
+        # suportado, e fica marcada. É o que a RVZ fez na Advertising — a ficha
+        # dela nunca fica negativa porque começa com o déficit —, e mantém no
+        # total o ressarcimento das unidades que têm imposto pago.
+        negativo = any(ln.saldo_quantidade < 0 for ln in linhas)
+        aberta_por_negativo = Decimal(0)
+        if negativo:
+            aberta_por_negativo = -min(ln.saldo_quantidade for ln in linhas)
+            razao = RazaoDoItem(codigo, SaldoInicial(qtd_abertura + aberta_por_negativo, valor_abertura))
+            razao.lancar_varios(movimentos)
+            linhas = razao.apurar()
         indice = {id(m): x for m, x in zip(movimentos, extras)}
         entradas = saidas = ressarc = compl = credito = Decimal(0)
-        # estoque negativo em qualquer linha tira a ficha do total
-        negativo = any(ln.saldo_quantidade < 0 for ln in linhas)
-        retirada = negativo
+        retirada = False
         sem_aliq = indef = sem_fator = 0
         for ln in linhas:
             m = ln.movimento
@@ -1071,6 +1089,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                        ("ressarcimento", ressarc.quantize(_Q15)), ("complemento", compl.quantize(_Q15)),
                        ("credito_operacao_propria", credito.quantize(_Q15)),
                        ("ficou_negativo", negativo), ("retirada", retirada),
+                       ("abertura_por_saldo_negativo", aberta_por_negativo.quantize(_Q6)),
                        ("saidas_sem_aliquota", sem_aliq),
                        ("saidas_indefinidas", indef), ("linhas_sem_fator", sem_fator)):
             lote_fichas[k].append(val)
@@ -1088,6 +1107,8 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         resumo.saidas_sem_aliquota += sem_aliq
         resumo.saidas_indefinidas += indef
         resumo.fichas_negativas += negativo
+        resumo.fichas_abertas_por_negativo += bool(aberta_por_negativo)
+        resumo.quantidade_aberta_por_negativo += aberta_por_negativo
         resumo.fichas_abertura_sem_valor += qtd_abertura != 0 and valor_abertura == 0
         resumo.fichas_abertura_valorada += valor_abertura != 0
         resumo.fichas_abertura_parcial += bool(va is not None and va.parcial)
@@ -1335,6 +1356,10 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
         "credito_operacao_propria": texto(resumo.credito_operacao_propria),
         "confronto_pela_entrada": resumo.confronto_pela_entrada,
         # fora do total até os dados chegarem: o valor delas não é confiável
+        "abertas_por_saldo_negativo": {
+            "fichas": resumo.fichas_abertas_por_negativo,
+            "quantidade": texto(resumo.quantidade_aberta_por_negativo),
+        },
         "retiradas": {
             "fichas": resumo.fichas_retiradas,
             "linhas": resumo.linhas_retiradas,

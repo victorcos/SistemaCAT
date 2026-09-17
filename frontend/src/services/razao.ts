@@ -70,6 +70,8 @@ export interface ResumoDoRazao {
   confronto_pela_entrada?: number;
   /** fora do total até os dados chegarem: o valor delas não é confiável */
   retiradas?: { fichas: number; linhas: number; ressarcimento: string; complemento: string };
+  /** v0.56: fichas que abriram com o que faltava para o estoque não ficar negativo. */
+  abertas_por_saldo_negativo?: { fichas: number; quantidade: string };
   por_enquadramento?: PorEnquadramento[];
   por_competencia?: { competencia: string; linhas: number; ressarcimento: string; complemento: string }[];
   saidas_por_origem?: Record<string, number>;
@@ -126,6 +128,7 @@ export interface LinhaDaFicha {
   enquadramento: number | null;
   enquadramento_indefinido: boolean;
   ficha_retirada?: boolean;
+  abertura_por_saldo_negativo?: string;
   /** a quantidade vai na unidade do inventário; estas dizem como chegou lá */
   unidade_origem?: string;
   fator_conversao?: string;

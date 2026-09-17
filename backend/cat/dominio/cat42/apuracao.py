@@ -36,6 +36,7 @@ class MotivoDeBloqueio(Enum):
 
     FORA_DE_SP = "fora_de_sp"
     FICHA_RETIRADA = "ficha_retirada"
+    ESTOQUE_NEGATIVO = "estoque_negativo"
     CONFRONTO_PENDENTE = "confronto_pendente"
     SEM_ALIQUOTA = "sem_aliquota"
     ENQUADRAMENTO_INDEFINIDO = "enquadramento_indefinido"
@@ -54,6 +55,7 @@ class MotivoDeBloqueio(Enum):
 _ROTULOS = {
     MotivoDeBloqueio.FORA_DE_SP: "Estabelecimento fora de São Paulo",
     MotivoDeBloqueio.FICHA_RETIRADA: "Ficha retirada por estoque negativo",
+    MotivoDeBloqueio.ESTOQUE_NEGATIVO: "Ficha aberta para cobrir estoque negativo",
     MotivoDeBloqueio.CONFRONTO_PENDENTE: "Confronto dos enquadramentos 2 e 4 não apurado",
     MotivoDeBloqueio.SEM_ALIQUOTA: "Saída sem alíquota interna no cadastro",
     MotivoDeBloqueio.ENQUADRAMENTO_INDEFINIDO: "Saída com enquadramento indefinido",
@@ -64,6 +66,7 @@ _ROTULOS = {
 _O_QUE_FAZER = {
     MotivoDeBloqueio.FORA_DE_SP: "A CAT 42 é paulista: esta competência não gera arquivo.",
     MotivoDeBloqueio.FICHA_RETIRADA: "Falta movimento — perdas, meses do relatório de saídas, produção.",
+    MotivoDeBloqueio.ESTOQUE_NEGATIVO: ("A ficha abriu com o que faltava, sem imposto pago: falta entrada, abertura ou algum tipo de saída (perdas, meses do relatório, produção)."),
     MotivoDeBloqueio.CONFRONTO_PENDENTE: "Depende do ICMS da operação própria da entrada (coluna 21).",
     MotivoDeBloqueio.SEM_ALIQUOTA: "Completar a alíquota interna no cadastro de itens (0200).",
     MotivoDeBloqueio.ENQUADRAMENTO_INDEFINIDO: "Dizer quem comprou: nota modelo 55 não responde sozinha.",
@@ -91,6 +94,8 @@ class CompetenciaApurada:
     itens: int = 0
     linhas: int = 0
     fichas_retiradas: int = 0
+    # fichas que abriram com o que faltava para o estoque não ficar negativo
+    fichas_negativas: int = 0
     confronto_pendente: int = 0
     sem_aliquota: int = 0
     indefinidas: int = 0
@@ -108,6 +113,7 @@ class CompetenciaApurada:
         travas = [
             (self.uf not in ("", "SP"), MotivoDeBloqueio.FORA_DE_SP),
             (self.fichas_retiradas > 0, MotivoDeBloqueio.FICHA_RETIRADA),
+            (self.fichas_negativas > 0, MotivoDeBloqueio.ESTOQUE_NEGATIVO),
             (self.confronto_pendente > 0, MotivoDeBloqueio.CONFRONTO_PENDENTE),
             (self.sem_aliquota > 0, MotivoDeBloqueio.SEM_ALIQUOTA),
             (self.indefinidas > 0, MotivoDeBloqueio.ENQUADRAMENTO_INDEFINIDO),

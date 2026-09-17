@@ -366,7 +366,8 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: Re
         { n: pend.fichas_abertura_parcial ?? 0, texto: "fichas com a abertura valorada só em parte: as entradas anteriores ao inventário não cobriram a quantidade, e o resto foi pela média delas", tom: "atencao" as Tom },
         { n: pend.confronto_pendente, texto: "saídas de enquadramento 2 ou 4 sem entrada anterior com o ICMS próprio: sem confronto, sem ressarcimento", tom: "atencao" as Tom },
         { n: pend.saidas_sem_aliquota, texto: "saídas sem alíquota interna no cadastro: sem confronto, sem ressarcimento", tom: "atencao" as Tom },
-        { n: resumo.retiradas?.fichas ?? pend.fichas_negativas, texto: "fichas retiradas do total até os dados chegarem: o estoque ficou negativo — falta entrada, abertura ou algum tipo de saída (perdas, meses do relatório, produção)", tom: "atencao" as Tom },
+        { n: resumo.abertas_por_saldo_negativo?.fichas ?? pend.fichas_negativas, texto: "fichas que abriram com o que faltava, sem ICMS suportado, porque o estoque ficaria negativo — falta entrada, abertura ou algum tipo de saída (perdas, meses do relatório, produção). Entram no total, e as unidades abertas não geram ressarcimento", tom: "atencao" as Tom },
+        { n: resumo.retiradas?.fichas ?? 0, texto: "fichas retiradas do total (rodadas até a v0.55.4, quando o estoque negativo tirava a ficha)", tom: "atencao" as Tom },
         { n: pend.saidas_indefinidas, texto: "saídas com enquadramento indefinido (nota modelo 55 sem dizer quem comprou)", tom: "atencao" as Tom },
         { n: pend.relatorio_sem_estabelecimento, texto: "linhas do relatório de saídas sem loja identificável ficaram de fora", tom: "atencao" as Tom },
         { n: pend.relatorio_trocado_pela_efd, texto: "linhas do relatório trocadas pela nota com item da EFD ou do XML, que vence", tom: "neutro" as Tom },
@@ -386,8 +387,10 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: Re
           <p className="m-0 text-xs text-texto-fraco">
             Diferença positiva entre o suportado baixado e o valor de confronto, saída a saída — só nas
             fichas válidas.
+            {(resumo.abertas_por_saldo_negativo?.fichas ?? 0) > 0 &&
+              ` ${numero(resumo.abertas_por_saldo_negativo?.fichas ?? 0)} fichas abriram com o que faltava, sem ICMS suportado, para o estoque não ficar negativo.`}
             {(resumo.retiradas?.fichas ?? 0) > 0 &&
-              ` ${numero(resumo.retiradas?.fichas ?? 0)} fichas com estoque negativo ficaram fora até os dados chegarem.`}
+              ` ${numero(resumo.retiradas?.fichas ?? 0)} fichas com estoque negativo ficaram fora (rodada anterior à v0.56).`}
           </p>
         </Cartao>
         <Cartao className="flex flex-col gap-2">
@@ -677,6 +680,7 @@ function Fichas({ execucaoId, total, rodape }: { execucaoId: number; total: numb
           aoMudar={setRecorte}
           opcoes={[
             { chave: "validas", rotulo: "Válidas" },
+            { chave: "negativas", rotulo: "Abertas por negativo" },
             { chave: "retiradas", rotulo: "Retiradas" },
             { chave: "sem_aliquota", rotulo: "Sem alíquota" },
             { chave: "indefinidas", rotulo: "Indefinidas" },
@@ -753,7 +757,8 @@ function Fichas({ execucaoId, total, rodape }: { execucaoId: number; total: numb
                     {valor(f.ressarcimento)}
                   </span>
                   <span className="flex flex-wrap gap-1">
-                    {(f.retirada ?? f.ficou_negativo) && <Marca>retirada · estoque negativo</Marca>}
+                    {f.retirada && <Marca>retirada · estoque negativo</Marca>}
+                    {!f.retirada && f.ficou_negativo && <Marca>aberta · estoque negativo</Marca>}
                     {f.abertura_sem_valor && <Marca>abertura s/ ICMS</Marca>}
                     {f.abertura_parcial && <Marca>abertura em parte</Marca>}
                     {f.saidas_sem_aliquota > 0 && <Marca>s/ alíquota</Marca>}

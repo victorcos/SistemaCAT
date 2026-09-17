@@ -26,6 +26,7 @@ COLUNAS_APURACAO = (
     Coluna("saldo_final_quantidade", "Saldo final (quantidade)", "quantidade", 14),
     Coluna("saldo_final_icms", "Saldo final (ICMS suportado)", "numero", 16),
     Coluna("fichas_retiradas", "Fichas retiradas", "numero_inteiro", 10),
+    Coluna("fichas_negativas", "Fichas abertas por estoque negativo", "numero_inteiro", 12),
     Coluna("confronto_pendente", "Saídas com confronto pendente", "numero_inteiro", 12),
     Coluna("sem_aliquota", "Saídas sem alíquota", "numero_inteiro", 10),
     Coluna("indefinidas", "Saídas indefinidas", "numero_inteiro", 10),

@@ -7,7 +7,7 @@
 
 ## Onde estamos
 
-**As oito etapas da CAT 42 estão no ar (v0.55.4), e o trabalho do Amigão passou
+**As oito etapas da CAT 42 estão no ar (v0.56.0), e o trabalho do Amigão passou
 por todas** (de novo em 16/09/2026, da etapa 4 à 8, em 59 min). Desde a v0.53, a
 etapa 3 lê o item do XML, o razão aplica o de-para aprovado e confronta os
 enquadramentos 2 e 4 com o crédito do art. 271; na v0.54, a nota cancelada na
@@ -102,6 +102,8 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       mesmo produto (decisão do Victor, v0.55.3)
 - [x] Lista de canceladas: aba de devoluções e linha de cancelamento rejeitado não
       contam (v0.55.4)
+- [x] Estoque negativo abre a ficha com o que faltaria, sem ICMS suportado, em vez
+      de tirá-la do total (decisão do Victor, v0.56.0)
 - [ ] Comparar com a RVZ razão, apuração, X.949, canceladas e não escrituradas
 
 ### 3. O que a apuração ainda não calcula

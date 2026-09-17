@@ -30,6 +30,7 @@ export interface Competencia {
   saldo_final_quantidade: string;
   saldo_final_icms: string;
   fichas_retiradas: number;
+  fichas_negativas?: number;
   confronto_pendente: number;
   sem_aliquota: number;
   indefinidas: number;

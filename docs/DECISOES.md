@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-09-17 — Estoque negativo abre a ficha, em vez de tirá-la do total
+
+**O que se via.** Na Advertising, 6 mercadorias ficavam com saldo negativo em
+algum ponto, e o sistema tirava a ficha inteira do total: R$ 100,7 mil que a RVZ
+apurou ficavam de fora. Em três delas o negativo era de 1 a 3 unidades.
+
+**O que a RVZ faz.** A ficha dela nunca fica negativa porque começa com uma
+abertura do tamanho do déficit, sem nota que a sustente: 54 unidades no 4001,
+41 no 3132, 25 no 3133, 3 no 1111, 1 no 1116 e 1 no 1413 — quase exatamente o
+pior saldo do sistema em cada uma. A Ficha 3 dela tem a coluna de inconsistência
+"Saldo Inicial sem ICMS suportado".
+
+**A decisão do Victor (17/09/2026): fazer o mesmo, marcado.** Quando o saldo
+ficaria negativo, a ficha abre com a quantidade que faltaria, **sem ICMS
+suportado**, e continua no total. O efeito é conservador: as unidades abertas
+entram com imposto zero, então a média ponderada cai e a saída que as consome
+gera menos ressarcimento (ou complemento). No exemplo do teste, a saída que
+antes dava R$ 7,00 de ressarcimento passa a dar R$ 13,00 de complemento.
+
+**Como fica marcado:** `ficou_negativo` continua, e a ficha ganha
+`abertura_por_saldo_negativo` com a quantidade aberta; o resumo do razão traz
+`abertas_por_saldo_negativo` (fichas e quantidade); a apuração conta
+`fichas_negativas` e a competência fica bloqueada pelo motivo novo
+`estoque_negativo` — entra no total, mas não vira arquivo digital sem alguém
+olhar. `retirada` fica para sempre falso: as rodadas antigas continuam
+legíveis, e o motivo `ficha_retirada` segue existindo para elas.
+
+---
+
 ## 2026-09-17 — Lista de canceladas: só a aba de canceladas, só a linha cancelada
 
 **Como apareceu.** Na comparação das fichas negativas com a RVZ, o Victor notou

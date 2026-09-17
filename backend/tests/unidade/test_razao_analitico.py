@@ -316,13 +316,17 @@ class TestConferenciaComInventario:
         assert r.conferencia["divergentes"] == 1
 
 
-class TestFichaRetirada:
-    """Estoque negativo tira a ficha do total até os dados chegarem.
+class TestEstoqueNegativo:
+    """Estoque negativo abre a ficha com o que faltaria, sem ICMS suportado.
 
     Mercadoria W na loja A, sem abertura:
-        05/01 entrada 1 un, R$ 5,00           -> saldo 1, unit 5
-        06/01 venda de PDV 5 un, R$ 100, 18%  -> saldo -4; baixa 25; confronto 18
-              -> ressarcimento 7,00 que NÃO entra no total
+        05/01 entrada 1 un, R$ 5,00           -> faltam 4 un para a venda
+        06/01 venda de PDV 5 un, R$ 100, 18%  -> confronto 18
+
+    A ficha abre com as 4 unidades que faltam, sem imposto: o suportado das 5
+    unidades vendidas vira R$ 5,00 (só o da entrada), e a saída gera
+    complemento de R$ 13,00 — em vez de um ressarcimento de R$ 7,00 apoiado em
+    estoque que não existia (decisão do Victor, 17/09/2026).
     """
 
     @pytest.fixture
@@ -345,23 +349,26 @@ class TestFichaRetirada:
         destino.mkdir()
         return destino, montar(fontes, str(destino))
 
-    def test_a_ficha_negativa_nao_soma_no_total(self, com_w):
+    def test_a_ficha_abre_com_o_que_faltava_e_soma_no_total(self, com_w):
         _, r = com_w
-        assert r.ressarcimento == d("1.4")                  # só a ficha X
-        assert r.fichas_retiradas == 1 and r.ressarcimento_retirado == d(7)
+        assert r.fichas_abertas_por_negativo == 1 and r.quantidade_aberta_por_negativo == d(4)
+        assert r.fichas_retiradas == 0
+        assert r.ressarcimento == d("1.4")                  # a de W virou complemento
+        assert r.complemento == d(13)
         s = serializar(r)
-        assert s["retiradas"] == {"fichas": 1, "linhas": 2, "ressarcimento": "7.00", "complemento": "0.00"}
-        assert sum(d(e["ressarcimento"]) for e in s["por_enquadramento"]) == d("1.40")
-        assert sum(d(c["ressarcimento"]) for c in s["por_competencia"]) == d("1.40")
+        assert s["abertas_por_saldo_negativo"]["fichas"] == 1
+        assert d(s["abertas_por_saldo_negativo"]["quantidade"]) == d(4)
+        assert sum(d(c["complemento"]) for c in s["por_competencia"]) == d(13)
 
-    def test_a_ficha_retirada_fica_gravada_e_marcada(self, com_w):
+    def test_a_ficha_fica_marcada_e_no_total(self, com_w):
         destino, _ = com_w
         linhas = [l for l in ficha(destino) if l["codigo"] == "W"]
-        assert len(linhas) == 2 and all(l["ficha_retirada"] for l in linhas)
-        assert lista_de_fichas(str(destino), so="retiradas")["linhas"][0]["codigo"] == "W"
-        assert [f["codigo"] for f in lista_de_fichas(str(destino), so="validas")["linhas"]] == ["X"]
-        # sem recorte, as retiradas vão para o fim mesmo com ressarcimento maior
-        assert [f["codigo"] for f in lista_de_fichas(str(destino))["linhas"]] == ["X", "W"]
+        assert len(linhas) == 2 and not any(l["ficha_retirada"] for l in linhas)
+        assert all(l["saldo_quantidade"] >= 0 for l in linhas)
+        w = next(f for f in lista_de_fichas(str(destino))["linhas"] if f["codigo"] == "W")
+        assert w["ficou_negativo"] and d(w["abertura_por_saldo_negativo"]) == d(4)
+        assert lista_de_fichas(str(destino), so="retiradas")["linhas"] == []
+        assert {f["codigo"] for f in lista_de_fichas(str(destino), so="validas")["linhas"]} == {"X", "W"}
 
 
 class TestPendencias:

@@ -281,6 +281,17 @@ devolução e indefinido), `enquadramento_indefinido`, `quantidade` (com sinal),
 nulo quando não se apura), `saldo_quantidade`, `saldo_unitario`, `saldo_valor`,
 `ressarcimento`, `complemento`.
 
+### Estoque negativo (v0.56.0)
+
+A ficha cujo saldo ficaria negativo abre com a quantidade que faltaria, sem
+ICMS suportado, e entra no total. `fichas.parquet` ganha
+`abertura_por_saldo_negativo`; `ficou_negativo` continua marcando a
+inconsistência e `retirada` fica falso (rodadas até a v0.55.4 podem ter
+`retirada` verdadeiro). O resumo do razão traz `abertas_por_saldo_negativo`
+(`fichas`, `quantidade`). Na apuração, `fichas_negativas` conta as mercadorias
+assim na competência, e o motivo de bloqueio `estoque_negativo` impede o
+arquivo digital até alguém conferir.
+
 ## 9. Apuração do período (etapa 6)
 
 | Método | Rota | O que faz |

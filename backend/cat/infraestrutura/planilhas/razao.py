@@ -52,6 +52,7 @@ COLUNAS_FICHAS = (
     Coluna("complemento", "Complemento", "numero", 14),
     Coluna("ficou_negativo", "Estoque ficou negativo", "texto", 12),
     Coluna("retirada", "Retirada do total", "texto", 10),
+    Coluna("abertura_por_saldo_negativo", "Abertura para cobrir estoque negativo", "quantidade", 14),
     Coluna("saidas_sem_aliquota", "Saídas sem alíquota", "numero_inteiro", 10),
     Coluna("saidas_indefinidas", "Saídas indefinidas", "numero_inteiro", 10),
     Coluna("linhas_sem_fator", "Linhas com unidade sem fator", "numero_inteiro", 10),

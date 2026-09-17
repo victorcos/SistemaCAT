@@ -73,6 +73,7 @@ ESQUEMA_APURACAO = pa.schema([
     ("saldo_final_quantidade", pa.decimal128(24, 3)),
     ("saldo_final_icms", pa.decimal128(24, 2)),
     ("fichas_retiradas", pa.int32()),
+    ("fichas_negativas", pa.int32()),
     ("confronto_pendente", pa.int32()),
     ("sem_aliquota", pa.int32()),
     ("indefinidas", pa.int32()),
@@ -177,7 +178,8 @@ def _preparar(con, ficha3: str, fichas: str, conferencia: str) -> None:
     """Tabelas de trabalho: linhas com competência, saldo por mês e conferência."""
     con.execute(f"""
         CREATE OR REPLACE TABLE linhas AS
-        SELECT l.*, strftime(l.data, '%Y-%m') AS competencia, f.uf, f.retirada
+        SELECT l.*, strftime(l.data, '%Y-%m') AS competencia, f.uf, f.retirada,
+               coalesce(f.ficou_negativo, false) AS ficha_negativa
         FROM read_parquet('{_escapar(ficha3)}') l
         JOIN read_parquet('{_escapar(fichas)}') f ON f.cnpj = l.cnpj AND f.codigo = l.codigo
     """)
@@ -251,6 +253,7 @@ def _gravar_apuracao(con, destino: str, uf_por_cnpj: dict, resumo: ResumoDoPerio
                    sum(CASE WHEN retirada THEN 0 ELSE complemento END) AS complemento,
                    sum(CASE WHEN retirada THEN 0 ELSE coalesce(credito_operacao_propria, 0) END) AS credito,
                    count(DISTINCT codigo) FILTER (retirada) AS fichas_retiradas,
+                   count(DISTINCT codigo) FILTER (ficha_negativa) AS fichas_negativas,
                    count(*) FILTER (especie = 'saida' AND NOT devolucao
                                     AND enquadramento IN (2, 4) AND icms_efetivo IS NULL) AS confronto_pendente,
                    count(*) FILTER (especie = 'saida' AND NOT devolucao
@@ -288,7 +291,8 @@ def _gravar_apuracao(con, destino: str, uf_por_cnpj: dict, resumo: ResumoDoPerio
                 complemento=Decimal(d["complemento"] or 0),
                 credito_operacao_propria=Decimal(d["credito"] or 0),
                 itens=d["itens"], linhas=d["linhas"],
-                fichas_retiradas=d["fichas_retiradas"], confronto_pendente=d["confronto_pendente"],
+                fichas_retiradas=d["fichas_retiradas"], fichas_negativas=d["fichas_negativas"],
+                confronto_pendente=d["confronto_pendente"],
                 sem_aliquota=d["sem_aliquota"], indefinidas=d["indefinidas"],
                 inventarios_conferidos=d["conferidos"], inventarios_divergentes=d["divergentes"],
             )
@@ -327,6 +331,7 @@ def _acrescentar(lote: dict, c: CompetenciaApurada, d: dict) -> None:
     lote["saldo_final_quantidade"].append(Decimal(d["qtd_fim"] or 0).quantize(_Q3))
     lote["saldo_final_icms"].append(Decimal(d["icms_fim"] or 0).quantize(_Q2))
     lote["fichas_retiradas"].append(c.fichas_retiradas)
+    lote["fichas_negativas"].append(c.fichas_negativas)
     lote["confronto_pendente"].append(c.confronto_pendente)
     lote["sem_aliquota"].append(c.sem_aliquota)
     lote["indefinidas"].append(c.indefinidas)
