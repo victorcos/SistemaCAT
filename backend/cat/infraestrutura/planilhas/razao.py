@@ -17,6 +17,7 @@ COLUNAS_FICHA3 = (
     Coluna("especie", "Espécie", "texto", 10),
     Coluna("devolucao", "Devolução", "texto", 10),
     Coluna("cfop", "CFOP", "texto", 7),
+    Coluna("cst_icms", "CST", "texto", 6),
     Coluna("documento", "Documento", "texto", 46),
     Coluna("origem", "Origem", "texto", 11),
     Coluna("enquadramento", "Enquadramento legal", "numero_inteiro", 12),

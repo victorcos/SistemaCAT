@@ -157,6 +157,8 @@ class TestAConta:
             ("saida", "relatorio", d(13)), ("saida", "efd", d(14))]
         venda = linhas[2]
         assert venda["enquadramento"] == 1
+        # o CST de cada linha vem junto, entrada e saída (pedido do Victor)
+        assert [l["cst_icms"] for l in linhas] == ["060", "060", "060", "060"]
         assert venda["icms_efetivo"] == d("3.60")
         assert venda["ressarcimento"] == d("1.4")
         assert linhas[3]["devolucao"] and linhas[3]["saldo_valor"] == d(14)
@@ -683,16 +685,16 @@ class TestReducaoDeBase:
             ("destinatario", pa.string()), ("emissao", pa.date32()), ("ncm", pa.string()),
             ("cst_icms", pa.string()), ("bc_icms", pa.decimal128(18, 2)),
             ("valor", pa.decimal128(18, 2)), ("desconto", pa.decimal128(18, 2)),
-            ("aliq_icms", pa.decimal128(9, 4)),
+            ("aliq_icms", pa.decimal128(9, 4)), ("cfop", pa.string()),
         ], [
             # a entrada de 05/01: base reduzida a 48% do valor, CST 70
             {"chave": "4" * 44, "numero_item": 1, "emitente": "99999999000191", "destinatario": A,
              "emissao": date(2021, 1, 5), "ncm": "33059000", "cst_icms": "570",
-             "bc_icms": d(48), "valor": d(100), "desconto": d(0), "aliq_icms": d(25)},
+             "bc_icms": d(48), "valor": d(100), "desconto": d(0), "aliq_icms": d(25), "cfop": "5401"},
             # a saída da própria loja não entra na conta da redução
             {"chave": CHAVE_TRANSF, "numero_item": 1, "emitente": A, "destinatario": "22222222000100",
              "emissao": date(2021, 1, 6), "ncm": "33059000", "cst_icms": "070",
-             "bc_icms": d(90), "valor": d(100), "desconto": d(0), "aliq_icms": d(18)},
+             "bc_icms": d(90), "valor": d(100), "desconto": d(0), "aliq_icms": d(18), "cfop": "5405"},
         ])
         destino = tmp_path / "razao_reduzido"
         destino.mkdir()
@@ -755,10 +757,10 @@ class TestReducaoDeBase:
             ("destinatario", pa.string()), ("emissao", pa.date32()), ("ncm", pa.string()),
             ("cst_icms", pa.string()), ("bc_icms", pa.decimal128(18, 2)),
             ("valor", pa.decimal128(18, 2)), ("desconto", pa.decimal128(18, 2)),
-            ("aliq_icms", pa.decimal128(9, 4)),
+            ("aliq_icms", pa.decimal128(9, 4)), ("cfop", pa.string()),
         ], [{"chave": "4" * 44, "numero_item": 1, "emitente": "99999999000191", "destinatario": A,
              "emissao": date(2021, 1, 5), "ncm": "33059000", "cst_icms": "570",
-             "bc_icms": d(48), "valor": d(100), "desconto": d(0), "aliq_icms": d(25)}])
+             "bc_icms": d(48), "valor": d(100), "desconto": d(0), "aliq_icms": d(25), "cfop": "5401"}])
         destino = tmp_path / "ncm_da_nota"
         destino.mkdir()
         montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
@@ -784,15 +786,15 @@ class TestReducaoDeBase:
             ("destinatario", pa.string()), ("emissao", pa.date32()), ("ncm", pa.string()),
             ("cst_icms", pa.string()), ("bc_icms", pa.decimal128(18, 4)),
             ("valor", pa.decimal128(18, 2)), ("desconto", pa.decimal128(18, 2)),
-            ("aliq_icms", pa.decimal128(9, 4)),
+            ("aliq_icms", pa.decimal128(9, 4)), ("cfop", pa.string()),
         ], [
             # 51,2715% e 51,2714% -> mediana 51,27145%, que não cabe em 4 casas
             {"chave": "4" * 44, "numero_item": 1, "emitente": "99999999000191", "destinatario": A,
              "emissao": date(2021, 1, 5), "ncm": "33059000", "cst_icms": "570",
-             "bc_icms": d("48.7285"), "valor": d(100), "desconto": d(0), "aliq_icms": d(25)},
+             "bc_icms": d("48.7285"), "valor": d(100), "desconto": d(0), "aliq_icms": d(25), "cfop": "5401"},
             {"chave": "7" * 44, "numero_item": 1, "emitente": "99999999000191", "destinatario": A,
              "emissao": date(2021, 1, 5), "ncm": "33059000", "cst_icms": "570",
-             "bc_icms": d("48.7286"), "valor": d(100), "desconto": d(0), "aliq_icms": d(25)},
+             "bc_icms": d("48.7286"), "valor": d(100), "desconto": d(0), "aliq_icms": d(25), "cfop": "5401"},
         ])
         destino = tmp_path / "mediana"
         destino.mkdir()
@@ -814,10 +816,10 @@ class TestReducaoDeBase:
             ("destinatario", pa.string()), ("emissao", pa.date32()), ("ncm", pa.string()),
             ("cst_icms", pa.string()), ("bc_icms", pa.decimal128(18, 2)),
             ("valor", pa.decimal128(18, 2)), ("desconto", pa.decimal128(18, 2)),
-            ("aliq_icms", pa.decimal128(9, 4)),
+            ("aliq_icms", pa.decimal128(9, 4)), ("cfop", pa.string()),
         ], [{"chave": "4" * 44, "numero_item": 1, "emitente": "99999999000191", "destinatario": A,
              "emissao": date(2021, 1, 5), "ncm": "33059000", "cst_icms": "570",
-             "bc_icms": d(48), "valor": d(100), "desconto": d(0), "aliq_icms": d(25)}])
+             "bc_icms": d(48), "valor": d(100), "desconto": d(0), "aliq_icms": d(25), "cfop": "5401"}])
         destino = tmp_path / "aliquota_da_entrada"
         destino.mkdir()
         r = montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
@@ -826,6 +828,34 @@ class TestReducaoDeBase:
         assert venda["icms_efetivo"] == d("2.4")             # 20 x 48% x 25%
         assert r.saidas_com_aliquota_da_entrada == 1 and r.saidas_sem_aliquota == 0
         assert serializar(r)["aliquota_da_entrada"] == 1
+
+    def test_entrada_de_fora_do_estado_nao_empresta_aliquota(self, fontes, tmp_path):
+        """A compra interestadual vem a 4%, 7% ou 12%: não é a tributação
+        interna da mercadoria, e não pode virar o confronto de uma saída
+        interna (corrigido na v0.58.1)."""
+        mov = tmp_path / "movimentacao"
+        gravar(mov / ARQUIVO_ITENS, [
+            ("cnpj", pa.string()), ("codigo", pa.string()), ("descricao", pa.string()),
+            ("unidade", pa.string()), ("aliq_icms", pa.decimal128(9, 4)), ("ncm", pa.string()),
+        ], [{"cnpj": A, "codigo": "X", "descricao": "Refrigerante cola 2L", "unidade": "UN",
+             "aliq_icms": None, "ncm": "33059000"}])
+        gravar(mov / ARQUIVO_ITENS_DO_XML, [
+            ("chave", pa.string()), ("numero_item", pa.int32()), ("emitente", pa.string()),
+            ("destinatario", pa.string()), ("emissao", pa.date32()), ("ncm", pa.string()),
+            ("cst_icms", pa.string()), ("bc_icms", pa.decimal128(18, 2)),
+            ("valor", pa.decimal128(18, 2)), ("desconto", pa.decimal128(18, 2)),
+            ("aliq_icms", pa.decimal128(9, 4)), ("cfop", pa.string()),
+        ], [{"chave": "4" * 44, "numero_item": 1, "emitente": "99999999000191", "destinatario": A,
+             "emissao": date(2021, 1, 5), "ncm": "33059000", "cst_icms": "570",
+             "bc_icms": d(48), "valor": d(100), "desconto": d(0), "aliq_icms": d(12),
+             "cfop": "6401"}])                               # compra de outro estado
+        destino = tmp_path / "de_fora"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+        venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
+        assert venda["aliquota"] is None and venda["reducao_base"] is None
+        assert venda["icms_efetivo"] is None
+        assert r.saidas_com_aliquota_da_entrada == 0 and r.saidas_sem_aliquota == 1
 
     def test_o_0200_vence_a_nota_de_entrada(self, com_reducao):
         """Com cadastro, a alíquota é a dele: 18% do 0200, não os 25% da entrada."""

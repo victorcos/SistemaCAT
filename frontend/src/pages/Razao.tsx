@@ -883,7 +883,9 @@ function LinhasDaFicha({ execucaoId, ficha }: { execucaoId: number; ficha: Ficha
               {l.devolucao ? (l.especie === "entrada" ? "Devolução de compra" : "Devolução de venda") : l.especie === "entrada" ? "Entrada" : "Saída"}
             </span>
             <span className="ml-1.5 font-mono text-[11px] text-texto-fraco">
-              {l.cfop} · {l.origem === "relatorio" ? "relatório" : l.origem.toUpperCase()}
+              {l.cfop}
+              {l.cst_icms ? ` · CST ${l.cst_icms}` : ""} ·{" "}
+              {l.origem === "relatorio" ? "relatório" : l.origem.toUpperCase()}
             </span>
           </span>
           <span className={cn("font-mono text-xs", l.enquadramento_indefinido ? "text-atencao" : "text-texto-suave")}>

@@ -193,6 +193,9 @@ ESQUEMA_FICHA3 = pa.schema([
     ("especie", pa.string()),
     ("devolucao", pa.bool_()),
     ("cfop", pa.string()),
+    # o CST do documento, como veio da EFD ou do XML: é por ele que se confere
+    # o enquadramento e a tributação da linha, entrada e saída
+    ("cst_icms", pa.string()),
     ("documento", pa.string()),
     ("origem", pa.string()),
     ("enquadramento", pa.int8()),
@@ -1016,8 +1019,14 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
     aliq_sql: list[str] = []
     xml_itens = os.path.join(fontes.movimentacao, ARQUIVO_ITENS_DO_XML)
     colunas_xml = set(pq.read_schema(xml_itens).names) if os.path.isfile(xml_itens) else set()
-    de_fora = {"ncm", "emissao", "destinatario", "emitente"}
-    if de_fora | {"cst_icms", "bc_icms", "valor", "desconto"} <= colunas_xml:
+    de_fora = {"ncm", "emissao", "destinatario", "emitente", "cfop"}
+    # Só entrada **interna** empresta alíquota e redução: o confronto do
+    # enquadramento 1 é de uma saída dentro do estado, e a compra de fora vem
+    # com 4%, 7% ou 12%, que não são a tributação interna da mercadoria. No XML
+    # o CFOP é o do emitente (5.xxx é interna); na EFD, o nosso (1.xxx).
+    interna_xml = "left(replace(coalesce(x.cfop, ''), '.', ''), 1) = '5'"
+    interna_efd = "left(replace(coalesce(m.cfop, ''), '.', ''), 1) = '1'"
+    if de_fora | {"cst_icms", "bc_icms", "valor", "desconto"} <= colunas_xml:  # noqa: SIM300
         # o XML vence: na Advertising, a EFD escritura a entrada com CST 70 e
         # zera base e imposto, e só o XML do fornecedor tem a base reduzida
         fontes_sql.append(f"""
@@ -1026,23 +1035,27 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
             FROM read_parquet('{_escapar(xml_itens)}') x
             WHERE x.destinatario IN (SELECT cnpj FROM estabs)
               AND x.emitente NOT IN (SELECT cnpj FROM estabs)
-              AND right(coalesce(x.cst_icms, ''), 2) IN ({cst}) AND x.bc_icms > 0""")
+              AND right(coalesce(x.cst_icms, ''), 2) IN ({cst}) AND x.bc_icms > 0
+              AND {interna_xml}""")
     if de_fora | {"aliq_icms"} <= colunas_xml:
         aliq_sql.append(f"""
             SELECT nullif(x.ncm, '') AS ncm, x.emissao AS data, x.aliq_icms AS aliquota
             FROM read_parquet('{_escapar(xml_itens)}') x
             WHERE x.destinatario IN (SELECT cnpj FROM estabs)
-              AND x.emitente NOT IN (SELECT cnpj FROM estabs) AND x.aliq_icms > 0""")
-    if {"ncm", "bc_icms", "desconto"} <= set(colunas_mov):
+              AND x.emitente NOT IN (SELECT cnpj FROM estabs) AND x.aliq_icms > 0
+              AND {interna_xml}""")
+    if {"ncm", "bc_icms", "desconto", "cfop"} <= set(colunas_mov):
         fontes_sql.append(f"""
             SELECT nullif(m.ncm, '') AS ncm, m.data, m.cst_icms, m.bc_icms, m.valor, m.desconto
             FROM {mov} m
             WHERE m.operacao = 'entrada'
-              AND right(coalesce(m.cst_icms, ''), 2) IN ({cst}) AND m.bc_icms > 0""")
-    if {"ncm", "aliq_icms"} <= set(colunas_mov):
+              AND right(coalesce(m.cst_icms, ''), 2) IN ({cst}) AND m.bc_icms > 0
+              AND {interna_efd}""")
+    if {"ncm", "aliq_icms", "cfop"} <= set(colunas_mov):
         aliq_sql.append(f"""
             SELECT nullif(m.ncm, '') AS ncm, m.data, m.aliq_icms AS aliquota
-            FROM {mov} m WHERE m.operacao = 'entrada' AND m.aliq_icms > 0""")
+            FROM {mov} m WHERE m.operacao = 'entrada' AND m.aliq_icms > 0
+              AND {interna_efd}""")
     por_dia: dict[tuple[str, date], list[Decimal]] = {}
     if fontes_sql:
         for ncm, data, cst_item, base, valor, desconto in con.execute(
@@ -1159,7 +1172,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
     estabelecimentos: set[str] = set()
     atual: tuple[str, str] | None = None
     movimentos: list[Movimento] = []
-    # (indefinido, faltou, conversão, documento, (alíquota, redução, veio da entrada))
+    # (indefinido, faltou, conversão, documento, (alíquota, redução, da entrada), CST)
     extras: list[tuple] = []
     # as entradas da ficha lidas até aqui, com o ICMS próprio: o confronto de 2 e 4
     entradas_da_ficha: list[EntradaAnterior] = []
@@ -1192,11 +1205,11 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         sem_aliq = indef = sem_fator = com_reducao = com_aliq_entrada = 0
         for ln in linhas:
             m = ln.movimento
-            indefinido, faltou, conversao, doc, confronto = indice[id(m)]
+            indefinido, faltou, conversao, doc, confronto, cst = indice[id(m)]
             reducao = confronto[1]
             com_aliq_entrada += confronto[2]
             competencia = m.data.isoformat()[:7]
-            _acrescentar(lote, cnpj, codigo, ln, indefinido, conversao, retirada, doc, confronto)
+            _acrescentar(lote, cnpj, codigo, ln, indefinido, conversao, retirada, doc, confronto, cst)
             if reducao:
                 com_reducao += 1
                 # o que a redução tirou do confronto: efetivo * r / (100 - r)
@@ -1311,7 +1324,8 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                                                              len(entradas_da_ficha)))
                 resumo.confronto_pendente += pendente
                 movimentos.append(m)
-                extras.append((indefinido, faltou, conversao, _documento(linha), confronto))
+                extras.append((indefinido, faltou, conversao, _documento(linha), confronto,
+                               (linha.get("cst_icms") or "").strip()))
                 andamento.linhas += 1
             if avisar is not None:
                 andamento.fichas = resumo.fichas
@@ -1394,7 +1408,7 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
 
 def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conversao: tuple,
                  retirada: bool, doc: tuple = ("", None, "", "", ""),
-                 confronto: tuple = (None, None, False)) -> None:
+                 confronto: tuple = (None, None, False), cst: str = "") -> None:
     m = ln.movimento
     lote["cnpj"].append(cnpj)
     lote["codigo"].append(codigo)
@@ -1403,6 +1417,7 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conve
     lote["especie"].append(m.especie.value)
     lote["devolucao"].append(m.devolucao)
     lote["cfop"].append(m.cfop)
+    lote["cst_icms"].append(cst)
     lote["documento"].append(m.documento)
     lote["origem"].append(m.origem)
     saida_propria = not m.especie.e_entrada and not m.devolucao

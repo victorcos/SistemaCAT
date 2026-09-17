@@ -128,6 +128,8 @@ export interface LinhaDaFicha {
   especie: "entrada" | "saida";
   devolucao: boolean;
   cfop: string;
+  /** v0.58: o CST do documento, da EFD ou do XML */
+  cst_icms?: string;
   documento: string;
   origem: string;
   enquadramento: number | null;

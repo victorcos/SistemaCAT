@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-09-17 — Só a entrada interna empresta alíquota e redução
+
+**O que se via.** Na primeira rodada com a alíquota da entrada, 3.160 saídas da
+Advertising confrontaram a 4%, 7%, 8%, 9,5% e 12% — alíquotas de **compra
+interestadual**, e uma delas (9,5%) nem existe: era a mediana de um dia com uma
+entrada a 7% e outra a 12%. Essas linhas sozinhas respondiam por R$ 21,9 mil dos
+R$ 24,3 mil de ressarcimento do enquadramento 1.
+
+**A correção.** O confronto do enquadramento 1 é de uma saída **dentro do
+estado**: a alíquota e a redução de base só podem vir de entrada interna. No XML
+o CFOP é o do emitente (5.xxx é interna); na EFD é o nosso (1.xxx). Mercadoria
+que só entrou de fora fica sem alíquota, contada, como já era antes.
+
+---
+
 ## 2026-09-17 — Sem 0200, a alíquota vem da nota de entrada
 
 **O que se via.** 13.909 saídas da Advertising ficavam sem valor de confronto —

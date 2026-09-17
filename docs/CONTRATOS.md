@@ -281,11 +281,18 @@ devolução e indefinido), `enquadramento_indefinido`, `quantidade` (com sinal),
 nulo quando não se apura), `saldo_quantidade`, `saldo_unitario`, `saldo_valor`,
 `ressarcimento`, `complemento`.
 
+### CST na Ficha 3 (v0.58.1)
+
+`ficha3.parquet` grava `cst_icms` em toda linha, entrada e saída, como veio da
+EFD ou do XML — a planilha traz a coluna "CST" e a tela mostra ao lado do CFOP.
+
 ### Alíquota da nota de entrada (v0.58.0)
 
 Sem alíquota no 0200 — do mês, a mais recente, a do destino do de-para —, o
 confronto usa a da **nota de entrada** da mesma mercadoria, pelo NCM e pela
-mesma regra de data da redução. `ficha3.parquet` ganha `aliquota` (a que fez o
+mesma regra de data da redução, e só de **entrada interna** (CFOP 5.xxx no XML
+do fornecedor, 1.xxx na EFD): compra de fora vem a 4%, 7% ou 12%, que não é a
+tributação interna da mercadoria. `ficha3.parquet` ganha `aliquota` (a que fez o
 confronto) e o resumo do razão traz `aliquota_da_entrada` (quantas saídas
 vieram dela).
 
