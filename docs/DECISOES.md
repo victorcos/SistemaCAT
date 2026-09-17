@@ -5,6 +5,32 @@
 
 ---
 
+## 2026-09-17 — Certificado digital não se abre nem se lista
+
+**O risco.** A inspeção do lote lê o começo de todo arquivo da pasta e grava o
+nome de cada um. A pasta da Advertising tem `05 - CERTIFICADO` e
+`10 - RETIFICAÇÃO SPEDS/CERTIFICADOS`, com o A1 do cliente em .pfx — e o nome
+do arquivo carrega a senha. Apontar a raiz da pasta levaria o certificado para
+a leitura e o nome para o banco. Nenhum lote gravou certificado até aqui
+(conferido pela contagem, sem ler nome).
+
+**A regra (decisão do Victor):**
+
+* pasta com a palavra "certificado" ou "certificados" no nome não é aberta — a
+  palavra inteira, sem acento e sem caixa: "Certificadora Parceira" é aberta;
+* arquivo .pfx/.p12, e compactado (.zip, .rar, .7z) com essa palavra no nome,
+  não é lido;
+* o mesmo vale dentro de zip, nas etapas 2 e 3 e na pré-validação: membro em
+  pasta de certificado, .pfx e zip de certificado são pulados sem ir para log
+  nem para os recusados;
+* a pasta escolhida que é de certificado, ou está dentro de uma, é recusada;
+* fica só a contagem, num aviso da inspeção, e no log sem nome.
+
+**Medido na Advertising:** inspecionar a raiz inteira classificou 1.098
+arquivos em 18 s, nenhum de caminho de certificado, e avisou das 2 pastas.
+
+---
+
 ## 2026-09-16 — A mesma nota em vários XML, a nota denegada e o lote que muda de tipo
 
 **A pergunta do Victor:** como a v0.54 trata a duplicidade de XML, no caso de

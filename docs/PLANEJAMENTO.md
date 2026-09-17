@@ -7,7 +7,7 @@
 
 ## Onde estamos
 
-**As oito etapas da CAT 42 estão no ar (v0.55.0), e o trabalho do Amigão passou
+**As oito etapas da CAT 42 estão no ar (v0.55.1), e o trabalho do Amigão passou
 por todas** (de novo em 16/09/2026, da etapa 4 à 8, em 59 min). Desde a v0.53, a
 etapa 3 lê o item do XML, o razão aplica o de-para aprovado e confronta os
 enquadramentos 2 e 4 com o crédito do art. 271; na v0.54, a nota cancelada na
@@ -96,6 +96,8 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] XML dentro de zip no lote, com um nível de zip dentro de zip, sem extrair (v0.54.0)
 - [x] Reimportar a pasta atualiza o tipo do arquivo já no trabalho; nota denegada
       (cStat fora de 100/150) sai; cópia autorizada vence a sem protocolo (v0.55.0)
+- [x] Certificado digital na pasta do cliente não é aberto nem listado (v0.55.1)
+- [ ] Carregar a Advertising no sistema e comparar com a RVZ, começando pelo de-para
 
 ### 3. O que a apuração ainda não calcula
 

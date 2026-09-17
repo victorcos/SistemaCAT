@@ -44,6 +44,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from cat.dominio.cat42.pre_validacao import Regra, Severidade, Validacao, validar
+from cat.dominio.lote import caminho_de_certificado
 from cat.infraestrutura.analitico.arquivo_digital import (
     ARQUIVO_OCORRENCIAS,
     ESQUEMA_OCORRENCIAS,
@@ -171,6 +172,9 @@ def _do_zip(z: zipfile.ZipFile, origem: str, caminho_do_zip: str, resumo: Resumo
             aninhados: list[str] | None, nivel: int = 0) -> Iterator[Candidato]:
     for info in z.infolist():
         nome = info.filename
+        if caminho_de_certificado(nome):
+            # certificado dentro do zip: não se abre, e o nome não vai a log nem ao resumo
+            continue
         if nome.lower().endswith(".txt"):
             yield Candidato(f"{origem} :: {nome}", os.path.basename(nome), lambda i=info: z.open(i),
                             ("zip", caminho_do_zip, nome))

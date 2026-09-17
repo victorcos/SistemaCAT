@@ -21,7 +21,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cat.config import obter_config
-from cat.dominio.lote import ArquivoDoLote, ResumoDoLote, TipoDeArquivo
+from cat.dominio.lote import (
+    ArquivoDoLote,
+    CertificadosIgnorados,
+    ResumoDoLote,
+    TipoDeArquivo,
+    e_pasta_de_certificado,
+)
 from cat.infraestrutura.arquivos.classificador import (
     LIMITE_DE_ARQUIVOS,
     classificar,
@@ -182,10 +188,17 @@ def inspecionar_pasta(
         )
     if not os.path.isdir(caminho):
         raise PastaInvalida(f"'{caminho}' é um arquivo, não uma pasta.")
+    if any(e_pasta_de_certificado(parte) for parte in os.path.abspath(caminho).replace("\\", "/").split("/")):
+        raise PastaInvalida(
+            "Esta pasta é de certificado digital, ou está dentro de uma: o sistema não a abre. "
+            "Escolha a pasta com os arquivos fiscais."
+        )
     _conferir_permissao(caminho)
 
     resumo = ResumoDoLote(pasta=os.path.abspath(caminho))
-    lista = list(percorrer_pasta(caminho))
+    certificados = CertificadosIgnorados()
+    lista = list(percorrer_pasta(caminho, certificados))
+    resumo.certificados = certificados
 
     # Identificar arquivo em disco de rede é espera, não conta: cada arquivo
     # custa uma ida e volta até o servidor. Em série, 325 arquivos levaram 49 s,
@@ -223,6 +236,8 @@ def inspecionar_pasta(
             "bytes": resumo.bytes_totais,
             "por_tipo": {t.value: q for t, q in resumo.por_tipo.items()},
             "nao_baixados": resumo.por_tipo.get(TipoDeArquivo.NAO_BAIXADO, 0),
+            "certificados_pastas": certificados.pastas,
+            "certificados_arquivos": certificados.arquivos,
         },
     )
     return resumo

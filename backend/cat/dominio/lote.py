@@ -21,9 +21,59 @@ o que abrir e o que ignorar: onde está, o que é, de quem é e de quando é.
 
 from __future__ import annotations
 
+import os
+import re
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
+
+# ---------------------------------------------------------------------------
+# Certificado digital: não se abre, não se lista
+# ---------------------------------------------------------------------------
+# A pasta do cliente costuma trazer o certificado A1 (.pfx/.p12), e o nome do
+# arquivo muitas vezes carrega a senha. O lote não lê o arquivo nem grava o
+# nome: a pasta com "certificado" no nome não é aberta, e o .pfx/.p12 solto é
+# pulado. O que fica é a contagem (decisão do Victor, 17/09/2026).
+EXTENSOES_DE_CERTIFICADO = (".pfx", ".p12")
+# a palavra inteira: "CERTIFICADOS", "05 - Certificado"; não "Certificadora Ltda"
+_RE_PASTA_DE_CERTIFICADO = re.compile(r"(?<![a-z])certificados?(?![a-z])")
+
+
+def _sem_acento(texto: str) -> str:
+    return unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode().lower()
+
+
+def e_arquivo_de_certificado(nome: str) -> bool:
+    """O .pfx/.p12, e o compactado com "certificado" no nome — que é como ele costuma ir junto."""
+    minusculo = nome.lower()
+    if minusculo.endswith(EXTENSOES_DE_CERTIFICADO):
+        return True
+    raiz, extensao = os.path.splitext(minusculo)
+    return extensao in (".zip", ".rar", ".7z") and e_pasta_de_certificado(raiz)
+
+
+def e_pasta_de_certificado(nome: str) -> bool:
+    return _RE_PASTA_DE_CERTIFICADO.search(_sem_acento(nome)) is not None
+
+
+def caminho_de_certificado(caminho: str) -> bool:
+    """Algum pedaço do caminho é pasta de certificado, ou o arquivo é um certificado.
+
+    Serve para membro de zip, que vem com as pastas no nome (`CERTIFICADOS/x.pfx`).
+    """
+    partes = [p for p in caminho.replace("\\", "/").split("/") if p]
+    if not partes:
+        return False
+    return e_arquivo_de_certificado(partes[-1]) or any(e_pasta_de_certificado(p) for p in partes[:-1])
+
+
+@dataclass
+class CertificadosIgnorados:
+    """Quantos ficaram de fora sem ser abertos. Nome nenhum."""
+
+    pastas: int = 0
+    arquivos: int = 0
 
 
 class Grupo(str, Enum):
@@ -175,6 +225,7 @@ class ResumoDoLote:
     copias: list[tuple[ArquivoDoLote, str]] = field(default_factory=list)
     ignorados: int = 0
     limite_atingido: bool = False
+    certificados: CertificadosIgnorados = field(default_factory=CertificadosIgnorados)
 
     @property
     def total(self) -> int:
@@ -232,6 +283,16 @@ class ResumoDoLote:
     def avisos(self) -> list[str]:
         """O que quem confirma precisa saber antes de confirmar."""
         avisos: list[str] = []
+        if self.certificados.pastas or self.certificados.arquivos:
+            partes = []
+            if self.certificados.pastas:
+                partes.append(f"{self.certificados.pastas} pasta(s) de certificado")
+            if self.certificados.arquivos:
+                partes.append(f"{self.certificados.arquivos} arquivo(s) de certificado")
+            avisos.append(
+                f"{' e '.join(partes)} ficaram de fora sem ser abertos. O nome não é "
+                "gravado: costuma carregar a senha do certificado."
+            )
         if self.de_outra_empresa:
             cnpjs = sorted({a.cnpj for a in self.de_outra_empresa if a.cnpj})
             avisos.append(

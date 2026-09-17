@@ -464,6 +464,16 @@ XML de dentro, e `arquivo` vira `lote.zip > nota.xml`. Evento de cancelamento
 dentro do zip vai para `chaves_canceladas.parquet`. O zip `xml_compactado`
 também é fonte da pré-validação dos arquivos do cliente.
 
+### Certificado digital (v0.55.1)
+
+A inspeção do lote não abre pasta com "certificado(s)" no nome nem lê .pfx,
+.p12 ou compactado com essa palavra no nome; não os devolve em `arquivos` e
+avisa só a contagem ("N pasta(s) de certificado e N arquivo(s) de certificado
+ficaram de fora sem ser abertos"). Pasta escolhida que é de certificado, ou
+está dentro de uma, dá 422. Nos zips (etapas 2 e 3, classificação e
+pré-validação), membro de certificado é pulado sem aparecer em log nem em
+recusados.
+
 ### Arquivo já no trabalho com outro tipo (v0.55)
 
 `POST /interno/lotes/inspecionar` devolve, em cada arquivo já no trabalho,

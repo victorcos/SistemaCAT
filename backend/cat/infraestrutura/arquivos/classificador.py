@@ -22,7 +22,13 @@ import zipfile
 from datetime import date
 from typing import Iterator
 
-from cat.dominio.lote import ArquivoDoLote, TipoDeArquivo
+from cat.dominio.lote import (
+    ArquivoDoLote,
+    CertificadosIgnorados,
+    TipoDeArquivo,
+    e_arquivo_de_certificado,
+    e_pasta_de_certificado,
+)
 from cat.dominio.gerencial.campos import Especie
 from cat.dominio.sped.cabecalho import (
     ArquivoNaoReconhecido,
@@ -369,13 +375,18 @@ def hash_de(caminho: str, bloco: int = 1 << 20) -> str:
     return resumo.hexdigest()
 
 
-def percorrer_pasta(pasta: str) -> Iterator[tuple[str, int]]:
+def percorrer_pasta(pasta: str,
+                    certificados: CertificadosIgnorados | None = None) -> Iterator[tuple[str, int]]:
     """(caminho, tamanho) de cada arquivo, entrando nas subpastas.
 
     Usa `scandir` em vez de `os.walk` porque a listagem do diretório já traz o
     tamanho: pegá-lo aqui evita um `getsize` por arquivo, que em disco de rede
     é uma viagem inteira até o servidor.
+
+    Pasta de certificado não é aberta e .pfx/.p12 não sai daqui: só a contagem
+    vai para `certificados`, e o log não leva nome.
     """
+    certificados = certificados if certificados is not None else CertificadosIgnorados()
     vistos = 0
     pilha = [pasta]
     while pilha:
@@ -385,7 +396,13 @@ def percorrer_pasta(pasta: str) -> Iterator[tuple[str, int]]:
                 for entrada in sorted(entradas, key=lambda e: e.name):
                     try:
                         if entrada.is_dir(follow_symlinks=False):
-                            pilha.append(entrada.path)
+                            if e_pasta_de_certificado(entrada.name):
+                                certificados.pastas += 1
+                            else:
+                                pilha.append(entrada.path)
+                            continue
+                        if e_arquivo_de_certificado(entrada.name):
+                            certificados.arquivos += 1
                             continue
                         tamanho = entrada.stat(follow_symlinks=False).st_size
                     except OSError:
@@ -402,3 +419,6 @@ def percorrer_pasta(pasta: str) -> Iterator[tuple[str, int]]:
             # subpasta sem permissão não derruba a varredura inteira
             log.warning("subpasta ignorada",
                         extra={"subpasta": atual, "motivo": str(erro)})
+    if certificados.pastas or certificados.arquivos:
+        log.info("certificados deixados de fora da varredura, sem abrir",
+                 extra={"pasta": pasta, "pastas": certificados.pastas, "arquivos": certificados.arquivos})

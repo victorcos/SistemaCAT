@@ -22,6 +22,7 @@ import os
 import zipfile
 from collections.abc import Iterable, Iterator
 
+from cat.dominio.lote import caminho_de_certificado
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -53,7 +54,8 @@ def membros_xml(arquivo: zipfile.ZipFile, nome: str,
     """(nome de exibição, zip que contém, membro) de cada XML, entrando um nível."""
     for info in arquivo.infolist():
         minusculo = info.filename.lower()
-        if info.is_dir():
+        if info.is_dir() or caminho_de_certificado(info.filename):
+            # certificado dentro do zip: não se abre, e o nome não vai a log nem a recusados
             continue
         if minusculo.endswith(".xml"):
             yield nome_do_membro(nome, info.filename), arquivo, info
