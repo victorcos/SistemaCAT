@@ -5,6 +5,52 @@
 
 ---
 
+## 2026-09-17 — A redução de base da entrada entra no ICMS efetivo da saída
+
+**O que se via.** O complemento do enquadramento 1 da Advertising dava
+R$ 380 mil contra R$ 148,7 mil da RVZ, e a diferença inteira era a alíquota: o
+sistema confrontava valor × 25% (Grecin) e × 18% (Vagisil), a RVZ usava 13% e
+6%. Nenhum dos dois números tinha fundamento escrito no papel de trabalho dela.
+
+**Onde estava a resposta.** Nas **entradas**. O fornecedor (139 notas, 210
+itens, um só CNPJ) emite com **CST 70** — redução de base com ST — e informa a
+base que usou:
+
+| NCM | Alíquota | `pRedBC` declarado | Base usada (`vBC`) | Carga |
+|---|---|---|---|---|
+| 3305.90.00, 3304.99.90 (Grecin) | 25% | 48,00 | 48% do valor | 12% |
+| 3401.20.10, 3307.20.10/.90 (Vagisil) | 18% | 66,67 | 66,67% do valor | 12% |
+| 3006.70.00 (gel, CST 10) | 18% | — | sem redução | 18% |
+
+O `pRedBC` está preenchido **ao contrário**: o fornecedor põe ali a base que
+sobra, não o que reduziu. Lido ao pé da letra dá 13% num grupo e 6% no outro —
+foi o que a RVZ fez — e nenhum dos dois reproduz o `vICMS` da própria nota. Pelo
+`vBC`, os dois grupos dão a mesma carga de **12%**.
+
+**A decisão do Victor (17/09/2026).** O ICMS efetivo da saída passa a incidir
+sobre a base já reduzida, e a redução é a **real**, calculada por
+`1 - vBC / (vProd - vDesc)` — nunca pelo `pRedBC`. Vale **só no enquadramento
+1**: o 3 segue com a alíquota cheia, e o 2 e o 4 confrontam com o ICMS próprio
+da entrada, onde a redução já vem embutida no `vICMS` da nota.
+
+**Como funciona.** A redução é da mercadoria, então a chave é o **NCM** — o da
+nota, e o do 0200 quando ela não traz (venda de PDV do relatório). Cada saída
+herda a redução da entrada mais recente até a data dela; antes da primeira
+entrada, a primeira que houver. O dia com mais de uma entrada fica com a
+mediana. A Ficha 3 grava `reducao_base` em cada linha, a ficha conta
+`saidas_com_reducao` e o resumo traz `reducao_de_base` com quanto a redução
+tirou do confronto.
+
+**O que muda na Advertising.** Nas 44.469 linhas de saída de enquadramento 1 e
+3, o ICMS efetivo cai de R$ 950,2 mil (alíquota cheia) para R$ 463,7 mil, e o
+complemento de R$ 623,1 mil para R$ 139,1 mil — a RVZ apurou R$ 148,8 mil com
+os 13%/6% dela.
+
+**O que ainda falta.** Registrar o fundamento legal do benefício de carga 12%
+por NCM: hoje o sistema só sabe o que a nota de entrada declara.
+
+---
+
 ## 2026-09-17 — Estoque negativo abre a ficha, em vez de tirá-la do total
 
 **O que se via.** Na Advertising, 6 mercadorias ficavam com saldo negativo em

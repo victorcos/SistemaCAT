@@ -68,6 +68,15 @@ hoje sempre falso), para consulta e
 download, mas não somam ressarcimento, complemento, enquadramento nem
 competência.
 
+## Redução de base: a entrada manda no efetivo da saída
+
+Quando a entrada da mercadoria vem com CST 20 ou 70, o fornecedor declara base
+reduzida, e o ICMS efetivo da saída a consumidor (enquadramento 1) incide sobre
+essa mesma base — não sobre o valor cheio. A redução sai do `vBC` da nota, não
+do `pRedBC`, e a chave é o NCM: cada saída herda a da entrada mais recente até
+a data dela. O porquê está em `cat.dominio.cat42.reducao`; aqui fica só a
+leitura das entradas e o carimbo em `lancamentos.reducao_base`.
+
 ## De-para: o mesmo produto com outro código
 
 Com pares aprovados (`Fontes.depara`, um parquet com `cnpj`, `codigo_origem`,
@@ -94,6 +103,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
+from statistics import median
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -116,7 +126,13 @@ from cat.dominio.cat42.razao import (
     RazaoDoItem,
     SaldoInicial,
 )
+from cat.dominio.cat42.reducao import (
+    CST_COM_REDUCAO,
+    icms_efetivo as icms_efetivo_da_saida,
+    reducao_da_entrada,
+)
 from cat.infraestrutura.analitico.confronto import _abrir, _escapar, _limpar
+from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML
 from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_CONVERSOES,
     ARQUIVO_ITENS,
@@ -150,6 +166,7 @@ AMOSTRA_PARA_ACHAR_SAIDA = 5_000
 _DEVOLUCAO_DE_VENDA = frozenset(c for c in CFOP_DEVOLUCAO if c[0] in "123")
 _DEVOLUCAO_DE_COMPRA = frozenset(c for c in CFOP_DEVOLUCAO if c[0] in "567")
 
+_Q4 = Decimal("0.0001")
 _Q6 = Decimal("0.000001")
 _Q15 = Decimal("0.000000000000001")
 
@@ -190,6 +207,8 @@ ESQUEMA_FICHA3 = pa.schema([
     ("icms_suportado", pa.decimal128(30, 15)),
     ("valor_unitario_usado", pa.decimal128(30, 15)),
     ("icms_efetivo", pa.decimal128(24, 6)),
+    # redução de base herdada da entrada, em %, quando ela entrou no efetivo
+    ("reducao_base", pa.decimal128(9, 4)),
     ("saldo_quantidade", pa.decimal128(24, 6)),
     ("saldo_unitario", pa.decimal128(30, 15)),
     ("saldo_valor", pa.decimal128(30, 15)),
@@ -234,6 +253,7 @@ ESQUEMA_FICHAS = pa.schema([
     # fora do total até os dados chegarem; o ressarcimento dela não é confiável
     ("retirada", pa.bool_()),
     ("saidas_sem_aliquota", pa.int32()),
+    ("saidas_com_reducao", pa.int32()),
     ("saidas_indefinidas", pa.int32()),
     ("linhas_sem_fator", pa.int32()),
 ])
@@ -409,6 +429,10 @@ class ResumoDaMontagem:
     por_competencia: dict = field(default_factory=dict)
     saidas_por_origem: dict = field(default_factory=dict)
     saidas_sem_aliquota: int = 0
+    # saídas do enquadramento 1 cujo efetivo saiu de base reduzida, e quanto a
+    # redução tirou do valor de confronto
+    saidas_com_reducao: int = 0
+    efetivo_reduzido: Decimal = Decimal(0)
     saidas_indefinidas: int = 0
     confronto_pendente: int = 0
     fichas_negativas: int = 0
@@ -706,6 +730,10 @@ def _preparar(con, fontes: Fontes) -> dict:
     origem_mov = "coalesce(fonte_item, 'efd')" if "fonte_item" in colunas_mov else "'efd'"
     # o indFinal do XML diz se a NF-e foi a consumidor final
     consumidor_mov = "consumidor_final_xml" if "consumidor_final_xml" in colunas_mov else "NULL::BOOLEAN"
+    # o NCM diz de qual mercadoria é a redução de base: o do XML primeiro, o do
+    # cadastro depois. Etapas antigas não têm nem uma coluna nem outra
+    ncm_mov = " || ".join(f"nullif(s.{c}, '')" for c in ("ncm_xml", "ncm") if c in colunas_mov)
+    ncm_mov = f"coalesce({ncm_mov})" if ncm_mov else "NULL::VARCHAR"
     colunas_sup = pq.read_schema(os.path.join(fontes.apuracao, ARQUIVO_SUPORTADO)).names
     serie_sup = "s.serie" if "serie" in colunas_sup else "NULL::VARCHAR"
     # apuração de antes da v0.53 não guarda o ICMS próprio: o confronto de 2 e 4 fica pendente
@@ -739,12 +767,13 @@ def _preparar(con, fontes: Fontes) -> dict:
     con.execute(f"""
         CREATE OR REPLACE TABLE saidas_efd AS
         SELECT cnpj, codigo, data, replace(cfop, '.', '') AS cfop, cst_icms, modelo, unidade,
+               {ncm_mov} AS ncm,
                quantidade, valor, coalesce(valor_icms, 0) + coalesce(valor_st, 0) AS suportado,
                coalesce(nullif(chave, ''), numero_documento) AS documento, chave,
                false AS pdv, {origem_mov} AS origem,
                numero_item, participante, numero_documento, {serie_mov} AS serie,
                {consumidor_mov} AS consumidor_final
-        FROM {mov} WHERE operacao = 'saida'
+        FROM {mov} s WHERE s.operacao = 'saida'
     """)
 
     sem_estab = trocado = 0
@@ -782,6 +811,8 @@ def _preparar(con, fontes: Fontes) -> dict:
                    CASE WHEN length(chave) = 44 THEN substr(chave, 21, 2) ELSE '' END AS modelo,
                    -- a "Qtde;Unitária" do relatório já é a unidade básica
                    NULL::VARCHAR AS unidade,
+                   -- o relatório não traz NCM: a redução de base vem do 0200
+                   NULL::VARCHAR AS ncm,
                    quantidade, valor, suportado,
                    coalesce(nullif(chave, ''), 'relatorio|' || unidade || '|' || numero_documento) AS documento,
                    chave, pdv, 'relatorio' AS origem,
@@ -807,11 +838,14 @@ def _preparar(con, fontes: Fontes) -> dict:
     """)
     codigos = con.execute("SELECT count(*) FROM codigos").fetchone()[0]
     if os.path.isfile(itens):
+        ncm_cad = "nullif(i.ncm, '')" if "ncm" in pq.read_schema(itens).names else "NULL::VARCHAR"
         con.execute(f"""CREATE OR REPLACE TABLE unid AS
-            SELECT cnpj, codigo, nullif(upper(trim(unidade)), '') AS unidade, aliq_icms
-            FROM read_parquet('{_escapar(itens)}')""")
+            SELECT i.cnpj, i.codigo, nullif(upper(trim(i.unidade)), '') AS unidade, i.aliq_icms,
+                   {ncm_cad} AS ncm
+            FROM read_parquet('{_escapar(itens)}') i""")
     else:
-        con.execute("CREATE OR REPLACE TABLE unid (cnpj VARCHAR, codigo VARCHAR, unidade VARCHAR, aliq_icms DECIMAL(9, 4))")
+        con.execute("CREATE OR REPLACE TABLE unid (cnpj VARCHAR, codigo VARCHAR, unidade VARCHAR, "
+                    "aliq_icms DECIMAL(9, 4), ncm VARCHAR)")
     # A alíquota do confronto é a do mês da saída, não a do fim do período: no
     # Amigão, 23 mil itens mudaram de alíquota dentro de 2021 (12% para 13,3% em
     # fevereiro). A unidade continua a mais recente — é nela que a ficha inteira
@@ -841,7 +875,9 @@ def _preparar(con, fontes: Fontes) -> dict:
 
     con.execute(f"""
         CREATE OR REPLACE TABLE lancamentos AS
-        SELECT l.* REPLACE (coalesce(d.codigo_destino, l.codigo) AS codigo),
+        SELECT l.* REPLACE (coalesce(d.codigo_destino, l.codigo) AS codigo,
+                            -- o NCM da nota, e o do cadastro quando ela não traz
+                            coalesce(l.ncm, u.ncm, ud.ncm) AS ncm),
                l.codigo AS codigo_original,
                coalesce(am.aliq_icms, u.aliq_icms, ud.aliq_icms) AS aliquota, u.unidade AS unidade_estoque,
                (am.aliq_icms IS NOT NULL AND u.aliq_icms IS NOT NULL
@@ -849,7 +885,7 @@ def _preparar(con, fontes: Fontes) -> dict:
                {_FATOR.format(t="l")} * coalesce(d.fator, 1) AS fator, {_SEM_FATOR.format(t="l")} AS sem_fator
         FROM (
             SELECT s.cnpj, s.codigo, s.data, replace(s.cfop, '.', '') AS cfop, s.cst_icms, s.modelo,
-                   ue.unidade,
+                   ue.unidade, NULL::VARCHAR AS ncm,
                    s.quantidade, NULL::DECIMAL(20, 6) AS valor, s.suportado,
                    coalesce(nullif(s.chave, ''), s.numero_documento) AS documento,
                    false AS pdv, 'efd' AS origem,
@@ -863,7 +899,7 @@ def _preparar(con, fontes: Fontes) -> dict:
               ON ue.cnpj = s.cnpj AND ue.chave = s.chave AND ue.numero_documento = s.numero_documento
              AND ue.data = s.data AND ue.numero_item = s.numero_item AND ue.codigo = s.codigo
             UNION ALL
-            SELECT s.cnpj, s.codigo, s.data, s.cfop, s.cst_icms, s.modelo, s.unidade,
+            SELECT s.cnpj, s.codigo, s.data, s.cfop, s.cst_icms, s.modelo, s.unidade, s.ncm,
                    s.quantidade, s.valor, s.suportado, s.documento, s.pdv, s.origem,
                    CASE WHEN s.cfop IN ({lista(_DEVOLUCAO_DE_COMPRA)}) THEN 'entrada' ELSE 'saida' END,
                    s.cfop IN ({lista(_DEVOLUCAO_DE_COMPRA)}),
@@ -882,6 +918,8 @@ def _preparar(con, fontes: Fontes) -> dict:
           AND l.cnpj IN (SELECT cnpj FROM estabs)
           AND l.data BETWEEN DATE '{inicio}' AND DATE '{fim}'
     """)
+    _reducoes(con, fontes, mov, colunas_mov)
+
     # uso e consumo não é estoque de comercialização: sai da ficha e fica contado
     uso_e_consumo = con.execute(
         f"SELECT count(*) FROM lancamentos WHERE cfop IN ({lista(CFOP_USO_E_CONSUMO)})").fetchone()[0]
@@ -959,6 +997,68 @@ def _preparar(con, fontes: Fontes) -> dict:
 # ---------------------------------------------------------------------------
 # o percurso, ficha a ficha
 # ---------------------------------------------------------------------------
+def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
+    """Põe em `lancamentos.reducao_base` a redução de base da mercadoria.
+
+    Quem declara a redução é a entrada, com CST 20 ou 70. O percentual sai da
+    base que a nota de fato usou, e não do `pRedBC` — que o fornecedor da
+    Advertising preenche ao contrário (ver `cat.dominio.cat42.reducao`). O
+    benefício é da mercadoria, então a chave é o NCM, e cada saída herda a
+    redução da entrada mais recente até a data dela; antes da primeira entrada,
+    a primeira que houver.
+    """
+    cst = ", ".join(f"'{c}'" for c in sorted(CST_COM_REDUCAO))
+    fontes_sql = []
+    xml_itens = os.path.join(fontes.movimentacao, ARQUIVO_ITENS_DO_XML)
+    if os.path.isfile(xml_itens):
+        # o XML vence: na Advertising, a EFD escritura a entrada com CST 70 e
+        # zera base e imposto, e só o XML do fornecedor tem a base reduzida
+        fontes_sql.append(f"""
+            SELECT nullif(x.ncm, '') AS ncm, x.emissao AS data, x.cst_icms,
+                   x.bc_icms, x.valor, x.desconto
+            FROM read_parquet('{_escapar(xml_itens)}') x
+            WHERE x.destinatario IN (SELECT cnpj FROM estabs)
+              AND x.emitente NOT IN (SELECT cnpj FROM estabs)
+              AND right(coalesce(x.cst_icms, ''), 2) IN ({cst}) AND x.bc_icms > 0""")
+    if {"ncm", "bc_icms", "desconto"} <= set(colunas_mov):
+        fontes_sql.append(f"""
+            SELECT nullif(m.ncm, '') AS ncm, m.data, m.cst_icms, m.bc_icms, m.valor, m.desconto
+            FROM {mov} m
+            WHERE m.operacao = 'entrada'
+              AND right(coalesce(m.cst_icms, ''), 2) IN ({cst}) AND m.bc_icms > 0""")
+    por_dia: dict[tuple[str, date], list[Decimal]] = {}
+    if fontes_sql:
+        for ncm, data, cst_item, base, valor, desconto in con.execute(
+                " UNION ALL ".join(fontes_sql)).fetchall():
+            reduzida = reducao_da_entrada(cst_item, base, valor, desconto)
+            if reduzida is None or not ncm or data is None:
+                continue
+            por_dia.setdefault((ncm, data), []).append(reduzida)
+    con.execute("ALTER TABLE lancamentos ADD COLUMN reducao_base DECIMAL(9, 4)")
+    if por_dia:
+        # o dia com mais de uma entrada fica com a mediana: um item digitado
+        # errado não muda a redução da mercadoria inteira
+        lidas = pa.Table.from_pylist(
+            [{"ncm": n, "data": d, "reducao": median(v)} for (n, d), v in sorted(por_dia.items())],
+            schema=pa.schema([("ncm", pa.string()), ("data", pa.date32()),
+                              ("reducao", pa.decimal128(9, 4))]))
+        con.register("reducoes_lidas", lidas)
+        con.execute("CREATE OR REPLACE TABLE reducoes AS SELECT * FROM reducoes_lidas")
+        con.unregister("reducoes_lidas")
+        con.execute("""UPDATE lancamentos SET reducao_base = (
+                SELECT r.reducao FROM reducoes r
+                WHERE r.ncm = lancamentos.ncm AND r.data <= lancamentos.data
+                ORDER BY r.data DESC LIMIT 1)
+            WHERE ncm IS NOT NULL""")
+        # a saída anterior à primeira entrada herda a primeira redução que houver
+        con.execute("""UPDATE lancamentos SET reducao_base = (
+                SELECT r.reducao FROM reducoes r
+                WHERE r.ncm = lancamentos.ncm ORDER BY r.data LIMIT 1)
+            WHERE reducao_base IS NULL AND ncm IS NOT NULL""")
+    log.info("redução de base lida das entradas",
+             extra={"mercadorias": len({n for n, _ in por_dia}), "dias": len(por_dia)})
+
+
 def _enquadrar(linha: dict, venda_a_consumidor: VendaAConsumidor) -> tuple[EnquadramentoLegal | None, bool]:
     enq = classificar(linha["cfop"] or "", linha["cst_icms"] or "",
                       consumidor_final=True if linha["pdv"] else linha.get("consumidor_final"),
@@ -968,26 +1068,34 @@ def _enquadrar(linha: dict, venda_a_consumidor: VendaAConsumidor) -> tuple[Enqua
 
 
 def _confronto(enq: EnquadramentoLegal, linha: dict,
-               entradas: list[EntradaAnterior] | None = None) -> tuple[Decimal | None, bool, bool]:
-    """(ICMS efetivo, faltou alíquota, confronto pendente).
+               entradas: list[EntradaAnterior] | None = None
+               ) -> tuple[Decimal | None, bool, bool, Decimal | None]:
+    """(ICMS efetivo, faltou alíquota, confronto pendente, redução aplicada).
 
     Enquadramentos 1 e 3 confrontam com a alíquota interna vezes o valor da
     saída (leiaute, VL_CONFR). Os 2 e 4 confrontam com o ICMS da operação
     própria das entradas mais recentes da ficha até a saída (item 3.3.8); sem
     entrada com esse valor, ficam pendentes, contados, sem ressarcimento inventado.
+
+    No enquadramento 1 — e só nele, por decisão do Victor de 17/09/2026 — a
+    alíquota incide sobre a base já reduzida, quando a entrada da mercadoria
+    declara redução (`cat.dominio.cat42.reducao`).
     """
     if not enq.gera_ressarcimento:
-        return None, False, False
+        return None, False, False, None
     if not enq.confronta_com_saida:
         if not entradas:
-            return None, False, True
+            return None, False, True, None
         quantidade = Decimal(linha["quantidade"] or 0) * Decimal(linha["fator"] or 1)
-        return valor_da_abertura(abs(quantidade), entradas).valor.quantize(_Q6), False, False
+        return valor_da_abertura(abs(quantidade), entradas).valor.quantize(_Q6), False, False, None
     aliquota = linha["aliquota"]
     valor = linha["valor"]
     if not aliquota or valor is None:
-        return None, True, False
-    return (Decimal(valor) * Decimal(aliquota) / 100).quantize(_Q6), False, False
+        return None, True, False, None
+    reducao = linha.get("reducao_base") if enq is EnquadramentoLegal.CONSUMIDOR_FINAL else None
+    reducao = Decimal(reducao) if reducao else None
+    return (icms_efetivo_da_saida(Decimal(valor), Decimal(aliquota), reducao).quantize(_Q6),
+            False, False, reducao)
 
 
 def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: ResumoDaMontagem,
@@ -1001,7 +1109,8 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
     estabelecimentos: set[str] = set()
     atual: tuple[str, str] | None = None
     movimentos: list[Movimento] = []
-    extras: list[tuple] = []   # (indefinido, faltou alíquota, conversão, documento) por movimento
+    # (indefinido, faltou alíquota, conversão, documento, redução) por movimento
+    extras: list[tuple] = []
     # as entradas da ficha lidas até aqui, com o ICMS próprio: o confronto de 2 e 4
     entradas_da_ficha: list[EntradaAnterior] = []
     andamento = Andamento(total=total)
@@ -1030,12 +1139,17 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         indice = {id(m): x for m, x in zip(movimentos, extras)}
         entradas = saidas = ressarc = compl = credito = Decimal(0)
         retirada = False
-        sem_aliq = indef = sem_fator = 0
+        sem_aliq = indef = sem_fator = com_reducao = 0
         for ln in linhas:
             m = ln.movimento
-            indefinido, faltou, conversao, doc = indice[id(m)]
+            indefinido, faltou, conversao, doc, reducao = indice[id(m)]
             competencia = m.data.isoformat()[:7]
-            _acrescentar(lote, cnpj, codigo, ln, indefinido, conversao, retirada, doc)
+            _acrescentar(lote, cnpj, codigo, ln, indefinido, conversao, retirada, doc, reducao)
+            if reducao:
+                com_reducao += 1
+                # o que a redução tirou do confronto: efetivo * r / (100 - r)
+                resumo.efetivo_reduzido += ((m.icms_efetivo or Decimal(0))
+                                            * Decimal(reducao) / (Decimal(100) - Decimal(reducao)))
             sem_fator += conversao[2]
             resumo.linhas_convertidas += conversao[1] != 1
             resumo.linhas_unidade_sem_fator += conversao[2]
@@ -1091,6 +1205,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                        ("ficou_negativo", negativo), ("retirada", retirada),
                        ("abertura_por_saldo_negativo", aberta_por_negativo.quantize(_Q6)),
                        ("saidas_sem_aliquota", sem_aliq),
+                       ("saidas_com_reducao", com_reducao),
                        ("saidas_indefinidas", indef), ("linhas_sem_fator", sem_fator)):
             lote_fichas[k].append(val)
         resumo.fichas += 1
@@ -1105,6 +1220,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
             resumo.complemento += compl
             resumo.credito_operacao_propria += credito
         resumo.saidas_sem_aliquota += sem_aliq
+        resumo.saidas_com_reducao += com_reducao
         resumo.saidas_indefinidas += indef
         resumo.fichas_negativas += negativo
         resumo.fichas_abertas_por_negativo += bool(aberta_por_negativo)
@@ -1132,7 +1248,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                     if atual is not None:
                         fechar(atual)
                     atual, movimentos, extras, entradas_da_ficha = chave, [], [], []
-                m, indefinido, faltou, pendente, conversao = _movimento(
+                m, indefinido, faltou, pendente, conversao, reducao = _movimento(
                     linha, len(movimentos), resumo, venda_a_consumidor, entradas_da_ficha)
                 if m is None:
                     continue
@@ -1142,7 +1258,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                                                              len(entradas_da_ficha)))
                 resumo.confronto_pendente += pendente
                 movimentos.append(m)
-                extras.append((indefinido, faltou, conversao, _documento(linha)))
+                extras.append((indefinido, faltou, conversao, _documento(linha), reducao))
                 andamento.linhas += 1
             if avisar is not None:
                 andamento.fichas = resumo.fichas
@@ -1177,7 +1293,8 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
                venda_a_consumidor: VendaAConsumidor = VendaAConsumidor.ENQUADRAMENTO_1,
                entradas_da_ficha: list[EntradaAnterior] | None = None):
     """Converte um lançamento em `Movimento`. Devolve (movimento, indefinido,
-    faltou alíquota, confronto pendente, (unidade de origem, fator, sem fator))."""
+    faltou alíquota, confronto pendente, (unidade de origem, fator, sem fator),
+    redução de base aplicada)."""
     especie = Especie.ENTRADA if linha["especie"] == "entrada" else Especie.SAIDA
     quantidade = Decimal(linha["quantidade"] or 0)
     if quantidade < 0:
@@ -1189,11 +1306,12 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
     # a ficha é na unidade do inventário
     quantidade = quantidade * fator
     enq, indefinido, faltou, pendente, efetivo = EnquadramentoLegal.DEMAIS_SAIDAS, False, False, False, None
+    reducao = None
     if especie is Especie.SAIDA and not linha["devolucao"]:
         classificado, indefinido = _enquadrar(linha, venda_a_consumidor)
         if classificado is not None:
             enq = classificado
-            efetivo, faltou, pendente = _confronto(enq, linha, entradas_da_ficha)
+            efetivo, faltou, pendente, reducao = _confronto(enq, linha, entradas_da_ficha)
             if efetivo is not None and not enq.confronta_com_saida:
                 resumo.confronto_pela_entrada += 1
     try:
@@ -1213,12 +1331,13 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
     except MovimentoInvalido as erro:
         log.warning("lançamento recusado pelo razão", extra={"motivo": str(erro),
                                                             "codigo": linha["codigo"]})
-        return None, False, False, False, conversao
-    return m, indefinido, faltou, pendente, conversao
+        return None, False, False, False, conversao, None
+    return m, indefinido, faltou, pendente, conversao, reducao
 
 
 def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conversao: tuple,
-                 retirada: bool, doc: tuple = ("", None, "", "", "")) -> None:
+                 retirada: bool, doc: tuple = ("", None, "", "", ""),
+                 reducao: Decimal | None = None) -> None:
     m = ln.movimento
     lote["cnpj"].append(cnpj)
     lote["codigo"].append(codigo)
@@ -1240,6 +1359,7 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conve
     lote["icms_suportado"].append(ln.icms_suportado.quantize(_Q15))
     lote["valor_unitario_usado"].append(ln.valor_unitario_usado.quantize(_Q15))
     lote["icms_efetivo"].append(m.icms_efetivo.quantize(_Q6) if m.icms_efetivo is not None else None)
+    lote["reducao_base"].append(Decimal(reducao).quantize(_Q4) if reducao else None)
     lote["saldo_quantidade"].append(ln.saldo_quantidade.quantize(_Q6))
     lote["saldo_unitario"].append(ln.saldo_unitario.quantize(_Q15))
     lote["saldo_valor"].append(ln.saldo_valor.quantize(_Q15))
@@ -1380,6 +1500,12 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
             for k, v in sorted(resumo.por_competencia.items())
         ],
         "saidas_por_origem": resumo.saidas_por_origem,
+        # quantas saídas do enquadramento 1 confrontaram com base reduzida, e
+        # quanto a redução tirou do valor de confronto
+        "reducao_de_base": {
+            "saidas": resumo.saidas_com_reducao,
+            "efetivo_reduzido": texto(resumo.efetivo_reduzido),
+        },
         "pendencias": {
             "saidas_sem_aliquota": resumo.saidas_sem_aliquota,
             "saidas_indefinidas": resumo.saidas_indefinidas,

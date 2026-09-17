@@ -398,7 +398,11 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: Re
           <p className={cn("m-0 font-mono text-[32px] leading-none", zero(resumo.complemento) ? "text-texto-fraco" : "text-atencao")}>
             {valor(resumo.complemento)}
           </p>
-          <p className="m-0 text-xs text-texto-fraco">Só existe no enquadramento 1, consumidor final.</p>
+          <p className="m-0 text-xs text-texto-fraco">
+            Só existe no enquadramento 1, consumidor final.
+            {(resumo.reducao_de_base?.saidas ?? 0) > 0 &&
+              ` ${numero(resumo.reducao_de_base?.saidas ?? 0)} saídas confrontaram com base reduzida, herdada da entrada com CST 20 ou 70: a redução tirou ${valor(resumo.reducao_de_base?.efetivo_reduzido ?? "0")} do confronto.`}
+          </p>
         </Cartao>
         <Cartao className="flex flex-col gap-2">
           <Rotulo>Fichas válidas</Rotulo>
@@ -896,7 +900,13 @@ function LinhasDaFicha({ execucaoId, ficha }: { execucaoId: number; ficha: Ficha
             ) : null}
           </span>
           <span className="text-right font-mono text-xs text-texto">{valor(l.icms_suportado)}</span>
-          <span className="text-right font-mono text-xs text-texto-suave">{l.icms_efetivo === null ? "—" : valor(l.icms_efetivo)}</span>
+          <span
+            className="text-right font-mono text-xs text-texto-suave"
+            title={l.reducao_base ? `base reduzida em ${Number(l.reducao_base).toLocaleString("pt-BR")}%, herdada da entrada` : undefined}
+          >
+            {l.icms_efetivo === null ? "—" : valor(l.icms_efetivo)}
+            {l.reducao_base ? <span className="ml-1 text-[10px] text-texto-fraco">−{Number(l.reducao_base).toLocaleString("pt-BR")}%</span> : null}
+          </span>
           <span className={cn("text-right font-mono text-xs", Number(l.saldo_quantidade) < 0 ? "text-atencao" : "text-texto-suave")}>
             {qtd(l.saldo_quantidade)}
           </span>

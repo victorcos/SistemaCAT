@@ -281,6 +281,16 @@ devolução e indefinido), `enquadramento_indefinido`, `quantidade` (com sinal),
 nulo quando não se apura), `saldo_quantidade`, `saldo_unitario`, `saldo_valor`,
 `ressarcimento`, `complemento`.
 
+### Redução de base herdada da entrada (v0.57.0)
+
+O ICMS efetivo do **enquadramento 1** incide sobre a base reduzida quando a
+entrada da mercadoria declara redução (CST 20 ou 70). O percentual sai do `vBC`
+da nota — `1 - vBC / (vProd - vDesc)` —, não do `pRedBC`, e a chave é o NCM (o
+da nota, o do 0200 quando falta). `ficha3.parquet` ganha `reducao_base` (%, nula
+quando não houve), `fichas.parquet` ganha `saidas_com_reducao`, e o resumo do
+razão traz `reducao_de_base` com `saidas` e `efetivo_reduzido`. Enquadramentos
+2, 3 e 4 seguem como antes.
+
 ### Estoque negativo (v0.56.0)
 
 A ficha cujo saldo ficaria negativo abre com a quantidade que faltaria, sem

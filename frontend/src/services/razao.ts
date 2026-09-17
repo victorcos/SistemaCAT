@@ -72,6 +72,8 @@ export interface ResumoDoRazao {
   retiradas?: { fichas: number; linhas: number; ressarcimento: string; complemento: string };
   /** v0.56: fichas que abriram com o que faltava para o estoque não ficar negativo. */
   abertas_por_saldo_negativo?: { fichas: number; quantidade: string };
+  /** v0.57: saídas de enquadramento 1 que confrontaram com base reduzida, e quanto ela tirou do confronto. */
+  reducao_de_base?: { saidas: number; efetivo_reduzido: string };
   por_enquadramento?: PorEnquadramento[];
   por_competencia?: { competencia: string; linhas: number; ressarcimento: string; complemento: string }[];
   saidas_por_origem?: Record<string, number>;
@@ -109,6 +111,7 @@ export interface Ficha {
   ficou_negativo: boolean;
   retirada?: boolean;
   saidas_sem_aliquota: number;
+  saidas_com_reducao?: number;
   saidas_indefinidas: number;
   linhas_sem_fator?: number;
   inventarios_conferidos?: number;
@@ -137,6 +140,8 @@ export interface LinhaDaFicha {
   icms_suportado: string;
   valor_unitario_usado: string;
   icms_efetivo: string | null;
+  /** v0.57: redução de base, em %, que entrou no valor de confronto */
+  reducao_base?: string | null;
   saldo_quantidade: string;
   saldo_unitario: string;
   saldo_valor: string;

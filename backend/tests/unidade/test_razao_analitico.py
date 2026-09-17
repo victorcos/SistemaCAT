@@ -23,6 +23,8 @@ import pyarrow.parquet as pq
 import pytest
 
 from cat.dominio.cat42.enquadramento import VendaAConsumidor
+from cat.dominio.cat42.razao import EnquadramentoLegal
+from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML
 from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_CONVERSOES,
     ARQUIVO_ITENS,
@@ -35,6 +37,7 @@ from cat.infraestrutura.analitico.razao import (
     ARQUIVO_FICHAS,
     ESQUEMA_SAIDA_DO_RELATORIO,
     Fontes,
+    _confronto,
     linhas_da_ficha,
     lista_de_fichas,
     montar,
@@ -656,3 +659,75 @@ class TestConfrontoPelaEntrada:
         venda = next(l for l in ficha(destino) if l["cfop"] == "6102")
         assert venda["icms_efetivo"] is None and venda["credito_operacao_propria"] == 0
         assert (r.confronto_pendente, r.credito_operacao_propria) == (1, 0)
+
+
+class TestReducaoDeBase:
+    """Entrada com CST 70 reduz a base do ICMS efetivo da saída a consumidor.
+
+    O fornecedor da Advertising vende o Grecin (NCM 3305.90.00) com base
+    reduzida a 48% e alíquota de 25%, ou seja, carga de 12%. A venda de PDV da
+    mercadoria X, R$ 20,00 a 18%, deixa de confrontar com R$ 3,60 e passa a
+    confrontar com R$ 1,728 — 18% sobre os 48% que sobraram da base.
+    """
+
+    @pytest.fixture
+    def com_reducao(self, fontes, tmp_path):
+        mov = tmp_path / "movimentacao"
+        gravar(mov / ARQUIVO_ITENS, [
+            ("cnpj", pa.string()), ("codigo", pa.string()), ("descricao", pa.string()),
+            ("unidade", pa.string()), ("aliq_icms", pa.decimal128(9, 4)), ("ncm", pa.string()),
+        ], [{"cnpj": A, "codigo": "X", "descricao": "Refrigerante cola 2L", "unidade": "UN",
+             "aliq_icms": d(18), "ncm": "33059000"}])
+        gravar(mov / ARQUIVO_ITENS_DO_XML, [
+            ("chave", pa.string()), ("numero_item", pa.int32()), ("emitente", pa.string()),
+            ("destinatario", pa.string()), ("emissao", pa.date32()), ("ncm", pa.string()),
+            ("cst_icms", pa.string()), ("bc_icms", pa.decimal128(18, 2)),
+            ("valor", pa.decimal128(18, 2)), ("desconto", pa.decimal128(18, 2)),
+        ], [
+            # a entrada de 05/01: base reduzida a 48% do valor, CST 70
+            {"chave": "4" * 44, "numero_item": 1, "emitente": "99999999000191", "destinatario": A,
+             "emissao": date(2021, 1, 5), "ncm": "33059000", "cst_icms": "570",
+             "bc_icms": d(48), "valor": d(100), "desconto": d(0)},
+            # a saída da própria loja não entra na conta da redução
+            {"chave": CHAVE_TRANSF, "numero_item": 1, "emitente": A, "destinatario": "22222222000100",
+             "emissao": date(2021, 1, 6), "ncm": "33059000", "cst_icms": "070",
+             "bc_icms": d(90), "valor": d(100), "desconto": d(0)},
+        ])
+        destino = tmp_path / "razao_reduzido"
+        destino.mkdir()
+        return destino, montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+
+    def test_a_venda_a_consumidor_confronta_com_a_base_reduzida(self, com_reducao):
+        destino, _ = com_reducao
+        venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
+        assert venda["enquadramento"] == 1
+        assert venda["reducao_base"] == d("52.0000")
+        assert venda["icms_efetivo"] == d("1.728")
+        assert venda["ressarcimento"] == d("3.272")     # 5,00 baixados - 1,728
+
+    def test_o_resumo_diz_quanto_a_reducao_tirou_do_confronto(self, com_reducao):
+        _, r = com_reducao
+        assert r.saidas_com_reducao == 1
+        assert r.efetivo_reduzido == d("1.872")          # 3,60 cheios - 1,728
+        assert serializar(r)["reducao_de_base"] == {"saidas": 1, "efetivo_reduzido": "1.87"}
+
+    def test_a_ficha_conta_as_saidas_com_reducao(self, com_reducao):
+        destino, _ = com_reducao
+        x = next(f for f in lista_de_fichas(str(destino))["linhas"] if f["codigo"] == "X")
+        assert x["saidas_com_reducao"] == 1
+
+    def test_sem_entrada_reduzida_a_aliquota_continua_cheia(self, montado):
+        destino, r = montado
+        venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
+        assert venda["reducao_base"] is None and venda["icms_efetivo"] == d("3.60")
+        assert r.saidas_com_reducao == 0
+
+    def test_so_o_enquadramento_1_usa_a_base_reduzida(self):
+        """Decisão do Victor, 17/09/2026: o 3 segue com a alíquota cheia."""
+        linha = {"aliquota": d(18), "valor": d(100), "reducao_base": d(52),
+                 "quantidade": d(1), "fator": d(1)}
+        efetivo, _, _, reducao = _confronto(EnquadramentoLegal.CONSUMIDOR_FINAL, linha)
+        assert (efetivo, reducao) == (d("8.64"), d(52))
+        efetivo, _, _, reducao = _confronto(EnquadramentoLegal.ISENCAO_OU_NAO_INCIDENCIA, linha)
+        assert (efetivo, reducao) == (d(18), None)
+
