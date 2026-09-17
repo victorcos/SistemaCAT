@@ -1039,7 +1039,10 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
         # o dia com mais de uma entrada fica com a mediana: um item digitado
         # errado não muda a redução da mercadoria inteira
         lidas = pa.Table.from_pylist(
-            [{"ncm": n, "data": d, "reducao": median(v)} for (n, d), v in sorted(por_dia.items())],
+            # a mediana de um número par de entradas é uma média, e média de
+            # decimal estoura as quatro casas do esquema
+            [{"ncm": n, "data": d, "reducao": median(v).quantize(_Q4)}
+             for (n, d), v in sorted(por_dia.items())],
             schema=pa.schema([("ncm", pa.string()), ("data", pa.date32()),
                               ("reducao", pa.decimal128(9, 4))]))
         con.register("reducoes_lidas", lidas)

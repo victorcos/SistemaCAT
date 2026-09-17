@@ -722,6 +722,35 @@ class TestReducaoDeBase:
         assert venda["reducao_base"] is None and venda["icms_efetivo"] == d("3.60")
         assert r.saidas_com_reducao == 0
 
+    def test_duas_entradas_no_mesmo_dia_ficam_com_a_mediana(self, fontes, tmp_path):
+        """A mediana de um número par de entradas é uma média, e média de
+        decimal estoura as quatro casas do esquema se não for arredondada."""
+        mov = tmp_path / "movimentacao"
+        gravar(mov / ARQUIVO_ITENS, [
+            ("cnpj", pa.string()), ("codigo", pa.string()), ("descricao", pa.string()),
+            ("unidade", pa.string()), ("aliq_icms", pa.decimal128(9, 4)), ("ncm", pa.string()),
+        ], [{"cnpj": A, "codigo": "X", "descricao": "Refrigerante cola 2L", "unidade": "UN",
+             "aliq_icms": d(18), "ncm": "33059000"}])
+        gravar(mov / ARQUIVO_ITENS_DO_XML, [
+            ("chave", pa.string()), ("numero_item", pa.int32()), ("emitente", pa.string()),
+            ("destinatario", pa.string()), ("emissao", pa.date32()), ("ncm", pa.string()),
+            ("cst_icms", pa.string()), ("bc_icms", pa.decimal128(18, 4)),
+            ("valor", pa.decimal128(18, 2)), ("desconto", pa.decimal128(18, 2)),
+        ], [
+            # 51,2715% e 51,2714% -> mediana 51,27145%, que não cabe em 4 casas
+            {"chave": "4" * 44, "numero_item": 1, "emitente": "99999999000191", "destinatario": A,
+             "emissao": date(2021, 1, 5), "ncm": "33059000", "cst_icms": "570",
+             "bc_icms": d("48.7285"), "valor": d(100), "desconto": d(0)},
+            {"chave": "7" * 44, "numero_item": 1, "emitente": "99999999000191", "destinatario": A,
+             "emissao": date(2021, 1, 5), "ncm": "33059000", "cst_icms": "570",
+             "bc_icms": d("48.7286"), "valor": d(100), "desconto": d(0)},
+        ])
+        destino = tmp_path / "mediana"
+        destino.mkdir()
+        montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+        venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
+        assert venda["reducao_base"] == d("51.2714")
+
     def test_so_o_enquadramento_1_usa_a_base_reduzida(self):
         """Decisão do Victor, 17/09/2026: o 3 segue com a alíquota cheia."""
         linha = {"aliquota": d(18), "valor": d(100), "reducao_base": d(52),
