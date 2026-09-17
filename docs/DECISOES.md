@@ -5,6 +5,42 @@
 
 ---
 
+## 2026-09-17 — O de-para da Advertising pelo sistema, contra o da RVZ
+
+**Como se testou.** A Advertising entrou no sistema como um trabalho de verdade
+(trabalho 5, 0004-21, 08/2022 a 06/2024), pela API: EFD de
+`10 - RETIFICAÇÃO SPEDS/SPEDS` (decisão do Victor; os 24 arquivos são os de
+`01 - SPEDS` com a retificadora de 08/2022 — 23 deles dizem "original" no 0000,
+e importar as duas pastas dobraria os meses), XML de `XML's` e
+`04 - CAPTAÇÃO DOCUMENTOS FALTANTES` (os 12 zips de `10 - RETIFICAÇÃO/XML'S`
+foram recusados como cópia) e as listas de `09 - NOTAS CANCELADAS`. Conferência,
+movimentos e suportado rodaram pela fila. As propostas de de-para foram
+comparadas com a aba "04. De-Para" da entrega da RVZ: 10 pares do cliente e 44
+da RVZ, com o fator do kit tirado da descrição ("KIT 3X").
+
+**O que a comparação ensinou.** O código da EFD tem espaços (`4002           08`)
+e a RVZ o escreveu sem (`400208`): comparado sem espaço, a v0.55.1 acertava 35
+dos 44 pares da RVZ — destino e fator —, deixava os 10 do cliente como "sem par"
+e não propunha nada a mais. Faltavam 9:
+
+* **8 kits de compra** (`3133K3         08`, "GRECIN 5 PG PRETO KIT 3X"). O kit
+  vem da descrição, e a unidade se procurava pela descrição igual sem o kit.
+  Dois tropeços: a unidade existe com dois códigos (`3133` e `3133           08`)
+  e a regra desistia; e a descrição do kit abrevia a da unidade ("CAST. ESC" e
+  "CAST. ESCURO"). Agora, entre dois códigos, fica o que começa o código do kit;
+  e, sem descrição igual, vale o código mais longo que começa o do kit, com o
+  mesmo NCM e descrição compatível;
+* **1 código só com devolução de compra** (`4004`, CFOP 5.411). Devolução não
+  conta para escolher o destino, mas é movimento da ficha: a do `4004` só tinha
+  a devolução, e juntar com `4004           08` a conserta. Passou a contar para
+  decidir se o grupo conserta alguma ficha.
+
+**Depois:** os 44 pares da RVZ iguais, os 10 do cliente como "sem par" (códigos
+de marketplace sem GTIN nem parentesco de código — é o que o cliente preenche)
+e nenhuma proposta a mais. No Amigão, as propostas não mudaram (2 antes e depois).
+
+---
+
 ## 2026-09-17 — Certificado digital não se abre nem se lista
 
 **O risco.** A inspeção do lote lê o começo de todo arquivo da pasta e grava o

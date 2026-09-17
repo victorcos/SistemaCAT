@@ -21,9 +21,11 @@ from cat.dominio.depara.candidatos import (
 D = Decimal
 
 
-def item(codigo, entradas=0, saidas=0, descricao="", ncm="33059000", gtins=(), estoque=0):
+def item(codigo, entradas=0, saidas=0, descricao="", ncm="33059000", gtins=(), estoque=0,
+         dev_venda=0, dev_compra=0):
     return ItemParaCasar(codigo=codigo, descricao=descricao, ncm=ncm, gtins=frozenset(gtins),
-                         entradas=D(entradas), saidas=D(saidas), estoque_inicial=D(estoque))
+                         entradas=D(entradas), saidas=D(saidas), estoque_inicial=D(estoque),
+                         devolucoes_de_venda=D(dev_venda), devolucoes_de_compra=D(dev_compra))
 
 
 BASE = [
@@ -80,6 +82,46 @@ class TestPares:
         compra = pares["1111K3         08"]
         assert (compra.destino, compra.fator) == ("1111", D(3))
         assert {Motivo.SUFIXO, Motivo.KIT} <= set(compra.motivos)
+
+    def test_kit_de_compra_acha_a_unidade_que_tem_dois_codigos(self):
+        """Na Advertising: `3133K3         08` entra, e a unidade é `3133` e `3133           08`."""
+        itens = BASE + [
+            item("3133           08", entradas=22668, descricao="GRECIN 5 PG PRETO"),
+            item("3133K3         08", entradas=1268, descricao="GRECIN 5 PG PRETO KIT 3X", gtins={"7891653040238"}),
+        ]
+        compra = pares_por_origem(itens)["3133K3         08"]
+        assert (compra.destino, compra.fator) == ("3133", D(3))
+        assert Motivo.KIT in compra.motivos
+
+    def test_kit_com_descricao_abreviada_acha_a_unidade_pelo_comeco_do_codigo(self):
+        itens = BASE + [
+            item("3132", saidas=12416, descricao="GRECIN 5 PG CAST. ESCURO"),
+            item("3132           08", entradas=9000, descricao="GRECIN 5 PG CAST. ESCURO"),
+            item("3132K3         08", entradas=1768, descricao="GRECIN 5 PG CAST. ESC KIT 3X"),
+        ]
+        compra = pares_por_origem(itens)["3132K3         08"]
+        assert (compra.destino, compra.fator) == ("3132", D(3))
+
+    def test_comeco_do_codigo_com_descricao_de_outro_produto_nao_liga(self):
+        itens = [item("31", saidas=100, descricao="VAGISIL DESODORANTE FP"),
+                 item("31K3         08", entradas=30, descricao="GRECIN 5 PG CAST. ESC KIT 3X")]
+        assert propor(itens) == []
+
+    def test_codigo_so_com_devolucao_de_compra_junta_com_o_da_entrada(self):
+        """O `4004` só tinha devolução ao fornecedor (5.411); a entrada foi no `4004           08`."""
+        itens = BASE + [
+            item("4004", dev_compra=2300, ncm="34012010", gtins={"7891653040047"},
+                 descricao="PACK VAGISIL PH + DEO PH Lote: 32002023 Val: 01/07/26"),
+            item("4004           08", entradas=2316, ncm="34012010", gtins={"7891653040047"},
+                 descricao="PACK VAGISIL PH + DEO PH"),
+        ]
+        par = pares_por_origem(itens)["4004           08"]
+        assert (par.destino, par.fator) == ("4004", D(1))
+
+    def test_so_devolucao_dos_dois_lados_nao_conserta_nada(self):
+        itens = [item("5005", dev_compra=10, gtins={"7891653040047"}, descricao="PRODUTO X"),
+                 item("5005           08", dev_compra=5, gtins={"7891653040047"}, descricao="PRODUTO X")]
+        assert propor(itens) == []
 
     def test_codigo_sem_ligacao_fica_para_o_cliente(self):
         pares = pares_por_origem(BASE)

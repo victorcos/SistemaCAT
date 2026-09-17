@@ -25,7 +25,10 @@ Os códigos que são o mesmo produto formam um **grupo**, ligados por:
 
 Só se propõe grupo que **conserta alguma ficha**: com pelo menos um código sem
 entrada ou sem saída. Dois códigos com entrada e saída cada um são, até prova
-em contrário, produtos diferentes que se parecem.
+em contrário, produtos diferentes que se parecem. Devolução conta como
+movimento aqui — o `4004` da Advertising só tinha devolução de compra (5.411),
+e a ficha dele, só com a devolução, é a que juntar conserta —, mas não escolhe
+o destino, que é onde se vende.
 
 Em cada grupo, o código que fica é o de **mais saídas** (é nele que o cliente
 vende); os outros viram pares `origem → destino` com o fator acumulado.
@@ -34,6 +37,12 @@ vende); os outros viram pares `origem → destino` com o fator acumulado.
 
 * `K3` no fim do código é kit, não sufixo: quem liga o kit à unidade é a regra
   do kit, com fator. Tratado como sufixo, o kit virava unidade com fator 1;
+* o kit reconhecido pela descrição ("KIT 3X") procura a unidade pela descrição
+  sem o kit; quando ela tem mais de um código (`3133` e `3133           08`),
+  fica o que é o começo do código do kit (`3133K3         08`). Quando a
+  descrição do kit abrevia a da unidade ("CAST. ESC" e "CAST. ESCURO"), vale o
+  código mais longo que começa o do kit, com o mesmo NCM e descrição compatível.
+  Na Advertising eram 8 kits de compra que ficavam sem par;
 * GTIN não liga kit a unidade — são embalagens diferentes do mesmo produto, e
   o fator não sai do GTIN;
 * sufixo também só liga descrições compatíveis: num catálogo numérico grande,
@@ -98,9 +107,11 @@ class ItemParaCasar:
     descricao: str = ""
     ncm: str = ""
     gtins: frozenset[str] = frozenset()
-    entradas: Decimal = ZERO        # quantidade entrada no período
-    saidas: Decimal = ZERO          # quantidade saída no período
+    entradas: Decimal = ZERO        # quantidade entrada no período, sem devolução
+    saidas: Decimal = ZERO          # quantidade saída no período, sem devolução
     estoque_inicial: Decimal = ZERO  # abertura do inventário
+    devolucoes_de_venda: Decimal = ZERO   # entrada de devolução (1.411, 2.411...)
+    devolucoes_de_compra: Decimal = ZERO  # saída de devolução ao fornecedor (5.411, 6.411...)
 
     @property
     def tem_origem(self) -> bool:
@@ -109,6 +120,16 @@ class ItemParaCasar:
     @property
     def tem_saida(self) -> bool:
         return self.saidas > ZERO
+
+    @property
+    def movimenta_entrada(self) -> bool:
+        """Algo entra na ficha deste código, devolução inclusive."""
+        return self.tem_origem or self.devolucoes_de_venda > ZERO
+
+    @property
+    def movimenta_saida(self) -> bool:
+        """Algo sai da ficha deste código, devolução inclusive."""
+        return self.tem_saida or self.devolucoes_de_compra > ZERO
 
 
 @dataclass(frozen=True)
@@ -270,11 +291,38 @@ def _por_kit(itens: dict[str, ItemParaCasar]) -> list[_Ligacao]:
         if unidade is None:
             candidatos = [c for c in por_descricao.get(_descricao_sem_kit(item.descricao), [])
                           if (itens[c].ncm or item.ncm) == (item.ncm or itens[c].ncm)]
+            if len(candidatos) > 1:
+                # a unidade com mais de um código: vale o que é o começo do código do kit
+                do_kit = normalizar_codigo(codigo)
+                prefixos = [c for c in candidatos if do_kit.startswith(normalizar_codigo(c))]
+                candidatos = prefixos or candidatos
             unidade = candidatos[0] if len(candidatos) == 1 else None
+        if unidade is None:
+            unidade = _unidade_pelo_comeco_do_codigo(codigo, item, itens, normal)
         if unidade is not None and unidade != codigo:
             ligacoes.append(_Ligacao(codigo, unidade, Decimal(unidades), Motivo.KIT,
                                      f"kit de {unidades} unidades"))
     return ligacoes
+
+
+def _unidade_pelo_comeco_do_codigo(codigo: str, kit: ItemParaCasar, itens: dict[str, ItemParaCasar],
+                                   normal: dict[str, str]) -> str | None:
+    """O código mais longo que começa o código do kit, com o mesmo NCM e descrição compatível.
+
+    A descrição do kit costuma abreviar a da unidade ("GRECIN 5 PG CAST. ESC KIT 3X"
+    e "GRECIN 5 PG CAST. ESCURO"), e a igualdade não acha. O começo do código
+    (`3132K3         08` → `3132`) acha, e a descrição confere.
+    """
+    do_kit = normalizar_codigo(codigo)
+    for tamanho in range(len(do_kit) - 1, 1, -1):
+        outro = normal.get(do_kit[:tamanho])
+        if outro is None or outro == codigo or fator_do_kit(itens[outro]) is not None:
+            continue
+        if (itens[outro].ncm or kit.ncm) != (kit.ncm or itens[outro].ncm):
+            continue
+        if descricoes_compativeis(kit.descricao, itens[outro].descricao):
+            return outro
+    return None
 
 
 def _por_descricao(itens: dict[str, ItemParaCasar]) -> list[_Ligacao]:
@@ -352,10 +400,10 @@ def _pares_do_grupo(grupo: _Grupo, itens: dict[str, ItemParaCasar]) -> list[Par]
     membros = [itens[c] for c in grupo.codigos if c in itens]
     if len(membros) < 2:
         return []
-    # só vale propor se juntar conserta alguma ficha
+    # só vale propor se juntar conserta alguma ficha; a devolução é movimento da ficha
     if all(m.tem_origem and m.tem_saida for m in membros):
         return []
-    if not any(m.tem_origem for m in membros) or not any(m.tem_saida for m in membros):
+    if not any(m.movimenta_entrada for m in membros) or not any(m.movimenta_saida for m in membros):
         return []
     # o destino é onde se vende: mais saídas na unidade da raiz; empate, o código mais curto
     destino = max(membros, key=lambda m: (m.saidas * grupo.fatores[m.codigo],

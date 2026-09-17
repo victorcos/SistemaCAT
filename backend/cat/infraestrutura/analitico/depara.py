@@ -6,7 +6,8 @@ quanto saiu, o estoque de abertura, a descrição, o NCM e os GTINs — do 0200 
 do XML, que no distribuidor é onde o código de barras aparece.
 
 Devolução não conta como entrada nem como saída: a devolução de venda não é de
-onde o estoque veio, e a de compra não é venda.
+onde o estoque veio, e a de compra não é venda. Vai à parte, porque ainda é
+movimento da ficha — o que decide se juntar dois códigos conserta alguma.
 
 O GTIN vem do 0200 e do XML **do próprio código** (a saída que o XML trouxe).
 O do XML pareado com o C170 não entra: o código ali é o do fornecedor, e um
@@ -54,6 +55,10 @@ def itens_para_casar(pasta_movimentos: str) -> dict[str, list[ItemParaCasar]]:
                         AND replace(cfop, '.', '') NOT IN ({devolucoes})) AS entradas,
                    sum(quantidade) FILTER (WHERE operacao = 'saida'
                         AND replace(cfop, '.', '') NOT IN ({devolucoes})) AS saidas,
+                   sum(quantidade) FILTER (WHERE operacao = 'entrada'
+                        AND replace(cfop, '.', '') IN ({devolucoes})) AS devolucoes_de_venda,
+                   sum(quantidade) FILTER (WHERE operacao = 'saida'
+                        AND replace(cfop, '.', '') IN ({devolucoes})) AS devolucoes_de_compra,
                    any_value(descricao) AS descricao, any_value(ncm) AS ncm,
                    list_distinct({gtins}) AS gtins
             FROM read_parquet('{_escapar(movimentos)}')
@@ -76,7 +81,8 @@ def itens_para_casar(pasta_movimentos: str) -> dict[str, list[ItemParaCasar]]:
                    coalesce({"i.descricao, " if cadastro else ""}m.descricao, ''),
                    coalesce({"i.ncm, " if cadastro else ""}m.ncm, ''),
                    coalesce(m.gtins, []), coalesce(m.entradas, 0), coalesce(m.saidas, 0),
-                   coalesce(e.quantidade, 0)
+                   coalesce(e.quantidade, 0), coalesce(m.devolucoes_de_venda, 0),
+                   coalesce(m.devolucoes_de_compra, 0)
             FROM mov m
             FULL JOIN estoque e ON e.cnpj = m.cnpj AND e.codigo = m.codigo
             {cadastro}
@@ -86,11 +92,12 @@ def itens_para_casar(pasta_movimentos: str) -> dict[str, list[ItemParaCasar]]:
         con.close()
 
     por_estabelecimento: dict[str, list[ItemParaCasar]] = {}
-    for cnpj, codigo, descricao, ncm, gtins, entradas, saidas, estoque in linhas:
+    for cnpj, codigo, descricao, ncm, gtins, entradas, saidas, estoque, dev_venda, dev_compra in linhas:
         por_estabelecimento.setdefault(cnpj, []).append(ItemParaCasar(
             codigo=codigo, descricao=descricao, ncm=ncm,
             gtins=frozenset(g for g in gtins if g), entradas=Decimal(entradas or 0),
-            saidas=Decimal(saidas or 0), estoque_inicial=Decimal(estoque or 0)))
+            saidas=Decimal(saidas or 0), estoque_inicial=Decimal(estoque or 0),
+            devolucoes_de_venda=Decimal(dev_venda or 0), devolucoes_de_compra=Decimal(dev_compra or 0)))
     return por_estabelecimento
 
 
