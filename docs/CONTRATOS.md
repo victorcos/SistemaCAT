@@ -553,6 +553,10 @@ ganha `chaves_canceladas`, `documentos_cancelados_na_sefaz` e
 `movimentos_cancelados`, e um aviso quando há documento cancelado. Execução
 anterior não tem esses campos.
 
+Lista de canceladas em planilha (v0.55.4): vale só a aba com "cancel" no nome
+(sem nenhuma, todas menos a de "devol"), e a linha cujo retorno da SEFAZ diz
+rejeição, uso autorizado ou denegação não conta.
+
 ### Notas não escrituradas e contingência (v0.54.0)
 
 A consolidação grava `contingencia.parquet`: o item de cada XML do

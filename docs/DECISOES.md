@@ -5,6 +5,34 @@
 
 ---
 
+## 2026-09-17 — Lista de canceladas: só a aba de canceladas, só a linha cancelada
+
+**Como apareceu.** Na comparação das fichas negativas com a RVZ, o Victor notou
+que o sistema não trazia as devoluções: no 3132, a ficha da RVZ tinha 59 e a do
+sistema, nenhuma. Das 59, 35 tinham sido tiradas como "canceladas na SEFAZ" — e
+nenhuma tinha evento de cancelamento.
+
+**A causa.** O relatório "NF-e Canceladas-Devoluções" (pasta 09) tem duas abas:
+"NF-e Canceladas" (180 notas) e "NF-e Devoluções" (245 notas que não foram
+canceladas). A leitura da lista pegava a chave de qualquer aba. E a lista do
+cliente tinha 6 linhas cujo retorno da SEFAZ dizia o contrário do nome:
+"Rejeição: Pedido de Cancelamento..." (4) e "Autorizado o uso da NF-e" (2).
+
+**A regra agora:**
+
+* numa planilha de canceladas, vale a aba com "cancel" no nome; sem nenhuma
+  assim, todas menos a que diz "devol";
+* a linha (da planilha ou do texto) cujo retorno fala em rejeição, uso
+  autorizado ou denegação, sem falar em cancelamento autorizado ou homologado,
+  não conta;
+* o que ficou de fora vai ao log, com a contagem.
+
+**Na Advertising:** a planilha "Canceladas-Devoluções" passa de 425 para 180
+chaves, e a do cliente de 890 para 885. As devoluções escrituradas voltam à
+movimentação.
+
+---
+
 ## 2026-09-17 — A base da multa sem valor no XML vem da nota vizinha
 
 **A pergunta que estava aberta.** Na Advertising, a saída não escriturada é

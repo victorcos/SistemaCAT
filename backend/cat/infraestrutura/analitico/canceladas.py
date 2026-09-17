@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from cat.dominio.lote import abas_de_canceladas
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -41,6 +42,17 @@ ESQUEMA_CHAVES_CANCELADAS = pa.schema([
 _RE_CHAVE = re.compile(r"(?<!\d)(\d{44})(?!\d)")
 _RE_CHAVE_DO_EVENTO = re.compile(rb"<chNFe>\s*(\d{44})\s*</chNFe>")
 _RE_CANCELAMENTO = re.compile(rb"<tpEvento>\s*110111\s*</tpEvento>")
+# a linha da lista que diz, ela mesma, que a nota não foi cancelada: o pedido de
+# cancelamento rejeitado e o uso autorizado (na lista do cliente da Advertising,
+# 4 "Rejeição: Pedido de Cancelamento..." e 2 "Autorizado o uso da NF-e")
+_RE_NAO_CANCELADA = re.compile(r"rejei|autorizado o uso|uso autorizado|denegad", re.IGNORECASE)
+_RE_CANCELADA = re.compile(r"cancelamento\s+(autorizado|homologado)", re.IGNORECASE)
+
+
+def linha_diz_que_nao_cancelou(textos: list[str]) -> bool:
+    """A linha traz um retorno da SEFAZ que não é de cancelamento."""
+    return (any(_RE_NAO_CANCELADA.search(t) for t in textos)
+            and not any(_RE_CANCELADA.search(t) for t in textos))
 
 
 @dataclass
@@ -61,25 +73,44 @@ def chaves_de_evento(conteudo: bytes) -> list[str]:
 
 
 def chaves_de_texto(texto: str) -> list[str]:
-    return _RE_CHAVE.findall(texto)
+    chaves = []
+    for linha in texto.splitlines():
+        if linha_diz_que_nao_cancelou([linha]):
+            continue
+        chaves += _RE_CHAVE.findall(linha)
+    return chaves
 
 
 def chaves_de_planilha(caminho: str) -> list[str]:
-    """Toda chave de 44 dígitos escrita como texto em qualquer célula.
+    """Toda chave de 44 dígitos escrita como texto nas abas de canceladas.
 
     Chave gravada como número o Excel já estragou (vira 3,52E+43) e não se
-    recupera; fica de fora sem ser adivinhada.
+    recupera; fica de fora sem ser adivinhada. Aba de devoluções no mesmo
+    arquivo não conta (`abas_de_canceladas`), nem a linha cujo retorno da SEFAZ
+    diz que o cancelamento foi rejeitado ou que o uso está autorizado.
     """
     from openpyxl import load_workbook  # noqa: PLC0415
 
     chaves: list[str] = []
     livro = load_workbook(caminho, read_only=True, data_only=True)
     try:
-        for aba in livro.worksheets:
+        validas = set(abas_de_canceladas(livro.sheetnames))
+        ignoradas = [t for t in livro.sheetnames if t not in validas]
+        if ignoradas:
+            log.info("abas da planilha de canceladas que não listam canceladas",
+                     extra={"arquivo": os.path.basename(caminho), "abas": ignoradas})
+        fora = 0
+        for aba in (a for a in livro.worksheets if a.title in validas):
             for linha in aba.iter_rows(values_only=True):
-                for valor in linha:
-                    if isinstance(valor, str):
-                        chaves += _RE_CHAVE.findall(valor)
+                textos = [v for v in linha if isinstance(v, str)]
+                da_linha = [c for v in textos for c in _RE_CHAVE.findall(v)]
+                if da_linha and linha_diz_que_nao_cancelou(textos):
+                    fora += len(da_linha)
+                    continue
+                chaves += da_linha
+        if fora:
+            log.info("chaves da lista de canceladas cujo retorno da SEFAZ não é cancelamento",
+                     extra={"arquivo": os.path.basename(caminho), "chaves": fora})
     finally:
         livro.close()
     return chaves

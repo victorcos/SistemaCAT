@@ -24,6 +24,7 @@ from typing import Iterator
 
 from cat.dominio.lote import (
     ArquivoDoLote,
+    abas_de_canceladas,
     CertificadosIgnorados,
     TipoDeArquivo,
     e_arquivo_de_certificado,
@@ -261,7 +262,8 @@ def _da_planilha_de_canceladas(caminho: str, tamanho: int) -> ArquivoDoLote | No
         return None
     try:
         chaves = 0
-        for aba in livro.worksheets:
+        validas = set(abas_de_canceladas(livro.sheetnames))
+        for aba in (a for a in livro.worksheets if a.title in validas):
             for linha in aba.iter_rows(values_only=True, max_row=200):
                 chaves += sum(1 for v in linha if isinstance(v, str) and _RE_CHAVE_SOLTA.search(v))
     finally:

@@ -68,6 +68,20 @@ def caminho_de_certificado(caminho: str) -> bool:
     return e_arquivo_de_certificado(partes[-1]) or any(e_pasta_de_certificado(p) for p in partes[:-1])
 
 
+def abas_de_canceladas(titulos: list[str]) -> list[str]:
+    """As abas de uma planilha de canceladas que listam, de fato, notas canceladas.
+
+    O relatório "NF-e Canceladas-Devoluções" da Advertising tem duas abas: as
+    canceladas e as devoluções. Ler as duas tirava da movimentação 245
+    devoluções que nunca foram canceladas. Vale a aba com "cancel" no nome;
+    sem nenhuma assim, todas, menos a que diz "devol".
+    """
+    com_cancel = [t for t in titulos if "cancel" in _sem_acento(t)]
+    if com_cancel:
+        return com_cancel
+    return [t for t in titulos if "devol" not in _sem_acento(t)]
+
+
 @dataclass
 class CertificadosIgnorados:
     """Quantos ficaram de fora sem ser abertos. Nome nenhum."""

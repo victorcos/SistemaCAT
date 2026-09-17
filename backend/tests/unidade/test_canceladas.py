@@ -72,6 +72,37 @@ class TestLeitura:
         ])
         assert chaves_de_planilha(caminho) == [CHAVE_OUTRA]
 
+    def test_aba_de_devolucoes_no_mesmo_arquivo_nao_conta(self, tmp_path):
+        """O relatório "NF-e Canceladas-Devoluções": uma aba de canceladas, outra de devoluções."""
+        livro = Workbook()
+        canceladas = livro.active
+        canceladas.title = "NF-e Canceladas"
+        canceladas.append(["Tipo de Operação", "Chave NFe"])
+        canceladas.append(["Saída", CHAVE_OUTRA])
+        devolucoes = livro.create_sheet("NF-e Devoluções")
+        devolucoes.append(["ENTRADA", CHAVE_ENTRADA])
+        caminho = str(tmp_path / "NF-e Canceladas-Devoluções.xlsx")
+        livro.save(caminho)
+        assert chaves_de_planilha(caminho) == [CHAVE_OUTRA]
+        a = classificar(caminho)
+        assert (a.tipo, a.detalhe) == (TipoDeArquivo.LISTA_DE_CANCELADAS, "1 chaves nas primeiras linhas")
+
+    def test_linha_com_cancelamento_rejeitado_ou_uso_autorizado_nao_conta(self, tmp_path):
+        caminho = planilha(tmp_path / "canceladas do cliente.xlsx", [
+            ["OBSERVACAO", "CHAVE NFE", "RETORNO SEFAZ"],
+            ["NF CANCELADA", CHAVE_OUTRA, "Cancelamento autorizado"],
+            ["NF CANCELADA", CHAVE_ENTRADA, "Rejeição: Pedido de Cancelamento para NF-e com carta de correção"],
+            ["NF CANCELADA", CHAVE_SAIDA, "Autorizado o uso da NF-e"],
+        ])
+        assert chaves_de_planilha(caminho) == [CHAVE_OUTRA]
+        assert chaves_de_texto(f"{CHAVE_OUTRA};Cancelamento homologado fora de prazo\n{CHAVE_SAIDA};Autorizado o uso da NF-e\n") == [CHAVE_OUTRA]
+
+    def test_abas_que_valem(self):
+        from cat.dominio.lote import abas_de_canceladas
+        assert abas_de_canceladas(["NF-e Canceladas", "NF-e Devoluções"]) == ["NF-e Canceladas"]
+        assert abas_de_canceladas(["Planilha1"]) == ["Planilha1"]
+        assert abas_de_canceladas(["Planilha1", "Devoluções"]) == ["Planilha1"]
+
     def test_uma_linha_por_chave_e_o_quebrado_contado(self, tmp_path):
         (tmp_path / "evento.xml").write_bytes(evento(CHAVE_SAIDA))
         (tmp_path / "canceladas.txt").write_text(f"{CHAVE_SAIDA}\n{CHAVE_ENTRADA}\n")
