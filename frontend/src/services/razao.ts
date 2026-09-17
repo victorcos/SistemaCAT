@@ -74,6 +74,8 @@ export interface ResumoDoRazao {
   abertas_por_saldo_negativo?: { fichas: number; quantidade: string };
   /** v0.57: saídas de enquadramento 1 que confrontaram com base reduzida, e quanto ela tirou do confronto. */
   reducao_de_base?: { saidas: number; efetivo_reduzido: string };
+  /** v0.58: saídas cuja alíquota veio da nota de entrada, por falta de 0200. */
+  aliquota_da_entrada?: number;
   por_enquadramento?: PorEnquadramento[];
   por_competencia?: { competencia: string; linhas: number; ressarcimento: string; complemento: string }[];
   saidas_por_origem?: Record<string, number>;
@@ -140,7 +142,8 @@ export interface LinhaDaFicha {
   icms_suportado: string;
   valor_unitario_usado: string;
   icms_efetivo: string | null;
-  /** v0.57: redução de base, em %, que entrou no valor de confronto */
+  /** v0.57: a alíquota do confronto e a redução de base, em %, que entraram nele */
+  aliquota?: string | null;
   reducao_base?: string | null;
   saldo_quantidade: string;
   saldo_unitario: string;

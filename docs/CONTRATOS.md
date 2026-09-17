@@ -281,6 +281,14 @@ devolução e indefinido), `enquadramento_indefinido`, `quantidade` (com sinal),
 nulo quando não se apura), `saldo_quantidade`, `saldo_unitario`, `saldo_valor`,
 `ressarcimento`, `complemento`.
 
+### Alíquota da nota de entrada (v0.58.0)
+
+Sem alíquota no 0200 — do mês, a mais recente, a do destino do de-para —, o
+confronto usa a da **nota de entrada** da mesma mercadoria, pelo NCM e pela
+mesma regra de data da redução. `ficha3.parquet` ganha `aliquota` (a que fez o
+confronto) e o resumo do razão traz `aliquota_da_entrada` (quantas saídas
+vieram dela).
+
 ### Redução de base herdada da entrada (v0.57.0)
 
 O ICMS efetivo do **enquadramento 1** incide sobre a base reduzida quando a

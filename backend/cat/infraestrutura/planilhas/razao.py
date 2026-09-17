@@ -29,6 +29,7 @@ COLUNAS_FICHA3 = (
     Coluna("icms_suportado", "ICMS suportado", "numero", 16),
     Coluna("valor_unitario_usado", "Unitário do saldo anterior", "quantidade", 16),
     Coluna("icms_efetivo", "Valor de confronto", "numero", 16),
+    Coluna("aliquota", "Alíquota do confronto (%)", "quantidade", 12),
     Coluna("reducao_base", "Redução de base (%)", "quantidade", 12),
     Coluna("saldo_quantidade", "Saldo em quantidade", "quantidade", 14),
     Coluna("saldo_unitario", "Saldo unitário", "quantidade", 16),

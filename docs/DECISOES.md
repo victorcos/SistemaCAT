@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-09-17 — Sem 0200, a alíquota vem da nota de entrada
+
+**O que se via.** 13.909 saídas da Advertising ficavam sem valor de confronto —
+os códigos 4002, 4009, 4008 e 4007, que **não têm registro 0200 em arquivo
+nenhum**, nem no próprio CNPJ nem em outro. Sem alíquota não há ICMS efetivo, e
+sem efetivo não há ressarcimento nem complemento nessas linhas; a RVZ apurou
+todas elas.
+
+**A decisão do Victor (17/09/2026).** Quando o cadastro não tem a alíquota, ela
+vem da **nota de entrada** da mesma mercadoria: é a alíquota que o fornecedor
+usou na operação própria dele, pelo mesmo NCM e pela mesma regra de data da
+redução de base — a entrada mais recente até a saída, e antes dela a primeira
+que houver. A ordem completa fica: 0200 do mês, 0200 mais recente, 0200 do
+destino do de-para e, por último, a nota de entrada.
+
+**Como fica marcado.** A Ficha 3 grava a `aliquota` que fez o confronto em cada
+linha, e o resumo do razão traz `aliquota_da_entrada` com quantas saídas
+precisaram desse último recurso. Os quatro códigos da Advertising têm NCM no
+XML da saída (3305.90.00, 3304.99.90 e 3401.20.10), então todos são alcançados.
+
+---
+
 ## 2026-09-17 — A redução de base da entrada entra no ICMS efetivo da saída
 
 **O que se via.** O complemento do enquadramento 1 da Advertising dava

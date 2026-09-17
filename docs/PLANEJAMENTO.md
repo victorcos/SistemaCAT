@@ -7,7 +7,7 @@
 
 ## Onde estamos
 
-**As oito etapas da CAT 42 estão no ar (v0.57.1), e o trabalho do Amigão passou
+**As oito etapas da CAT 42 estão no ar (v0.58.0), e o trabalho do Amigão passou
 por todas** (de novo em 16/09/2026, da etapa 4 à 8, em 59 min). Desde a v0.53, a
 etapa 3 lê o item do XML, o razão aplica o de-para aprovado e confronta os
 enquadramentos 2 e 4 com o crédito do art. 271; na v0.54, a nota cancelada na
@@ -106,6 +106,8 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       de tirá-la do total (decisão do Victor, v0.56.0)
 - [x] Redução de base da entrada (CST 20/70) no ICMS efetivo do enquadramento 1,
       pela base real da nota e não pelo `pRedBC` (decisão do Victor, v0.57.0)
+- [x] Alíquota da nota de entrada quando a mercadoria não tem 0200 (decisão do
+      Victor, v0.58.0)
 - [ ] Registrar o fundamento legal do benefício de carga 12% por NCM
 - [ ] Comparar com a RVZ razão, apuração, X.949, canceladas e não escrituradas
 
