@@ -96,7 +96,7 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] XML dentro de zip no lote, com um nível de zip dentro de zip, sem extrair (v0.54.0)
 - [x] Reimportar a pasta atualiza o tipo do arquivo já no trabalho; nota denegada
       (cStat fora de 100/150) sai; cópia autorizada vence a sem protocolo (v0.55.0)
-- [x] Certificado digital na pasta do cliente não é aberto nem listado (v0.55.2)
+- [x] Certificado digital na pasta do cliente não é aberto nem listado (v0.55.1)
 - [x] Carregar a Advertising no sistema (trabalho 5) e comparar o de-para com a RVZ:
       44 de 44 pares, os 10 do cliente como sem par (v0.55.2)
 - [ ] Comparar com a RVZ razão, apuração, X.949, canceladas e não escrituradas
