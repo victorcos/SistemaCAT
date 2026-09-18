@@ -31,9 +31,14 @@ A redução aplicada na saída passa a ser `1 - 12 / alíquota` — 52% no que �
 tributado a 25% e 33,33% no que é tributado a 18% —, e não a que o fornecedor
 mediu. Sem isso, o arredondamento do sistema dele entrava na nossa apuração.
 
-**O que muda:** R$ 392.806,08 contra R$ 391.609,94 de antes. E `reducao_da_carga`
-aceita outra carga, o que deixa o caminho aberto para a janela do Decreto
-65.255/2020 (13,3% de 15/01/2021 a 14/01/2023), que o sistema ainda não trata.
+**O que muda:** R$ 392.806,08 contra R$ 391.609,94 de antes.
+
+**O redutor do Decreto 65.255/2020 não entra** (decisão do Victor, 18/09/2026):
+vale a alíquota interna com a carga de 12% em todo o período, e não os 13,3%
+que aquele decreto instituiu entre 15/01/2021 e 14/01/2023. O próprio
+fornecedor faturou a 12% dentro da janela, e é o que as notas mostram.
+`reducao_da_carga` aceita outra carga por parâmetro, então tratar o redutor
+depois é trocar um número — mas hoje ele não é aplicado, de propósito.
 
 ---
 
