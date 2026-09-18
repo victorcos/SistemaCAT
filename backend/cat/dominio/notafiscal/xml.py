@@ -110,6 +110,8 @@ class ItemDoXml:
     bc_efetiva: Decimal = ZERO
     aliquota_efetiva: Decimal = ZERO
     icms_efetivo: Decimal = ZERO
+    # pRedBC: o percentual de redução da base que o emitente declara
+    reducao_declarada: Decimal = ZERO
 
     @property
     def base_da_operacao(self) -> Decimal:
@@ -308,6 +310,7 @@ def _item(det: ET.Element) -> ItemDoXml:
         valor_icms_substituto=_decimal(_texto(icms, "vICMSSubstituto")),
         valor_st_retido=_decimal(_texto(icms, "vICMSSTRet")),
         fcp_st_retido=_decimal(_texto(icms, "vFCPSTRet")),
+        reducao_declarada=_decimal(_texto(icms, "pRedBC")),
         bc_efetiva=_decimal(_texto(icms, "vBCEfet")),
         aliquota_efetiva=_decimal(_texto(icms, "pICMSEfet")),
         icms_efetivo=_decimal(_texto(icms, "vICMSEfet")),

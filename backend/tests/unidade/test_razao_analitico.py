@@ -717,10 +717,10 @@ class TestConfrontoPelaEntrada:
 class TestReducaoDeBase:
     """Entrada com CST 70 reduz a base do ICMS efetivo da saída a consumidor.
 
-    A entrada diz que a mercadoria tem o benefício; o quanto ele vale é a lei
-    que diz — carga de 12% (artigo 34 do Anexo II). Então a venda de PDV da
-    mercadoria X, R$ 20,00 a 18%, deixa de confrontar com R$ 3,60 e passa a
-    confrontar com R$ 2,40, que é a redução de 33,3333% sobre a base.
+    Vale o pRedBC que o documento declara (decisão do Victor, 18/09/2026): a
+    entrada declara 48%, e a venda de PDV da mercadoria X — R$ 20,00 a 18% —
+    deixa de confrontar com R$ 3,60 e passa a confrontar com R$ 1,872, que é
+    18% sobre os 52% que sobram da base.
     """
 
     @pytest.fixture
@@ -737,15 +737,19 @@ class TestReducaoDeBase:
             ("cst_icms", pa.string()), ("bc_icms", pa.decimal128(18, 2)),
             ("valor", pa.decimal128(18, 2)), ("desconto", pa.decimal128(18, 2)),
             ("aliq_icms", pa.decimal128(9, 4)), ("cfop", pa.string()),
+            ("reducao_declarada", pa.decimal128(9, 4)),
         ], [
-            # a entrada de 05/01: base reduzida a 48% do valor, CST 70
+            # a entrada de 05/01, como o fornecedor da Advertising emite: declara
+            # pRedBC de 48% e usa base de 48% do valor
             {"chave": "4" * 44, "numero_item": 1, "emitente": "99999999000191", "destinatario": A,
              "emissao": date(2021, 1, 5), "ncm": "33059000", "cst_icms": "570",
-             "bc_icms": d(48), "valor": d(100), "desconto": d(0), "aliq_icms": d(25), "cfop": "5401"},
+             "bc_icms": d(48), "valor": d(100), "desconto": d(0), "aliq_icms": d(25), "cfop": "5401",
+             "reducao_declarada": d(48)},
             # a saída da própria loja não entra na conta da redução
             {"chave": CHAVE_TRANSF, "numero_item": 1, "emitente": A, "destinatario": "22222222000100",
              "emissao": date(2021, 1, 6), "ncm": "33059000", "cst_icms": "070",
-             "bc_icms": d(90), "valor": d(100), "desconto": d(0), "aliq_icms": d(18), "cfop": "5405"},
+             "bc_icms": d(90), "valor": d(100), "desconto": d(0), "aliq_icms": d(18), "cfop": "5405",
+             "reducao_declarada": d(10)},
         ])
         destino = tmp_path / "razao_reduzido"
         destino.mkdir()
@@ -755,15 +759,15 @@ class TestReducaoDeBase:
         destino, _ = com_reducao
         venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
         assert venda["enquadramento"] == 1
-        assert venda["reducao_base"] == d("33.3333")   # 18% com carga de 12%
-        assert venda["icms_efetivo"] == d("2.400001")   # 20,00 x 66,6667% x 18%
-        assert venda["ressarcimento"] == d("2.599999")  # 5,00 baixados - 2,40
+        assert venda["reducao_base"] == d("48.0000")   # o pRedBC que a entrada declara
+        assert venda["icms_efetivo"] == d("1.872")      # 20,00 x 52% x 18%
+        assert venda["ressarcimento"] == d("3.128")     # 5,00 baixados - 1,872
 
     def test_o_resumo_diz_quanto_a_reducao_tirou_do_confronto(self, com_reducao):
         _, r = com_reducao
         assert r.saidas_com_reducao == 1
-        assert round(r.efetivo_reduzido, 2) == d("1.20")  # 3,60 cheios - 2,40
-        assert serializar(r)["reducao_de_base"] == {"saidas": 1, "efetivo_reduzido": "1.20"}
+        assert round(r.efetivo_reduzido, 2) == d("1.73")  # 3,60 cheios - 1,872
+        assert serializar(r)["reducao_de_base"] == {"saidas": 1, "efetivo_reduzido": "1.73"}
 
     def test_a_ficha_conta_as_saidas_com_reducao(self, com_reducao):
         destino, _ = com_reducao
@@ -809,16 +813,18 @@ class TestReducaoDeBase:
             ("cst_icms", pa.string()), ("bc_icms", pa.decimal128(18, 2)),
             ("valor", pa.decimal128(18, 2)), ("desconto", pa.decimal128(18, 2)),
             ("aliq_icms", pa.decimal128(9, 4)), ("cfop", pa.string()),
+            ("reducao_declarada", pa.decimal128(9, 4)),
         ], [{"chave": "4" * 44, "numero_item": 1, "emitente": "99999999000191", "destinatario": A,
              "emissao": date(2021, 1, 5), "ncm": "33059000", "cst_icms": "570",
-             "bc_icms": d(48), "valor": d(100), "desconto": d(0), "aliq_icms": d(25), "cfop": "5401"}])
+             "bc_icms": d(48), "valor": d(100), "desconto": d(0), "aliq_icms": d(25), "cfop": "5401",
+             "reducao_declarada": d(48)}])
         destino = tmp_path / "ncm_da_nota"
         destino.mkdir()
         montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
         venda = next(l for l in ficha(destino) if l["cfop"] == "5405" and l["origem"] == "efd")
         assert venda["enquadramento"] == 1
-        assert venda["reducao_base"] == d("33.3333")
-        assert venda["icms_efetivo"] == d("3.600002")            # 30 x 66,6667% x 18%
+        assert venda["reducao_base"] == d("48.0000")
+        assert venda["icms_efetivo"] == d("2.808")               # 30 x 52% x 18%
         # a venda de PDV do relatório não tem NCM e cai no cadastro, que aqui está errado
         pdv = next(l for l in ficha(destino) if l["origem"] == "relatorio")
         assert pdv["reducao_base"] is None
@@ -855,7 +861,7 @@ class TestReducaoDeBase:
         destino.mkdir()
         montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
         venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
-        assert venda["reducao_base"] == d("33.3333")
+        assert venda["reducao_base"] == d("51.2714")   # sem pRedBC, vale a base medida
 
     def test_sem_0200_a_aliquota_vem_da_nota_de_entrada(self, fontes, tmp_path):
         """Decisão do Victor, 17/09/2026: sem cadastro, vale a alíquota que o

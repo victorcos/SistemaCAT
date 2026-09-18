@@ -28,27 +28,29 @@ da base que sobra, não o da redução. Lido ao pé da letra daria 13% no grupo 
 deles bate com o `vICMS` da própria nota. Foi o que a RVZ fez no trabalho de
 referência.
 
-Por isso este módulo **não lê `pRedBC`**: calcula a redução pela base que a
-nota de fato usou, `1 - vBC / (vProd - vDesc)`, que reproduz o `vICMS` da nota
-ao centavo e dá a mesma carga de 12% nos dois grupos (decisão do Victor,
-17/09/2026).
+## Qual número vale: o declarado
 
-## O que a entrada decide, e o que a lei decide
+**Vale o `pRedBC` que o documento declara** (decisão do Victor, 18/09/2026): é
+o percentual de redução da base, e a saída aplica esse mesmo percentual. Nos
+NCM do Grecin, 48% sobre a alíquota de 25% deixa a carga em 13%; nos do
+Vagisil, 66,67% sobre 18% deixa em 6%.
 
-A entrada diz **se a mercadoria tem o benefício**; quanto ele vale é a lei que
-diz. O artigo 34 do Anexo II do RICMS/SP reduz a base de modo que a carga
-resulte em **12%** — e é essa a redução que a saída aplica, não a que o
-fornecedor mediu (decisão do Victor, 18/09/2026).
+Há uma incoerência conhecida no arquivo do fornecedor da Advertising, e ela
+está registrada aqui para não ser redescoberta: o `vBC` que ele usa **não**
+corresponde ao `pRedBC` que declara. Na nota 51462, item 1012‑N:
 
-A diferença é pequena e teimosa: na nota 51462 o fornecedor usou base de
-48,84% do valor e recolheu 12,21%, não 12,00%; em outras usou 48% e recolheu
-12,00%. Levar essa variação para a nossa saída seria herdar o arredondamento
-do sistema dele. Com a carga fixa, a redução vira `1 - 12 / alíquota`: 52% no
-que é tributado a 25%, 33,33% no que é tributado a 18%.
+```
+vProd 123,84 · pRedBC 48,00 · vBC 60,48 (48,84% do valor) · vICMS 15,12 (12,21%)
+```
 
-**Fica pendente** a janela do Decreto 65.255/2020, que elevou essa carga a
-13,3% de 15/01/2021 a 14/01/2023 — o fornecedor da Advertising faturou a 12%
-mesmo dentro dela, e o sistema não trata o redutor por período.
+Reduzir *em* 48% daria base de 64,40 e ICMS de 16,10; ele recolheu 15,12. Ou
+seja, o imposto que ele pagou segue o `vBC`, não a tag. A decisão foi seguir a
+**tag**, que é o campo que a legislação define como percentual de redução e o
+que a entrega da RVZ usa — a divergência de centavos por nota fica documentada
+e não se propaga para a apuração.
+
+Quando o documento não traz o `pRedBC` — a EFD não tem esse campo —, a redução
+vem da base que a nota usou, `1 - vBC / (vProd - vDesc)`.
 
 ## Onde se aplica
 
@@ -68,23 +70,22 @@ CST_COM_REDUCAO = frozenset({"20", "70"})
 _CEM = Decimal(100)
 _Q4 = Decimal("0.0001")
 
-# a carga que o benefício do artigo 34 do Anexo II do RICMS/SP deixa na
-# operação interna. Não é a alíquota: é o que sobra depois da redução da base
-CARGA_DO_BENEFICIO = Decimal("12")
-
 
 def reducao_da_entrada(cst: str | None, base: Decimal | None, valor: Decimal | None,
-                       desconto: Decimal | None = None) -> Decimal | None:
-    """Percentual de redução (0 a 100) que a entrada aplicou, ou None.
+                       desconto: Decimal | None = None,
+                       declarada: Decimal | None = None) -> Decimal | None:
+    """Percentual de redução (0 a 100) que a entrada declara, ou None.
 
-    Calculado pela base que a nota usou, não pelo `pRedBC` declarado — ver o
-    cabeçalho do módulo. Devolve None quando o CST não admite redução, quando
-    falta base ou valor, e quando a conta cai fora de 0 a 100 (base maior que o
-    valor, valor zerado, item de bonificação): nesses casos a saída fica com a
-    alíquota cheia, em vez de herdar um número que não se sustenta.
+    O `pRedBC` vence quando vem; sem ele, a redução sai da base que a nota usou
+    — ver o cabeçalho do módulo. Devolve None quando o CST não admite redução,
+    quando falta base ou valor, e quando a conta cai fora de 0 a 100 (base maior
+    que o valor, valor zerado, item de bonificação): nesses casos a saída fica
+    com a alíquota cheia, em vez de herdar um número que não se sustenta.
     """
     if (cst or "")[-2:] not in CST_COM_REDUCAO:
         return None
+    if declarada is not None and Decimal(0) < Decimal(declarada) < _CEM:
+        return Decimal(declarada).quantize(_Q4)
     if base is None or valor is None:
         return None
     cheio = Decimal(valor) - Decimal(desconto or 0)
@@ -94,18 +95,6 @@ def reducao_da_entrada(cst: str | None, base: Decimal | None, valor: Decimal | N
     if reduzida <= 0 or reduzida >= _CEM:
         return None
     return reduzida.quantize(_Q4)
-
-
-def reducao_da_carga(aliquota: Decimal, carga: Decimal = CARGA_DO_BENEFICIO) -> Decimal | None:
-    """A redução de base que faz a alíquota resultar na carga do benefício.
-
-    25% com carga de 12% dá 52% de redução; 18%, 33,33%. Devolve None quando a
-    alíquota não passa da carga — aí não há o que reduzir, e inventar uma
-    redução negativa seria majorar imposto por conta própria.
-    """
-    if aliquota <= carga:
-        return None
-    return ((Decimal(1) - Decimal(carga) / Decimal(aliquota)) * _CEM).quantize(_Q4)
 
 
 def base_reduzida(valor: Decimal, reducao: Decimal | None) -> Decimal:

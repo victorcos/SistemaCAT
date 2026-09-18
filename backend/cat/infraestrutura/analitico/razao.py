@@ -127,7 +127,6 @@ from cat.dominio.cat42.razao import (
     SaldoInicial,
 )
 from cat.dominio.cat42.reducao import (
-    CARGA_DO_BENEFICIO,
     CST_COM_REDUCAO,
     icms_efetivo as icms_efetivo_da_saida,
     reducao_da_entrada,
@@ -1101,6 +1100,10 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
     aliq_sql: list[str] = []
     xml_itens = os.path.join(fontes.movimentacao, ARQUIVO_ITENS_DO_XML)
     colunas_xml = set(pq.read_schema(xml_itens).names) if os.path.isfile(xml_itens) else set()
+    # o pRedBC do documento, que é o percentual de redução que vale
+    declarada_xml = "x.reducao_declarada" if "reducao_declarada" in colunas_xml else "NULL::DECIMAL(9, 4)"
+    declarada_efd = ("m.reducao_declarada_xml" if "reducao_declarada_xml" in colunas_mov
+                     else "NULL::DECIMAL(9, 4)")
     de_fora = {"ncm", "emissao", "destinatario", "emitente", "cfop"}
     # Só entrada **interna** empresta alíquota e redução: o confronto do
     # enquadramento 1 é de uma saída dentro do estado, e a compra de fora vem
@@ -1113,7 +1116,7 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
         # zera base e imposto, e só o XML do fornecedor tem a base reduzida
         fontes_sql.append(f"""
             SELECT nullif(x.ncm, '') AS ncm, x.emissao AS data, x.cst_icms,
-                   x.bc_icms, x.valor, x.desconto
+                   x.bc_icms, x.valor, x.desconto, {declarada_xml} AS declarada
             FROM read_parquet('{_escapar(xml_itens)}') x
             WHERE x.destinatario IN (SELECT cnpj FROM estabs)
               AND x.emitente NOT IN (SELECT cnpj FROM estabs)
@@ -1128,7 +1131,8 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
               AND {interna_xml}""")
     if {"ncm", "bc_icms", "desconto", "cfop"} <= set(colunas_mov):
         fontes_sql.append(f"""
-            SELECT nullif(m.ncm, '') AS ncm, m.data, m.cst_icms, m.bc_icms, m.valor, m.desconto
+            SELECT nullif(m.ncm, '') AS ncm, m.data, m.cst_icms, m.bc_icms, m.valor, m.desconto,
+                   {declarada_efd} AS declarada
             FROM {mov} m
             WHERE m.operacao = 'entrada'
               AND right(coalesce(m.cst_icms, ''), 2) IN ({cst}) AND m.bc_icms > 0
@@ -1140,9 +1144,9 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
               AND {interna_efd}""")
     por_dia: dict[tuple[str, date], list[Decimal]] = {}
     if fontes_sql:
-        for ncm, data, cst_item, base, valor, desconto in con.execute(
+        for ncm, data, cst_item, base, valor, desconto, declarada in con.execute(
                 " UNION ALL ".join(fontes_sql)).fetchall():
-            reduzida = reducao_da_entrada(cst_item, base, valor, desconto)
+            reduzida = reducao_da_entrada(cst_item, base, valor, desconto, declarada)
             if reduzida is None or not ncm or data is None:
                 continue
             por_dia.setdefault((ncm, data), []).append(reduzida)
@@ -1202,15 +1206,6 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
         pegou = con.execute("SELECT count(*) FROM lancamentos WHERE aliquota_da_entrada").fetchone()[0]
         log.info("alíquota da nota de entrada onde falta 0200",
                  extra={"sem_cadastro": faltando, "resolvidas": pegou})
-
-    # A entrada diz que a mercadoria tem o benefício; quanto ele vale é a lei
-    # que diz. A redução aplicada na saída é a que faz a carga bater nos 12% do
-    # artigo 34 do Anexo II (decisão do Victor, 18/09/2026) — e não a que o
-    # fornecedor mediu, que varia de nota para nota entre 12,00% e 12,21%.
-    con.execute(f"""UPDATE lancamentos
-        SET reducao_base = round(100 - ({CARGA_DO_BENEFICIO} * 100.0 / aliquota), 4)
-        WHERE reducao_base IS NOT NULL AND aliquota > {CARGA_DO_BENEFICIO}""")
-    con.execute(f"UPDATE lancamentos SET reducao_base = NULL WHERE aliquota <= {CARGA_DO_BENEFICIO}")
 
     # o documento nem sempre diz a alíquota: o CST 60 não destaca nada, e nem
     # todo emitente preenche o pICMSEfet (na Advertising, 35.448 dos 81.157

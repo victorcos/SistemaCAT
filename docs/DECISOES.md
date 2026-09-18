@@ -25,13 +25,18 @@ O fornecedor recolheu **15,12**: a nota contradiz a leitura literal da tag. Mas
 ela também não bate nos 12% exatos — ele usou base de 48,84% num item e de 48%
 noutro, e recolheu 12,21% aqui e 12,00% ali.
 
-**A decisão do Victor (18/09/2026): carga de 12% exata.** A entrada serve para
-dizer **se** a mercadoria tem o benefício; **quanto** ele vale é a lei que diz.
-A redução aplicada na saída passa a ser `1 - 12 / alíquota` — 52% no que é
-tributado a 25% e 33,33% no que é tributado a 18% —, e não a que o fornecedor
-mediu. Sem isso, o arredondamento do sistema dele entrava na nossa apuração.
+**A decisão do Victor, ao fim do dia 18/09/2026: vale o `pRedBC` declarado.**
+O caminho foi longo e fica registrado inteiro porque cada passo mudou o número:
+primeiro a redução medida no `vBC` (12,00 a 12,21% de carga), depois a carga
+fixa de 12% da lei, e por fim a **tag do documento** — 48% de redução sobre 25%
+dá carga de 13%; 66,67% sobre 18% dá 6%. É o campo que a legislação define
+como percentual de redução, é o que a entrega da RVZ usa, e é o que o ICMS
+efetivo da Ficha 3 passa a mostrar: R$ 5,1987 na venda de R$ 39,99 do produto
+1012, não R$ 4,7988.
 
-**O que muda:** R$ 392.806,08 contra R$ 391.609,94 de antes.
+A incoerência do arquivo do fornecedor — declarar 48% e recolher sobre base de
+48,84% — fica documentada em `cat.dominio.cat42.reducao` e não se propaga: o
+que entra na apuração é a tag.
 
 **O redutor do Decreto 65.255/2020 não entra** (decisão do Victor, 18/09/2026):
 vale a alíquota interna com a carga de 12% em todo o período, e não os 13,3%

@@ -89,6 +89,7 @@ ESQUEMA_ITENS_DO_XML = pa.schema([
     ("fcp_st", pa.decimal128(18, 2)),
     ("bc_st_retido", pa.decimal128(18, 2)),
     # o que o CST 60 informa do imposto que a ST encerrou (NT 2020.005)
+    ("reducao_declarada", pa.decimal128(9, 4)),
     ("bc_efetiva", pa.decimal128(18, 2)),
     ("aliquota_efetiva", pa.decimal128(9, 4)),
     ("icms_efetivo", pa.decimal128(18, 2)),
@@ -252,6 +253,7 @@ def _linha(doc: DocumentoXml, arquivo: str, item, leitura: int) -> dict:
         "cst_icms": item.cst_icms,
         "frete": _q(item.frete, _Q2), "seguro": _q(item.seguro, _Q2),
         "outras": _q(item.outras, _Q2), "base_do_item": _q(item.base_da_operacao, _Q2),
+        "reducao_declarada": _q(item.reducao_declarada, _Q4),
         "bc_efetiva": _q(item.bc_efetiva, _Q2),
         "aliquota_efetiva": _q(item.aliquota_efetiva, _Q4),
         "icms_efetivo": _q(item.icms_efetivo, _Q2),

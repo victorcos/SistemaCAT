@@ -104,6 +104,7 @@ _COLUNAS_DO_XML = """
     x.unidade AS unidade_xml, x.quantidade AS quantidade_xml,
     x.valor_icms AS valor_icms_xml, x.bc_st AS bc_st_xml, x.valor_st AS valor_st_xml,
     x.base_do_item AS base_do_item_xml, x.aliquota_efetiva AS aliquota_efetiva_xml,
+    x.reducao_declarada AS reducao_declarada_xml,
     x.fcp_st AS fcp_st_xml, x.retido_informado AS retido_xml,
     x.consumidor_final AS consumidor_final_xml
 """
