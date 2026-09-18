@@ -14,9 +14,9 @@ contra a de outro escritório compara coluna com coluna, sem tradução no meio.
 
 O que muda em relação ao papel de trabalho, e por quê:
 
-* a **quantidade e o valor vêm em colunas separadas por enquadramento** — (15)
-  a (19) —, como manda o leiaute, mas o valor que cai ali é o VL_ITEM da linha,
-  não um rateio;
+* as colunas (15) a (19) levam o **ICMS suportado baixado** na saída, por
+  enquadramento — não o valor da venda. É desse valor que o confronto de (20)
+  ou (21) é subtraído para dar o ressarcimento ou o complemento;
 * acrescentamos **CST, origem do dado, alíquota do confronto e redução de
   base**: é o que permite refazer a conta da linha sem abrir outro arquivo;
 * as **inconsistências** são as nossas, marcadas por linha em vez de por ficha;
@@ -136,11 +136,15 @@ DERIVACAO = {
     "cod_legal": "enquadramento",
     "qtd_saida": "CASE WHEN especie = 'saida' THEN abs(quantidade) END",
     "suportado_unitario": "CASE WHEN especie = 'saida' THEN valor_unitario_usado END",
-    "saida_enq1": "CASE WHEN especie = 'saida' AND enquadramento = 1 THEN valor_item END",
-    "saida_enq2": "CASE WHEN especie = 'saida' AND enquadramento = 2 THEN valor_item END",
-    "saida_enq3": "CASE WHEN especie = 'saida' AND enquadramento = 3 THEN valor_item END",
-    "saida_enq4": "CASE WHEN especie = 'saida' AND enquadramento = 4 THEN valor_item END",
-    "saida_enq0": "CASE WHEN especie = 'saida' AND enquadramento = 0 THEN valor_item END",
+    # (15) a (19) não levam o valor da saída: levam o **ICMS suportado que sai
+    # da ficha** — quantidade vezes o unitário do saldo anterior —, na coluna do
+    # enquadramento. É contra esse valor que o confronto de (20)/(21) é feito, e
+    # a diferença vira o ressarcimento (25) ou o complemento (26)
+    "saida_enq1": "CASE WHEN especie = 'saida' AND enquadramento = 1 THEN abs(icms_suportado) END",
+    "saida_enq2": "CASE WHEN especie = 'saida' AND enquadramento = 2 THEN abs(icms_suportado) END",
+    "saida_enq3": "CASE WHEN especie = 'saida' AND enquadramento = 3 THEN abs(icms_suportado) END",
+    "saida_enq4": "CASE WHEN especie = 'saida' AND enquadramento = 4 THEN abs(icms_suportado) END",
+    "saida_enq0": "CASE WHEN especie = 'saida' AND enquadramento = 0 THEN abs(icms_suportado) END",
     # o leiaute separa o confronto pela coluna: 1 e 3 olham a saída, 2 e 4 a entrada
     "confronto_saida": "CASE WHEN enquadramento IN (1, 3) THEN icms_efetivo END",
     "confronto_entrada": "CASE WHEN enquadramento IN (2, 4) THEN icms_efetivo END",

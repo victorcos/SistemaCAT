@@ -281,6 +281,12 @@ devolução e indefinido), `enquadramento_indefinido`, `quantidade` (com sinal),
 nulo quando não se apura), `saldo_quantidade`, `saldo_unitario`, `saldo_valor`,
 `ressarcimento`, `complemento`.
 
+### Colunas 15 a 19 da Ficha 3 (v0.60.1)
+
+As colunas de enquadramento da planilha levam `abs(icms_suportado)` da linha de
+saída — o imposto baixado da ficha —, não o valor da operação. É delas que o
+valor de confronto (20)/(21) é subtraído para dar ressarcimento e complemento.
+
 ### VL_ITEM é a base do ICMS (v0.60.0)
 
 `itens_do_xml.parquet` ganha `frete`, `seguro`, `outras`, `bc_efetiva`,

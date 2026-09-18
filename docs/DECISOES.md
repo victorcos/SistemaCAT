@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-09-18 — As colunas 15 a 19 levam o ICMS suportado, não o valor da saída
+
+**A correção do Victor.** Na primeira versão do leiaute, as colunas de
+enquadramento — (15) a (19) — saíram com o VL_ITEM da linha. Está errado: elas
+levam o **ICMS suportado que sai da ficha** naquela saída, por enquadramento.
+
+A Ficha 3 da RVZ mostra a conta inteira na horizontal:
+
+```
+(13) qtd saída 1,00 × (14) suportado unitário 2,14958 = (15) 2,15
+(20) confronto 5,20 → (26) complemento 3,05      (5,20 − 2,15)
+(21) confronto 0,63 → (25) ressarcimento 1,52    (2,15 − 0,63)
+```
+
+É esse o desenho do leiaute: a coluna do enquadramento guarda o imposto baixado,
+o confronto guarda o que a operação teria de imposto, e a diferença vira
+ressarcimento ou complemento. Com o VL_ITEM ali, a linha não fechava.
+
+---
+
 ## 2026-09-18 — VL_ITEM é a base de cálculo do ICMS, não o valor da mercadoria
 
 **O que a comparação mostrou.** Confrontando a nossa Ficha 3 com a da RVZ,

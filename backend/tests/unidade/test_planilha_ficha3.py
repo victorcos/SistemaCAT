@@ -153,13 +153,34 @@ class TestOQueCaiEmCadaColuna:
         assert planilha.cell(row=5, column=entrada).value is None
         assert planilha.cell(row=5, column=saida).value == 2      # sem o sinal da baixa
 
-    def test_o_valor_da_saida_cai_na_coluna_do_enquadramento(self, planilha):
+    def test_o_suportado_baixado_cai_na_coluna_do_enquadramento(self, planilha):
+        """(15) a (19) levam o ICMS suportado que sai da ficha, não o valor da
+        venda: é dele que o confronto é subtraído (correção do Victor,
+        18/09/2026)."""
         enq1 = _coluna(planilha, "Saída a Consumidor ou Usuário Final - Código Enquadramento 1")
         enq4 = _coluna(planilha, "Saída para Outro Estado - Código Enquadramento 4")
         assert (planilha.cell(row=5, column=enq1).value,
-                planilha.cell(row=5, column=enq4).value) == (30, None)
+                planilha.cell(row=5, column=enq4).value) == (4, None)
         assert (planilha.cell(row=6, column=enq1).value,
-                planilha.cell(row=6, column=enq4).value) == (None, 9)
+                planilha.cell(row=6, column=enq4).value) == (None, 2)
+
+    def test_a_conta_fecha_na_horizontal(self, planilha):
+        """O que o leiaute promete: suportado baixado - confronto = ressarcimento,
+        e o contrário vira complemento."""
+        enq1 = _coluna(planilha, "Saída a Consumidor ou Usuário Final - Código Enquadramento 1")
+        confronto = _coluna(planilha, "ICMS Efetivo na Saída a Consumidor ou Usuário Final")
+        compl = _coluna(planilha, "Valor do Complemento")
+        ressarc = _coluna(planilha, "Valor do Ressarcimento")
+        # 4,00 de suportado baixado contra 2,88 de confronto: sobra 1,12 de ressarcimento
+        assert round(planilha.cell(row=5, column=enq1).value
+                     - planilha.cell(row=5, column=confronto).value
+                     - planilha.cell(row=5, column=ressarc).value, 2) == 0
+        assert planilha.cell(row=5, column=compl).value == 0
+        enq4 = _coluna(planilha, "Saída para Outro Estado - Código Enquadramento 4")
+        confronto_entrada = _coluna(planilha, "ICMS Efetivo da Entrada nas Demais Hipóteses")
+        assert round(planilha.cell(row=6, column=enq4).value
+                     - planilha.cell(row=6, column=confronto_entrada).value
+                     - planilha.cell(row=6, column=ressarc).value, 2) == 0
 
     def test_o_confronto_separa_saida_de_entrada(self, planilha):
         saida = _coluna(planilha, "ICMS Efetivo na Saída a Consumidor ou Usuário Final")
