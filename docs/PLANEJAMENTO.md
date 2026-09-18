@@ -108,7 +108,11 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       pela base real da nota e não pelo `pRedBC` (decisão do Victor, v0.57.0)
 - [x] Alíquota da nota de entrada quando a mercadoria não tem 0200 (decisão do
       Victor, v0.58.0)
-- [ ] Registrar o fundamento legal do benefício de carga 12% por NCM
+- [ ] **Decidir a premissa do ICMS efetivo do enquadramento 1**: o art. 34 do
+      Anexo II (carga 12%) não alcança saída a consumidor final (§ 1º) nem a
+      cadeia da ST (RC 23455/2021). Hoje o sistema aplica a redução
+      (+R$ 407.210,25); a alíquota cheia dá −R$ 77.779,52. Ver DECISOES de
+      18/09/2026
 - [ ] Comparar com a RVZ razão, apuração, X.949, canceladas e não escrituradas
 
 ### 3. O que a apuração ainda não calcula

@@ -5,6 +5,55 @@
 
 ---
 
+## 2026-09-18 — O artigo 34 não alcança a saída a consumidor: premissa em aberto
+
+**O que a pesquisa achou.** O benefício que o fornecedor da Advertising aplica é
+o **artigo 34 do Anexo II do RICMS/SP** (perfumes, cosméticos e produtos de
+higiene pessoal): reduz a base na saída interna de fabricante ou atacadista de
+forma que a carga fique em 12%. Os NCM batem um a um com o que as notas mostram:
+
+| Produto | NCM | Inciso | Alíquota interna (art. 55, IV) |
+|---|---|---|---|
+| Grecin | 3305.90.00 | VIII | 25% |
+| 4008 | 3304.99.90 | VII | 25% |
+| Vagisil desodorante | 3307.20.10 / .90 | IX | 18% (exceção do 3307.20) |
+| Vagisil sabonete | 3401.20.10 | X | 18% |
+| Gel lubrificante (1413) | 3006.70.00 | **fora da lista** | 18% |
+
+A única entrada sem redução (CST 10) é a do 3006.70.00, que não está no artigo —
+a lei e os dados fecham sozinhos.
+
+**Vigência.** Decreto 48.959/2004, sem prazo desde o Decreto 58.761/2012. O
+Decreto 65.255/2020 pôs um complemento de 1,3% — carga de **13,3%** — por 24
+meses a partir de 15/01/2021, ou seja até 14/01/2023; o trabalho da Advertising
+(08/2022 a 06/2024) pega essa faixa até 14/01/2023, mas as notas do fornecedor
+mostram 12% também ali. Prorrogações: Dec. 67.524/2023 (31/12/2024), 69.292/2025
+(31/12/2025), 70.293/2025 (31/12/2026).
+
+**O problema.** O **§ 1º** do artigo 34 diz que a redução **não se aplica a
+saída destinada a consumidor final**, e a **RC 23455/2021** é expressa: *"o
+benefício fiscal de redução da base de cálculo do artigo 34 não poderá ser
+aplicado no cálculo do valor do imposto a ser recolhido a título de substituição
+tributária"*. A venda da Advertising a consumidor final é exatamente o
+enquadramento 1 — logo, pela letra da lei, o ICMS efetivo dela seria a alíquota
+cheia, e não a base reduzida que a v0.57 passou a usar.
+
+**O tamanho.** Com a redução (como está hoje): efetivo de R$ 464.923,00,
+complemento de R$ 140.038,22, apuração de **+R$ 407.210,25 a receber**. Com a
+alíquota cheia: efetivo de R$ 950.248,91, complemento de R$ 623.079,89, apuração
+de **−R$ 77.779,52 a pagar**. Diferença de R$ 484.989,77, com troca de sinal.
+
+**A decisão do Victor (18/09/2026): por enquanto fica como está** — a redução
+continua no confronto do enquadramento 1. A premissa fica registrada aqui como
+aberta: adotar a alíquota cheia é o caminho literal da lei, e manter a redução
+precisa de tese fiscal escrita de que o "imposto efetivo" da CAT 42 mede a carga
+da cadeia, não a tributação da operação isolada.
+
+Fontes: art. 34 do Anexo II do RICMS/SP, RC 23455/2021, RC 28913/2023, Decreto
+65.255/2020, RC 18477/2018 (alíquota do art. 55, IV).
+
+---
+
 ## 2026-09-17 — Só a entrada interna empresta alíquota e redução
 
 **O que se via.** Na primeira rodada com a alíquota da entrada, 3.160 saídas da
