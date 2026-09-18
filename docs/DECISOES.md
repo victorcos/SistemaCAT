@@ -5,6 +5,38 @@
 
 ---
 
+## 2026-09-18 — A entrada diz que há benefício; a lei diz quanto ele vale
+
+**O que se via.** O confronto de uma venda de R$ 39,99 dava R$ 4,88 no sistema
+e R$ 5,20 na RVZ. Olhando a nota de entrada que o Victor apontou (chave
+...1261213122, item 1012‑N):
+
+```
+vProd 123,84 · pRedBC 48,00 · vBC 60,48 · pICMS 25% · vICMS 15,12
+```
+
+| Leitura | Base | ICMS que daria |
+|---|---|---|
+| "reduzir **em** 48%" (base 52%) — a da RVZ | 64,40 | 16,10 |
+| "base reduzida **a** 48,84%" (o `vBC` da nota) — a nossa | 60,48 | **15,12** |
+| carga de 12% (artigo 34 do Anexo II) | 59,44 | 14,86 |
+
+O fornecedor recolheu **15,12**: a nota contradiz a leitura literal da tag. Mas
+ela também não bate nos 12% exatos — ele usou base de 48,84% num item e de 48%
+noutro, e recolheu 12,21% aqui e 12,00% ali.
+
+**A decisão do Victor (18/09/2026): carga de 12% exata.** A entrada serve para
+dizer **se** a mercadoria tem o benefício; **quanto** ele vale é a lei que diz.
+A redução aplicada na saída passa a ser `1 - 12 / alíquota` — 52% no que é
+tributado a 25% e 33,33% no que é tributado a 18% —, e não a que o fornecedor
+mediu. Sem isso, o arredondamento do sistema dele entrava na nossa apuração.
+
+**O que muda:** R$ 392.806,08 contra R$ 391.609,94 de antes. E `reducao_da_carga`
+aceita outra carga, o que deixa o caminho aberto para a janela do Decreto
+65.255/2020 (13,3% de 15/01/2021 a 14/01/2023), que o sistema ainda não trata.
+
+---
+
 ## 2026-09-18 — Duas alíquotas, duas colunas
 
 **O que o Victor viu.** Na Ficha 3 da RVZ a alíquota está preenchida em toda

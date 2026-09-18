@@ -717,10 +717,10 @@ class TestConfrontoPelaEntrada:
 class TestReducaoDeBase:
     """Entrada com CST 70 reduz a base do ICMS efetivo da saída a consumidor.
 
-    O fornecedor da Advertising vende o Grecin (NCM 3305.90.00) com base
-    reduzida a 48% e alíquota de 25%, ou seja, carga de 12%. A venda de PDV da
+    A entrada diz que a mercadoria tem o benefício; o quanto ele vale é a lei
+    que diz — carga de 12% (artigo 34 do Anexo II). Então a venda de PDV da
     mercadoria X, R$ 20,00 a 18%, deixa de confrontar com R$ 3,60 e passa a
-    confrontar com R$ 1,728 — 18% sobre os 48% que sobraram da base.
+    confrontar com R$ 2,40, que é a redução de 33,3333% sobre a base.
     """
 
     @pytest.fixture
@@ -755,15 +755,15 @@ class TestReducaoDeBase:
         destino, _ = com_reducao
         venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
         assert venda["enquadramento"] == 1
-        assert venda["reducao_base"] == d("52.0000")
-        assert venda["icms_efetivo"] == d("1.728")
-        assert venda["ressarcimento"] == d("3.272")     # 5,00 baixados - 1,728
+        assert venda["reducao_base"] == d("33.3333")   # 18% com carga de 12%
+        assert venda["icms_efetivo"] == d("2.400001")   # 20,00 x 66,6667% x 18%
+        assert venda["ressarcimento"] == d("2.599999")  # 5,00 baixados - 2,40
 
     def test_o_resumo_diz_quanto_a_reducao_tirou_do_confronto(self, com_reducao):
         _, r = com_reducao
         assert r.saidas_com_reducao == 1
-        assert r.efetivo_reduzido == d("1.872")          # 3,60 cheios - 1,728
-        assert serializar(r)["reducao_de_base"] == {"saidas": 1, "efetivo_reduzido": "1.87"}
+        assert round(r.efetivo_reduzido, 2) == d("1.20")  # 3,60 cheios - 2,40
+        assert serializar(r)["reducao_de_base"] == {"saidas": 1, "efetivo_reduzido": "1.20"}
 
     def test_a_ficha_conta_as_saidas_com_reducao(self, com_reducao):
         destino, _ = com_reducao
@@ -817,15 +817,19 @@ class TestReducaoDeBase:
         montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
         venda = next(l for l in ficha(destino) if l["cfop"] == "5405" and l["origem"] == "efd")
         assert venda["enquadramento"] == 1
-        assert venda["reducao_base"] == d("52.0000")
-        assert venda["icms_efetivo"] == d("2.592")               # 30 x 48% x 18%
+        assert venda["reducao_base"] == d("33.3333")
+        assert venda["icms_efetivo"] == d("3.600002")            # 30 x 66,6667% x 18%
         # a venda de PDV do relatório não tem NCM e cai no cadastro, que aqui está errado
         pdv = next(l for l in ficha(destino) if l["origem"] == "relatorio")
         assert pdv["reducao_base"] is None
 
-    def test_duas_entradas_no_mesmo_dia_ficam_com_a_mediana(self, fontes, tmp_path):
+    def test_duas_entradas_no_mesmo_dia_nao_quebram_a_gravacao(self, fontes, tmp_path):
         """A mediana de um número par de entradas é uma média, e média de
-        decimal estoura as quatro casas do esquema se não for arredondada."""
+        decimal estoura as quatro casas do esquema se não for arredondada.
+
+        O que a ficha grava é a redução da lei, não a medida — mas a medida
+        continua sendo calculada para saber que há benefício, e é ali que o
+        arredondamento quebrava."""
         mov = tmp_path / "movimentacao"
         gravar(mov / ARQUIVO_ITENS, [
             ("cnpj", pa.string()), ("codigo", pa.string()), ("descricao", pa.string()),
@@ -851,7 +855,7 @@ class TestReducaoDeBase:
         destino.mkdir()
         montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
         venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
-        assert venda["reducao_base"] == d("51.2714")
+        assert venda["reducao_base"] == d("33.3333")
 
     def test_sem_0200_a_aliquota_vem_da_nota_de_entrada(self, fontes, tmp_path):
         """Decisão do Victor, 17/09/2026: sem cadastro, vale a alíquota que o
@@ -876,7 +880,7 @@ class TestReducaoDeBase:
         r = montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
         venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
         assert venda["aliquota"] == d("25.0000") and venda["reducao_base"] == d("52.0000")
-        assert venda["icms_efetivo"] == d("2.4")             # 20 x 48% x 25%
+        assert venda["icms_efetivo"] == d("2.4")             # 20 x 48% x 25% = carga de 12%
         assert r.saidas_com_aliquota_da_entrada == 1 and r.saidas_sem_aliquota == 0
         assert serializar(r)["aliquota_da_entrada"] == 1
 

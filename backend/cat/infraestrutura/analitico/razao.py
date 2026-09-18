@@ -127,6 +127,7 @@ from cat.dominio.cat42.razao import (
     SaldoInicial,
 )
 from cat.dominio.cat42.reducao import (
+    CARGA_DO_BENEFICIO,
     CST_COM_REDUCAO,
     icms_efetivo as icms_efetivo_da_saida,
     reducao_da_entrada,
@@ -1201,6 +1202,15 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
         pegou = con.execute("SELECT count(*) FROM lancamentos WHERE aliquota_da_entrada").fetchone()[0]
         log.info("alíquota da nota de entrada onde falta 0200",
                  extra={"sem_cadastro": faltando, "resolvidas": pegou})
+
+    # A entrada diz que a mercadoria tem o benefício; quanto ele vale é a lei
+    # que diz. A redução aplicada na saída é a que faz a carga bater nos 12% do
+    # artigo 34 do Anexo II (decisão do Victor, 18/09/2026) — e não a que o
+    # fornecedor mediu, que varia de nota para nota entre 12,00% e 12,21%.
+    con.execute(f"""UPDATE lancamentos
+        SET reducao_base = round(100 - ({CARGA_DO_BENEFICIO} * 100.0 / aliquota), 4)
+        WHERE reducao_base IS NOT NULL AND aliquota > {CARGA_DO_BENEFICIO}""")
+    con.execute(f"UPDATE lancamentos SET reducao_base = NULL WHERE aliquota <= {CARGA_DO_BENEFICIO}")
 
     # o documento nem sempre diz a alíquota: o CST 60 não destaca nada, e nem
     # todo emitente preenche o pICMSEfet (na Advertising, 35.448 dos 81.157

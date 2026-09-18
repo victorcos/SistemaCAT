@@ -281,6 +281,14 @@ devolução e indefinido), `enquadramento_indefinido`, `quantidade` (com sinal),
 nulo quando não se apura), `saldo_quantidade`, `saldo_unitario`, `saldo_valor`,
 `ressarcimento`, `complemento`.
 
+### A redução é a da carga do benefício (v0.61.0)
+
+A redução medida na entrada (CST 20/70) diz que a mercadoria tem o benefício; o
+valor aplicado na saída é `reducao_da_carga(alíquota)` — o que faz a carga bater
+em `CARGA_DO_BENEFICIO` (12%, artigo 34 do Anexo II). `ficha3.parquet` grava
+essa redução em `reducao_base`: 52% a 25%, 33,3333% a 18%. Alíquota igual ou
+menor que a carga não reduz nada.
+
 ### Duas alíquotas na Ficha 3 (v0.60.2)
 
 `ficha3.parquet` ganha `aliquota_documento` — a da operação, destacada no

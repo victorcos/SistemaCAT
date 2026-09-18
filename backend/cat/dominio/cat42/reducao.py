@@ -33,6 +33,23 @@ nota de fato usou, `1 - vBC / (vProd - vDesc)`, que reproduz o `vICMS` da nota
 ao centavo e dá a mesma carga de 12% nos dois grupos (decisão do Victor,
 17/09/2026).
 
+## O que a entrada decide, e o que a lei decide
+
+A entrada diz **se a mercadoria tem o benefício**; quanto ele vale é a lei que
+diz. O artigo 34 do Anexo II do RICMS/SP reduz a base de modo que a carga
+resulte em **12%** — e é essa a redução que a saída aplica, não a que o
+fornecedor mediu (decisão do Victor, 18/09/2026).
+
+A diferença é pequena e teimosa: na nota 51462 o fornecedor usou base de
+48,84% do valor e recolheu 12,21%, não 12,00%; em outras usou 48% e recolheu
+12,00%. Levar essa variação para a nossa saída seria herdar o arredondamento
+do sistema dele. Com a carga fixa, a redução vira `1 - 12 / alíquota`: 52% no
+que é tributado a 25%, 33,33% no que é tributado a 18%.
+
+**Fica pendente** a janela do Decreto 65.255/2020, que elevou essa carga a
+13,3% de 15/01/2021 a 14/01/2023 — o fornecedor da Advertising faturou a 12%
+mesmo dentro dela, e o sistema não trata o redutor por período.
+
 ## Onde se aplica
 
 Só no **enquadramento 1**, por decisão do Victor. O 3 (isenção ou não
@@ -50,6 +67,10 @@ CST_COM_REDUCAO = frozenset({"20", "70"})
 
 _CEM = Decimal(100)
 _Q4 = Decimal("0.0001")
+
+# a carga que o benefício do artigo 34 do Anexo II do RICMS/SP deixa na
+# operação interna. Não é a alíquota: é o que sobra depois da redução da base
+CARGA_DO_BENEFICIO = Decimal("12")
 
 
 def reducao_da_entrada(cst: str | None, base: Decimal | None, valor: Decimal | None,
@@ -73,6 +94,18 @@ def reducao_da_entrada(cst: str | None, base: Decimal | None, valor: Decimal | N
     if reduzida <= 0 or reduzida >= _CEM:
         return None
     return reduzida.quantize(_Q4)
+
+
+def reducao_da_carga(aliquota: Decimal, carga: Decimal = CARGA_DO_BENEFICIO) -> Decimal | None:
+    """A redução de base que faz a alíquota resultar na carga do benefício.
+
+    25% com carga de 12% dá 52% de redução; 18%, 33,33%. Devolve None quando a
+    alíquota não passa da carga — aí não há o que reduzir, e inventar uma
+    redução negativa seria majorar imposto por conta própria.
+    """
+    if aliquota <= carga:
+        return None
+    return ((Decimal(1) - Decimal(carga) / Decimal(aliquota)) * _CEM).quantize(_Q4)
 
 
 def base_reduzida(valor: Decimal, reducao: Decimal | None) -> Decimal:
