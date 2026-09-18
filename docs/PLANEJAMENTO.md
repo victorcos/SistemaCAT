@@ -112,11 +112,13 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       (achado do Victor na comparação com a RVZ, v0.60.0)
 - [x] Ficha 3 no leiaute do papel de trabalho, com o cabeçalho padrão em todas
       as planilhas (pedido do Victor, v0.59.0)
-- [ ] **Decidir a premissa do ICMS efetivo do enquadramento 1**: o art. 34 do
-      Anexo II (carga 12%) não alcança saída a consumidor final (§ 1º) nem a
-      cadeia da ST (RC 23455/2021). Hoje o sistema aplica a redução
-      (+R$ 407.210,25); a alíquota cheia dá −R$ 77.779,52. Ver DECISOES de
-      18/09/2026
+- [x] Redução aplicada é a da carga do benefício — 12% do art. 34 do Anexo II,
+      sobre a alíquota interna, sem o redutor do Decreto 65.255/2020 (decisões
+      do Victor, v0.61.0)
+- [ ] **Decidir a premissa do ICMS efetivo do enquadramento 1**: o § 1º do art.
+      34 exclui a saída a consumidor final, e a RC 23455/2021 exclui a cadeia da
+      ST. Hoje o sistema aplica a redução (R$ 392.475,69); a alíquota cheia dá
+      −R$ 110.152,30. Ver DECISOES de 18/09/2026
 - [ ] Comparar com a RVZ razão, apuração, X.949, canceladas e não escrituradas
 
 ### 3. O que a apuração ainda não calcula
