@@ -31,6 +31,8 @@ O grupo do ICMS muda de nome conforme o CST (`ICMS00`, `ICMS10`, `ICMS60`,
 `ICMSSN500`...). Lê-se o que houver dentro dele, pelo nome do campo:
 
 * destacado — `vBC`, `pICMS`, `vICMS`, `vBCST`, `pICMSST`, `vICMSST`, `vFCPST`;
+* **efetivo do CST 60** (NT 2020.005) — `vBCEfet`, `pICMSEfet`, `vICMSEfet`: o
+  próprio emitente diz qual seria o imposto da operação que a ST encerrou;
 * **retido anteriormente** — `vBCSTRet`, `vICMSSubstituto`, `vICMSSTRet`,
   `vFCPSTRet`. É o "informado pelo fornecedor" da cascata do suportado: o CST
   60 não destaca nada, e a NF-e 4.0 diz ali quanto foi suportado antes.
@@ -88,6 +90,10 @@ class ItemDoXml:
     quantidade: Decimal
     valor: Decimal
     desconto: Decimal = ZERO
+    # o que o emitente cobrou além da mercadoria e que entra na base do ICMS
+    frete: Decimal = ZERO
+    seguro: Decimal = ZERO
+    outras: Decimal = ZERO
     cst_icms: str = ""
     bc_icms: Decimal = ZERO
     aliq_icms: Decimal = ZERO
@@ -100,6 +106,35 @@ class ItemDoXml:
     valor_icms_substituto: Decimal = ZERO
     valor_st_retido: Decimal = ZERO
     fcp_st_retido: Decimal = ZERO
+    # grupo do CST 60: a base e o imposto que a operação teria sem a ST
+    bc_efetiva: Decimal = ZERO
+    aliquota_efetiva: Decimal = ZERO
+    icms_efetivo: Decimal = ZERO
+
+    @property
+    def base_da_operacao(self) -> Decimal:
+        """O valor sobre o qual o ICMS da operação incide.
+
+        Não é o valor da mercadoria: frete, seguro e despesas cobrados do
+        destinatário entram na base (artigo 37, § 1º, 1 do RICMS/SP), e
+        desconto incondicional sai. Por isso a ordem é a do próprio documento:
+
+        1. `vBC`, a base que o emitente destacou — já com frete e desconto, e já
+           reduzida quando há benefício (CST 20 e 70);
+        2. `vBCEfet`, que o CST 60 informa como base do imposto que a ST
+           encerrou — é o que a nota de venda a consumidor traz;
+        3. na falta das duas, a soma: mercadoria mais frete, seguro e outras
+           despesas, menos o desconto.
+
+        É esta a base do valor de confronto da Ficha 3, e é o que o papel de
+        trabalho da CAT 42 grava na coluna VL_ITEM (decisão do Victor,
+        18/09/2026).
+        """
+        if self.bc_icms > ZERO:
+            return self.bc_icms
+        if self.bc_efetiva > ZERO:
+            return self.bc_efetiva
+        return self.valor + self.frete + self.seguro + self.outras - self.desconto
 
     @property
     def retido_informado(self) -> Decimal | None:
@@ -258,6 +293,9 @@ def _item(det: ET.Element) -> ItemDoXml:
         quantidade=_decimal(_texto(prod, "qCom")),
         valor=_decimal(_texto(prod, "vProd")),
         desconto=_decimal(_texto(prod, "vDesc")),
+        frete=_decimal(_texto(prod, "vFrete")),
+        seguro=_decimal(_texto(prod, "vSeg")),
+        outras=_decimal(_texto(prod, "vOutro")),
         cst_icms=_cst(icms),
         bc_icms=_decimal(_texto(icms, "vBC")),
         aliq_icms=_decimal(_texto(icms, "pICMS")),
@@ -270,6 +308,9 @@ def _item(det: ET.Element) -> ItemDoXml:
         valor_icms_substituto=_decimal(_texto(icms, "vICMSSubstituto")),
         valor_st_retido=_decimal(_texto(icms, "vICMSSTRet")),
         fcp_st_retido=_decimal(_texto(icms, "vFCPSTRet")),
+        bc_efetiva=_decimal(_texto(icms, "vBCEfet")),
+        aliquota_efetiva=_decimal(_texto(icms, "pICMSEfet")),
+        icms_efetivo=_decimal(_texto(icms, "vICMSEfet")),
     )
 
 

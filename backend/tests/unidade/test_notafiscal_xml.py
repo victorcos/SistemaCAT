@@ -101,6 +101,49 @@ class TestNFe:
         assert ler_documento_xml(conteudo.encode()).chave == CHAVE_NFE
 
 
+class TestBaseDaOperacao:
+    """A base do ICMS, que é o que vai para a coluna VL_ITEM da Ficha 3.
+
+    Os números são os da nota 71782 da Advertising, 5 itens com frete rateado
+    pelo emitente: o item 1421 sai por 23,71 de mercadoria e 2,52 de frete, e o
+    ICMS é calculado sobre 26,23 — que é o que a DANFE mostra em "B.CALC ICMS".
+    """
+
+    def test_a_base_destacada_vence(self):
+        item = """<det nItem="1"><prod><cProd>1421</cProd><cEAN>7896183301422</cEAN>
+            <xProd>VAGISIL DESODORANTE PH 75 ML</xProd><NCM>33072090</NCM><CFOP>6108</CFOP>
+            <uCom>PC</uCom><qCom>1.0000</qCom><vProd>23.71</vProd><vFrete>2.52</vFrete></prod>
+            <imposto><ICMS><ICMS00><orig>8</orig><CST>00</CST><modBC>3</modBC><vBC>26.23</vBC>
+            <pICMS>4.0000</pICMS><vICMS>1.05</vICMS></ICMS00></ICMS></imposto></det>"""
+        i = ler_documento_xml(nfe(item)).itens[0]
+        assert (i.valor, i.frete) == (D("23.71"), D("2.52"))
+        assert i.base_da_operacao == D("26.23")
+
+    def test_sem_base_destacada_vale_a_do_cst_60(self):
+        item = """<det nItem="1"><prod><cProd>1012</cProd><cEAN>SEM GTIN</cEAN><xProd>GRECIN</xProd>
+            <NCM>33059000</NCM><CFOP>5405</CFOP><uCom>PC</uCom><qCom>1.0000</qCom>
+            <vProd>39.99</vProd><vFrete>14.90</vFrete></prod>
+            <imposto><ICMS><ICMS60><orig>0</orig><CST>60</CST><vBCSTRet>30.00</vBCSTRet>
+            <pRedBCEfet>0.0000</pRedBCEfet><vBCEfet>54.89</vBCEfet><pICMSEfet>25.0000</pICMSEfet>
+            <vICMSEfet>13.72</vICMSEfet></ICMS60></ICMS></imposto></det>"""
+        i = ler_documento_xml(nfe(item)).itens[0]
+        assert (i.bc_efetiva, i.aliquota_efetiva, i.icms_efetivo) == (D("54.89"), D("25.0000"), D("13.72"))
+        assert i.base_da_operacao == D("54.89")        # mercadoria + frete, como o emitente calculou
+
+    def test_sem_base_nenhuma_soma_o_que_a_operacao_cobrou(self):
+        item = """<det nItem="1"><prod><cProd>1012</cProd><cEAN></cEAN><xProd>GRECIN</xProd>
+            <NCM>33059000</NCM><CFOP>5405</CFOP><uCom>PC</uCom><qCom>1.0000</qCom>
+            <vProd>39.99</vProd><vFrete>14.90</vFrete><vSeg>1.00</vSeg><vOutro>2.00</vOutro>
+            <vDesc>3.00</vDesc></prod>
+            <imposto><ICMS><ICMS60><orig>0</orig><CST>60</CST></ICMS60></ICMS></imposto></det>"""
+        i = ler_documento_xml(nfe(item)).itens[0]
+        assert i.base_da_operacao == D("54.89")        # 39,99 + 14,90 + 1,00 + 2,00 - 3,00
+
+    def test_o_desconto_sai_da_base(self):
+        i = ler_documento_xml(nfe(ITEM_CST00)).itens[0]
+        assert i.base_da_operacao == D("79.98")        # aqui o emitente destacou vBC
+
+
 class TestCFeSat:
     def test_cupom(self):
         conteudo = f"""<?xml version="1.0"?>

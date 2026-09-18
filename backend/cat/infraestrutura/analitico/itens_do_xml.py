@@ -73,6 +73,12 @@ ESQUEMA_ITENS_DO_XML = pa.schema([
     ("quantidade", pa.decimal128(20, 5)),
     ("valor", pa.decimal128(18, 2)),
     ("desconto", pa.decimal128(18, 2)),
+    ("frete", pa.decimal128(18, 2)),
+    ("seguro", pa.decimal128(18, 2)),
+    ("outras", pa.decimal128(18, 2)),
+    # a base do ICMS da operação: vBC, senão vBCEfet, senão a soma do item com
+    # frete e despesas menos o desconto. É a base do valor de confronto
+    ("base_do_item", pa.decimal128(18, 2)),
     ("cst_icms", pa.string()),
     ("bc_icms", pa.decimal128(18, 2)),
     ("aliq_icms", pa.decimal128(9, 4)),
@@ -82,6 +88,10 @@ ESQUEMA_ITENS_DO_XML = pa.schema([
     ("valor_st", pa.decimal128(18, 2)),
     ("fcp_st", pa.decimal128(18, 2)),
     ("bc_st_retido", pa.decimal128(18, 2)),
+    # o que o CST 60 informa do imposto que a ST encerrou (NT 2020.005)
+    ("bc_efetiva", pa.decimal128(18, 2)),
+    ("aliquota_efetiva", pa.decimal128(9, 4)),
+    ("icms_efetivo", pa.decimal128(18, 2)),
     # o ICMS suportado antes, como a NF-e informa no CST 60: substituto + retido + FCP
     ("retido_informado", pa.decimal128(18, 2)),
     # a ordem do arquivo na leitura: entre cópias da mesma chave, fica a de número maior
@@ -240,6 +250,11 @@ def _linha(doc: DocumentoXml, arquivo: str, item, leitura: int) -> dict:
         "unidade": item.unidade, "quantidade": _q(item.quantidade, _Q5),
         "valor": _q(item.valor, _Q2), "desconto": _q(item.desconto, _Q2),
         "cst_icms": item.cst_icms,
+        "frete": _q(item.frete, _Q2), "seguro": _q(item.seguro, _Q2),
+        "outras": _q(item.outras, _Q2), "base_do_item": _q(item.base_da_operacao, _Q2),
+        "bc_efetiva": _q(item.bc_efetiva, _Q2),
+        "aliquota_efetiva": _q(item.aliquota_efetiva, _Q4),
+        "icms_efetivo": _q(item.icms_efetivo, _Q2),
         "bc_icms": _q(item.bc_icms, _Q2), "aliq_icms": _q(item.aliq_icms, _Q4),
         "valor_icms": _q(item.valor_icms, _Q2),
         "bc_st": _q(item.bc_st, _Q2), "aliq_st": _q(item.aliq_st, _Q4),

@@ -137,7 +137,7 @@ class TestOQueCaiEmCadaColuna:
         assert periodo.date() == date(2021, 1, 1)      # o mês da linha, dia 1
         assert planilha.cell(row=4, column=_coluna(planilha, "NCM")).value == "22021000"
         assert planilha.cell(row=4, column=_coluna(planilha, "Descrição")).value == "Refrigerante cola 2L"
-        assert planilha.cell(row=4, column=_coluna(planilha, "VL_ITEM")).value == 100
+        assert planilha.cell(row=4, column=_coluna(planilha, "VL_ITEM (base de cálculo do ICMS)")).value == 100
         # sem código de origem, o "Código Original" repete o da mercadoria
         assert planilha.cell(row=4, column=_coluna(planilha, "Código Original")).value == "X"
 

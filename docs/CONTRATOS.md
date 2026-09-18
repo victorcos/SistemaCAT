@@ -281,6 +281,16 @@ devolução e indefinido), `enquadramento_indefinido`, `quantidade` (com sinal),
 nulo quando não se apura), `saldo_quantidade`, `saldo_unitario`, `saldo_valor`,
 `ressarcimento`, `complemento`.
 
+### VL_ITEM é a base do ICMS (v0.60.0)
+
+`itens_do_xml.parquet` ganha `frete`, `seguro`, `outras`, `bc_efetiva`,
+`aliquota_efetiva`, `icms_efetivo` e `base_do_item` — a base da operação, na
+ordem `vBC` → `vBCEfet` → mercadoria + frete + seguro + outras − desconto.
+`movimentos.parquet` leva `base_do_item_xml`, e o razão passa a usar essa base
+no `valor` da saída: é o VL_ITEM da Ficha 3 e a base do valor de confronto.
+Sem XML, vale a base do C170; sem nenhuma das duas, o valor do item, como era
+antes.
+
 ### Ficha 3 no leiaute do papel de trabalho (v0.59.0)
 
 `ficha3.parquet` ganha `descricao` (do 0200 e, sem cadastro, do xProd do XML que o próprio estabelecimento emitiu — preenchida no fim da rodada, como já era na ficha), `ncm`, `unidade_estoque` e `valor_item` — nas entradas, o VL_ITEM vem da movimentação, porque a apuração do suportado guarda o imposto e não o valor do item. A

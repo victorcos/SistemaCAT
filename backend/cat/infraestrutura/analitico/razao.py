@@ -796,6 +796,13 @@ def _preparar(con, fontes: Fontes) -> dict:
     origem_mov = "coalesce(fonte_item, 'efd')" if "fonte_item" in colunas_mov else "'efd'"
     # o indFinal do XML diz se a NF-e foi a consumidor final
     consumidor_mov = "consumidor_final_xml" if "consumidor_final_xml" in colunas_mov else "NULL::BOOLEAN"
+    # A base do confronto não é o valor da mercadoria: frete e despesas cobrados
+    # do destinatário entram, e desconto sai (artigo 37, § 1º, 1 do RICMS/SP).
+    # O XML já traz isso calculado em `base_do_item`; sem XML, vale a base do
+    # C170; sem nenhuma das duas, o valor do item, como era antes da v0.60.
+    base_mov = " ".join(f'nullif(s.{c}, 0),' for c in ("base_do_item_xml", "bc_icms")
+                        if c in colunas_mov)
+    base_mov = f"coalesce({base_mov} s.valor)"
     # o NCM diz de qual mercadoria é a redução de base: o do XML primeiro, o do
     # cadastro depois. Etapas antigas não têm nem uma coluna nem outra
     ncm_mov = ", ".join(f"nullif(s.{c}, '')" for c in ("ncm_xml", "ncm") if c in colunas_mov)
@@ -834,7 +841,8 @@ def _preparar(con, fontes: Fontes) -> dict:
         CREATE OR REPLACE TABLE saidas_efd AS
         SELECT cnpj, codigo, data, replace(cfop, '.', '') AS cfop, cst_icms, modelo, unidade,
                {ncm_mov} AS ncm,
-               quantidade, valor, coalesce(valor_icms, 0) + coalesce(valor_st, 0) AS suportado,
+               quantidade, {base_mov} AS valor,
+               coalesce(valor_icms, 0) + coalesce(valor_st, 0) AS suportado,
                coalesce(nullif(chave, ''), numero_documento) AS documento, chave,
                false AS pdv, {origem_mov} AS origem,
                numero_item, participante, numero_documento, {serie_mov} AS serie,

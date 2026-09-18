@@ -5,6 +5,47 @@
 
 ---
 
+## 2026-09-18 — VL_ITEM é a base de cálculo do ICMS, não o valor da mercadoria
+
+**O que a comparação mostrou.** Confrontando a nossa Ficha 3 com a da RVZ,
+17.044 linhas divergiam no VL_ITEM, R$ 309.357,59. O Victor achou o motivo
+olhando a DANFE: **a coluna que o leiaute chama de "VL_ITEM" leva a base de
+cálculo do ICMS**, não o valor do item.
+
+A nota 71782 (5 itens, CFOP 6.108) mostra isso inteiro. O emitente já rateia o
+frete por item, dentro do XML:
+
+| Item | `vProd` | `vFrete` | `vBC` = o que a RVZ grava | o que gravávamos |
+|---|---|---|---|---|
+| 1421 | 23,71 | 2,52 | **26,23** | 23,71 |
+| 1424 | 17,26 | 1,83 | **19,09** | 17,26 |
+| 1425 | 17,26 | 1,84 | **19,10** | 17,26 |
+| 1426 | 17,83 | 1,89 | **19,72** | 17,83 |
+| 1427 | 17,83 | 1,90 | **19,73** | 17,83 |
+
+A DANFE traz 26,23 em "B.CALC ICMS", e o total da nota tem `vBC` 103,87 contra
+`vProd` 93,89: o imposto do emitente foi calculado sobre produto **mais frete**,
+como manda o artigo 37, § 1º, 1 do RICMS/SP.
+
+**A regra adotada** (`ItemDoXml.base_da_operacao`), na ordem do documento:
+
+1. `vBC`, a base que o emitente destacou — já com frete e desconto, e já
+   reduzida quando há benefício (CST 20 e 70);
+2. `vBCEfet`, que o CST 60 informa como base do imposto que a ST encerrou — é o
+   caso da venda a consumidor, que não destaca nada;
+3. sem as duas, a soma: mercadoria mais frete, seguro e outras despesas, menos
+   o desconto.
+
+Medido na Advertising: 47.048 saídas passam a bater exatamente com a base que a
+RVZ usou, e as 15.920 de CST 60 ganham o frete. No enquadramento 1 são
+R$ 132.079,41 a mais de base.
+
+**A coluna passa a se chamar "VL_ITEM (base de cálculo do ICMS)"** na planilha.
+O nome do leiaute fica, porque é por ele que se confere; a explicação vai junto,
+porque foi exatamente o rótulo que criou a divergência.
+
+---
+
 ## 2026-09-18 — A Ficha 3 sai no leiaute do papel de trabalho
 
 **O pedido do Victor.** A planilha da Ficha 3 passa a ter o desenho do papel de

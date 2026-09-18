@@ -73,7 +73,9 @@ COLUNAS_FICHA3 = (
     Coluna("participante", "Código do Remetente ou Destinatário", "texto", 18, GERAIS, "8"),
     Coluna("cfop", "CFOP", "texto", 8, GERAIS, "9"),
     Coluna("numero_item", "Número do Item no Documento XML", "numero_inteiro", 10, GERAIS, "10"),
-    Coluna("valor_item", "VL_ITEM", "numero", 14, GERAIS),
+    # o leiaute chama de VL_ITEM, mas o que entra na conta é a base do ICMS da
+    # operação — o título diz as duas coisas para ninguém somar errado
+    Coluna("valor_item", "VL_ITEM (base de cálculo do ICMS)", "numero", 16, GERAIS),
     Coluna("cst_icms", "CST", "texto", 7, GERAIS),
     Coluna("origem", "Origem do Dado", "texto", 11, GERAIS),
 
