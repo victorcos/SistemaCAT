@@ -173,6 +173,37 @@ class TestAConta:
         assert venda["descricao"] == "Refrigerante cola 2L"
         assert venda["valor_item"] == d(20)               # a venda de PDV do relatório
 
+    def test_sem_0200_a_descricao_vem_do_xml_da_propria_saida(self, fontes, tmp_path):
+        """Quatro códigos da Advertising não têm 0200 em arquivo nenhum: a
+        descrição vem do xProd da nota que o próprio estabelecimento emitiu."""
+        mov = tmp_path / "movimentacao"
+        gravar(mov / ARQUIVO_ITENS, [
+            ("cnpj", pa.string()), ("codigo", pa.string()), ("descricao", pa.string()),
+            ("unidade", pa.string()), ("aliq_icms", pa.decimal128(9, 4)),
+        ], [{"cnpj": A, "codigo": "X", "descricao": "", "unidade": "UN", "aliq_icms": d(18)}])
+        gravar(mov / ARQUIVO_ITENS_DO_XML, [
+            ("chave", pa.string()), ("numero_item", pa.int32()), ("emitente", pa.string()),
+            ("destinatario", pa.string()), ("emissao", pa.date32()), ("codigo", pa.string()),
+            ("descricao", pa.string()), ("ncm", pa.string()), ("cst_icms", pa.string()),
+            ("bc_icms", pa.decimal128(18, 2)), ("valor", pa.decimal128(18, 2)),
+            ("desconto", pa.decimal128(18, 2)), ("aliq_icms", pa.decimal128(9, 4)),
+            ("cfop", pa.string()),
+        ], [
+            {"chave": CHAVE_TRANSF, "numero_item": 1, "emitente": A, "destinatario": "22222222000100",
+             "emissao": date(2021, 1, 6), "codigo": "X", "descricao": "REFRIGERANTE COLA 2L (XML)",
+             "ncm": "22021000", "cst_icms": "060", "bc_icms": d(0), "valor": d(30),
+             "desconto": d(0), "aliq_icms": d(0), "cfop": "5152"},
+            # a nota do fornecedor traz o código dele: não serve de descrição nossa
+            {"chave": "9" * 44, "numero_item": 1, "emitente": "99999999000191", "destinatario": A,
+             "emissao": date(2021, 1, 5), "codigo": "X", "descricao": "CODIGO DO FORNECEDOR",
+             "ncm": "22021000", "cst_icms": "000", "bc_icms": d(0), "valor": d(10),
+             "desconto": d(0), "aliq_icms": d(0), "cfop": "5102"},
+        ])
+        destino = tmp_path / "descricao_do_xml"
+        destino.mkdir()
+        montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+        assert {l["descricao"] for l in ficha(destino)} == {"REFRIGERANTE COLA 2L (XML)"}
+
     def test_o_resumo_soma_o_que_a_ficha_diz(self, montado):
         _, r = montado
         assert r.fichas == 1 and r.codigos_com_st == 1 and r.estabelecimentos == 1

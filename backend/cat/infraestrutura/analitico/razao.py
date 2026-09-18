@@ -557,7 +557,8 @@ def montar(
         itens_do_cadastro = os.path.join(fontes.movimentacao, ARQUIVO_ITENS)
         _completar_fichas(con, fichas, itens_do_cadastro,
                           os.path.join(destino, ARQUIVO_CONFERENCIA_INVENTARIO))
-        _completar_ficha3(con, ficha3, itens_do_cadastro)
+        _completar_ficha3(con, ficha3, itens_do_cadastro,
+                          os.path.join(fontes.movimentacao, ARQUIVO_ITENS_DO_XML))
     except ApuracaoCancelada:
         con.close()
         for arquivo in (ficha3, fichas, os.path.join(destino, ARQUIVO_CONFERENCIA_INVENTARIO)):
@@ -609,24 +610,49 @@ def _valorar_aberturas(con, aberturas: dict) -> dict[tuple[str, str], ValorDaAbe
     return valores
 
 
-def _completar_ficha3(con, ficha3: str, itens: str) -> None:
-    """Põe a descrição do 0200 em cada linha da Ficha 3.
+def _completar_ficha3(con, ficha3: str, itens: str, xml_itens: str = "") -> None:
+    """Põe a descrição da mercadoria em cada linha da Ficha 3.
 
     Mesma razão de `_completar_fichas`, e a mesma escolha: em SQL, no fim. A
     descrição é do cadastro, não do lançamento — mas o leiaute do papel de
     trabalho a quer na linha, e quem abre a planilha não deve precisar de um
     segundo arquivo para saber que mercadoria é aquela.
+
+    Primeiro o 0200. Sem cadastro, vale o **xProd do XML da própria saída**: na
+    Advertising, quatro códigos não têm 0200 em arquivo nenhum e respondem por
+    34.672 linhas — a mesma lacuna que obrigou a buscar a alíquota na nota de
+    entrada (v0.58.0).
     """
-    if not os.path.isfile(ficha3) or not os.path.isfile(itens):
+    if not os.path.isfile(ficha3):
+        return
+    juncoes, fontes_da_descricao = [], []
+    if os.path.isfile(itens):
+        juncoes.append(f"""
+            LEFT JOIN (SELECT cnpj, codigo, any_value(descricao) AS descricao
+                       FROM read_parquet('{_escapar(itens)}') GROUP BY cnpj, codigo) i
+              ON i.cnpj = f.cnpj AND i.codigo = f.codigo""")
+        fontes_da_descricao.append("nullif(i.descricao, '')")
+    if os.path.isfile(xml_itens) and {"codigo", "descricao", "emitente"} <= {
+            c.name for c in pq.read_schema(xml_itens)}:
+        # só o que o próprio estabelecimento emitiu: aí o cProd é o código da
+        # ficha. Na nota do fornecedor, o código é o dele
+        juncoes.append(f"""
+            LEFT JOIN (SELECT replace(codigo, ' ', '') AS codigo, mode(descricao) AS descricao
+                       FROM read_parquet('{_escapar(xml_itens)}') x
+                       WHERE x.emitente IN (SELECT DISTINCT cnpj FROM read_parquet('{_escapar(ficha3)}'))
+                         AND nullif(x.descricao, '') IS NOT NULL
+                       GROUP BY 1) x
+              ON x.codigo = replace(f.codigo, ' ', '')""")
+        fontes_da_descricao.append("nullif(x.descricao, '')")
+    if not fontes_da_descricao:
         return
     provisorio = ficha3 + ".tmp"
     con.execute(f"""
         COPY (
-            SELECT f.* REPLACE (coalesce(nullif(f.descricao, ''), i.descricao, '') AS descricao)
+            SELECT f.* REPLACE (coalesce(nullif(f.descricao, ''),
+                                         {', '.join(fontes_da_descricao)}, '') AS descricao)
             FROM read_parquet('{_escapar(ficha3)}') f
-            LEFT JOIN (SELECT cnpj, codigo, any_value(descricao) AS descricao
-                       FROM read_parquet('{_escapar(itens)}') GROUP BY cnpj, codigo) i
-              ON i.cnpj = f.cnpj AND i.codigo = f.codigo
+            {"".join(juncoes)}
         ) TO '{_escapar(provisorio)}' (FORMAT PARQUET, COMPRESSION ZSTD)
     """)
     os.replace(provisorio, ficha3)
