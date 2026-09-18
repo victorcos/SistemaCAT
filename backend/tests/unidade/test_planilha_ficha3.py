@@ -38,7 +38,7 @@ def _linha(**campos) -> dict:
         "enquadramento_indefinido": False, "ficha_retirada": False, "unidade_origem": "UN",
         "fator_conversao": d(1), "unidade_sem_fator": False, "quantidade": d(10),
         "valor_item": d(100), "icms_suportado": d(20), "valor_unitario_usado": d(2),
-        "icms_efetivo": None, "aliquota": None, "reducao_base": None,
+        "icms_efetivo": None, "aliquota": None, "aliquota_documento": None, "reducao_base": None,
         "saldo_quantidade": d(10), "saldo_unitario": d(2), "saldo_valor": d(20),
         "ressarcimento": d(0), "complemento": d(0), "chave": "4" * 44, "numero_item": 1,
         "modelo": "55", "participante": "F1", "numero_documento": "1", "serie": "1",
@@ -55,11 +55,11 @@ def ficha3(tmp_path):
         _linha(),
         _linha(numero=2, data=date(2021, 1, 6), especie="saida", cfop="5405", cst_icms="560",
                enquadramento=1, quantidade=d(-2), valor_item=d(30), icms_suportado=d(-4),
-               icms_efetivo=d("2.88"), aliquota=d(18), reducao_base=d(52),
+               icms_efetivo=d("2.88"), aliquota=d(18), aliquota_documento=d(18), reducao_base=d(52),
                saldo_quantidade=d(8), saldo_valor=d(16), complemento=d(0), ressarcimento=d("1.12")),
         _linha(numero=3, data=date(2021, 2, 8), especie="saida", cfop="6102", cst_icms="500",
                enquadramento=4, quantidade=d(-1), valor_item=d(9), icms_suportado=d(-2),
-               icms_efetivo=d("0.63"), saldo_quantidade=d(-1), saldo_valor=d(14),
+               icms_efetivo=d("0.63"), aliquota_documento=d(4), saldo_quantidade=d(-1), saldo_valor=d(14),
                ressarcimento=d("1.37"), credito_operacao_propria=d("0.63")),
     ]
     caminho = tmp_path / "ficha3.parquet"
@@ -190,8 +190,15 @@ class TestOQueCaiEmCadaColuna:
         assert planilha.cell(row=6, column=entrada).value == 0.63   # enquadramento 4
         assert planilha.cell(row=6, column=saida).value is None
 
-    def test_as_nossas_colunas_de_confronto(self, planilha):
-        assert planilha.cell(row=5, column=_coluna(planilha, "Alíquota do ICMS")).value == 18
+    def test_a_aliquota_do_documento_e_a_do_confronto_sao_colunas_diferentes(self, planilha):
+        """A dos Dados Gerais é a da operação — 4% na venda interestadual; a do
+        confronto é a interna da mercadoria (correção do Victor, 18/09/2026)."""
+        documento = _coluna(planilha, "Alíquota do ICMS")
+        confronto = _coluna(planilha, "Alíquota do Confronto (%)")
+        assert planilha.cell(row=6, column=documento).value == 4        # saída para outro estado
+        assert planilha.cell(row=6, column=confronto).value is None     # enq 4 não confronta a saída
+        assert planilha.cell(row=5, column=documento).value == 18
+        assert planilha.cell(row=5, column=confronto).value == 18
         assert planilha.cell(row=5, column=_coluna(planilha, "Redução de Base (%)")).value == 52
         assert planilha.cell(row=5, column=_coluna(planilha, "CST")).value == "560"
 

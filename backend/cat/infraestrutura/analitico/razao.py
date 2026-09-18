@@ -218,8 +218,10 @@ ESQUEMA_FICHA3 = pa.schema([
     ("icms_suportado", pa.decimal128(30, 15)),
     ("valor_unitario_usado", pa.decimal128(30, 15)),
     ("icms_efetivo", pa.decimal128(24, 6)),
-    # a alíquota interna que fez o confronto, e a redução de base herdada da
+    # a alíquota da operação, como o documento a traz — e, separada dela, a
+    # alíquota interna que fez o confronto com a redução de base herdada da
     # entrada, em %, quando ela entrou no efetivo
+    ("aliquota_documento", pa.decimal128(9, 4)),
     ("aliquota", pa.decimal128(9, 4)),
     ("reducao_base", pa.decimal128(9, 4)),
     ("saldo_quantidade", pa.decimal128(24, 6)),
@@ -796,6 +798,13 @@ def _preparar(con, fontes: Fontes) -> dict:
     origem_mov = "coalesce(fonte_item, 'efd')" if "fonte_item" in colunas_mov else "'efd'"
     # o indFinal do XML diz se a NF-e foi a consumidor final
     consumidor_mov = "consumidor_final_xml" if "consumidor_final_xml" in colunas_mov else "NULL::BOOLEAN"
+    # A alíquota da operação, que a Ficha 3 mostra em cada linha: a destacada no
+    # documento e, no CST 60 — que não destaca nada —, a que o emitente informa
+    # como efetiva (pICMSEfet). Não confundir com a alíquota do confronto, que é
+    # a interna da mercadoria e só existe no enquadramento que confronta a saída.
+    aliq_doc = " ".join(f'nullif(s.{c}, 0),' for c in ("aliq_icms", "aliquota_efetiva_xml")
+                        if c in colunas_mov)
+    aliq_doc = f"coalesce({aliq_doc} NULL)" if aliq_doc else "NULL::DECIMAL(9, 4)"
     # A base do confronto não é o valor da mercadoria: frete e despesas cobrados
     # do destinatário entram, e desconto sai (artigo 37, § 1º, 1 do RICMS/SP).
     # O XML já traz isso calculado em `base_do_item`; sem XML, vale a base do
@@ -840,7 +849,7 @@ def _preparar(con, fontes: Fontes) -> dict:
     con.execute(f"""
         CREATE OR REPLACE TABLE saidas_efd AS
         SELECT cnpj, codigo, data, replace(cfop, '.', '') AS cfop, cst_icms, modelo, unidade,
-               {ncm_mov} AS ncm,
+               {ncm_mov} AS ncm, {aliq_doc} AS aliquota_documento,
                quantidade, {base_mov} AS valor,
                coalesce(valor_icms, 0) + coalesce(valor_st, 0) AS suportado,
                coalesce(nullif(chave, ''), numero_documento) AS documento, chave,
@@ -885,8 +894,8 @@ def _preparar(con, fontes: Fontes) -> dict:
                    CASE WHEN length(chave) = 44 THEN substr(chave, 21, 2) ELSE '' END AS modelo,
                    -- a "Qtde;Unitária" do relatório já é a unidade básica
                    NULL::VARCHAR AS unidade,
-                   -- o relatório não traz NCM: a redução de base vem do 0200
-                   NULL::VARCHAR AS ncm,
+                   -- o relatório não traz NCM nem alíquota: vêm do 0200
+                   NULL::VARCHAR AS ncm, NULL::DECIMAL(9, 4) AS aliquota_documento,
                    quantidade, valor, suportado,
                    coalesce(nullif(chave, ''), 'relatorio|' || unidade || '|' || numero_documento) AS documento,
                    chave, pdv, 'relatorio' AS origem,
@@ -939,11 +948,12 @@ def _preparar(con, fontes: Fontes) -> dict:
             FROM read_parquet('{_escapar(conversoes)}')""")
     else:
         con.execute("CREATE OR REPLACE TABLE conv (cnpj VARCHAR, codigo VARCHAR, unidade VARCHAR, fator DECIMAL(24, 9))")
+    aliq_doc_entrada = aliq_doc.replace("s.", "")
     # a unidade de cada entrada está na movimentação, não na apuração
     con.execute(f"""
         CREATE OR REPLACE TABLE unidade_das_entradas AS
         SELECT cnpj, chave, numero_documento, data, numero_item, codigo, any_value(unidade) AS unidade,
-               any_value(valor) AS valor
+               any_value(valor) AS valor, max({aliq_doc_entrada}) AS aliquota_documento
         FROM {mov} WHERE operacao = 'entrada'
         GROUP BY cnpj, chave, numero_documento, data, numero_item, codigo
     """)
@@ -960,7 +970,7 @@ def _preparar(con, fontes: Fontes) -> dict:
                {_FATOR.format(t="l")} * coalesce(d.fator, 1) AS fator, {_SEM_FATOR.format(t="l")} AS sem_fator
         FROM (
             SELECT s.cnpj, s.codigo, s.data, replace(s.cfop, '.', '') AS cfop, s.cst_icms, s.modelo,
-                   ue.unidade, NULL::VARCHAR AS ncm,
+                   ue.unidade, NULL::VARCHAR AS ncm, ue.aliquota_documento,
                    -- o VL_ITEM da entrada está na movimentação: a apuração do
                    -- suportado guarda o imposto, não o valor do item
                    s.quantidade, ue.valor, s.suportado,
@@ -977,6 +987,7 @@ def _preparar(con, fontes: Fontes) -> dict:
              AND ue.data = s.data AND ue.numero_item = s.numero_item AND ue.codigo = s.codigo
             UNION ALL
             SELECT s.cnpj, s.codigo, s.data, s.cfop, s.cst_icms, s.modelo, s.unidade, s.ncm,
+                   s.aliquota_documento,
                    s.quantidade, s.valor, s.suportado, s.documento, s.pdv, s.origem,
                    CASE WHEN s.cfop IN ({lista(_DEVOLUCAO_DE_COMPRA)}) THEN 'entrada' ELSE 'saida' END,
                    s.cfop IN ({lista(_DEVOLUCAO_DE_COMPRA)}),
@@ -1436,6 +1447,7 @@ class DadosDaLinha:
     ncm: str = ""
     unidade_estoque: str = ""
     valor_item: Decimal | None = None
+    aliquota_documento: Decimal | None = None
 
 
 def _documento(linha: dict) -> tuple:
@@ -1466,7 +1478,7 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
         cst=(linha.get("cst_icms") or "").strip(),
         ncm=(linha.get("ncm") or "").strip(),
         unidade_estoque=(linha.get("unidade_estoque") or "").strip(),
-        valor_item=linha.get("valor"), **kw)
+        valor_item=linha.get("valor"), aliquota_documento=linha.get("aliquota_documento"), **kw)
     # a ficha é na unidade do inventário
     quantidade = quantidade * fator
     enq, indefinido, faltou, pendente, efetivo = EnquadramentoLegal.DEMAIS_SAIDAS, False, False, False, None
@@ -1534,6 +1546,8 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, dados: DadosDaLinha,
     lote["icms_suportado"].append(ln.icms_suportado.quantize(_Q15))
     lote["valor_unitario_usado"].append(ln.valor_unitario_usado.quantize(_Q15))
     lote["icms_efetivo"].append(m.icms_efetivo.quantize(_Q6) if m.icms_efetivo is not None else None)
+    lote["aliquota_documento"].append(Decimal(dados.aliquota_documento).quantize(_Q4)
+                                      if dados.aliquota_documento else None)
     lote["aliquota"].append(Decimal(dados.aliquota).quantize(_Q4) if dados.aliquota else None)
     lote["reducao_base"].append(Decimal(dados.reducao).quantize(_Q4) if dados.reducao else None)
     lote["saldo_quantidade"].append(ln.saldo_quantidade.quantize(_Q6))

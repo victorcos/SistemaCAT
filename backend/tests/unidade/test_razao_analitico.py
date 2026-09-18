@@ -204,6 +204,15 @@ class TestAConta:
         montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
         assert {l["descricao"] for l in ficha(destino)} == {"REFRIGERANTE COLA 2L (XML)"}
 
+    def test_a_aliquota_da_operacao_vem_do_documento(self, montado):
+        """A Ficha 3 mostra a alíquota de cada linha como o documento a traz —
+        é outra coisa que a alíquota interna do confronto."""
+        destino, _ = montado
+        linhas = ficha(destino)
+        # a venda de PDV vem do relatório, que não traz alíquota
+        assert linhas[2]["aliquota_documento"] is None
+        assert linhas[2]["aliquota"] == d(18)          # a do confronto, do 0200
+
     def test_o_resumo_soma_o_que_a_ficha_diz(self, montado):
         _, r = montado
         assert r.fichas == 1 and r.codigos_com_st == 1 and r.estabelecimentos == 1

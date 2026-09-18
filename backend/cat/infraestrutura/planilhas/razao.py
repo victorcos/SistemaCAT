@@ -17,8 +17,12 @@ O que muda em relação ao papel de trabalho, e por quê:
 * as colunas (15) a (19) levam o **ICMS suportado baixado** na saída, por
   enquadramento — não o valor da venda. É desse valor que o confronto de (20)
   ou (21) é subtraído para dar o ressarcimento ou o complemento;
-* acrescentamos **CST, origem do dado, alíquota do confronto e redução de
-  base**: é o que permite refazer a conta da linha sem abrir outro arquivo;
+* a coluna "Alíquota do ICMS" dos Dados Gerais é a **da operação**, como o
+  documento a traz — e no CST 60, que não destaca nada, a que o emitente informa
+  como efetiva. A **do confronto** é outra coisa, é a interna da mercadoria, e
+  por isso fica no bloco do confronto, ao lado da redução de base;
+* acrescentamos **CST e origem do dado**: é o que permite refazer a conta da
+  linha sem abrir outro arquivo;
 * as **inconsistências** são as nossas, marcadas por linha em vez de por ficha;
 * não temos **alíquota do ICMS ST** nem **MVA do NCM** por linha, e coluna vazia
   em planilha de conferência custa mais do que ajuda: ficam de fora.
@@ -62,7 +66,7 @@ COLUNAS_FICHA3 = (
     Coluna("ncm", "NCM", "texto", 11, GERAIS),
     Coluna("unidade_estoque", "Unidade de Medida", "texto", 10, GERAIS),
     Coluna("unidade_origem", "Unidade de Medida (NF-e)", "texto", 11, GERAIS),
-    Coluna("aliquota", "Alíquota do ICMS", "quantidade", 10, GERAIS),
+    Coluna("aliquota_documento", "Alíquota do ICMS", "quantidade", 10, GERAIS),
     Coluna("numero", "Número da Ordem", "numero_inteiro", 9, GERAIS, "1"),
     Coluna("data", "Data", "data", 11, GERAIS, "2"),
     Coluna("chave", "Chave", "texto", 46, GERAIS, "3"),
@@ -102,6 +106,7 @@ COLUNAS_FICHA3 = (
            "numero", 15, CONFRONTO, "20"),
     Coluna("confronto_entrada", "ICMS Efetivo da Entrada nas Demais Hipóteses",
            "numero", 15, CONFRONTO, "21"),
+    Coluna("aliquota", "Alíquota do Confronto (%)", "quantidade", 12, CONFRONTO),
     Coluna("reducao_base", "Redução de Base (%)", "quantidade", 12, CONFRONTO),
 
     Coluna("saldo_quantidade", "Quantidade", "quantidade", 13, SALDO, "22"),

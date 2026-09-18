@@ -281,6 +281,14 @@ devolução e indefinido), `enquadramento_indefinido`, `quantidade` (com sinal),
 nulo quando não se apura), `saldo_quantidade`, `saldo_unitario`, `saldo_valor`,
 `ressarcimento`, `complemento`.
 
+### Duas alíquotas na Ficha 3 (v0.60.2)
+
+`ficha3.parquet` ganha `aliquota_documento` — a da operação, destacada no
+documento e, sem destaque, a efetiva que o emitente informa no CST 60. A
+coluna "Alíquota do ICMS" dos Dados Gerais passa a ser ela; a `aliquota` do
+confronto vai para o bloco do confronto, como "Alíquota do Confronto (%)".
+`movimentos.parquet` leva `aliquota_efetiva_xml` para isso.
+
 ### Colunas 15 a 19 da Ficha 3 (v0.60.1)
 
 As colunas de enquadramento da planilha levam `abs(icms_suportado)` da linha de

@@ -5,6 +5,29 @@
 
 ---
 
+## 2026-09-18 — Duas alíquotas, duas colunas
+
+**O que o Victor viu.** Na Ficha 3 da RVZ a alíquota está preenchida em toda
+linha; na nossa, só em parte — e só com 25 e 18.
+
+**Por quê.** São duas coisas diferentes que estavam na mesma coluna:
+
+* a **alíquota da operação**, que o documento traz: 4, 7 ou 12 na venda
+  interestadual, 18 ou 25 na interna. Existe em toda linha;
+* a **alíquota do confronto**, que é a interna da mercadoria e só aparece onde
+  o enquadramento confronta a saída (1 e 3) — no 2 e no 4 o confronto vem do
+  ICMS próprio da entrada, e não há alíquota nenhuma a mostrar.
+
+A nossa coluna "Alíquota do ICMS" levava a segunda. Agora leva a primeira, e a
+do confronto foi para o bloco do confronto, ao lado da redução de base.
+
+**No CST 60 não há destaque**, e é aí que a RVZ mostra 25 ou 18: é a alíquota
+que o próprio emitente informa como efetiva no grupo do ICMS60 (`pICMSEfet`, da
+NT 2020.005), que a v0.60.0 passou a ler. Então a coluna fica: alíquota
+destacada; sem destaque, a efetiva do emitente.
+
+---
+
 ## 2026-09-18 — As colunas 15 a 19 levam o ICMS suportado, não o valor da saída
 
 **A correção do Victor.** Na primeira versão do leiaute, as colunas de
