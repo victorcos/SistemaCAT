@@ -1170,6 +1170,12 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
                 SELECT r.reducao FROM reducoes r
                 WHERE r.ncm = lancamentos.ncm ORDER BY r.data LIMIT 1)
             WHERE reducao_base IS NULL AND ncm IS NOT NULL""")
+    # o documento nem sempre diz a alíquota: o CST 60 não destaca nada, e nem
+    # todo emitente preenche o pICMSEfet (na Advertising, 35.448 dos 81.157
+    # itens). Nessas linhas a Ficha 3 mostra a alíquota interna da mercadoria,
+    # que é o que a operação teria — é o que o papel de trabalho faz
+    con.execute("""UPDATE lancamentos SET aliquota_documento = aliquota
+        WHERE aliquota_documento IS NULL AND aliquota IS NOT NULL""")
     log.info("redução de base lida das entradas",
              extra={"mercadorias": len({n for n, _ in por_dia}), "dias": len(por_dia)})
 

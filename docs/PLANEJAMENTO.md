@@ -7,7 +7,7 @@
 
 ## Onde estamos
 
-**As oito etapas da CAT 42 estão no ar (v0.60.2), e o trabalho do Amigão passou
+**As oito etapas da CAT 42 estão no ar (v0.60.3), e o trabalho do Amigão passou
 por todas** (de novo em 16/09/2026, da etapa 4 à 8, em 59 min). Desde a v0.53, a
 etapa 3 lê o item do XML, o razão aplica o de-para aprovado e confronta os
 enquadramentos 2 e 4 com o crédito do art. 271; na v0.54, a nota cancelada na

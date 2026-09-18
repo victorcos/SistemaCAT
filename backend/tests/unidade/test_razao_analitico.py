@@ -209,8 +209,9 @@ class TestAConta:
         é outra coisa que a alíquota interna do confronto."""
         destino, _ = montado
         linhas = ficha(destino)
-        # a venda de PDV vem do relatório, que não traz alíquota
-        assert linhas[2]["aliquota_documento"] is None
+        # a venda de PDV vem do relatório, que não traz alíquota: a ficha mostra
+        # a interna da mercadoria, que é o que a operação teria
+        assert linhas[2]["aliquota_documento"] == d(18)
         assert linhas[2]["aliquota"] == d(18)          # a do confronto, do 0200
 
     def test_o_resumo_soma_o_que_a_ficha_diz(self, montado):

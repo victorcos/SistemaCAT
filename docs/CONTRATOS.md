@@ -285,7 +285,8 @@ nulo quando não se apura), `saldo_quantidade`, `saldo_unitario`, `saldo_valor`,
 
 `ficha3.parquet` ganha `aliquota_documento` — a da operação, destacada no
 documento e, sem destaque, a efetiva que o emitente informa no CST 60. A
-coluna "Alíquota do ICMS" dos Dados Gerais passa a ser ela; a `aliquota` do
+coluna "Alíquota do ICMS" dos Dados Gerais passa a ser ela — e, sem nenhuma das
+duas, a interna da mercadoria, para que toda linha tenha alíquota; a `aliquota` do
 confronto vai para o bloco do confronto, como "Alíquota do Confronto (%)".
 `movimentos.parquet` leva `aliquota_efetiva_xml` para isso.
 

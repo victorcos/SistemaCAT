@@ -23,8 +23,13 @@ do confronto foi para o bloco do confronto, ao lado da redução de base.
 
 **No CST 60 não há destaque**, e é aí que a RVZ mostra 25 ou 18: é a alíquota
 que o próprio emitente informa como efetiva no grupo do ICMS60 (`pICMSEfet`, da
-NT 2020.005), que a v0.60.0 passou a ler. Então a coluna fica: alíquota
-destacada; sem destaque, a efetiva do emitente.
+NT 2020.005), que a v0.60.0 passou a ler. Mas nem todo emitente preenche esse
+campo — na Advertising, 35.448 dos 81.157 itens de CST 60. Nas outras, a ficha
+mostra a **alíquota interna da mercadoria**, que é o que a operação teria.
+
+A coluna fica então, nesta ordem: alíquota destacada no documento; a efetiva
+que o emitente informou; a interna da mercadoria. Assim toda linha tem alíquota,
+como na Ficha 3 deles.
 
 ---
 
