@@ -112,9 +112,9 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       (achado do Victor na comparação com a RVZ, v0.60.0)
 - [x] Ficha 3 no leiaute do papel de trabalho, com o cabeçalho padrão em todas
       as planilhas (pedido do Victor, v0.59.0)
-- [x] Redução aplicada é a da carga do benefício — 12% do art. 34 do Anexo II,
-      sobre a alíquota interna, sem o redutor do Decreto 65.255/2020 (decisões
-      do Victor, v0.61.0)
+- [x] Redução aplicada é a que o documento declara no `pRedBC` — 13% no Grecin,
+      6% no Vagisil —, sem o redutor do Decreto 65.255/2020 (decisões do
+      Victor, v0.62.0)
 - [ ] **Decidir a premissa do ICMS efetivo do enquadramento 1**: o § 1º do art.
       34 exclui a saída a consumidor final, e a RC 23455/2021 exclui a cadeia da
       ST. Hoje o sistema aplica a redução (R$ 392.475,69); a alíquota cheia dá
