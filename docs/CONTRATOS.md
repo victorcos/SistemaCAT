@@ -283,7 +283,7 @@ nulo quando não se apura), `saldo_quantidade`, `saldo_unitario`, `saldo_valor`,
 
 ### Ficha 3 no leiaute do papel de trabalho (v0.59.0)
 
-`ficha3.parquet` ganha `descricao`, `ncm`, `unidade_estoque` e `valor_item`. A
+`ficha3.parquet` ganha `descricao` (do 0200, preenchida no fim da rodada como já era na ficha), `ncm`, `unidade_estoque` e `valor_item` — nas entradas, o VL_ITEM vem da movimentação, porque a apuração do suportado guarda o imposto e não o valor do item. A
 planilha da etapa sai com cabeçalho de três linhas (faixa do bloco, título e o
 número do campo do leiaute, de 1 a 27) e com as colunas do papel de trabalho da
 CAT 42, mais CST, origem, alíquota do confronto e redução de base. O CSV leva o

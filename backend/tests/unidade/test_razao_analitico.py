@@ -163,6 +163,16 @@ class TestAConta:
         assert venda["ressarcimento"] == d("1.4")
         assert linhas[3]["devolucao"] and linhas[3]["saldo_valor"] == d(14)
 
+    def test_a_linha_traz_o_cadastro_e_o_valor_do_item(self, montado):
+        """O leiaute do papel de trabalho pede descrição, NCM e VL_ITEM na
+        linha — inclusive na entrada, cujo valor está na movimentação."""
+        destino, _ = montado
+        entrada, venda = ficha(destino)[0], ficha(destino)[2]
+        assert entrada["descricao"] == "Refrigerante cola 2L"
+        assert entrada["valor_item"] == d(100)            # o C170 da entrada
+        assert venda["descricao"] == "Refrigerante cola 2L"
+        assert venda["valor_item"] == d(20)               # a venda de PDV do relatório
+
     def test_o_resumo_soma_o_que_a_ficha_diz(self, montado):
         _, r = montado
         assert r.fichas == 1 and r.codigos_com_st == 1 and r.estabelecimentos == 1

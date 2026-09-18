@@ -554,8 +554,10 @@ def montar(
         resumo.conferencia = _conferir_inventario(
             con, fontes, ficha3, fichas, os.path.join(destino, ARQUIVO_CONFERENCIA_INVENTARIO),
             info["inicio"], info["fim"])
-        _completar_fichas(con, fichas, os.path.join(fontes.movimentacao, ARQUIVO_ITENS),
+        itens_do_cadastro = os.path.join(fontes.movimentacao, ARQUIVO_ITENS)
+        _completar_fichas(con, fichas, itens_do_cadastro,
                           os.path.join(destino, ARQUIVO_CONFERENCIA_INVENTARIO))
+        _completar_ficha3(con, ficha3, itens_do_cadastro)
     except ApuracaoCancelada:
         con.close()
         for arquivo in (ficha3, fichas, os.path.join(destino, ARQUIVO_CONFERENCIA_INVENTARIO)):
@@ -605,6 +607,29 @@ def _valorar_aberturas(con, aberturas: dict) -> dict[tuple[str, str], ValorDaAbe
         if chave not in valores:
             valores[chave] = valor_da_abertura(Decimal(quantidade), [])
     return valores
+
+
+def _completar_ficha3(con, ficha3: str, itens: str) -> None:
+    """Põe a descrição do 0200 em cada linha da Ficha 3.
+
+    Mesma razão de `_completar_fichas`, e a mesma escolha: em SQL, no fim. A
+    descrição é do cadastro, não do lançamento — mas o leiaute do papel de
+    trabalho a quer na linha, e quem abre a planilha não deve precisar de um
+    segundo arquivo para saber que mercadoria é aquela.
+    """
+    if not os.path.isfile(ficha3) or not os.path.isfile(itens):
+        return
+    provisorio = ficha3 + ".tmp"
+    con.execute(f"""
+        COPY (
+            SELECT f.* REPLACE (coalesce(nullif(f.descricao, ''), i.descricao, '') AS descricao)
+            FROM read_parquet('{_escapar(ficha3)}') f
+            LEFT JOIN (SELECT cnpj, codigo, any_value(descricao) AS descricao
+                       FROM read_parquet('{_escapar(itens)}') GROUP BY cnpj, codigo) i
+              ON i.cnpj = f.cnpj AND i.codigo = f.codigo
+        ) TO '{_escapar(provisorio)}' (FORMAT PARQUET, COMPRESSION ZSTD)
+    """)
+    os.replace(provisorio, ficha3)
 
 
 def _completar_fichas(con, fichas: str, itens: str, conferencia: str) -> None:
@@ -883,7 +908,8 @@ def _preparar(con, fontes: Fontes) -> dict:
     # a unidade de cada entrada está na movimentação, não na apuração
     con.execute(f"""
         CREATE OR REPLACE TABLE unidade_das_entradas AS
-        SELECT cnpj, chave, numero_documento, data, numero_item, codigo, any_value(unidade) AS unidade
+        SELECT cnpj, chave, numero_documento, data, numero_item, codigo, any_value(unidade) AS unidade,
+               any_value(valor) AS valor
         FROM {mov} WHERE operacao = 'entrada'
         GROUP BY cnpj, chave, numero_documento, data, numero_item, codigo
     """)
@@ -901,7 +927,9 @@ def _preparar(con, fontes: Fontes) -> dict:
         FROM (
             SELECT s.cnpj, s.codigo, s.data, replace(s.cfop, '.', '') AS cfop, s.cst_icms, s.modelo,
                    ue.unidade, NULL::VARCHAR AS ncm,
-                   s.quantidade, NULL::DECIMAL(20, 6) AS valor, s.suportado,
+                   -- o VL_ITEM da entrada está na movimentação: a apuração do
+                   -- suportado guarda o imposto, não o valor do item
+                   s.quantidade, ue.valor, s.suportado,
                    coalesce(nullif(s.chave, ''), s.numero_documento) AS documento,
                    false AS pdv, 'efd' AS origem,
                    CASE WHEN replace(s.cfop, '.', '') IN ({lista(_DEVOLUCAO_DE_VENDA)}) THEN 'saida' ELSE 'entrada' END AS especie,
