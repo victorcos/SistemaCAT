@@ -46,6 +46,23 @@ from cat.log import obter_log
 
 log = obter_log(__name__)
 
+# O cabeçalho de todas as planilhas do projeto, no padrão do papel de trabalho
+# da CAT 42 (pedido do Victor, 18/09/2026): faixa azul-marinho, Arial 10 em
+# negrito branco, centralizado e com quebra de linha. Fica aqui, e não em cada
+# gerador, porque planilha com cara diferente a cada etapa é o que o cliente
+# percebe primeiro.
+AZUL_DO_CABECALHO = "#001E50"
+FONTE_DA_PLANILHA = "Arial"
+CORPO_DA_FONTE = 10
+ESTILO_DO_CABECALHO = {
+    "bold": True, "bg_color": AZUL_DO_CABECALHO, "font_color": "#FFFFFF",
+    "font_name": FONTE_DA_PLANILHA, "font_size": CORPO_DA_FONTE, "border": 1,
+    "align": "center", "valign": "vcenter", "text_wrap": True,
+}
+# a altura da faixa de títulos: o do papel de trabalho tem 51, e é o que cabe
+# em três linhas de texto sem cortar
+ALTURA_DO_CABECALHO = 51
+
 LIMITE_POR_ABA = 900_000
 LINHAS_POR_LEITURA = 50_000
 
@@ -65,6 +82,21 @@ class Coluna:
     titulo: str
     tipo: str = "texto"      # texto | numero | quantidade | numero_inteiro | data
     largura: int = 16
+    # o bloco do cabeçalho ("Dados Gerais", "Saídas") e o número do campo no
+    # leiaute da CAT 42 ("1", "20"). Colunas seguidas com o mesmo bloco
+    # viram uma faixa mesclada acima dos títulos; o número vai numa linha
+    # abaixo deles. Vazios nos dois, o cabeçalho é de uma linha só, como era.
+    bloco: str = ""
+    numero: str = ""
+
+    @property
+    def titulo_no_csv(self) -> str:
+        """No CSV não há faixa nem linha de número: tudo vira um título só."""
+        return f"{self.titulo} ({self.numero})" if self.numero else self.titulo
+
+    @property
+    def numero_na_planilha(self) -> str:
+        return f"({self.numero})" if self.numero else ""
 
 
 COLUNAS_SEM_DOCUMENTO = (
@@ -289,7 +321,8 @@ def _gerar_csv(parquet: str, destino: str, colunas: tuple[Coluna, ...],
     pasta = _pasta_de_rascunho(destino)
 
     with open(destino, "w", encoding="utf-8-sig", newline="") as f:
-        csv.writer(f, delimiter=SEPARADOR_CSV, quoting=csv.QUOTE_MINIMAL).writerow([c.titulo for c in colunas])
+        csv.writer(f, delimiter=SEPARADOR_CSV,
+                   quoting=csv.QUOTE_MINIMAL).writerow([c.titulo_no_csv for c in colunas])
     con = duckdb.connect()
     try:
         con.execute("SET threads TO 4")
@@ -345,20 +378,18 @@ def _gerar_xlsx(parquet: str, destino: str, colunas: tuple[Coluna, ...],
         # mesma escolha que o DuckDB já faz com `temp_directory`.
         "tmpdir": _pasta_de_rascunho(destino),
     })
-    cabecalho = livro.add_format({
-        "bold": True, "bg_color": "#021D44", "font_color": "#FFFFFF",
-        "border": 1, "align": "left", "valign": "vcenter",
-    })
-    texto = livro.add_format({"num_format": "@"})
-    dinheiro = livro.add_format({"num_format": "#,##0.00"})
+    cabecalho = livro.add_format(ESTILO_DO_CABECALHO)
+    corpo = {"font_name": FONTE_DA_PLANILHA, "font_size": CORPO_DA_FONTE}
+    texto = livro.add_format({"num_format": "@", **corpo})
+    dinheiro = livro.add_format({"num_format": "#,##0.00", **corpo})
     # quantidade tem até cinco casas na EFD; mostrar duas esconderia fração
-    quantidade = livro.add_format({"num_format": "#,##0.00###"})
-    inteiro = livro.add_format({"num_format": "0"})
-    dia = livro.add_format({"num_format": "dd/mm/yyyy"})
+    quantidade = livro.add_format({"num_format": "#,##0.00###", **corpo})
+    inteiro = livro.add_format({"num_format": "0", **corpo})
+    dia = livro.add_format({"num_format": "dd/mm/yyyy", **corpo})
     formatos = {"texto": texto, "numero": dinheiro, "quantidade": quantidade,
                 "numero_inteiro": inteiro, "data": dia}
 
-    aba = _abrir_aba(livro, titulo_da_aba, 1, colunas, cabecalho)
+    aba, primeira = _abrir_aba(livro, titulo_da_aba, 1, colunas, cabecalho)
     escritas = 0
     na_aba = 0
     abas = 1
@@ -366,9 +397,9 @@ def _gerar_xlsx(parquet: str, destino: str, colunas: tuple[Coluna, ...],
     for r in _filtradas(parquet, modelos, classificacoes, campo):
         if na_aba >= LIMITE_POR_ABA:
             abas += 1
-            aba = _abrir_aba(livro, titulo_da_aba, abas, colunas, cabecalho)
+            aba, primeira = _abrir_aba(livro, titulo_da_aba, abas, colunas, cabecalho)
             na_aba = 0
-        _escrever(aba, na_aba + 1, r, colunas, formatos)
+        _escrever(aba, primeira + na_aba, r, colunas, formatos)
         na_aba += 1
         escritas += 1
 
@@ -379,15 +410,51 @@ def _gerar_xlsx(parquet: str, destino: str, colunas: tuple[Coluna, ...],
     return escritas
 
 
+def _faixas(colunas: tuple[Coluna, ...]) -> list[tuple[str, int, int]]:
+    """As faixas de bloco: (título, primeira coluna, última), colunas seguidas
+    com o mesmo bloco viram uma só."""
+    faixas: list[tuple[str, int, int]] = []
+    for i, coluna in enumerate(colunas):
+        if faixas and faixas[-1][0] == coluna.bloco:
+            faixas[-1] = (coluna.bloco, faixas[-1][1], i)
+        else:
+            faixas.append((coluna.bloco, i, i))
+    return faixas
+
+
 def _abrir_aba(livro, titulo: str, numero: int, colunas: tuple[Coluna, ...],
                formato_cabecalho):
+    """Abre a aba e escreve o cabeçalho. Devolve (aba, primeira linha de dado).
+
+    Com bloco ou número nas colunas, o cabeçalho tem três linhas — faixa,
+    título e número do campo no leiaute —, como o papel de trabalho da CAT 42.
+    Sem eles, continua com uma linha só.
+    """
     nome = titulo if numero == 1 else f"{titulo} ({numero})"
     aba = livro.add_worksheet(nome[:31])
+    tem_faixa = any(c.bloco for c in colunas)
+    tem_numero = any(c.numero for c in colunas)
+    linha_do_titulo = 1 if tem_faixa else 0
     for i, coluna in enumerate(colunas):
         aba.set_column(i, i, coluna.largura)
-        aba.write(0, i, coluna.titulo, formato_cabecalho)
-    aba.freeze_panes(1, 0)
-    return aba
+    # com `constant_memory` o xlsxwriter despeja cada linha em disco assim que
+    # a seguinte começa: a faixa tem de ser escrita antes dos títulos, e os
+    # títulos antes dos números, senão a linha de cima já foi e some
+    if tem_faixa:
+        for bloco, de, ate in _faixas(colunas):
+            if de == ate:
+                aba.write(0, de, bloco, formato_cabecalho)
+            else:
+                aba.merge_range(0, de, 0, ate, bloco, formato_cabecalho)
+    aba.set_row(linha_do_titulo, ALTURA_DO_CABECALHO)
+    for i, coluna in enumerate(colunas):
+        aba.write(linha_do_titulo, i, coluna.titulo, formato_cabecalho)
+    if tem_numero:
+        for i, coluna in enumerate(colunas):
+            aba.write(linha_do_titulo + 1, i, coluna.numero_na_planilha, formato_cabecalho)
+    primeira = linha_do_titulo + (2 if tem_numero else 1)
+    aba.freeze_panes(primeira, 0)
+    return aba, primeira
 
 
 def _escrever(aba, linha: int, registro: dict, colunas: tuple[Coluna, ...],

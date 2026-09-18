@@ -281,6 +281,15 @@ devolução e indefinido), `enquadramento_indefinido`, `quantidade` (com sinal),
 nulo quando não se apura), `saldo_quantidade`, `saldo_unitario`, `saldo_valor`,
 `ressarcimento`, `complemento`.
 
+### Ficha 3 no leiaute do papel de trabalho (v0.59.0)
+
+`ficha3.parquet` ganha `descricao`, `ncm`, `unidade_estoque` e `valor_item`. A
+planilha da etapa sai com cabeçalho de três linhas (faixa do bloco, título e o
+número do campo do leiaute, de 1 a 27) e com as colunas do papel de trabalho da
+CAT 42, mais CST, origem, alíquota do confronto e redução de base. O CSV leva o
+número junto do título ("Chave (3)"). O estilo do cabeçalho — `#001E50`, Arial
+10 negrito branco — passa a valer em todas as planilhas do projeto.
+
 ### CST na Ficha 3 (v0.58.1)
 
 `ficha3.parquet` grava `cst_icms` em toda linha, entrada e saída, como veio da

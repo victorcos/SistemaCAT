@@ -3,41 +3,173 @@
 A ficha é a lista grande — uma linha por lançamento, e numa base real são
 dezenas de milhões. É a que se baixa em CSV. O resumo por ficha é o que se
 abre no Excel para achar onde está o ressarcimento e o que pede atenção.
+
+## A Ficha 3 sai no leiaute do papel de trabalho
+
+Decisão do Victor, 18/09/2026: a planilha da Ficha 3 segue o desenho do papel
+de trabalho da CAT 42 — faixas por bloco (Dados Gerais, Entradas, Saídas, Valor
+de Confronto, Saldo, Apuração, Inconsistências) e o **número do campo no
+leiaute** debaixo de cada título, de (1) a (27). Quem confere a nossa entrega
+contra a de outro escritório compara coluna com coluna, sem tradução no meio.
+
+O que muda em relação ao papel de trabalho, e por quê:
+
+* a **quantidade e o valor vêm em colunas separadas por enquadramento** — (15)
+  a (19) —, como manda o leiaute, mas o valor que cai ali é o VL_ITEM da linha,
+  não um rateio;
+* acrescentamos **CST, origem do dado, alíquota do confronto e redução de
+  base**: é o que permite refazer a conta da linha sem abrir outro arquivo;
+* as **inconsistências** são as nossas, marcadas por linha em vez de por ficha;
+* não temos **alíquota do ICMS ST** nem **MVA do NCM** por linha, e coluna vazia
+  em planilha de conferência custa mais do que ajuda: ficam de fora.
+
+A derivação é feita em SQL sobre o parquet, num arquivo de rascunho, e só
+depois a planilha é escrita — assim o xlsx e o CSV saem das mesmas colunas, e
+a Ficha 3 de milhões de linhas continua saindo com memória constante.
 """
 
 from __future__ import annotations
 
-from cat.infraestrutura.planilhas.conferencia import Coluna, gerar
+import os
+
+import duckdb
+import pyarrow.parquet as pq
+
+from cat.infraestrutura.planilhas.conferencia import (
+    Coluna,
+    _literal,
+    _pasta_de_rascunho,
+    gerar,
+)
+
+# ---------------------------------------------------------------------------
+# a Ficha 3 no leiaute do papel de trabalho
+# ---------------------------------------------------------------------------
+GERAIS = "Dados Gerais"
+ENTRADAS = "Entradas"
+SAIDAS = "Saídas"
+CONFRONTO = "Valor de Confronto"
+SALDO = "Saldo"
+APURACAO = "Apuração"
+INCONSISTENCIAS = "Inconsistências"
 
 COLUNAS_FICHA3 = (
-    Coluna("cnpj", "CNPJ do estabelecimento", "texto", 20),
-    Coluna("codigo", "Código da mercadoria", "texto", 16),
-    Coluna("numero", "Linha", "numero_inteiro", 8),
-    Coluna("data", "Data", "data", 12),
-    Coluna("especie", "Espécie", "texto", 10),
-    Coluna("devolucao", "Devolução", "texto", 10),
-    Coluna("cfop", "CFOP", "texto", 7),
-    Coluna("cst_icms", "CST", "texto", 6),
-    Coluna("documento", "Documento", "texto", 46),
-    Coluna("origem", "Origem", "texto", 11),
-    Coluna("enquadramento", "Enquadramento legal", "numero_inteiro", 12),
-    Coluna("enquadramento_indefinido", "Enquadramento indefinido", "texto", 12),
-    Coluna("ficha_retirada", "Ficha retirada do total", "texto", 10),
-    Coluna("unidade_origem", "Unidade na nota", "texto", 9),
-    Coluna("fator_conversao", "Fator (0220)", "quantidade", 10),
-    Coluna("unidade_sem_fator", "Unidade sem fator", "texto", 10),
-    Coluna("quantidade", "Quantidade (unidade do inventário)", "quantidade", 14),
-    Coluna("icms_suportado", "ICMS suportado", "numero", 16),
-    Coluna("valor_unitario_usado", "Unitário do saldo anterior", "quantidade", 16),
-    Coluna("icms_efetivo", "Valor de confronto", "numero", 16),
-    Coluna("aliquota", "Alíquota do confronto (%)", "quantidade", 12),
-    Coluna("reducao_base", "Redução de base (%)", "quantidade", 12),
-    Coluna("saldo_quantidade", "Saldo em quantidade", "quantidade", 14),
-    Coluna("saldo_unitario", "Saldo unitário", "quantidade", 16),
-    Coluna("saldo_valor", "Saldo em valor", "numero", 16),
-    Coluna("ressarcimento", "Ressarcimento", "numero", 14),
-    Coluna("complemento", "Complemento", "numero", 14),
+    Coluna("periodo", "Período", "data", 11, GERAIS),
+    Coluna("cnpj", "CNPJ do Estabelecimento", "texto", 20, GERAIS),
+    Coluna("codigo", "Código da Mercadoria", "texto", 16, GERAIS),
+    Coluna("codigo_original", "Código Original", "texto", 16, GERAIS),
+    Coluna("descricao", "Descrição", "texto", 40, GERAIS),
+    Coluna("ncm", "NCM", "texto", 11, GERAIS),
+    Coluna("unidade_estoque", "Unidade de Medida", "texto", 10, GERAIS),
+    Coluna("unidade_origem", "Unidade de Medida (NF-e)", "texto", 11, GERAIS),
+    Coluna("aliquota", "Alíquota do ICMS", "quantidade", 10, GERAIS),
+    Coluna("numero", "Número da Ordem", "numero_inteiro", 9, GERAIS, "1"),
+    Coluna("data", "Data", "data", 11, GERAIS, "2"),
+    Coluna("chave", "Chave", "texto", 46, GERAIS, "3"),
+    Coluna("serie_ecf", "Número de Série de Fabricação do ECF", "texto", 12, GERAIS, "4"),
+    Coluna("tipo", "Tipo 0 - Entrada 1 - Saída", "texto", 10, GERAIS, "5"),
+    Coluna("serie", "Série do Documento", "texto", 9, GERAIS, "6"),
+    Coluna("numero_documento", "Número do Documento", "texto", 13, GERAIS, "7"),
+    Coluna("participante", "Código do Remetente ou Destinatário", "texto", 18, GERAIS, "8"),
+    Coluna("cfop", "CFOP", "texto", 8, GERAIS, "9"),
+    Coluna("numero_item", "Número do Item no Documento XML", "numero_inteiro", 10, GERAIS, "10"),
+    Coluna("valor_item", "VL_ITEM", "numero", 14, GERAIS),
+    Coluna("cst_icms", "CST", "texto", 7, GERAIS),
+    Coluna("origem", "Origem do Dado", "texto", 11, GERAIS),
+
+    Coluna("qtd_entrada", "Quantidade (Entrada)", "quantidade", 12, ENTRADAS, "11"),
+    Coluna("suportado_entrada",
+           "Valor Total do ICMS Suportado na Retenção ou Antecipação por Substituição Tributária",
+           "numero", 17, ENTRADAS, "12"),
+
+    Coluna("cod_legal", "COD_LEGAL", "numero_inteiro", 10, SAIDAS),
+    Coluna("qtd_saida", "Quantidade (Saída)", "quantidade", 12, SAIDAS, "13"),
+    Coluna("suportado_unitario", "Valor Unitário do ICMS Suportado", "numero", 15, SAIDAS, "14"),
+    Coluna("saida_enq1", "Saída a Consumidor ou Usuário Final - Código Enquadramento 1",
+           "numero", 15, SAIDAS, "15"),
+    Coluna("saida_enq2", "Fato Gerador Não Realizado - Código Enquadramento 2",
+           "numero", 15, SAIDAS, "16"),
+    Coluna("saida_enq3", "Saída ou Saída Subsequente com Isenção ou Não Incidência - Código Enquadramento 3",
+           "numero", 15, SAIDAS, "17"),
+    Coluna("saida_enq4", "Saída para Outro Estado - Código Enquadramento 4",
+           "numero", 15, SAIDAS, "18"),
+    Coluna("saida_enq0", "Saída para Comercialização Subsequente (Demais Saídas)",
+           "numero", 15, SAIDAS, "19"),
+
+    Coluna("confronto_saida", "ICMS Efetivo na Saída a Consumidor ou Usuário Final",
+           "numero", 15, CONFRONTO, "20"),
+    Coluna("confronto_entrada", "ICMS Efetivo da Entrada nas Demais Hipóteses",
+           "numero", 15, CONFRONTO, "21"),
+    Coluna("reducao_base", "Redução de Base (%)", "quantidade", 12, CONFRONTO),
+
+    Coluna("saldo_quantidade", "Quantidade", "quantidade", 13, SALDO, "22"),
+    Coluna("saldo_unitario", "Valor Unitário do Saldo", "quantidade", 14, SALDO, "23"),
+    Coluna("saldo_valor", "Valor Total do Saldo", "numero", 14, SALDO, "24"),
+
+    Coluna("ressarcimento", "Valor do Ressarcimento", "numero", 14, APURACAO, "25"),
+    Coluna("complemento", "Valor do Complemento", "numero", 14, APURACAO, "26"),
+    Coluna("credito_operacao_propria", "ICMS - Crédito da Operação Própria (artigo 271)",
+           "numero", 15, APURACAO, "27"),
+
+    Coluna("entrada_sem_suportado", "Entrada sem ICMS Suportado", "texto", 12, INCONSISTENCIAS),
+    Coluna("devolucao_sem_suportado", "Devolução sem ICMS Suportado", "texto", 12, INCONSISTENCIAS),
+    Coluna("ressarcimento_sem_confronto", "Ressarcimento sem Valor de Confronto",
+           "texto", 12, INCONSISTENCIAS),
+    Coluna("saldo_negativo", "Saldo Parcial Negativo", "texto", 12, INCONSISTENCIAS),
+    Coluna("enquadramento_indefinido", "Enquadramento Indefinido", "texto", 12, INCONSISTENCIAS),
+    Coluna("unidade_sem_fator", "Unidade sem Fator de Conversão", "texto", 12, INCONSISTENCIAS),
+    Coluna("ficha_retirada", "Ficha Retirada do Total", "texto", 12, INCONSISTENCIAS),
 )
+
+# como cada coluna do leiaute sai do parquet da ficha. O que não existir no
+# arquivo — rodada antiga, coluna que ainda não havia — vira nulo, e a planilha
+# sai assim mesmo: melhor a coluna vazia do que a etapa recusando o download.
+DERIVACAO = {
+    "periodo": "date_trunc('month', data)::DATE",
+    "codigo_original": "coalesce(codigo_original, codigo)",
+    "serie_ecf": "NULL::VARCHAR",
+    "tipo": "CASE WHEN especie = 'entrada' THEN '0' ELSE '1' END",
+    "qtd_entrada": "CASE WHEN especie = 'entrada' THEN abs(quantidade) END",
+    "suportado_entrada": "CASE WHEN especie = 'entrada' THEN icms_suportado END",
+    "cod_legal": "enquadramento",
+    "qtd_saida": "CASE WHEN especie = 'saida' THEN abs(quantidade) END",
+    "suportado_unitario": "CASE WHEN especie = 'saida' THEN valor_unitario_usado END",
+    "saida_enq1": "CASE WHEN especie = 'saida' AND enquadramento = 1 THEN valor_item END",
+    "saida_enq2": "CASE WHEN especie = 'saida' AND enquadramento = 2 THEN valor_item END",
+    "saida_enq3": "CASE WHEN especie = 'saida' AND enquadramento = 3 THEN valor_item END",
+    "saida_enq4": "CASE WHEN especie = 'saida' AND enquadramento = 4 THEN valor_item END",
+    "saida_enq0": "CASE WHEN especie = 'saida' AND enquadramento = 0 THEN valor_item END",
+    # o leiaute separa o confronto pela coluna: 1 e 3 olham a saída, 2 e 4 a entrada
+    "confronto_saida": "CASE WHEN enquadramento IN (1, 3) THEN icms_efetivo END",
+    "confronto_entrada": "CASE WHEN enquadramento IN (2, 4) THEN icms_efetivo END",
+    "entrada_sem_suportado":
+        "especie = 'entrada' AND NOT devolucao AND coalesce(icms_suportado, 0) = 0",
+    "devolucao_sem_suportado": "devolucao AND coalesce(icms_suportado, 0) = 0",
+    "ressarcimento_sem_confronto": "ressarcimento > 0 AND icms_efetivo IS NULL",
+    "saldo_negativo": "saldo_quantidade < 0",
+}
+
+
+def _derivado(parquet: str, destino: str) -> str:
+    """Escreve o parquet de rascunho com as colunas do leiaute e devolve o caminho."""
+    tem = {c.name for c in pq.read_schema(parquet)}
+    partes = []
+    for coluna in COLUNAS_FICHA3:
+        expressao = DERIVACAO.get(coluna.campo, f'"{coluna.campo}"')
+        if coluna.campo not in DERIVACAO and coluna.campo not in tem:
+            expressao = "NULL"
+        partes.append(f'{expressao} AS "{coluna.campo}"')
+    rascunho = os.path.join(_pasta_de_rascunho(destino), "ficha3_leiaute.parquet")
+    con = duckdb.connect()
+    try:
+        con.execute("SET threads TO 4")
+        con.execute(f"SET temp_directory = {_literal(os.path.dirname(rascunho))}")
+        con.execute(f"COPY (SELECT {', '.join(partes)} FROM read_parquet({_literal(parquet)})) "
+                    f"TO {_literal(rascunho)} (FORMAT parquet)")
+    finally:
+        con.close()
+    return rascunho
+
 
 COLUNAS_FICHAS = (
     Coluna("cnpj", "CNPJ do estabelecimento", "texto", 20),
@@ -79,7 +211,12 @@ COLUNAS_CONFERENCIA = (
 
 def gerar_ficha3(parquet: str, destino: str, modelos=None, classificacoes=None,
                  formato: str = "xlsx") -> int:
-    return gerar(parquet, destino, COLUNAS_FICHA3, "Ficha 3", formato=formato)
+    rascunho = _derivado(parquet, destino)
+    try:
+        return gerar(rascunho, destino, COLUNAS_FICHA3, "Ficha 3", formato=formato)
+    finally:
+        if os.path.isfile(rascunho):
+            os.remove(rascunho)
 
 
 def gerar_fichas(parquet: str, destino: str, modelos=None, classificacoes=None,

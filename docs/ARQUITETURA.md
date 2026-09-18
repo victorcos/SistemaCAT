@@ -120,6 +120,17 @@ zero à esquerda (CNPJ, inscrição estadual, chave da nota, série) vai como
 **texto**; valor, quantidade e data vão tipados, senão não se soma nem se monta
 dinâmica.
 
+O cabeçalho é o mesmo em **toda** planilha do projeto (decisão do Victor,
+18/09/2026): faixa `#001E50`, Arial 10 em negrito branco, centralizado, com
+quebra de linha e altura de 51. O estilo mora em
+`planilhas/conferencia.py` (`ESTILO_DO_CABECALHO`), e não em cada gerador —
+planilha com cara diferente a cada etapa é o que o cliente percebe primeiro.
+Uma coluna pode declarar `bloco` e `numero`: aí o cabeçalho vira três linhas —
+faixa mesclada por bloco, título e o número do campo no leiaute —, que é como
+sai a Ficha 3. Com `constant_memory`, essas três linhas têm de ser escritas de
+cima para baixo: o xlsxwriter despeja a linha anterior em disco assim que a
+seguinte começa.
+
 ## 10. Onde a IA entra, e onde não entra
 
 O cálculo do ressarcimento é determinístico e **não usa modelo**. Mandar detalhe

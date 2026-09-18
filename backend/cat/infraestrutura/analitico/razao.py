@@ -188,6 +188,11 @@ ESQUEMA_SAIDA_DO_RELATORIO = pa.schema([
 ESQUEMA_FICHA3 = pa.schema([
     ("cnpj", pa.string()),
     ("codigo", pa.string()),
+    # o cadastro da mercadoria, que o leiaute do papel de trabalho pede na
+    # linha e não obriga a cruzar com outro arquivo para ler a ficha
+    ("descricao", pa.string()),
+    ("ncm", pa.string()),
+    ("unidade_estoque", pa.string()),
     ("numero", pa.int32()),
     ("data", pa.date32()),
     ("especie", pa.string()),
@@ -207,6 +212,9 @@ ESQUEMA_FICHA3 = pa.schema([
     ("fator_conversao", pa.decimal128(24, 9)),
     ("unidade_sem_fator", pa.bool_()),
     ("quantidade", pa.decimal128(24, 6)),
+    # o VL_ITEM do documento, que é a base do confronto e o que se confere
+    # contra a nota
+    ("valor_item", pa.decimal128(20, 6)),
     ("icms_suportado", pa.decimal128(30, 15)),
     ("valor_unitario_usado", pa.decimal128(30, 15)),
     ("icms_efetivo", pa.decimal128(24, 6)),
@@ -1172,8 +1180,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
     estabelecimentos: set[str] = set()
     atual: tuple[str, str] | None = None
     movimentos: list[Movimento] = []
-    # (indefinido, faltou, conversão, documento, (alíquota, redução, da entrada), CST)
-    extras: list[tuple] = []
+    extras: list[DadosDaLinha] = []
     # as entradas da ficha lidas até aqui, com o ICMS próprio: o confronto de 2 e 4
     entradas_da_ficha: list[EntradaAnterior] = []
     andamento = Andamento(total=total)
@@ -1181,6 +1188,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
 
     def fechar(chave: tuple[str, str]) -> None:
         cnpj, codigo = chave
+        descricao = descricoes.get((cnpj, codigo)) or descricoes.get(("", codigo), "")
         qtd_abertura = Decimal(aberturas.get(chave) or 0)
         va = (valores or {}).get(chave)
         valor_abertura = va.valor if va is not None else Decimal(0)
@@ -1205,16 +1213,16 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         sem_aliq = indef = sem_fator = com_reducao = com_aliq_entrada = 0
         for ln in linhas:
             m = ln.movimento
-            indefinido, faltou, conversao, doc, confronto, cst = indice[id(m)]
-            reducao = confronto[1]
-            com_aliq_entrada += confronto[2]
+            d = indice[id(m)]
+            indefinido, faltou, conversao = d.indefinido, d.faltou_aliquota, d.conversao
+            com_aliq_entrada += d.aliquota_da_entrada
             competencia = m.data.isoformat()[:7]
-            _acrescentar(lote, cnpj, codigo, ln, indefinido, conversao, retirada, doc, confronto, cst)
-            if reducao:
+            _acrescentar(lote, cnpj, codigo, ln, d, retirada, descricao)
+            if d.reducao:
                 com_reducao += 1
                 # o que a redução tirou do confronto: efetivo * r / (100 - r)
                 resumo.efetivo_reduzido += ((m.icms_efetivo or Decimal(0))
-                                            * Decimal(reducao) / (Decimal(100) - Decimal(reducao)))
+                                            * Decimal(d.reducao) / (Decimal(100) - Decimal(d.reducao)))
             sem_fator += conversao[2]
             resumo.linhas_convertidas += conversao[1] != 1
             resumo.linhas_unidade_sem_fator += conversao[2]
@@ -1256,7 +1264,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         ultima = linhas[-1] if linhas else None
         uf = uf_por_cnpj.get(cnpj, "")
         for k, val in (("cnpj", cnpj), ("uf", uf), ("codigo", codigo),
-                       ("descricao", descricoes.get((cnpj, codigo)) or descricoes.get(("", codigo), "")),
+                       ("descricao", descricao),
                        ("linhas", len(linhas)),
                        ("abertura_quantidade", qtd_abertura.quantize(_Q6)),
                        ("abertura_valor", valor_abertura.quantize(_Q15)),
@@ -1314,7 +1322,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                     if atual is not None:
                         fechar(atual)
                     atual, movimentos, extras, entradas_da_ficha = chave, [], [], []
-                m, indefinido, faltou, pendente, conversao, confronto = _movimento(
+                m, pendente, dados = _movimento(
                     linha, len(movimentos), resumo, venda_a_consumidor, entradas_da_ficha)
                 if m is None:
                     continue
@@ -1324,8 +1332,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                                                              len(entradas_da_ficha)))
                 resumo.confronto_pendente += pendente
                 movimentos.append(m)
-                extras.append((indefinido, faltou, conversao, _documento(linha), confronto,
-                               (linha.get("cst_icms") or "").strip()))
+                extras.append(dados)
                 andamento.linhas += 1
             if avisar is not None:
                 andamento.fichas = resumo.fichas
@@ -1346,6 +1353,29 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
     resumo.estabelecimentos = len(estabelecimentos)
 
 
+@dataclass(frozen=True)
+class DadosDaLinha:
+    """O que a linha da Ficha 3 guarda além do que o razão calcula.
+
+    Era uma tupla que crescia a cada versão — e cada campo novo obrigava a
+    contar posições em quatro lugares. Aqui cada coisa tem nome.
+    """
+
+    indefinido: bool = False
+    faltou_aliquota: bool = False
+    # (unidade de origem, fator, unidade sem fator)
+    conversao: tuple = ("", Decimal(1), False)
+    # (chave, nº do item, modelo, participante, número, série, código de origem)
+    documento: tuple = ("", None, "", "", "", "", None)
+    aliquota: Decimal | None = None
+    reducao: Decimal | None = None
+    aliquota_da_entrada: bool = False
+    cst: str = ""
+    ncm: str = ""
+    unidade_estoque: str = ""
+    valor_item: Decimal | None = None
+
+
 def _documento(linha: dict) -> tuple:
     """(chave, nº do item, modelo, participante, número, série, código de origem) — o
     que o arquivo digital pede, e de que código a linha veio."""
@@ -1359,9 +1389,8 @@ def _documento(linha: dict) -> tuple:
 def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
                venda_a_consumidor: VendaAConsumidor = VendaAConsumidor.ENQUADRAMENTO_1,
                entradas_da_ficha: list[EntradaAnterior] | None = None):
-    """Converte um lançamento em `Movimento`. Devolve (movimento, indefinido,
-    faltou alíquota, confronto pendente, (unidade de origem, fator, sem fator),
-    redução de base aplicada)."""
+    """Converte um lançamento em `Movimento`. Devolve o movimento, se o
+    confronto ficou pendente e os `DadosDaLinha` que a ficha grava."""
     especie = Especie.ENTRADA if linha["especie"] == "entrada" else Especie.SAIDA
     quantidade = Decimal(linha["quantidade"] or 0)
     if quantidade < 0:
@@ -1370,6 +1399,12 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
         quantidade = -quantidade
     fator = Decimal(linha["fator"] or 1)
     conversao = (linha["unidade"] or "", fator, bool(linha["sem_fator"]))
+    dados = lambda **kw: DadosDaLinha(  # noqa: E731 - fecha sobre o lançamento
+        conversao=conversao, documento=_documento(linha),
+        cst=(linha.get("cst_icms") or "").strip(),
+        ncm=(linha.get("ncm") or "").strip(),
+        unidade_estoque=(linha.get("unidade_estoque") or "").strip(),
+        valor_item=linha.get("valor"), **kw)
     # a ficha é na unidade do inventário
     quantidade = quantidade * fator
     enq, indefinido, faltou, pendente, efetivo = EnquadramentoLegal.DEMAIS_SAIDAS, False, False, False, None
@@ -1402,22 +1437,26 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
     except MovimentoInvalido as erro:
         log.warning("lançamento recusado pelo razão", extra={"motivo": str(erro),
                                                             "codigo": linha["codigo"]})
-        return None, False, False, False, conversao, (None, None, False)
-    return m, indefinido, faltou, pendente, conversao, (aliquota, reducao, da_entrada)
+        return None, False, dados()
+    return m, pendente, dados(indefinido=indefinido, faltou_aliquota=faltou, aliquota=aliquota,
+                              reducao=reducao, aliquota_da_entrada=da_entrada)
 
 
-def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conversao: tuple,
-                 retirada: bool, doc: tuple = ("", None, "", "", ""),
-                 confronto: tuple = (None, None, False), cst: str = "") -> None:
+def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, dados: DadosDaLinha,
+                 retirada: bool = False, descricao: str = "") -> None:
     m = ln.movimento
+    indefinido, conversao, doc = dados.indefinido, dados.conversao, dados.documento
     lote["cnpj"].append(cnpj)
     lote["codigo"].append(codigo)
+    lote["descricao"].append(descricao)
+    lote["ncm"].append(dados.ncm)
+    lote["unidade_estoque"].append(dados.unidade_estoque)
     lote["numero"].append(ln.numero)
     lote["data"].append(m.data)
     lote["especie"].append(m.especie.value)
     lote["devolucao"].append(m.devolucao)
     lote["cfop"].append(m.cfop)
-    lote["cst_icms"].append(cst)
+    lote["cst_icms"].append(dados.cst)
     lote["documento"].append(m.documento)
     lote["origem"].append(m.origem)
     saida_propria = not m.especie.e_entrada and not m.devolucao
@@ -1428,12 +1467,13 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, indefinido: bool, conve
     lote["fator_conversao"].append(Decimal(conversao[1]).quantize(Decimal("0.000000001")))
     lote["unidade_sem_fator"].append(conversao[2])
     lote["quantidade"].append(ln.quantidade.quantize(_Q6))
+    lote["valor_item"].append(Decimal(dados.valor_item).quantize(_Q6)
+                              if dados.valor_item is not None else None)
     lote["icms_suportado"].append(ln.icms_suportado.quantize(_Q15))
     lote["valor_unitario_usado"].append(ln.valor_unitario_usado.quantize(_Q15))
     lote["icms_efetivo"].append(m.icms_efetivo.quantize(_Q6) if m.icms_efetivo is not None else None)
-    aliquota, reducao = confronto[0], confronto[1]
-    lote["aliquota"].append(Decimal(aliquota).quantize(_Q4) if aliquota else None)
-    lote["reducao_base"].append(Decimal(reducao).quantize(_Q4) if reducao else None)
+    lote["aliquota"].append(Decimal(dados.aliquota).quantize(_Q4) if dados.aliquota else None)
+    lote["reducao_base"].append(Decimal(dados.reducao).quantize(_Q4) if dados.reducao else None)
     lote["saldo_quantidade"].append(ln.saldo_quantidade.quantize(_Q6))
     lote["saldo_unitario"].append(ln.saldo_unitario.quantize(_Q15))
     lote["saldo_valor"].append(ln.saldo_valor.quantize(_Q15))

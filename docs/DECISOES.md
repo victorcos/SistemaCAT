@@ -5,6 +5,32 @@
 
 ---
 
+## 2026-09-18 — A Ficha 3 sai no leiaute do papel de trabalho
+
+**O pedido do Victor.** A planilha da Ficha 3 passa a ter o desenho do papel de
+trabalho da CAT 42 — o mesmo que o cliente já recebe de outro escritório —, e o
+cabeçalho azul daquele modelo vale para **todas** as planilhas do projeto.
+
+**Como ficou.** Cabeçalho de três linhas: faixa mesclada por bloco (Dados
+Gerais, Entradas, Saídas, Valor de Confronto, Saldo, Apuração, Inconsistências),
+título e, embaixo, o **número do campo no leiaute**, de (1) a (27). Quem
+confere compara coluna com coluna, sem tradução no meio. O estilo — `#001E50`,
+Arial 10 negrito branco, centralizado — é do projeto, não da Ficha 3: qualquer
+planilha nova nasce com ele.
+
+**As nossas adaptações**, que o papel de trabalho não tem: CST, origem do dado
+(EFD, XML ou relatório), alíquota do confronto e redução de base por linha — é
+o que permite refazer a conta sem abrir outro arquivo —, e as inconsistências
+marcadas **na linha** em vez de na ficha. Ficam de fora a alíquota do ICMS ST e
+a MVA do NCM, que não temos por linha: coluna vazia em planilha de conferência
+custa mais do que ajuda.
+
+**O que a Ficha 3 passou a guardar para isso:** `descricao`, `ncm`,
+`unidade_estoque` e `valor_item` (o VL_ITEM do documento). Rodada antiga sai com
+essas colunas vazias, em vez de a etapa recusar o download.
+
+---
+
 ## 2026-09-18 — O artigo 34 não alcança a saída a consumidor: premissa em aberto
 
 **O que a pesquisa achou.** O benefício que o fornecedor da Advertising aplica é
