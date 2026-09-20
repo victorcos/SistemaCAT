@@ -27,7 +27,9 @@ export type TipoDeEvento =
   | "etapa_falhou"
   | "planilha_baixada"
   | "parametro_alterado"
-  | "entrega_aprovada";
+  | "entrega_aprovada"
+  | "correcao_aplicada"
+  | "correcao_desfeita";
 
 export interface EventoDoProjeto {
   id: number;
@@ -44,6 +46,17 @@ export interface EventoDoProjeto {
     uteis?: number;
     bytes?: number;
     execucao_id?: number;
+    /** correção à mão: o antes e o depois de cada alteração (v0.64) */
+    correcoes?: number;
+    mudancas?: {
+      campo: string;
+      rotulo: string;
+      onde: string;
+      de: string;
+      para: string;
+      motivo: string;
+      frase: string;
+    }[];
     [k: string]: unknown;
   };
   autor: string;
@@ -80,7 +93,7 @@ export type Familia = "tudo" | "comentarios" | "situacao" | "arquivos" | "etapas
 
 export const FAMILIA: Record<Exclude<Familia, "tudo">, TipoDeEvento[]> = {
   comentarios: ["comentario"],
-  situacao: ["status", "sucessao", "criado", "parametro_alterado"],
+  situacao: ["status", "sucessao", "criado", "parametro_alterado", "correcao_aplicada", "correcao_desfeita"],
   arquivos: ["lote_importado", "lote_removido", "lote_reclassificado"],
   etapas: ["etapa_iniciada", "etapa_concluida", "etapa_falhou", "planilha_baixada", "entrega_aprovada"],
 };

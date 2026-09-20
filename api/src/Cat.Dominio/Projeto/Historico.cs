@@ -65,6 +65,8 @@ public static class TipoDeEvento
     public const string PlanilhaBaixada = "planilha_baixada";
     public const string ParametroAlterado = "parametro_alterado";
     public const string EntregaAprovada = "entrega_aprovada";
+    public const string CorrecaoAplicada = "correcao_aplicada";
+    public const string CorrecaoDesfeita = "correcao_desfeita";
 
     private static readonly Dictionary<string, string> Rotulos = new()
     {
@@ -81,6 +83,8 @@ public static class TipoDeEvento
         [PlanilhaBaixada] = "Planilha baixada",
         [ParametroAlterado] = "Parâmetro do trabalho alterado",
         [EntregaAprovada] = "Entrega aprovada",
+        [CorrecaoAplicada] = "Correção à mão",
+        [CorrecaoDesfeita] = "Correção desfeita",
     };
 
     /// <summary>

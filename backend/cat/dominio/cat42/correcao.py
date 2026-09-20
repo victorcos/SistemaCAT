@@ -32,6 +32,11 @@ o revisor precisa para aprovar a entrega. Sem motivo, não grava.
 **Correção não apaga o original.** O valor que o documento trazia continua no
 parquet, e a Ficha 3 mostra os dois: o que veio e o que se corrigiu. Desfazer é
 tirar a correção, não reescrever o dado.
+
+**E o histórico mostra o antes e o depois** (pedido do Victor, 20/09/2026). Por
+isso a correção guarda `valor_anterior`: o que estava na tela quando a pessoa
+corrigiu. Não é o valor de agora nem o de uma rodada futura — é o que ela viu e
+decidiu mudar, que é o que a auditoria precisa ler.
 """
 
 from __future__ import annotations
@@ -110,10 +115,25 @@ class Correcao:
     codigo: str = ""
     documento: str = ""
     numero_item: int | None = None
+    valor_anterior: str = ""
 
     @property
     def alvo(self) -> Alvo:
         return self.campo.alvo
+
+    @property
+    def onde(self) -> str:
+        """O alvo em uma linha, como o histórico mostra."""
+        if self.alvo is Alvo.MERCADORIA:
+            return f"mercadoria {self.codigo}"
+        documento = self.documento if len(self.documento) != 44 else f"…{self.documento[-6:]}"
+        return f"documento {documento}, item {self.numero_item}"
+
+    @property
+    def frase(self) -> str:
+        """O antes e o depois, prontos para a linha do tempo do trabalho."""
+        antes = self.valor_anterior.strip() or "(vazio)"
+        return f"{self.campo.rotulo} ({self.onde}): {antes} → {self.valor_gravado}"
 
     @property
     def valor_gravado(self) -> str:
@@ -131,7 +151,7 @@ def _decimal(valor, campo: Campo) -> Decimal:
 
 
 def validar(campo: str | Campo, valor, motivo: str | None, cnpj: str = "", codigo: str = "",
-            documento: str = "", numero_item=None) -> Correcao:
+            documento: str = "", numero_item=None, valor_anterior=None) -> Correcao:
     """Confere a correção e devolve-a normalizada, ou recusa dizendo por quê.
 
     A mesma regra vale para quem sobe planilha e para quem edita na tela: é por
@@ -207,5 +227,8 @@ def validar(campo: str | Campo, valor, motivo: str | None, cnpj: str = "", codig
             raise CorrecaoInvalida(f"{campo.rotulo} não pode ser negativo.")
         valor_final = numero.quantize(_Q6)
 
+    anterior = "" if valor_anterior is None else str(valor_anterior).strip()
+    if len(anterior) > MOTIVO_MAXIMO:
+        raise CorrecaoInvalida("O valor anterior informado é longo demais para ser um valor.")
     return Correcao(campo=campo, valor=valor_final, motivo=texto, cnpj=cnpj, codigo=codigo,
-                    documento=documento, numero_item=numero_item)
+                    documento=documento, numero_item=numero_item, valor_anterior=anterior)

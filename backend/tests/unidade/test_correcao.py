@@ -123,6 +123,31 @@ class TestCorrecaoDeLinha:
             validar("excluida", "talvez", "motivo bom", documento="3" * 44, numero_item=1)
 
 
+class TestOHistorico:
+    """O histórico mostra o antes e o depois (pedido do Victor, 20/09/2026)."""
+
+    def test_a_frase_da_mercadoria(self):
+        c = validar("aliquota", 25, "Sem 0200; NCM 3305.90.00", codigo="4002", valor_anterior="18.0000")
+        assert c.frase == "Alíquota interna (mercadoria 4002): 18.0000 → 25.0000"
+
+    def test_a_frase_da_linha_encurta_a_chave(self):
+        c = validar("enquadramento", 1, "consumidor confirmado pelo cliente",
+                    documento="3" * 44, numero_item=2, valor_anterior="indefinido")
+        assert c.frase == "Enquadramento legal (documento …333333, item 2): indefinido → 1"
+
+    def test_sem_valor_anterior_a_frase_diz_vazio(self):
+        c = validar("aliquota", 25, "motivo bom", codigo="X")
+        assert c.frase.endswith("(vazio) → 25.0000")
+
+    def test_documento_curto_aparece_inteiro(self):
+        c = validar("excluida", "sim", "cancelada fora da lista", documento="71782", numero_item=1)
+        assert "documento 71782, item 1" in c.frase
+
+    def test_valor_anterior_absurdo_e_recusado(self):
+        with pytest.raises(CorrecaoInvalida, match="longo demais"):
+            validar("aliquota", 25, "motivo bom", codigo="X", valor_anterior="a" * 501)
+
+
 class TestOQueNaoExiste:
     def test_campo_desconhecido(self):
         with pytest.raises(CorrecaoInvalida, match="Campo desconhecido"):

@@ -36,6 +36,15 @@ volta a linha da ficha.
 correção é a última palavra, inclusive sobre o enquadramento indefinido. A
 exclusão vem por último, porque não adianta corrigir o que sai da ficha.
 
+**O histórico mostra o antes e o depois** (pedido do Victor, 20/09/2026). Por
+isso a correção guarda `valor_anterior`: o que estava na tela quando a pessoa
+corrigiu — não o valor de agora nem o de uma rodada futura, mas o que ela viu e
+decidiu mudar. O evento `correcao_aplicada` leva a frase pronta
+("Alíquota interna (mercadoria 4002): 18 → 25,0000") e, em `dados.mudancas`,
+cada alteração com campo, alvo, de, para e motivo; `correcao_desfeita` registra
+o caminho de volta. A linha do tempo mostra as cinco primeiras e abre o resto a
+pedido.
+
 ---
 
 ## 2026-09-20 — Por que a alíquota é a da mercadoria, e não a do papel de trabalho

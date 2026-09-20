@@ -389,6 +389,8 @@ class CorrecaoDB(Base):
     documento: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
     numero_item: Mapped[int | None] = mapped_column(Integer)
     valor: Mapped[str] = mapped_column(Text, nullable=False)
+    # o que estava lá quando alguém corrigiu: é o "antes" do histórico
+    valor_anterior: Mapped[str | None] = mapped_column(Text)
     motivo: Mapped[str] = mapped_column(Text, nullable=False)
     situacao: Mapped[str] = mapped_column(String(10), nullable=False, default="ativa", server_default="ativa")
     criada_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))

@@ -22,6 +22,7 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
     public DbSet<ArquivoDoLoteLinha> ArquivosDoLote => Set<ArquivoDoLoteLinha>();
     public DbSet<ExecucaoLinha> Execucoes => Set<ExecucaoLinha>();
     public DbSet<DeParaLinha> DePara => Set<DeParaLinha>();
+    public DbSet<CorrecaoLinha> Correcoes => Set<CorrecaoLinha>();
 
     protected override void OnModelCreating(ModelBuilder modelo)
     {
@@ -107,6 +108,27 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
             e.Property(x => x.CriadoPor).HasColumnName("criado_por");
             e.Property(x => x.ResponsavelId).HasColumnName("responsavel_id");
             e.Property(x => x.VendaAConsumidor).HasColumnName("venda_a_consumidor");
+        });
+
+        modelo.Entity<CorrecaoLinha>(e =>
+        {
+            e.ToTable("correcao");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.ProjetoId).HasColumnName("projeto_id");
+            e.Property(x => x.Campo).HasColumnName("campo");
+            e.Property(x => x.Cnpj).HasColumnName("cnpj");
+            e.Property(x => x.Codigo).HasColumnName("codigo");
+            e.Property(x => x.Documento).HasColumnName("documento");
+            e.Property(x => x.NumeroItem).HasColumnName("numero_item");
+            e.Property(x => x.Valor).HasColumnName("valor");
+            e.Property(x => x.ValorAnterior).HasColumnName("valor_anterior");
+            e.Property(x => x.Motivo).HasColumnName("motivo");
+            e.Property(x => x.Situacao).HasColumnName("situacao");
+            e.Property(x => x.CriadaPor).HasColumnName("criada_por");
+            e.Property(x => x.CriadaEm).HasColumnName("criada_em");
+            e.Property(x => x.DesfeitaPor).HasColumnName("desfeita_por");
+            e.Property(x => x.DesfeitaEm).HasColumnName("desfeita_em");
         });
 
         modelo.Entity<DeParaLinha>(e =>
@@ -281,6 +303,25 @@ public sealed class ProjetoLinha
 }
 
 /// <summary>Um par do de-para, da empresa. A tabela é do Alembic (<c>c5e1a9d4b7f2</c>).</summary>
+public sealed class CorrecaoLinha
+{
+    public int Id { get; set; }
+    public int ProjetoId { get; set; }
+    public string Campo { get; set; } = "";
+    public string Cnpj { get; set; } = "";
+    public string Codigo { get; set; } = "";
+    public string Documento { get; set; } = "";
+    public int? NumeroItem { get; set; }
+    public string Valor { get; set; } = "";
+    public string? ValorAnterior { get; set; }
+    public string Motivo { get; set; } = "";
+    public string Situacao { get; set; } = "ativa";
+    public int? CriadaPor { get; set; }
+    public DateTime CriadaEm { get; set; }
+    public int? DesfeitaPor { get; set; }
+    public DateTime? DesfeitaEm { get; set; }
+}
+
 public sealed class DeParaLinha
 {
     public int Id { get; set; }

@@ -7,7 +7,7 @@
 
 ## Onde estamos
 
-**As oito etapas da CAT 42 estão no ar (v0.63.0), e o trabalho do Amigão passou
+**As oito etapas da CAT 42 estão no ar (v0.64.0), e o trabalho do Amigão passou
 por todas** (de novo em 16/09/2026, da etapa 4 à 8, em 59 min). Desde a v0.53, a
 etapa 3 lê o item do XML, o razão aplica o de-para aprovado e confronta os
 enquadramentos 2 e 4 com o crédito do art. 271; na v0.54, a nota cancelada na
@@ -120,7 +120,7 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       ST. Hoje o sistema aplica a redução (R$ 392.475,69); a alíquota cheia dá
       −R$ 110.152,30. Ver DECISOES de 18/09/2026
 - [x] Correção à mão: domínio, tabela e aplicação no razão (v0.63.0)
-- [ ] Correção à mão: rotas da API para criar, listar e desfazer
+- [x] Correção à mão: rotas da API, com o antes e o depois no histórico (v0.64.0)
 - [ ] Correção à mão: subir planilha editada, com o que mudou à vista antes de gravar
 - [ ] Correção à mão: editar na tela do razão, linha a linha
 - [ ] Comparar com a RVZ razão, apuração, X.949, canceladas e não escrituradas

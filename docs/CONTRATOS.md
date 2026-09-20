@@ -303,6 +303,24 @@ As colunas de enquadramento da planilha levam `abs(icms_suportado)` da linha de
 saída — o imposto baixado da ficha —, não o valor da operação. É delas que o
 valor de confronto (20)/(21) é subtraído para dar ressarcimento e complemento.
 
+### Correções à mão: rotas e histórico (v0.64.0)
+
+| Método | Rota | Quem |
+|---|---|---|
+| `GET` | `/api/projetos/{id}/correcoes?todas=` | quem vê o trabalho |
+| `POST` | `/api/projetos/{id}/correcoes` | quem escreve |
+| `DELETE` | `/api/projetos/{id}/correcoes/{correcaoId}` | quem escreve |
+
+O `GET` devolve `correcoes` (só as ativas; `todas=true` traz as desfeitas) e
+`campos`, com rótulo e alvo de cada um. O `POST` recebe `{correcoes: [...]}`
+com `campo`, `valor`, `motivo`, o alvo e o `valor_anterior` que estava na tela —
+o mesmo alvo e campo é **substituído**, não duplicado. O `DELETE` desfaz sem
+apagar: a linha vira `desfeita` e continua na lista com `todas=true`.
+
+Cada pedido grava um evento: `correcao_aplicada` ou `correcao_desfeita`, com
+`dados.mudancas` trazendo `de`, `para` e `motivo` de cada alteração, e
+`dados.frase` pronta para a linha do tempo.
+
 ### Correções à mão (v0.63.0)
 
 Tabela `correcao`: do **trabalho** (`projeto_id`), com `campo`, o alvo

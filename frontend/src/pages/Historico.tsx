@@ -90,6 +90,11 @@ const APARENCIA: Record<TipoDeEvento, { icone: Icone; classe: string }> = {
     classe: "bg-laranja-500/14 text-laranja-700 escuro:text-laranja-300",
   },
   entrega_aprovada: { icone: IconeConfirma, classe: "bg-sucesso-fundo text-sucesso" },
+  correcao_aplicada: {
+    icone: IconeTrocar,
+    classe: "bg-laranja-500/14 text-laranja-700 escuro:text-laranja-300",
+  },
+  correcao_desfeita: { icone: IconeTrocar, classe: "bg-superficie-alt text-texto-suave" },
 };
 
 const PADRAO = { icone: IconeComentario, classe: "bg-superficie-alt text-texto-suave" };
@@ -461,6 +466,8 @@ function SeletorDeSituacao({
 function LinhaDoTempo({ e, ultima }: { e: EventoDoProjeto; ultima: boolean }) {
   const { icone: Ico, classe } = APARENCIA[e.tipo] ?? PADRAO;
   const delta = e.dados.frase;
+  const mudancas = e.dados.mudancas ?? [];
+  const [mostrarTodas, setMostrarTodas] = useState(false);
 
   return (
     <li className="flex gap-3.5 py-4">
@@ -489,6 +496,39 @@ function LinhaDoTempo({ e, ultima }: { e: EventoDoProjeto; ultima: boolean }) {
           <p className="m-0 mt-2 text-[13px] font-semibold text-laranja-700 escuro:text-laranja-300">
             {delta}
           </p>
+        )}
+
+        {/* correção à mão: o antes e o depois de cada alteração, uma por linha */}
+        {mudancas.length > 0 && (
+          <ul className="m-0 mt-2 list-none space-y-1 p-0">
+            {mudancas.slice(0, mostrarTodas ? mudancas.length : 5).map((m, i) => (
+              <li key={i} className="text-[13px] leading-relaxed text-texto-suave">
+                <span className="text-texto">{m.rotulo}</span>{" "}
+                <span className="text-texto-fraco">({m.onde})</span>:{" "}
+                <span className="font-mono text-xs line-through decoration-texto-fraco/50">
+                  {m.de || "vazio"}
+                </span>{" "}
+                <span aria-hidden>→</span>{" "}
+                <span className="font-mono text-xs font-bold text-laranja-700 escuro:text-laranja-300">
+                  {m.para}
+                </span>
+                {m.motivo && <span className="text-texto-fraco"> — {m.motivo}</span>}
+              </li>
+            ))}
+            {mudancas.length > 5 && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setMostrarTodas((v) => !v)}
+                  className="border-0 bg-transparent p-0 text-xs text-info underline"
+                >
+                  {mostrarTodas
+                    ? "mostrar menos"
+                    : `mostrar as outras ${numero(mudancas.length - 5)} alterações`}
+                </button>
+              </li>
+            )}
+          </ul>
         )}
 
         {e.texto && (
