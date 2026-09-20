@@ -11,8 +11,8 @@ existe para isso (docs/MIGRACAO_CSHARP.md §4) e tem três portas fechadas:
 
 O que passa por aqui é o que lê ou escreve disco: apagar pasta de trabalho,
 inspecionar a pasta de um lote, analisar a remessa enviada, pôr uma execução na
-fila e gerar planilha. A regra de quem
-pode, o registro no banco e a resposta à tela ficam no C#.
+fila, gerar planilha e conferir a Ficha 3 que volta editada à mão. A regra de
+quem pode, o registro no banco e a resposta à tela ficam no C#.
 
 **Apagar pasta só dentro da pasta de trabalho.** O Python apagava o caminho que
 estivesse gravado na execução, sem conferir. Um valor torto no banco — ou uma
@@ -25,6 +25,7 @@ from __future__ import annotations
 import hmac
 import os
 import shutil
+import tempfile
 from datetime import date
 from typing import Annotated
 
@@ -62,6 +63,7 @@ from cat.infraestrutura.analitico import pre_validacao_do_cliente as analitico_p
 from cat.infraestrutura.analitico import razao as analitico_razao
 from cat.infraestrutura.analitico import suportado as analitico_suportado
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
+from cat.infraestrutura.planilhas import correcoes_da_planilha
 from cat.infraestrutura.repositorios.banco import obter_sessao
 from cat.infraestrutura.repositorios.modelos import ExecucaoDB
 from cat.log import contexto, obter_log
@@ -517,6 +519,64 @@ def linhas_do_razao(pedido: PedidoDeFicha, sessao: Annotated[Session, Depends(ob
         return _traduzir_leitura(lambda: analitico_razao.linhas_da_ficha(
             execucao.pasta_de_trabalho or "", pedido.cnpj, pedido.codigo, pedido.pagina,
             pedido.por_pagina))
+
+
+# quanto se lê por vez da planilha que sobe. A Ficha 3 de uma base grande passa
+# de 100 MB em xlsx, e carregá-la inteira em memória aqui seria o mesmo defeito
+# que a remessa já ensinou
+PEDACO_DA_PLANILHA = 1 << 20
+
+
+@router.post("/correcoes/planilha", dependencies=[Depends(exigir_segredo)])
+async def conferir_planilha_de_correcoes(
+    execucao_id: int,
+    arquivo: Annotated[UploadFile, File()],
+    sessao: Annotated[Session, Depends(obter_sessao)],
+) -> dict:
+    """A Ficha 3 editada sobe e volta o que mudou. **Nada é gravado aqui.**
+
+    Quem grava é a API em C#, depois de a pessoa ver o diff e confirmar — e é
+    ela também que decide quem pode. O motor faz o que é de disco: receber o
+    arquivo, compará-lo com o parquet do razão e dizer a diferença.
+
+    O razão vem na *query*, e não no formulário, de propósito: o corpo multipart
+    atravessa o C# como chegou do navegador, e um `execucao_id` embutido nele
+    seria escolhido por quem sobe o arquivo — daria para ler a ficha de outro
+    trabalho. Na query, quem o escreve é a API, depois de conferir o acesso.
+    """
+    execucao = _razao_concluido(execucao_id, sessao)
+    pasta = execucao.pasta_de_trabalho or ""
+    ficha3 = os.path.join(pasta, analitico_razao.ARQUIVO_FICHA3)
+    if not os.path.isfile(ficha3):
+        raise HTTPException(status.HTTP_410_GONE,
+                            "Os arquivos deste razão não estão mais em disco. Rode de novo.")
+    nome = arquivo.filename or "ficha3.xlsx"
+    _, extensao = os.path.splitext(nome)
+    if extensao.lower() not in correcoes_da_planilha.EXTENSOES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            "Suba a Ficha 3 em xlsx ou csv, como o sistema a gera.")
+    # o arquivo cai na pasta de trabalho do razão, que é disco local e foi
+    # dimensionada para o volume desta etapa — nunca na pasta temporária do
+    # Windows, que costuma ser o menor disco da máquina
+    rascunho = tempfile.mkdtemp(prefix="correcoes-", dir=pasta)
+    recebido = os.path.join(rascunho, "planilha" + extensao.lower())
+    bytes_lidos = 0
+    try:
+        with open(recebido, "wb") as saida:
+            while pedaco := await arquivo.read(PEDACO_DA_PLANILHA):
+                saida.write(pedaco)
+                bytes_lidos += len(pedaco)
+        with contexto(etapa=montar_razao.ETAPA, execucao_id=execucao.id,
+                      arquivo=nome, bytes=bytes_lidos):
+            try:
+                conferida = correcoes_da_planilha.conferir(recebido, ficha3, pasta=rascunho)
+            except correcoes_da_planilha.PlanilhaIlegivel as erro:
+                log.warning("planilha de correções recusada", extra={"motivo": str(erro)})
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)) from erro
+        return {"execucao_id": execucao.id, "projeto_id": execucao.projeto_id,
+                "arquivo": nome, **conferida.como_json()}
+    finally:
+        shutil.rmtree(rascunho, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------

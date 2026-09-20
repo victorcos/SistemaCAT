@@ -110,6 +110,25 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
             ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
         }), PrazoLinhas, cancelar);
 
+    /// <summary>
+    /// A Ficha 3 corrigida à mão sobe inteira antes de o motor começar a ler: ela
+    /// tem o tamanho da ficha do trabalho, e por isso vai no prazo da remessa.
+    ///
+    /// O razão vai na query, e não no formulário: o corpo multipart atravessa daqui
+    /// como chegou do navegador, e um identificador embutido nele seria escolhido
+    /// por quem sobe o arquivo. Na query quem o escreve somos nós, depois de o caso
+    /// de uso conferir que a pessoa enxerga aquele trabalho.
+    /// </summary>
+    public async Task<JsonElement> ConferirPlanilhaDeCorrecoes(int execucaoId, Stream corpo, string tipoDoConteudo,
+        long? tamanho, CancellationToken cancelar)
+    {
+        var conteudo = new StreamContent(corpo);
+        conteudo.Headers.ContentType = MediaTypeHeaderValue.Parse(tipoDoConteudo);
+        if (tamanho is { } bytes)
+            conteudo.Headers.ContentLength = bytes;
+        return await Chamar($"interno/correcoes/planilha?execucao_id={execucaoId}", conteudo, PrazoRemessa, cancelar);
+    }
+
     public async Task<JsonElement> CompetenciasApuradas(int execucaoId, PedidoDeCompetencias pedido, CancellationToken cancelar) =>
         await Chamar("interno/apuracao/competencias", JsonContent.Create(new Dictionary<string, object?>
         {

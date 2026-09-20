@@ -303,6 +303,29 @@ As colunas de enquadramento da planilha levam `abs(icms_suportado)` da linha de
 saída — o imposto baixado da ficha —, não o valor da operação. É delas que o
 valor de confronto (20)/(21) é subtraído para dar ressarcimento e complemento.
 
+### Correções à mão pela planilha (v0.65.0)
+
+| Método | Rota | Quem |
+|---|---|---|
+| `POST` | `/api/razao/{execucaoId}/correcoes/planilha` (multipart, campo `arquivo`) | quem escreve |
+
+Sobe a Ficha 3 editada e devolve **o que ela muda — sem gravar**. A resposta traz
+`correcoes` (cada uma com `campo`, `alvo`, `onde`, `de`, `para`, `motivo`,
+`frase`, `coluna`, `aba`, `linha_na_planilha` e `linhas_atingidas`), `erros` e
+`avisos` por linha, `linhas_lidas`, `abas`, `nao_achadas`, `total`,
+`total_de_erros`, `limite` e `truncado`. Gravar é o `POST` de correções abaixo,
+com as mudanças que a pessoa confirmou.
+
+A Ficha 3 ganhou duas colunas no fim, vazias na geração: **"Tirar da Ficha
+(sim/não)"** e **"Motivo da Correção"**. As colunas editáveis são as do leiaute:
+Alíquota do Confronto, Redução de Base, COD_LEGAL, Quantidade (entrada e saída),
+VL_ITEM, o ICMS suportado da entrada e a de tirar da ficha. A linha é achada por
+CNPJ + código + chave (ou número do documento) + número do item; a ordem e o
+recorte não importam. Linha sem motivo escrito não vira correção nem erro.
+
+No canal interno: `POST /interno/correcoes/planilha?execucao_id=` — o razão vai
+na query porque o corpo multipart atravessa o C# como chegou do navegador.
+
 ### Correções à mão: rotas e histórico (v0.64.0)
 
 | Método | Rota | Quem |

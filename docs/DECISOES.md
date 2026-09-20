@@ -5,6 +5,52 @@
 
 ---
 
+## 2026-09-20 — A planilha corrigida volta pelo diff, nunca direto para o banco
+
+**O pedido.** Corrigir à mão tem de caber nas duas mãos que já existem: a tela,
+linha a linha, e o Excel, onde o analista faz o trabalho de conferência. Esta
+decisão é da segunda porta.
+
+**Subir e gravar são dois passos, e isso não se negocia.** A Ficha 3 de uma base
+real tem milhões de linhas e 49 colunas. Uma coluna arrastada sem querer, um
+"preencher para baixo" a mais, uma planilha do razão anterior — qualquer um dos
+três viraria dezenas de milhares de correções silenciosas se subir gravasse. O
+motor **compara e devolve o que mudou**; gravar é o mesmo POST da tela, depois
+de a pessoa ver de que valor para que valor, em que linha, e com que motivo.
+
+**O que identifica a linha é o que o leiaute já mostra:** CNPJ, código da
+mercadoria, chave (ou número do documento, quando não há chave) e número do
+item. Quem ordena, filtra ou apaga linhas no Excel continua sendo entendido; a
+planilha não precisa voltar inteira nem na mesma ordem. Mexer nas colunas de
+identificação, sim, é erro — e volta dito, com o número da linha.
+
+**Linha sem motivo escrito não vira correção, nem erro.** A regra do motivo é do
+domínio e vale nas três portas. Daí decorre que a conferência **só reclama de
+linha que não casou com a ficha quando ela tem motivo**: numa planilha de dois
+milhões de linhas subida por engano, acusar cada uma daria dois milhões de erros
+e nenhum deles legível.
+
+**Duas colunas novas na Ficha 3, vazias de propósito:** "Tirar da Ficha
+(sim/não)" e "Motivo da Correção". São o espaço da correção, e sair em branco é
+o que diz que o sistema não propôs nada ali.
+
+**Tolerância na comparação.** O xlsx guarda número como float e o parquet, como
+decimal. Por igualdade, milhares de linhas "mudariam" sem ninguém ter tocado
+nelas. Cada campo compara com meia unidade da última casa que mostra; abaixo
+disso é arredondamento do Excel, não correção.
+
+**Reincluir linha não passa pela planilha.** A linha excluída sai da ficha e,
+portanto, sai da planilha: não há célula para destildar. Trazer de volta é
+desfazer a correção na tela, que é onde ela fica listada.
+
+**O razão vai na query, não no formulário.** O corpo multipart atravessa a API em
+C# como chegou do navegador — remontá-lo obrigaria a ter o arquivo inteiro em
+memória lá também. Um `execucao_id` embutido nesse corpo seria escolhido por
+quem sobe o arquivo, e daria para ler a ficha de outro trabalho; na query quem o
+escreve é a API, depois de conferir o acesso.
+
+---
+
 ## 2026-09-20 — Correção à mão: o que uma pessoa pode mudar no cálculo
 
 **Por que existe.** O sistema lê documento fiscal, e documento fiscal vem

@@ -222,3 +222,112 @@ class TestCanalInterno:
         r = cliente.post("/interno/pastas/apagar", headers=self.SEGREDO, json={"pastas": [dentro]})
         assert r.status_code == 503
         assert os.path.isdir(dentro)
+
+
+class TestCorrecoesPelaPlanilha:
+    """A Ficha 3 editada sobe pelo canal interno e volta o que mudou.
+
+    Pelo canal, e não por rota pública: quem decide se a pessoa pode corrigir é
+    a API em C#. Aqui só se confere que o motor lê o arquivo, acha a linha na
+    ficha e devolve a proposta — **sem gravar nada**.
+    """
+
+    @pytest.fixture
+    def razao(self):
+        """Uma execução de razão concluída, com ficha3.parquet em disco."""
+        from datetime import date  # noqa: PLC0415
+        from decimal import Decimal  # noqa: PLC0415
+
+        import pyarrow as pa  # noqa: PLC0415
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        from cat.infraestrutura.analitico.razao import ARQUIVO_FICHA3, ESQUEMA_FICHA3  # noqa: PLC0415
+        from cat.infraestrutura.planilhas.razao import gerar_ficha3  # noqa: PLC0415
+        from cat.infraestrutura.repositorios.banco import Sessao  # noqa: PLC0415
+        from cat.infraestrutura.repositorios.modelos import ExecucaoDB  # noqa: PLC0415
+        from tests.integracao.cadastro import criar_empresa, criar_projeto  # noqa: PLC0415
+
+        empresa = criar_empresa(raiz="27182818", cnpj="27182818000128",
+                                razao="EMPRESA DA CORREÇÃO", por="motor.ana")
+        projeto = criar_projeto(empresa_id=empresa, nome=f"Correção {os.urandom(3).hex()}",
+                                por="motor.ana")
+        pasta = os.path.join(obter_config().raiz_de_trabalho, f"razao-{os.urandom(4).hex()}")
+        os.makedirs(pasta)
+        linha = {
+            "cnpj": "27182818000128", "codigo": "4002", "descricao": "Xampu 350ml",
+            "ncm": "33051000", "unidade_estoque": "UN", "numero": 1, "data": date(2022, 8, 6),
+            "especie": "saida", "devolucao": False, "cfop": "5405", "cst_icms": "560",
+            "documento": "7" * 44, "origem": "xml", "enquadramento": 1,
+            "enquadramento_indefinido": False, "ficha_retirada": False, "corrigida": False,
+            "unidade_origem": "UN", "fator_conversao": Decimal(1), "unidade_sem_fator": False,
+            "quantidade": Decimal(-2), "valor_item": Decimal(30), "icms_suportado": Decimal(-4),
+            "valor_unitario_usado": Decimal(2), "icms_efetivo": Decimal("2.88"),
+            "aliquota": Decimal(18), "aliquota_documento": Decimal(18),
+            "reducao_base": Decimal(0), "saldo_quantidade": Decimal(8),
+            "saldo_unitario": Decimal(2), "saldo_valor": Decimal(16),
+            "ressarcimento": Decimal("1.12"), "complemento": Decimal(0), "chave": "7" * 44,
+            "numero_item": 1, "modelo": "55", "participante": "C1", "numero_documento": "900",
+            "serie": "1", "codigo_original": None, "credito_operacao_propria": Decimal(0),
+        }
+        parquet = os.path.join(pasta, ARQUIVO_FICHA3)
+        pq.write_table(pa.Table.from_pydict({c: [linha[c]] for c in ESQUEMA_FICHA3.names},
+                                            schema=ESQUEMA_FICHA3), parquet)
+        planilha = os.path.join(pasta, "ficha3.csv")
+        gerar_ficha3(parquet, planilha, formato="csv")
+        with Sessao() as s:
+            e = ExecucaoDB(projeto_id=projeto, etapa="razao", situacao="concluida",
+                           passo="Concluída", pasta_de_trabalho=pasta)
+            s.add(e)
+            s.commit()
+            execucao_id = e.id
+        yield execucao_id, projeto, planilha
+        shutil.rmtree(pasta, ignore_errors=True)
+
+    @staticmethod
+    def _editada(planilha, coluna: str, valor: str, motivo: str) -> bytes:
+        linhas = open(planilha, encoding="utf-8-sig").read().splitlines()
+        titulos = linhas[0].split(";")
+        celulas = linhas[1].split(";")
+        celulas[titulos.index(coluna)] = valor
+        celulas[titulos.index("Motivo da Correção")] = motivo
+        return ("\ufeff" + linhas[0] + "\n" + ";".join(celulas)).encode("utf-8")
+
+    def test_devolve_o_antes_e_o_depois_sem_gravar(self, cliente, razao):
+        execucao_id, projeto_id, planilha = razao
+        corpo = self._editada(planilha, "Alíquota do Confronto (%)", "25,00",
+                              "NCM 3305.10.00, art. 55, IV do RICMS")
+
+        r = cliente.post(f"/interno/correcoes/planilha?execucao_id={execucao_id}",
+                         headers=SEGREDO, files={"arquivo": ("ficha3.csv", corpo, "text/csv")})
+
+        assert r.status_code == 200, r.text
+        resposta = r.json()
+        assert resposta["projeto_id"] == projeto_id
+        assert resposta["linhas_lidas"] == 1
+        assert len(resposta["correcoes"]) == 1
+        c = resposta["correcoes"][0]
+        assert (c["campo"], c["de"], c["para"]) == ("aliquota", "18.0000", "25.0000")
+        assert c["frase"] == "Alíquota interna (mercadoria 4002): 18.0000 → 25.0000"
+        # nada foi gravado: a porta da planilha só propõe
+        from cat.infraestrutura.repositorios.banco import Sessao  # noqa: PLC0415
+        from cat.infraestrutura.repositorios.modelos import CorrecaoDB  # noqa: PLC0415
+        with Sessao() as s:
+            assert s.query(CorrecaoDB).filter_by(projeto_id=projeto_id).count() == 0
+
+    def test_arquivo_que_nao_e_planilha_e_recusado(self, cliente, razao):
+        execucao_id, _, _ = razao
+        r = cliente.post(f"/interno/correcoes/planilha?execucao_id={execucao_id}",
+                         headers=SEGREDO,
+                         files={"arquivo": ("ficha3.pdf", b"%PDF-1.4", "application/pdf")})
+        assert r.status_code == 422
+        assert "xlsx ou csv" in r.json()["detail"]
+
+    def test_sem_segredo_e_com_razao_que_nao_existe_nao_passa(self, cliente, razao):
+        execucao_id, _, planilha = razao
+        corpo = self._editada(planilha, "Alíquota do Confronto (%)", "25,00", "motivo bom")
+        r = cliente.post(f"/interno/correcoes/planilha?execucao_id={execucao_id}",
+                         files={"arquivo": ("ficha3.csv", corpo, "text/csv")})
+        assert r.status_code == 403
+        r = cliente.post("/interno/correcoes/planilha?execucao_id=999999", headers=SEGREDO,
+                         files={"arquivo": ("ficha3.csv", corpo, "text/csv")})
+        assert r.status_code == 404

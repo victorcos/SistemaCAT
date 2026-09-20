@@ -20,10 +20,14 @@ dependencies = [
     "pyarrow",
     "duckdb",
     "xlsxwriter",
+    # xlsxwriter escreve e não lê. A Ficha 3 corrigida à mão volta pela tela e
+    # tem de ser lida de volta (planilhas/correcoes_da_planilha.py): o openpyxl
+    # é o leitor, em modo read_only, que é o único que aguenta a planilha grande
+    "openpyxl",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "httpx", "openpyxl"]   # openpyxl só para conferir o xlsx gerado
+dev = ["pytest", "httpx"]
 
 # Só `cat` é pacote. Sem isto o setuptools acha também tests/, migracoes/ e
 # workers/ na raiz e recusa o `pip install -e`: foi o que impediu a instalação

@@ -111,6 +111,14 @@ public interface IMotor
     /// <summary>As linhas de uma ficha do razão.</summary>
     Task<System.Text.Json.JsonElement> LinhasDoRazao(int execucaoId, PedidoDeFicha pedido, CancellationToken cancelar);
 
+    /// <summary>
+    /// A Ficha 3 editada à mão, repassada em fluxo, e o que ela muda em relação
+    /// ao razão. O motor compara e devolve a proposta; **nada é gravado lá**.
+    /// </summary>
+    /// <exception cref="MotorRecusou">não é razão (404), não terminou (409), material apagado (410), arquivo ilegível (422)</exception>
+    Task<System.Text.Json.JsonElement> ConferirPlanilhaDeCorrecoes(int execucaoId, Stream corpo, string tipoDoConteudo,
+        long? tamanho, CancellationToken cancelar);
+
     /// <summary>As competências fechadas na apuração do período.</summary>
     /// <exception cref="MotorRecusou">não é apuração (404), não terminou (409), material apagado (410), recorte inválido (422)</exception>
     Task<System.Text.Json.JsonElement> CompetenciasApuradas(int execucaoId, PedidoDeCompetencias pedido, CancellationToken cancelar);

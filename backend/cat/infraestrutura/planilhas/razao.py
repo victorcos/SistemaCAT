@@ -25,7 +25,12 @@ O que muda em relação ao papel de trabalho, e por quê:
   linha sem abrir outro arquivo;
 * as **inconsistências** são as nossas, marcadas por linha em vez de por ficha;
 * não temos **alíquota do ICMS ST** nem **MVA do NCM** por linha, e coluna vazia
-  em planilha de conferência custa mais do que ajuda: ficam de fora.
+  em planilha de conferência custa mais do que ajuda: ficam de fora;
+* as duas últimas colunas — "Tirar da Ficha" e "Motivo da Correção" — saem
+  **vazias de propósito**: são o espaço da correção à mão. Quem corrige edita a
+  célula do valor errado, escreve o motivo ao lado e sobe o arquivo de volta;
+  `planilhas/correcoes_da_planilha.py` compara com este mesmo parquet e devolve
+  o que mudou, antes de gravar.
 
 A derivação é feita em SQL sobre o parquet, num arquivo de rascunho, e só
 depois a planilha é escrita — assim o xlsx e o CSV saem das mesmas colunas, e
@@ -56,6 +61,7 @@ CONFRONTO = "Valor de Confronto"
 SALDO = "Saldo"
 APURACAO = "Apuração"
 INCONSISTENCIAS = "Inconsistências"
+CORRECAO = "Correção à Mão"
 
 COLUNAS_FICHA3 = (
     Coluna("periodo", "Período", "data", 11, GERAIS),
@@ -127,6 +133,11 @@ COLUNAS_FICHA3 = (
     Coluna("unidade_sem_fator", "Unidade sem Fator de Conversão", "texto", 12, INCONSISTENCIAS),
     Coluna("ficha_retirada", "Ficha Retirada do Total", "texto", 12, INCONSISTENCIAS),
     Coluna("corrigida", "Corrigida à Mão", "texto", 12, INCONSISTENCIAS),
+
+    # as duas colunas que saem vazias de propósito: são as que a pessoa
+    # preenche para devolver a planilha corrigida
+    Coluna("tirar_da_ficha", "Tirar da Ficha (sim/não)", "texto", 14, CORRECAO),
+    Coluna("motivo_da_correcao", "Motivo da Correção", "texto", 44, CORRECAO),
 )
 
 # como cada coluna do leiaute sai do parquet da ficha. O que não existir no
@@ -159,6 +170,10 @@ DERIVACAO = {
     "devolucao_sem_suportado": "devolucao AND coalesce(icms_suportado, 0) = 0",
     "ressarcimento_sem_confronto": "ressarcimento > 0 AND icms_efetivo IS NULL",
     "saldo_negativo": "saldo_quantidade < 0",
+    # vazias na geração: é o que a pessoa escreve para devolver a planilha
+    # corrigida, e o que volta é conferido em `planilhas/correcoes_da_planilha.py`
+    "tirar_da_ficha": "NULL::VARCHAR",
+    "motivo_da_correcao": "NULL::VARCHAR",
 }
 
 

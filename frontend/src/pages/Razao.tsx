@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { BaixarPlanilha } from "@/components/shared/BaixarPlanilha";
+import { CorrecoesAMao } from "@/components/shared/CorrecoesAMao";
 import {
   BarraFina,
   Cartao,
@@ -446,6 +447,8 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: Re
       <PorCompetencia resumo={resumo} />
 
       <Fichas execucaoId={execucao.id} total={resumo.fichas ?? 0} rodape={par("fichas", "Baixar o resumo por ficha")} />
+
+      <CorrecoesAMao projetoId={execucao.projeto_id} execucaoId={execucao.id} />
 
       {(resumo.log ?? []).length > 0 && (
         <Cartao className="flex flex-col gap-3">

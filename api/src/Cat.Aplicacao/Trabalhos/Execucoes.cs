@@ -166,6 +166,24 @@ public sealed class Execucoes(
         return await motor.LinhasDoRazao(e.Id, pedido, cancelar);
     }
 
+    /// <summary>
+    /// A Ficha 3 editada à mão volta e o motor diz o que ela muda. Nada é gravado
+    /// aqui: o que volta é a proposta, e gravar é o POST das correções, depois de
+    /// a pessoa ver o antes e o depois de cada linha.
+    /// </summary>
+    public async Task<JsonElement> ConferirPlanilhaDeCorrecoes(int execucaoId, Stream corpo, string tipoDoConteudo,
+        long? tamanho, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, Razao, usuario, cancelar);
+        var resposta = await motor.ConferirPlanilhaDeCorrecoes(e.Id, corpo, tipoDoConteudo, tamanho, cancelar);
+        log.Info("planilha de correções conferida", new
+        {
+            execucao_id = e.Id, projeto_id = e.ProjetoId, por_usuario_id = usuario.Id,
+            correcoes = resposta.TryGetProperty("total", out var t) ? t.GetInt32() : 0,
+        });
+        return resposta;
+    }
+
     /// <summary>As competências fechadas, maior ressarcimento primeiro.</summary>
     public async Task<JsonElement> CompetenciasApuradas(int execucaoId, PedidoDeCompetencias pedido, Usuario usuario, CancellationToken cancelar)
     {

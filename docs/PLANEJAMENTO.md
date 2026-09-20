@@ -121,7 +121,7 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       −R$ 110.152,30. Ver DECISOES de 18/09/2026
 - [x] Correção à mão: domínio, tabela e aplicação no razão (v0.63.0)
 - [x] Correção à mão: rotas da API, com o antes e o depois no histórico (v0.64.0)
-- [ ] Correção à mão: subir planilha editada, com o que mudou à vista antes de gravar
+- [x] Correção à mão: subir planilha editada, com o que mudou à vista antes de gravar (v0.65.0)
 - [ ] Correção à mão: editar na tela do razão, linha a linha
 - [ ] Comparar com a RVZ razão, apuração, X.949, canceladas e não escrituradas
 
