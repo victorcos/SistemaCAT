@@ -5,6 +5,59 @@
 
 ---
 
+## 2026-09-20 — Por que a alíquota é a da mercadoria, e não a do papel de trabalho
+
+**A divergência.** O ICMS efetivo na saída a consumidor dá R$ 507.288,50 no
+sistema e R$ 471.798,34 na entrega da RVZ. A diferença — R$ 35.905,34 — está
+inteira em **10.336 linhas de CFOP 5.106 e 5.105**, onde eles aplicaram 18% e
+nós aplicamos 25%. Nas outras 34.117 linhas os dois lados batem ao centavo.
+
+O padrão é este: onde o XML informa o `pICMSEfet`, os dois usam 25%; onde o XML
+não informa nada, a RVZ cai num 18% padrão.
+
+| Linhas | CFOP | `pICMSEfet` | RVZ | Sistema |
+|---|---|---|---|---|
+| 27.580 | 5.405 e 5.102 | 25 | 13% | 13% |
+| 10.336 | **5.106 e 5.105** | **ausente** | **9,36%** | **13%** |
+
+**A decisão do Victor (20/09/2026): fica a nossa.** As justificativas, para a
+defesa do trabalho:
+
+1. **A lei fixa 25%.** Artigo 55, IV do RICMS/SP: perfumes e cosméticos das
+   posições 3303, 3304, 3305 e 3307 têm alíquota de 25%, excetuados o 3305.10 e
+   o 3307.20. O Grecin é **3305.90.00** — está no caput da regra, não na
+   exceção. O CFOP da venda não entra nessa definição.
+2. **O próprio contribuinte declarou 25%.** O registro 0200 da EFD dele traz
+   `ALIQ_ICMS 25,0000` nos 12 códigos de 3305.90.00. É declaração ao fisco,
+   feita por ele, e é a primeira fonte que o sistema consulta.
+3. **A cadeia inteira foi tributada a 25%.** As 158 entradas desses NCM trazem
+   `pICMS 25` na operação própria do fornecedor e `pICMSST 25` na retenção. O
+   imposto que se busca ressarcir foi retido a 25%: confrontá-lo com um efetivo
+   a 18% compararia coisas de bases diferentes.
+4. **O cliente emite as próprias notas a 25%.** Em 29.467 itens de saída desses
+   NCM o XML traz `pICMSEfet 25,0000` — é o que ele informa ao destinatário como
+   alíquota efetiva. Só 23 itens trazem outra coisa, e são interestaduais.
+5. **Nas linhas em disputa, o documento não diz nada.** Nos 9.797 itens de CFOP
+   5.106 e nos 624 de 5.105, nenhum traz `pICMSEfet` nem destaque. O 18% não
+   veio do documento: é o que a ferramenta deles usa quando o campo falta.
+6. **O CFOP não muda a alíquota da mercadoria.** 5.106 e 5.105 são vendas em que
+   a mercadoria não transita pelo estabelecimento — continuam operações internas
+   com o mesmo produto. Nada na legislação vincula alíquota a CFOP.
+7. **9,36% não existe na legislação paulista.** É o produto de 18% pela redução
+   de 48%; a alíquota que sustenta a conta teria de ser uma das do artigo 55.
+8. **Consistência dentro da própria ficha.** A mesma mercadoria teria dois
+   efetivos diferentes no mesmo mês conforme o caminho logístico da venda, e o
+   ressarcimento de uma unidade dependeria do CFOP com que ela saiu.
+9. **O nosso critério é o mais conservador.** 25% produz efetivo maior, logo
+   **menos** ressarcimento e mais complemento: R$ 35,9 mil a favor do fisco. Não
+   é escolha que aumente o crédito do cliente.
+10. **Cada linha mostra o que usou.** A Ficha 3 grava a alíquota do confronto em
+    coluna própria, e a ordem de busca é escrita: 0200 do mês, 0200 mais
+    recente, 0200 do destino do de-para e, por último, a nota de entrada
+    interna. Qualquer linha pode ser refeita à mão.
+
+---
+
 ## 2026-09-18 — A entrada diz que há benefício; a lei diz quanto ele vale
 
 **O que se via.** O confronto de uma venda de R$ 39,99 dava R$ 4,88 no sistema
