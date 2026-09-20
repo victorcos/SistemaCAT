@@ -126,6 +126,7 @@ COLUNAS_FICHA3 = (
     Coluna("enquadramento_indefinido", "Enquadramento Indefinido", "texto", 12, INCONSISTENCIAS),
     Coluna("unidade_sem_fator", "Unidade sem Fator de Conversão", "texto", 12, INCONSISTENCIAS),
     Coluna("ficha_retirada", "Ficha Retirada do Total", "texto", 12, INCONSISTENCIAS),
+    Coluna("corrigida", "Corrigida à Mão", "texto", 12, INCONSISTENCIAS),
 )
 
 # como cada coluna do leiaute sai do parquet da ficha. O que não existir no

@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-09-20 — Correção à mão: o que uma pessoa pode mudar no cálculo
+
+**Por que existe.** O sistema lê documento fiscal, e documento fiscal vem
+errado: alíquota que o 0200 não traz, enquadramento que nenhum CFOP decide,
+nota cancelada que não veio na lista, quantidade digitada errada no ERP. Até
+aqui esses casos viravam pendência contada — visível, e parada.
+
+**O desenho, e o precedente.** Correção é decisão humana, e decisão humana já
+tem um caminho no sistema: o de-para. Vale para ela o mesmo — o banco guarda,
+a API valida, o motor aplica na etapa. Assim a correção **sobrevive à rodada
+seguinte**, que é o que uma planilha editada à mão não faz.
+
+**O que se corrige:** alíquota e redução da mercadoria; enquadramento,
+quantidade, valor do item e ICMS suportado de uma linha; e tirar ou trazer de
+volta a linha da ficha.
+
+**Três regras (decisão do Victor, 20/09/2026):**
+
+* **é do trabalho, não da empresa.** O de-para se herda porque o código do
+  fornecedor não muda de ano para ano; alíquota e enquadramento mudam com a lei,
+  e o trabalho seguinte tem de olhar de novo;
+* **toda correção tem motivo escrito.** É o que a fiscalização vai ler e o que o
+  revisor precisa para aprovar a entrega. Sem motivo, não grava;
+* **não apaga o original.** O parquet do documento continua como o documento é;
+  a correção fica ao lado, a linha sai marcada `corrigida` na Ficha 3, e desfazer
+  é tirar a correção, não reescrever o dado.
+
+**Onde entra na conta.** No razão, depois de tudo o que o sistema deduziu — a
+correção é a última palavra, inclusive sobre o enquadramento indefinido. A
+exclusão vem por último, porque não adianta corrigir o que sai da ficha.
+
+---
+
 ## 2026-09-20 — Por que a alíquota é a da mercadoria, e não a do papel de trabalho
 
 **A divergência.** O ICMS efetivo na saída a consumidor dá R$ 507.288,50 no

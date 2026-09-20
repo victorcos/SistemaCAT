@@ -62,6 +62,7 @@ from cat.infraestrutura.analitico.suportado import ARQUIVO_SUPORTADO, ApuracaoCa
 from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import (
     ArquivoDoLoteDB,
+    CorrecaoDB,
     DeParaDB,
     ExecucaoDB,
     LoteDB,
@@ -73,6 +74,7 @@ log = obter_log(__name__)
 
 ETAPA = "razao"
 ARQUIVO_DEPARA = "depara.parquet"
+ARQUIVO_CORRECOES = "correcoes.parquet"
 # 2: fichas com estoque negativo saem do total (15/09/2026)
 VERSAO_DO_RESUMO = 2
 
@@ -222,11 +224,15 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     depara = gravar_depara(projeto.empresa_id, list(ufs), os.path.join(destino, ARQUIVO_DEPARA), sessao)         if projeto is not None else 0
     if depara:
         diario.anotar("info", f"{milhar(depara)} pares de de-para aprovados entram na montagem.")
+    correcoes = gravar_correcoes(execucao.projeto_id, os.path.join(destino, ARQUIVO_CORRECOES), sessao)
+    if correcoes:
+        diario.anotar("info", f"{milhar(correcoes)} correções à mão do trabalho entram na montagem.")
     fontes = Fontes(movimentacao=movimentos.pasta_de_trabalho,
                     apuracao=apuracao.pasta_de_trabalho,
                     saidas_do_relatorio=caminho_saidas,
                     periodo=periodo,
-                    depara=os.path.join(destino, ARQUIVO_DEPARA) if depara else None)
+                    depara=os.path.join(destino, ARQUIVO_DEPARA) if depara else None,
+                    correcoes=os.path.join(destino, ARQUIVO_CORRECOES) if correcoes else None)
     venda = venda_a_consumidor_do_projeto(execucao.projeto_id, sessao)
     diario.anotar("info", f"Venda a consumidor final: {venda.rotulo.lower()} (escolha do trabalho).")
     resumo = montar(fontes, destino, uf_por_cnpj=ufs,
@@ -274,6 +280,31 @@ def gravar_depara(empresa_id: int, cnpjs: list[str], destino: str, sessao: Sessi
                           ("codigo_destino", pa.string()), ("fator", pa.decimal128(24, 9))])), destino)
     log.info("de-para aplicado na montagem", extra={"empresa_id": empresa_id, "pares": len(pares)})
     return len(pares)
+
+
+def gravar_correcoes(projeto_id: int, destino: str, sessao: Session) -> int:
+    """As correções à mão ativas do trabalho, num parquet. Devolve quantas.
+
+    São do trabalho, não da empresa: o de-para se herda, a correção não
+    (decisão do Victor, 20/09/2026). Quem as aplica é o razão, em
+    `_correcoes`; aqui só se traduz banco em arquivo, como no de-para.
+    """
+    ativas = sessao.execute(
+        select(CorrecaoDB.campo, CorrecaoDB.cnpj, CorrecaoDB.codigo, CorrecaoDB.documento,
+               CorrecaoDB.numero_item, CorrecaoDB.valor)
+        .where(CorrecaoDB.projeto_id == projeto_id, CorrecaoDB.situacao == "ativa")
+        .order_by(CorrecaoDB.campo, CorrecaoDB.codigo, CorrecaoDB.documento)).all()
+    if not ativas:
+        return 0
+    pq.write_table(pa.Table.from_pylist(
+        [{"campo": campo, "cnpj": cnpj or "", "codigo": codigo or "", "documento": documento or "",
+          "numero_item": item, "valor": valor}
+         for campo, cnpj, codigo, documento, item, valor in ativas],
+        schema=pa.schema([("campo", pa.string()), ("cnpj", pa.string()), ("codigo", pa.string()),
+                          ("documento", pa.string()), ("numero_item", pa.int32()),
+                          ("valor", pa.string())])), destino)
+    log.info("correções à mão na montagem", extra={"projeto_id": projeto_id, "correcoes": len(ativas)})
+    return len(ativas)
 
 
 def venda_a_consumidor_do_projeto(projeto_id: int, sessao: Session) -> VendaAConsumidor:

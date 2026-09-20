@@ -357,3 +357,43 @@ class DeParaDB(Base):
         DateTime(timezone=True), default=agora, server_default=func.now(), nullable=False,
     )
 
+
+
+class CorrecaoDB(Base):
+    """Uma correção à mão no que o sistema calculou.
+
+    É do **trabalho**, não da empresa (decisão do Victor, 20/09/2026): alíquota
+    e enquadramento mudam com a lei e com o período, e herdá-los no trabalho
+    seguinte seria repetir sem olhar. O de-para é o contrário, e por isso vive
+    em outra tabela.
+
+    O alvo é a mercadoria (`cnpj` + `codigo`) ou a linha (`cnpj` + `documento` +
+    `numero_item`); `campo` diz o quê, e `valor` vai como texto porque cada
+    campo tem o seu tipo — quem converte é `cat.dominio.cat42.correcao`.
+
+    `situacao` é `ativa` ou `desfeita`: desfazer não apaga a linha, para o
+    histórico continuar contando o que foi feito e por quem.
+    """
+
+    __tablename__ = "correcao"
+    __table_args__ = (
+        UniqueConstraint("projeto_id", "campo", "cnpj", "codigo", "documento", "numero_item",
+                         name="uq_correcao_alvo"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    projeto_id: Mapped[int] = mapped_column(ForeignKey("projeto.id"), nullable=False)
+    campo: Mapped[str] = mapped_column(String(20), nullable=False)
+    cnpj: Mapped[str] = mapped_column(String(14), nullable=False, default="", server_default="")
+    codigo: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    documento: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    numero_item: Mapped[int | None] = mapped_column(Integer)
+    valor: Mapped[str] = mapped_column(Text, nullable=False)
+    motivo: Mapped[str] = mapped_column(Text, nullable=False)
+    situacao: Mapped[str] = mapped_column(String(10), nullable=False, default="ativa", server_default="ativa")
+    criada_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    criada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, server_default=func.now(), nullable=False,
+    )
+    desfeita_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    desfeita_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

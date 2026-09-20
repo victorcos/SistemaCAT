@@ -108,6 +108,7 @@ from statistics import median
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from cat.dominio.cat42.correcao import Campo
 from cat.dominio.cat42.enquadramento import (
     CFOP_DEVOLUCAO,
     CFOP_OUTRAS_X949,
@@ -207,6 +208,8 @@ ESQUEMA_FICHA3 = pa.schema([
     ("enquadramento_indefinido", pa.bool_()),
     # a ficha inteira ficou fora do total: estoque negativo em alguma linha
     ("ficha_retirada", pa.bool_()),
+    # a linha levou correção à mão em algum campo
+    ("corrigida", pa.bool_()),
     # a quantidade vai na unidade do inventário; estas três dizem como chegou lá
     ("unidade_origem", pa.string()),
     ("fator_conversao", pa.decimal128(24, 9)),
@@ -410,6 +413,8 @@ class Fontes:
     periodo: tuple[date, date] | None = None
     # os pares de de-para aprovados: cnpj, codigo_origem, codigo_destino, fator
     depara: str | None = None
+    # o parquet com as correções à mão do trabalho, escrito pela etapa
+    correcoes: str | None = None
 
 
 class PeriodoSemMovimento(ValueError):
@@ -450,6 +455,8 @@ class ResumoDaMontagem:
     efetivo_reduzido: Decimal = Decimal(0)
     # saídas cuja alíquota veio da nota de entrada, por falta de 0200
     saidas_com_aliquota_da_entrada: int = 0
+    # correções à mão aplicadas nesta rodada, por campo
+    correcoes: dict = field(default_factory=dict)
     saidas_indefinidas: int = 0
     confronto_pendente: int = 0
     fichas_negativas: int = 0
@@ -527,6 +534,7 @@ def montar(
         resumo.saidas_com_aliquota_do_mes = con.execute(
             "SELECT count(*) FROM lancamentos WHERE especie = 'saida' AND NOT devolucao "
             "AND aliquota_do_mes_diferente").fetchone()[0]
+        resumo.correcoes = info["correcoes"]
         resumo.lancamentos_de_uso_e_consumo = info["uso_e_consumo"]
         resumo.lancamentos_x949 = info["x949"]
         resumo.linhas_com_depara, resumo.codigos_trocados_pelo_depara = con.execute(
@@ -1007,6 +1015,7 @@ def _preparar(con, fontes: Fontes) -> dict:
           AND l.data BETWEEN DATE '{inicio}' AND DATE '{fim}'
     """)
     _reducoes(con, fontes, mov, colunas_mov)
+    correcoes = _correcoes(con, fontes)
 
     # uso e consumo não é estoque de comercialização: sai da ficha e fica contado
     uso_e_consumo = con.execute(
@@ -1077,6 +1086,7 @@ def _preparar(con, fontes: Fontes) -> dict:
                     "numero_item INTEGER, quantidade DECIMAL(38, 9), suportado DECIMAL(38, 15))")
 
     return {"inicio": inicio, "fim": fim, "abertura_em": abertura_em, "codigos": codigos,
+            "correcoes": correcoes,
             "sem_estabelecimento": sem_estab, "trocado_pela_efd": trocado,
             "abertura_sem_fator": abertura_sem_fator, "uso_e_consumo": uso_e_consumo, "x949": x949,
             "base_inicio": base_inicio, "base_fim": base_fim}
@@ -1085,6 +1095,67 @@ def _preparar(con, fontes: Fontes) -> dict:
 # ---------------------------------------------------------------------------
 # o percurso, ficha a ficha
 # ---------------------------------------------------------------------------
+def _correcoes(con, fontes) -> dict[str, int]:
+    """Aplica em `lancamentos` o que uma pessoa corrigiu à mão.
+
+    A correção é do trabalho e não toca o dado de origem: o parquet do
+    documento continua como o documento é. Aqui ela entra na conta, e a linha
+    fica marcada — `corrigida` — para a Ficha 3 mostrar de onde veio o número.
+
+    A ordem importa: alíquota e redução da mercadoria valem para todas as
+    linhas dela e entram depois de tudo o que o sistema deduziu, porque a
+    correção é a última palavra. A exclusão vem por último, porque não adianta
+    corrigir o que sai da ficha.
+    """
+    con.execute("ALTER TABLE lancamentos ADD COLUMN enquadramento_corrigido TINYINT")
+    con.execute("ALTER TABLE lancamentos ADD COLUMN corrigida BOOLEAN DEFAULT false")
+    caminho = fontes.correcoes
+    if not caminho or not os.path.isfile(caminho):
+        return {}
+    con.execute(f"""CREATE OR REPLACE TABLE correcoes AS
+        SELECT campo, coalesce(cnpj, '') AS cnpj, coalesce(codigo, '') AS codigo,
+               coalesce(documento, '') AS documento, numero_item, valor
+        FROM read_parquet('{_escapar(caminho)}')""")
+    # o alvo: mercadoria (código, e o CNPJ quando informado) ou linha
+    de_mercadoria = ("c.codigo = lancamentos.codigo "
+                     "AND (c.cnpj = '' OR c.cnpj = lancamentos.cnpj)")
+    de_linha = ("c.documento = lancamentos.documento AND c.numero_item = lancamentos.numero_item "
+                "AND (c.cnpj = '' OR c.cnpj = lancamentos.cnpj)")
+    colunas = {
+        Campo.ALIQUOTA: ("aliquota", "DECIMAL(9, 4)", de_mercadoria),
+        Campo.REDUCAO_BASE: ("reducao_base", "DECIMAL(9, 4)", de_mercadoria),
+        Campo.ENQUADRAMENTO: ("enquadramento_corrigido", "TINYINT", de_linha),
+        Campo.QUANTIDADE: ("quantidade", "DECIMAL(24, 6)", de_linha),
+        Campo.VALOR_ITEM: ("valor", "DECIMAL(20, 6)", de_linha),
+        Campo.ICMS_SUPORTADO: ("suportado", "DECIMAL(20, 6)", de_linha),
+    }
+    aplicadas: dict[str, int] = {}
+    for campo, (coluna, tipo, onde) in colunas.items():
+        existe = (f"EXISTS (SELECT 1 FROM correcoes c WHERE c.campo = '{campo.value}' AND {onde})")
+        atingidas = con.execute(f"SELECT count(*) FROM lancamentos WHERE {existe}").fetchone()[0]
+        if not atingidas:
+            continue
+        con.execute(f"""UPDATE lancamentos
+            SET {coluna} = (SELECT CAST(c.valor AS {tipo}) FROM correcoes c
+                            WHERE c.campo = '{campo.value}' AND {onde} LIMIT 1),
+                corrigida = true
+            WHERE {existe}""")
+        aplicadas[campo.value] = atingidas
+    # a quantidade corrigida vem sempre positiva: o sinal é da espécie
+    if Campo.QUANTIDADE.value in aplicadas:
+        con.execute("""UPDATE lancamentos SET quantidade = -abs(quantidade)
+            WHERE corrigida AND especie = 'saida' AND NOT devolucao AND quantidade > 0""")
+    fora = (f"EXISTS (SELECT 1 FROM correcoes c WHERE c.campo = '{Campo.EXCLUIDA.value}' "
+            f"AND c.valor = 'sim' AND {de_linha})")
+    excluidas = con.execute(f"SELECT count(*) FROM lancamentos WHERE {fora}").fetchone()[0]
+    if excluidas:
+        con.execute(f"DELETE FROM lancamentos WHERE {fora}")
+        aplicadas[Campo.EXCLUIDA.value] = excluidas
+    if aplicadas:
+        log.info("correções à mão aplicadas", extra=aplicadas)
+    return aplicadas
+
+
 def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
     """Põe em `lancamentos.reducao_base` a redução de base da mercadoria.
 
@@ -1460,6 +1531,7 @@ class DadosDaLinha:
     unidade_estoque: str = ""
     valor_item: Decimal | None = None
     aliquota_documento: Decimal | None = None
+    corrigida: bool = False
 
 
 def _documento(linha: dict) -> tuple:
@@ -1490,7 +1562,8 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
         cst=(linha.get("cst_icms") or "").strip(),
         ncm=(linha.get("ncm") or "").strip(),
         unidade_estoque=(linha.get("unidade_estoque") or "").strip(),
-        valor_item=linha.get("valor"), aliquota_documento=linha.get("aliquota_documento"), **kw)
+        valor_item=linha.get("valor"), aliquota_documento=linha.get("aliquota_documento"),
+        corrigida=bool(linha.get("corrigida")), **kw)
     # a ficha é na unidade do inventário
     quantidade = quantidade * fator
     enq, indefinido, faltou, pendente, efetivo = EnquadramentoLegal.DEMAIS_SAIDAS, False, False, False, None
@@ -1498,6 +1571,10 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
     da_entrada = False
     if especie is Especie.SAIDA and not linha["devolucao"]:
         classificado, indefinido = _enquadrar(linha, venda_a_consumidor)
+        corrigido = linha.get("enquadramento_corrigido")
+        if corrigido is not None:
+            # correção à mão é a última palavra, inclusive sobre o indefinido
+            classificado, indefinido = EnquadramentoLegal(int(corrigido)), False
         if classificado is not None:
             enq = classificado
             efetivo, faltou, pendente, reducao = _confronto(enq, linha, entradas_da_ficha)
@@ -1549,6 +1626,7 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, dados: DadosDaLinha,
     lote["enquadramento"].append(None if (indefinido or not saida_propria) else int(m.enquadramento))
     lote["enquadramento_indefinido"].append(indefinido)
     lote["ficha_retirada"].append(retirada)
+    lote["corrigida"].append(dados.corrigida)
     lote["unidade_origem"].append(conversao[0])
     lote["fator_conversao"].append(Decimal(conversao[1]).quantize(Decimal("0.000000001")))
     lote["unidade_sem_fator"].append(conversao[2])
@@ -1704,6 +1782,7 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
         "saidas_por_origem": resumo.saidas_por_origem,
         # quantas saídas do enquadramento 1 confrontaram com base reduzida, e
         # quanto a redução tirou do valor de confronto
+        "correcoes": resumo.correcoes,
         "reducao_de_base": {
             "saidas": resumo.saidas_com_reducao,
             "efetivo_reduzido": texto(resumo.efetivo_reduzido),

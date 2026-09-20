@@ -303,6 +303,18 @@ As colunas de enquadramento da planilha levam `abs(icms_suportado)` da linha de
 saída — o imposto baixado da ficha —, não o valor da operação. É delas que o
 valor de confronto (20)/(21) é subtraído para dar ressarcimento e complemento.
 
+### Correções à mão (v0.63.0)
+
+Tabela `correcao`: do **trabalho** (`projeto_id`), com `campo`, o alvo
+(`cnpj` + `codigo` para a mercadoria; `cnpj` + `documento` + `numero_item` para
+a linha), `valor` em texto, `motivo` obrigatório e `situacao` (`ativa` ou
+`desfeita`). As regras de cada campo estão em `cat.dominio.cat42.correcao`, e
+valem igual para quem sobe planilha e para quem edita na tela.
+
+A etapa do razão grava as ativas em `correcoes.parquet` e o motor as aplica em
+`lancamentos` antes de percorrer as fichas. `ficha3.parquet` ganha `corrigida`,
+e o resumo do razão traz `correcoes` com a contagem por campo.
+
 ### VL_ITEM é a base do ICMS (v0.60.0)
 
 `itens_do_xml.parquet` ganha `frete`, `seguro`, `outras`, `bc_efetiva`,

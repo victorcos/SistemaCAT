@@ -934,3 +934,84 @@ class TestReducaoDeBase:
         efetivo, _, _, reducao = _confronto(EnquadramentoLegal.ISENCAO_OU_NAO_INCIDENCIA, linha)
         assert (efetivo, reducao) == (d(18), None)
 
+class TestCorrecoesAMao:
+    """O que uma pessoa corrige à mão entra na conta — e fica marcado.
+
+    A ficha da mercadoria X: abertura de 10, entrada de 10 com R$ 20 de ICMS
+    suportado, transferência de 2, venda de PDV de 5 (R$ 20, 18%) e devolução
+    de 1. As correções mexem nisso sem tocar no dado de origem.
+    """
+
+    def correcoes(self, tmp_path, linhas):
+        caminho = tmp_path / "correcoes.parquet"
+        gravar(caminho, [
+            ("campo", pa.string()), ("cnpj", pa.string()), ("codigo", pa.string()),
+            ("documento", pa.string()), ("numero_item", pa.int32()), ("valor", pa.string()),
+        ], [{"cnpj": "", "codigo": "", "documento": "", "numero_item": None, **l} for l in linhas])
+        return str(caminho)
+
+    def montar_com(self, fontes, tmp_path, linhas, nome="corrigido"):
+        fontes.correcoes = self.correcoes(tmp_path, linhas)
+        destino = tmp_path / nome
+        destino.mkdir()
+        return destino, montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+
+    def test_aliquota_da_mercadoria_troca_o_confronto(self, fontes, tmp_path):
+        destino, r = self.montar_com(fontes, tmp_path, [
+            {"campo": "aliquota", "codigo": "X", "valor": "25.0000"}])
+        venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
+        assert venda["aliquota"] == d("25.0000")
+        assert venda["icms_efetivo"] == d("5.00")        # 20,00 x 25%, sem redução
+        assert venda["corrigida"]
+        assert r.correcoes == {"aliquota": 4}            # todas as linhas da ficha
+
+    def test_reducao_da_mercadoria(self, fontes, tmp_path):
+        destino, _ = self.montar_com(fontes, tmp_path, [
+            {"campo": "reducao_base", "codigo": "X", "valor": "48.0000"}])
+        venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
+        assert venda["reducao_base"] == d("48.0000")
+        assert venda["icms_efetivo"] == d("1.872")       # 20,00 x 52% x 18%
+
+    def test_enquadramento_da_linha(self, fontes, tmp_path):
+        """A transferência da EFD é enquadramento 0; corrigida para 4, passa a
+        confrontar pela entrada e a gerar crédito."""
+        destino, r = self.montar_com(fontes, tmp_path, [
+            {"campo": "enquadramento", "documento": CHAVE_TRANSF, "numero_item": 1, "valor": "4"}])
+        transferencia = next(l for l in ficha(destino) if l["cfop"] == "5152")
+        assert transferencia["enquadramento"] == 4 and transferencia["corrigida"]
+        assert r.correcoes == {"enquadramento": 1}
+
+    def test_excluir_a_linha_tira_da_ficha(self, fontes, tmp_path):
+        destino, r = self.montar_com(fontes, tmp_path, [
+            {"campo": "excluida", "documento": CHAVE_TRANSF, "numero_item": 1, "valor": "sim",
+             }])
+        assert [l["cfop"] for l in ficha(destino)] == ["1403", "5405", "1411"]
+        assert r.correcoes == {"excluida": 1}
+        # e o saldo acompanha: sem a transferência de 2, sobram 16 unidades
+        assert ficha(destino)[-1]["saldo_quantidade"] == d(16)
+
+    def test_quantidade_e_valor_da_linha(self, fontes, tmp_path):
+        destino, _ = self.montar_com(fontes, tmp_path, [
+            {"campo": "quantidade", "documento": CHAVE_TRANSF, "numero_item": 1, "valor": "3"},
+            {"campo": "valor_item", "documento": CHAVE_TRANSF, "numero_item": 1, "valor": "99.99"}])
+        transferencia = next(l for l in ficha(destino) if l["cfop"] == "5152")
+        assert transferencia["quantidade"] == d(-3)      # o sinal é da espécie
+        assert transferencia["valor_item"] == d("99.99")
+
+    def test_icms_suportado_da_entrada(self, fontes, tmp_path):
+        destino, _ = self.montar_com(fontes, tmp_path, [
+            {"campo": "icms_suportado", "documento": "4" * 44, "numero_item": 1, "valor": "40"}])
+        entrada = ficha(destino)[0]
+        assert entrada["icms_suportado"] == d(40)
+        assert entrada["saldo_valor"] == d(40)           # 10 un de abertura sem valor + 40
+
+    def test_sem_correcoes_nada_muda(self, montado):
+        destino, r = montado
+        assert r.correcoes == {}
+        assert not any(l["corrigida"] for l in ficha(destino))
+
+    def test_o_resumo_serializado_conta_as_correcoes(self, fontes, tmp_path):
+        _, r = self.montar_com(fontes, tmp_path, [
+            {"campo": "aliquota", "codigo": "X", "valor": "25"}], nome="serializado")
+        assert serializar(r)["correcoes"] == {"aliquota": 4}
+
