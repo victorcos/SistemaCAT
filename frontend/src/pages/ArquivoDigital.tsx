@@ -81,7 +81,7 @@ const tamanho = (bytes: number | undefined) => {
 
 const VENDA: Record<string, string> = {
   enquadramento_1: "enquadramento 1 (ressarcimento e complemento)",
-  demais_saidas: "demais saídas (0), como a BOA",
+  demais_saidas: "demais saídas (0), só perdas e interestaduais",
 };
 
 export default function ArquivoDigital() {

@@ -23,9 +23,11 @@ public static class VendaAConsumidor
         new(Enquadramento1, "Enquadramento 1: pede ressarcimento e recolhe complemento",
             "Como diz o manual. A venda a consumidor final confronta o ICMS suportado com a alíquota " +
             "vezes o preço: abaixo da base presumida gera ressarcimento, acima gera complemento."),
+        // a explicação não nomeia o cliente cuja entrega serviu de referência: a
+        // tela de um trabalho não mostra o nome de outro
         new(DemaisSaidas, "Demais saídas (0): só as perdas e as interestaduais",
-            "Como a BOA transmitiu. O cupom vai com enquadramento 0 e não há complemento; o " +
-            "ressarcimento vem da baixa de estoque (5.927) e da venda para outro estado."),
+            "Como a SEFAZ já aceitou em entregas reais. O cupom vai com enquadramento 0 e não há " +
+            "complemento; o ressarcimento vem da baixa de estoque (5.927) e da venda para outro estado."),
     ];
 
     public static DefinicaoDeVendaAConsumidor? Buscar(string? valor) => Todas.FirstOrDefault(v => v.Valor == valor);
