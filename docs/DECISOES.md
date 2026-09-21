@@ -5,6 +5,64 @@
 
 ---
 
+## 2026-09-21 — Vigência: o sistema não conhece data de lei, e a ST acaba em 04/2026
+
+**A pergunta do Victor (21/09/2026):** os 25% do art. 55, IV foram conferidos
+contra o período em que vigora a monofasia dos itens do capítulo 33 da TIPI?
+
+**O que se conferiu, e o que se achou.**
+
+**1. Não existe "25%" escrito no sistema.** A alíquota do confronto vem do que o
+contribuinte declarou na EFD, **por competência** — `aliq_mes` casa
+`cnpj + codigo + mês` com o `ALIQ_ICMS` do 0200/C170 — e, na falta dela, da
+alíquota da entrada interna. Nenhuma data de lei está codificada em lugar
+nenhum. Isso é mais seguro do que uma tabela NCM → alíquota, e o motivo está no
+próprio art. 55, IV: a exceção das **preparações anti-solares e bronzeadores**
+vive **dentro** da posição 3304, que de resto é 25%. Um protetor solar
+3304.99.90 é 18% e um creme facial 3304.99.90 é 25% — mesmo NCM. Só a descrição
+separa, e uma tabela por NCM erraria os dois.
+
+**2. No período da Advertising (08/2022 a 06/2024) a alíquota não se move.** Nos
+23 meses, só 25% (a regra) e 18% (as exceções), sem uma única transição.
+
+**3. E, pela lei, está certo para esse período.** O art. 55, IV não sofreu
+alteração, revogação nem suspensão entre 2022 e 2024, e nenhum redutor ou
+complemento o alcança: os complementos da Lei 17.293/2020 (1,3% e 2,4%) são dos
+arts. 53-A e 54.
+
+**A "monofasia" tem duas leituras, e só uma toca a CAT 42.**
+
+* **PIS/COFINS monofásico (Lei 10.147/2000)** — posições 33.03 a 33.07 e os
+  códigos 3401.11.90, 3401.20.10 e 9603.21.00, com 2,20% + 10,30% concentrados
+  no industrial/importador e zero no varejo. A lista de NCM é quase a mesma do
+  art. 55, IV, o que faz parecer que um regime governa o outro. **Não governa**:
+  é tributo federal, não muda a alíquota interna do ICMS nem a Ficha 3;
+* **a ST do ICMS**, que é a monofasia que importa aqui — e aí há uma data, mas
+  ela é **posterior ao trabalho**.
+
+**A data que importa: 1º/04/2026.** A **Portaria SRE 94/2025** (DOE de
+23/12/2025) revoga o Anexo XI da Portaria CAT 68/2019 e tira o segmento de
+perfumaria e higiene pessoal dos arts. 313-E e 313-F do RICMS/SP. Dali em
+diante não há ST nesses produtos: volta o débito e crédito normal, e o estoque
+de 31/03/2026 entra no levantamento da **Portaria CAT 28/2020**. Antes disso a
+base do Anexo XI valeu até 31/12/2024, e de 01/01/2025 a 31/03/2026 valeu o
+IVA-ST da Portaria SRE 48/2025 (também revogada).
+
+**O que fica em aberto, e é dívida nossa.** O trabalho da Advertising termina
+em 06/2024 e nada disso o alcança. Mas um trabalho cuja competência cruze
+**31/03/2026** monta hoje a ficha como se a ST continuasse: as saídas de 04/2026
+em diante deixam de ser CST 60, não baixam estoque da Ficha 3, e o **ICMS
+suportado do estoque remanescente — que é exatamente o que a CAT 42 ressarce —
+fica parado no saldo**, sem virar pedido. O sistema não tem calendário de
+vigência nenhum: nem de alíquota, nem da lista de mercadorias sob ST. Funcionou
+até aqui porque todo período trabalhado é homogêneo; deixa de funcionar na
+virada de abril de 2026.
+
+Fontes: art. 55, IV do RICMS/SP; Lei 17.293/2020, art. 22; Lei 10.147/2000;
+Portaria SRE 94/2025; Portaria CAT 68/2019, Anexo XI; Portaria CAT 28/2020.
+
+---
+
 ## 2026-09-20 — A planilha corrigida volta pelo diff, nunca direto para o banco
 
 **O pedido.** Corrigir à mão tem de caber nas duas mãos que já existem: a tela,

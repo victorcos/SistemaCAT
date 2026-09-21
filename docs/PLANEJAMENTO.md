@@ -123,6 +123,11 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] Correção à mão: rotas da API, com o antes e o depois no histórico (v0.64.0)
 - [x] Correção à mão: subir planilha editada, com o que mudou à vista antes de gravar (v0.65.0)
 - [ ] Correção à mão: editar na tela do razão, linha a linha
+- [ ] **Fim da ST de perfumaria e higiene em 1º/04/2026** (Portaria SRE 94/2025):
+      trabalho cuja competência cruze 31/03/2026 monta a ficha como se a ST
+      continuasse, e o ICMS suportado do estoque de 31/03/2026 fica no saldo em
+      vez de virar pedido. Falta o aviso no razão e o encerramento da ficha na
+      data. Ver DECISOES de 21/09/2026
 - [ ] Comparar com a RVZ razão, apuração, X.949, canceladas e não escrituradas
 
 ### 3. O que a apuração ainda não calcula
