@@ -12,7 +12,7 @@ from decimal import Decimal
 import pyarrow.parquet as pq
 import pytest
 
-from cat.dominio.cat42.arquivo_digital import Abertura, ArquivoDigital, Item, Participante, Saldo
+from cat.dominio.icms.cat42.arquivo_digital import Abertura, ArquivoDigital, Item, Participante, Saldo
 from cat.dominio.comum.cnpj import digitos_verificadores
 from cat.infraestrutura.analitico.arquivo_digital import ocorrencias
 from cat.infraestrutura.analitico.pre_validacao_do_cliente import (
@@ -142,7 +142,7 @@ class TestNomes:
 
 class TestSubstituicao:
     def test_a_substituicao_vence_o_original_lido_antes(self, tmp_path):
-        from cat.dominio.cat42.arquivo_digital import Finalidade  # noqa: PLC0415
+        from cat.dominio.icms.cat42.arquivo_digital import Finalidade  # noqa: PLC0415
         lote = tmp_path / "lote"
         lote.mkdir()
         original = so_saldo(1, 10, 20, 10, 20)
@@ -169,7 +169,7 @@ class TestSubstituicao:
         assert not [n for n in os.listdir(destino) if n.startswith(".")]
 
     def test_original_lido_depois_da_substituicao_e_so_repetido(self, tmp_path):
-        from cat.dominio.cat42.arquivo_digital import Finalidade  # noqa: PLC0415
+        from cat.dominio.icms.cat42.arquivo_digital import Finalidade  # noqa: PLC0415
         lote = tmp_path / "lote"
         lote.mkdir()
         substituto = so_saldo(1, 10, 20, 10, 20)
@@ -186,7 +186,7 @@ class TestEmParalelo:
     def test_com_processos_o_resultado_e_o_mesmo(self, fontes, tmp_path):
         """Zip, zip aninhado, cópia, outra empresa e uma substituição: lidos por
         dois processos, o que sai é o que sai lendo um arquivo por vez."""
-        from cat.dominio.cat42.arquivo_digital import Finalidade  # noqa: PLC0415
+        from cat.dominio.icms.cat42.arquivo_digital import Finalidade  # noqa: PLC0415
         substituto = so_saldo(2, 16, 40, 16, 40)
         substituto.abertura = Abertura(2024, 2, "LOJA DE TESTE", CNPJ, IE_SP, "3552205", Finalidade.SUBSTITUICAO)
         substituto.saldos.append(Saldo("SEM_CADASTRO", D(1), D(1), D(1), D(1)))

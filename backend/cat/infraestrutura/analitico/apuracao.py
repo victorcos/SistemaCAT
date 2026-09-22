@@ -1,7 +1,7 @@
 """Fecha o período: ressarcimento, complemento e saldos, por loja e por mês.
 
 A regra de quando uma competência está pronta é do domínio
-(`cat.dominio.cat42.apuracao`). Aqui é a parte suja: agregar a Ficha 3 que a
+(`cat.dominio.icms.cat42.apuracao`). Aqui é a parte suja: agregar a Ficha 3 que a
 etapa 5 gravou, casar com a conferência do inventário e deixar pronto o que a
 etapa 7 vai escrever.
 
@@ -35,7 +35,7 @@ from decimal import Decimal
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from cat.dominio.cat42.apuracao import CompetenciaApurada, MotivoDeBloqueio
+from cat.dominio.icms.cat42.apuracao import CompetenciaApurada, MotivoDeBloqueio
 from cat.infraestrutura.analitico.confronto import _abrir, _escapar, _limpar
 from cat.infraestrutura.analitico.razao import (
     ARQUIVO_CONFERENCIA_INVENTARIO,

@@ -12,7 +12,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from cat.dominio.cat42.suportado import Fonte, Pendencia
+from cat.dominio.icms.cat42.suportado import Fonte, Pendencia
 from cat.infraestrutura.analitico.movimentacao import ARQUIVO_ITENS, ARQUIVO_MOVIMENTOS
 from cat.infraestrutura.analitico.suportado import (
     ARQUIVO_DOCUMENTOS,

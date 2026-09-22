@@ -16,8 +16,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from cat.dominio.cat42.conferencia import Fatia
-from cat.dominio.cat42.movimentacao import ResumoDaMovimentacao
+from cat.dominio.icms.cat42.conferencia import Fatia
+from cat.dominio.icms.cat42.movimentacao import ResumoDaMovimentacao
 from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_ANALITICO,
     ARQUIVO_ITENS,

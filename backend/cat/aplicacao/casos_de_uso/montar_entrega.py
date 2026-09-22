@@ -27,8 +27,8 @@ from sqlalchemy.orm import Session
 from cat.aplicacao.casos_de_uso.conferir_documentos import pasta_da_execucao
 from cat.aplicacao.casos_de_uso.historico_do_projeto import exigir_que_ande, registrar_de_etapa
 from cat.aplicacao.casos_de_uso.rodada import Diario, Freio, duracao, milhar, nome_de, reais
-from cat.dominio.cat42.entrega import Gravidade
-from cat.dominio.cat42.enquadramento import VendaAConsumidor
+from cat.dominio.icms.cat42.entrega import Gravidade
+from cat.dominio.icms.cat42.enquadramento import VendaAConsumidor
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO
 from cat.infraestrutura.analitico.arquivo_digital import ARQUIVO_ARQUIVOS

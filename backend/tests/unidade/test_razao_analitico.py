@@ -22,8 +22,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from cat.dominio.cat42.enquadramento import VendaAConsumidor
-from cat.dominio.cat42.razao import EnquadramentoLegal
+from cat.dominio.icms.cat42.enquadramento import VendaAConsumidor
+from cat.dominio.icms.cat42.razao import EnquadramentoLegal
 from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML
 from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_CONVERSOES,

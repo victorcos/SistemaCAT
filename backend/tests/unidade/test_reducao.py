@@ -2,14 +2,14 @@
 
 Os números são os do fornecedor da Advertising, nota a nota: ele reduz a base
 e informa em `pRedBC` o percentual que **sobra**, não o que reduziu. Por isso a
-conta sai do `vBC`, e não da tag — ver `cat.dominio.cat42.reducao`.
+conta sai do `vBC`, e não da tag — ver `cat.dominio.icms.cat42.reducao`.
 """
 
 from decimal import Decimal
 
 import pytest
 
-from cat.dominio.cat42.reducao import (
+from cat.dominio.icms.cat42.reducao import (
     CST_COM_REDUCAO,
     base_reduzida,
     icms_efetivo,

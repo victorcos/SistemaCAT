@@ -1,6 +1,6 @@
 """A leitura dos resumos das etapas numa lista de pendências só."""
 
-from cat.dominio.cat42.entrega import Gravidade, SituacaoDaCompetencia, pendencias
+from cat.dominio.icms.cat42.entrega import Gravidade, SituacaoDaCompetencia, pendencias
 
 RESUMOS = {
     "conferencia": {"sem_documento_cobravel": 120, "nao_escrituradas": 0, "sem_chave_na_efd": 3},

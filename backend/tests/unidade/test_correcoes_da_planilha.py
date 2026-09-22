@@ -13,7 +13,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from cat.dominio.cat42.correcao import CORRECOES_POR_PEDIDO
+from cat.dominio.icms.cat42.correcao import CORRECOES_POR_PEDIDO
 from cat.infraestrutura.analitico.razao import ESQUEMA_FICHA3
 from cat.infraestrutura.planilhas.correcoes_da_planilha import (
     COLUNA_DO_MOTIVO,

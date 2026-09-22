@@ -21,7 +21,7 @@ from decimal import Decimal
 
 import pyarrow.parquet as pq
 
-from cat.dominio.cat42.enquadramento import CFOP_DEVOLUCAO
+from cat.dominio.icms.cat42.enquadramento import CFOP_DEVOLUCAO
 from cat.dominio.depara.candidatos import ItemParaCasar, Par, propor
 from cat.infraestrutura.analitico.movimentacao import ARQUIVO_ITENS, ARQUIVO_MOVIMENTOS
 from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO

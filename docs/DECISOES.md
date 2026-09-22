@@ -1,4 +1,4 @@
-# DECISÕES — Sistema CAT
+# DECISÕES — CRM Fiscal
 
 > Registro datado das escolhas e do porquê. Decisão sem motivo escrito vira
 > discussão de novo daqui a seis meses.

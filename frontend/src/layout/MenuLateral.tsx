@@ -51,7 +51,7 @@ export function MenuLateral({ papel }: { papel: Papel }) {
       </nav>
 
       <p className="m-0 text-xs text-moldura-texto-suave max-md:hidden md:mt-auto">
-        Sistema CAT
+        CRM Fiscal
       </p>
     </aside>
   );

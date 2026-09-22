@@ -61,8 +61,8 @@ from __future__ import annotations
 import os
 from decimal import Decimal
 
-from cat.dominio.cat42.conferencia import Fatia
-from cat.dominio.cat42.movimentacao import ResumoDaMovimentacao
+from cat.dominio.icms.cat42.conferencia import Fatia
+from cat.dominio.icms.cat42.movimentacao import ResumoDaMovimentacao
 from cat.infraestrutura.analitico.canceladas import ARQUIVO_CHAVES_CANCELADAS, ESQUEMA_CHAVES_CANCELADAS
 from cat.infraestrutura.analitico.confronto import SITUACOES_COM_DOCUMENTO, _abrir, _escapar, _limpar
 from cat.infraestrutura.analitico.contingencia import (

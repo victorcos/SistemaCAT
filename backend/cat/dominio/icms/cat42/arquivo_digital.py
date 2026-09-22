@@ -33,7 +33,7 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
 
-from cat.dominio.cat42.enquadramento import CFOP_DEVOLUCAO
+from cat.dominio.icms.cat42.enquadramento import CFOP_DEVOLUCAO
 
 VERSAO_DO_LEIAUTE = "01"          # 1.0.0, obrigatória a partir de 01/01/2018
 PAIS_BRASIL = "1058"

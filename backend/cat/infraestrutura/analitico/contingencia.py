@@ -16,12 +16,12 @@ construção, como na marca da conferência.
 A base da multa é a do XML; o item sem ela busca a nota mais próxima do mesmo
 produto (estabelecimento, operação e código) entre todos os XML do
 estabelecimento — escriturados ou não, fora os cancelados e as devoluções —, e
-leva dela o valor por unidade. A regra está em `cat.dominio.cat42.contingencia`.
+leva dela o valor por unidade. A regra está em `cat.dominio.icms.cat42.contingencia`.
 """
 
 from __future__ import annotations
 
-from cat.dominio.cat42.contingencia import (
+from cat.dominio.icms.cat42.contingencia import (
     BASE_DA_NOTA_ANTERIOR,
     BASE_DA_NOTA_POSTERIOR,
     BASE_DO_XML,
@@ -31,7 +31,7 @@ from cat.dominio.cat42.contingencia import (
     PERCENTUAL_SAIDA,
     SEM_REFERENCIA,
 )
-from cat.dominio.cat42.enquadramento import CFOP_DEVOLUCAO
+from cat.dominio.icms.cat42.enquadramento import CFOP_DEVOLUCAO
 from cat.log import obter_log
 
 log = obter_log(__name__)

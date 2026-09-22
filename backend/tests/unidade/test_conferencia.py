@@ -15,7 +15,7 @@ from decimal import Decimal
 import duckdb
 import pytest
 
-from cat.dominio.cat42.conferencia import ResumoDaConferencia
+from cat.dominio.icms.cat42.conferencia import ResumoDaConferencia
 from cat.dominio.sped.fiscais import Emitente, Operacao, ler_documento
 from cat.infraestrutura.analitico.confronto import confrontar
 from cat.infraestrutura.analitico.extracao import extrair_efd, extrair_pasta

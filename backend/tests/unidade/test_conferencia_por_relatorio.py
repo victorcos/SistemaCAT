@@ -13,7 +13,7 @@ from __future__ import annotations
 import duckdb
 import pytest
 
-from cat.dominio.cat42.conferencia import Origem
+from cat.dominio.icms.cat42.conferencia import Origem
 from cat.infraestrutura.analitico.confronto import confrontar
 from cat.infraestrutura.analitico.extracao import extrair_efd, extrair_pasta
 from cat.infraestrutura.planilhas.conferencia import (

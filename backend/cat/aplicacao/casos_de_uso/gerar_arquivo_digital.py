@@ -34,7 +34,7 @@ from cat.aplicacao.casos_de_uso.conferir_documentos import caminhos_de_efd_vigen
 from cat.aplicacao.casos_de_uso.historico_do_projeto import exigir_que_ande, registrar_de_etapa
 from cat.aplicacao.casos_de_uso.montar_razao import venda_a_consumidor_do_projeto
 from cat.aplicacao.casos_de_uso.rodada import Diario, Freio, duracao, milhar, nome_de, reais
-from cat.dominio.cat42.enquadramento import VendaAConsumidor
+from cat.dominio.icms.cat42.enquadramento import VendaAConsumidor
 from cat.dominio.lote import TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO

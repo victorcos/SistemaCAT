@@ -31,7 +31,7 @@ from decimal import Decimal
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from cat.dominio.cat42.conferencia import Origem
+from cat.dominio.icms.cat42.conferencia import Origem
 from cat.dominio.notafiscal.xml import BYTES_DO_PROTOCOLO, CSTAT_AUTORIZADOS, cstat_do_fim
 from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido, ler_cabecalho
 from cat.dominio.sped.fiscais import PREFIXOS, DocumentoEscriturado, ler_documento

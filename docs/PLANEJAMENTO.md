@@ -1,4 +1,4 @@
-# PLANEJAMENTO — Sistema CAT
+# PLANEJAMENTO — CRM Fiscal
 
 > O que existe, o que falta e em que ordem. Atualizado a cada entrega.
 > O porquê de cada escolha fica em DECISOES.md; as rotas, em CONTRATOS.md.

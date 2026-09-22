@@ -10,7 +10,7 @@ from decimal import Decimal
 
 import pytest
 
-from cat.dominio.cat42.suportado import (
+from cat.dominio.icms.cat42.suportado import (
     EntradaParaApurar,
     Fonte,
     Pendencia,

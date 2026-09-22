@@ -10,7 +10,7 @@ from decimal import Decimal
 
 import pytest
 
-from cat.dominio.cat42.arquivo_digital import (
+from cat.dominio.icms.cat42.arquivo_digital import (
     Abertura,
     ArquivoDigital,
     DocumentoEletronico,
@@ -26,7 +26,7 @@ from cat.dominio.cat42.arquivo_digital import (
     numero,
     texto,
 )
-from cat.dominio.cat42.pre_validacao import (
+from cat.dominio.icms.cat42.pre_validacao import (
     Regra,
     chave_valida,
     cpf_valido,

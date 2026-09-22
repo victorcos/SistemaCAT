@@ -46,7 +46,7 @@ from cat.aplicacao.casos_de_uso.rodada import (
     nome_de,
     reais,
 )
-from cat.dominio.cat42.enquadramento import VendaAConsumidor
+from cat.dominio.icms.cat42.enquadramento import VendaAConsumidor
 from cat.dominio.lote import TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.razao import (

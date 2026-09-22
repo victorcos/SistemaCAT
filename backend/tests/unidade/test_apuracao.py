@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from cat.dominio.cat42.apuracao import CompetenciaApurada, MotivoDeBloqueio
+from cat.dominio.icms.cat42.apuracao import CompetenciaApurada, MotivoDeBloqueio
 
 
 def competencia(**kw) -> CompetenciaApurada:

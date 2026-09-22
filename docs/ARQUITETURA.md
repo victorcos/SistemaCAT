@@ -1,4 +1,4 @@
-# ARQUITETURA — Sistema CAT
+# ARQUITETURA — CRM Fiscal
 
 > Responsabilidade única: responder "como este sistema é montado e por quê".
 > A regra fiscal está em DOMINIO.md. As escolhas datadas estão em DECISOES.md.
@@ -29,9 +29,11 @@ desenho abaixo é o do motor.
 backend/cat/
 ├── dominio/          regra fiscal pura, sem framework, sem I/O
 │   ├── comum/        NCM, CEST, CFOP, competência, dinheiro
-│   ├── cat42/        fichas, enquadramento legal, apuração
+│   ├── icms/         o que é de imposto estadual
+│   │   └── cat42/    fichas, enquadramento legal, apuração
+│   ├── piscofins/    base, créditos e exclusões das contribuições
 │   ├── depara/       cascata de casamento de item
-│   ├── sped/         regras dos registros
+│   ├── sped/         regras dos registros — servem a TODOS os módulos
 │   └── notafiscal/
 ├── aplicacao/
 │   └── casos_de_uso/ orquestra domínio + portas, uma classe por operação
@@ -54,6 +56,17 @@ pessoa pode é a API, antes de chamar.
 
 O front vive em `frontend/`, em React com TypeScript, e conversa **só por API**.
 Nunca importa nada do backend.
+
+### 2.1 Um módulo por tributo
+
+O sistema nasceu na CAT 42, e por isso a regra dela morava na raiz do domínio
+como se fosse o domínio inteiro. Desde 22/09/2026 cada tributo tem o seu lugar:
+**a CAT 42 é uma obrigação do ICMS**, não o contrário.
+
+O que **não** desce para dentro de um módulo: ler SPED, ler nota fiscal, o
+de-para e o lote de arquivos. Eles servem a todos — a exclusão do ICMS da base do
+PIS/COFINS lê a mesma EFD que a CAT 42 lê, e duplicá-la por módulo seria o começo
+de dois leitores que divergem.
 
 ## 3. Regras de dependência
 

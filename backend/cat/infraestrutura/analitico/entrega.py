@@ -1,7 +1,7 @@
 """Monta a entrega: relatório executivo, dossiê por estabelecimento e pacote.
 
 A leitura dos resumos e a situação de cada competência são do domínio
-(`cat.dominio.cat42.entrega`). Aqui é juntar o que as etapas deixaram em
+(`cat.dominio.icms.cat42.entrega`). Aqui é juntar o que as etapas deixaram em
 disco e escrever o que sai do escritório.
 
 ## O que sai
@@ -41,9 +41,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import xlsxwriter
 
-from cat.dominio.cat42.apuracao import MotivoDeBloqueio
-from cat.dominio.cat42.arquivo_digital import TravaDoArquivo
-from cat.dominio.cat42.entrega import NOME_DA_ETAPA, Gravidade, Pendencia, SituacaoDaCompetencia, pendencias
+from cat.dominio.icms.cat42.apuracao import MotivoDeBloqueio
+from cat.dominio.icms.cat42.arquivo_digital import TravaDoArquivo
+from cat.dominio.icms.cat42.entrega import NOME_DA_ETAPA, Gravidade, Pendencia, SituacaoDaCompetencia, pendencias
 from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO, ARQUIVO_SALDOS
 from cat.infraestrutura.analitico.arquivo_digital import ARQUIVO_ARQUIVOS, ARQUIVO_OCORRENCIAS, PASTA_ENVIO
 from cat.infraestrutura.analitico.confronto import _escapar
@@ -628,7 +628,7 @@ def _manifesto(destino: str, contexto: Contexto, resumo: ResumoDaEntrega) -> Non
         f"Venda a consumidor final: {contexto.venda_a_consumidor}",
         f"Gerado em: {quando:%d/%m/%Y %H:%M} por {contexto.gerado_por}" if quando else
         f"Gerado por: {contexto.gerado_por}",
-        f"Sistema CAT {contexto.versao_do_sistema}",
+        f"CRM Fiscal {contexto.versao_do_sistema}",
         "",
         f"Competencias apuradas: {resumo.competencias} (SP: {resumo.competencias_de_sp}; fora de SP: {resumo.fora_de_sp})",
         f"Prontas para envio, no dossie: {resumo.para_envio}; previas, so no relatorio: {resumo.previas}",

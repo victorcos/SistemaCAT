@@ -47,7 +47,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from cat.dominio.cat42.razao import EnquadramentoLegal
+from cat.dominio.icms.cat42.razao import EnquadramentoLegal
 
 
 class VendaAConsumidor(str, Enum):

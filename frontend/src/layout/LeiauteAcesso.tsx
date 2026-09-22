@@ -67,7 +67,7 @@ export function LeiauteAcesso({
         </div>
         {rodape}
         <footer className="text-xs text-texto-fraco">
-          BMS Consultoria Tributária · Sistema CAT
+          BMS Consultoria Tributária · CRM Fiscal
         </footer>
       </main>
     </div>

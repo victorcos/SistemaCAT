@@ -31,7 +31,7 @@ from cat.aplicacao.casos_de_uso.historico_do_projeto import (
     registrar_de_etapa,
 )
 from cat.config import obter_config
-from cat.dominio.cat42.conferencia import ResumoDaConferencia
+from cat.dominio.icms.cat42.conferencia import ResumoDaConferencia
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.dominio.lote import TipoDeArquivo
 from cat.infraestrutura.analitico.confronto import (

@@ -1,7 +1,7 @@
 """Monta a Ficha 3 de cada mercadoria, juntando as fontes da movimentação.
 
 A regra — custo médio ponderado móvel, entradas antes das saídas no dia,
-ressarcimento e complemento — está em `cat.dominio.cat42.razao`, e foi
+ressarcimento e complemento — está em `cat.dominio.icms.cat42.razao`, e foi
 conferida contra a Ficha 3 já calculada de um cliente, 100% das linhas. Aqui é
 a parte suja: achar os movimentos, dizer de qual loja e de qual enquadramento
 cada um é, e percorrer.
@@ -74,7 +74,7 @@ Quando a entrada da mercadoria vem com CST 20 ou 70, o fornecedor declara base
 reduzida, e o ICMS efetivo da saída a consumidor (enquadramento 1) incide sobre
 essa mesma base — não sobre o valor cheio. A redução sai do `vBC` da nota, não
 do `pRedBC`, e a chave é o NCM: cada saída herda a da entrada mais recente até
-a data dela. O porquê está em `cat.dominio.cat42.reducao`; aqui fica só a
+a data dela. O porquê está em `cat.dominio.icms.cat42.reducao`; aqui fica só a
 leitura das entradas e o carimbo em `lancamentos.reducao_base`.
 
 ## De-para: o mesmo produto com outro código
@@ -108,15 +108,15 @@ from statistics import median
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from cat.dominio.cat42.correcao import Campo
-from cat.dominio.cat42.enquadramento import (
+from cat.dominio.icms.cat42.correcao import Campo
+from cat.dominio.icms.cat42.enquadramento import (
     CFOP_DEVOLUCAO,
     CFOP_OUTRAS_X949,
     CFOP_USO_E_CONSUMO,
     VendaAConsumidor,
     classificar,
 )
-from cat.dominio.cat42.razao import (
+from cat.dominio.icms.cat42.razao import (
     EntradaAnterior,
     EnquadramentoLegal,
     ValorDaAbertura,
@@ -127,7 +127,7 @@ from cat.dominio.cat42.razao import (
     RazaoDoItem,
     SaldoInicial,
 )
-from cat.dominio.cat42.reducao import (
+from cat.dominio.icms.cat42.reducao import (
     CST_COM_REDUCAO,
     icms_efetivo as icms_efetivo_da_saida,
     reducao_da_entrada,
@@ -1161,7 +1161,7 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
 
     Quem declara a redução é a entrada, com CST 20 ou 70. O percentual sai da
     base que a nota de fato usou, e não do `pRedBC` — que o fornecedor da
-    Advertising preenche ao contrário (ver `cat.dominio.cat42.reducao`). O
+    Advertising preenche ao contrário (ver `cat.dominio.icms.cat42.reducao`). O
     benefício é da mercadoria, então a chave é o NCM, e cada saída herda a
     redução da entrada mais recente até a data dela; antes da primeira entrada,
     a primeira que houver.
@@ -1306,7 +1306,7 @@ def _confronto(enq: EnquadramentoLegal, linha: dict,
 
     No enquadramento 1 — e só nele, por decisão do Victor de 17/09/2026 — a
     alíquota incide sobre a base já reduzida, quando a entrada da mercadoria
-    declara redução (`cat.dominio.cat42.reducao`).
+    declara redução (`cat.dominio.icms.cat42.reducao`).
     """
     if not enq.gera_ressarcimento:
         return None, False, False, None

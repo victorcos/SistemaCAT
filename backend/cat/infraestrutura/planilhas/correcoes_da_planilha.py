@@ -25,7 +25,7 @@ outro lugar.
 ## O motivo manda
 
 Linha sem motivo escrito não vira correção, mesmo que o valor tenha mudado: a
-regra é do domínio (`cat.dominio.cat42.correcao`) e vale igual nas três portas.
+regra é do domínio (`cat.dominio.icms.cat42.correcao`) e vale igual nas três portas.
 Por isso a conferência só reclama de linha que **não foi achada na ficha** quando
 ela tem motivo — numa planilha de dois milhões de linhas, acusar cada uma que
 não casou daria dois milhões de erros para ler e nenhum deles útil.
@@ -59,7 +59,7 @@ import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from cat.dominio.cat42.correcao import (
+from cat.dominio.icms.cat42.correcao import (
     CORRECOES_POR_PEDIDO,
     Alvo,
     Campo,

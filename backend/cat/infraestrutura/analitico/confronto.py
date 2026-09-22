@@ -31,7 +31,7 @@ import duckdb
 
 from cat.config import obter_config
 
-from cat.dominio.cat42.conferencia import Fatia, Origem, ResumoDaConferencia
+from cat.dominio.icms.cat42.conferencia import Fatia, Origem, ResumoDaConferencia
 from cat.log import obter_log
 
 log = obter_log(__name__)

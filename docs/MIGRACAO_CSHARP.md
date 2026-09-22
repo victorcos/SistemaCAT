@@ -1,4 +1,4 @@
-# MIGRAÇÃO PARA C# — Sistema CAT
+# MIGRAÇÃO PARA C# — CRM Fiscal
 
 > Plano da troca da API de Python para C#. A decisão e o porquê estão em
 > `DECISOES.md`, 13/09/2026. Este documento diz **como** e **em que ordem**.

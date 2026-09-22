@@ -54,7 +54,7 @@ async def ciclo_de_vida(app: FastAPI):
 
 
 app = FastAPI(
-    title="Sistema CAT — motor",
+    title="CRM Fiscal — motor",
     # de uma fonte só: o arquivo VERSAO na raiz. Escrita à mão aqui, parou em
     # 0.3.0 enquanto as etiquetas do git iam a v0.15.2 — e a saúde mentia.
     version=versao(),

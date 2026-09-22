@@ -194,7 +194,7 @@ class ProjetoDB(Base):
     responsavel_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     # como a venda a consumidor final entra no razão: "enquadramento_1" (o
     # manual) ou "demais_saidas" (como a BOA transmitiu). Ver
-    # cat.dominio.cat42.enquadramento.VendaAConsumidor
+    # cat.dominio.icms.cat42.enquadramento.VendaAConsumidor
     venda_a_consumidor: Mapped[str] = mapped_column(
         String(20), default="enquadramento_1", server_default="enquadramento_1", nullable=False
     )
@@ -394,7 +394,7 @@ class CorrecaoDB(Base):
 
     O alvo é a mercadoria (`cnpj` + `codigo`) ou a linha (`cnpj` + `documento` +
     `numero_item`); `campo` diz o quê, e `valor` vai como texto porque cada
-    campo tem o seu tipo — quem converte é `cat.dominio.cat42.correcao`.
+    campo tem o seu tipo — quem converte é `cat.dominio.icms.cat42.correcao`.
 
     `situacao` é `ativa` ou `desfeita`: desfazer não apaga a linha, para o
     histórico continuar contando o que foi feito e por quem.

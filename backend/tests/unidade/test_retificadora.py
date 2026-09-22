@@ -10,7 +10,7 @@ valores de antes e depois da retificação.
 from datetime import date
 
 from cat.aplicacao.casos_de_uso.inspecionar_lote import inspecionar_pasta
-from cat.dominio.cat42.conferencia import ResumoDaConferencia
+from cat.dominio.icms.cat42.conferencia import ResumoDaConferencia
 from cat.infraestrutura.arquivos.classificador import classificar
 
 # raiz 50948371 — Irmãos Boa. COD_FIN é o campo antes de DT_INI: 0 / 1.

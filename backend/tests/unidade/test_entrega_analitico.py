@@ -123,7 +123,7 @@ class TestORelatorioEOPacote:
     def test_manifesto_confere_cada_arquivo(self, montada):
         destino, _ = montada
         texto = (destino / ARQUIVO_MANIFESTO).read_text("utf-8")
-        assert "execucao #51" in texto and "Sistema CAT 9.9.9" in texto
+        assert "execucao #51" in texto and "CRM Fiscal 9.9.9" in texto
         listados = [l.strip().split(" | ") for l in texto.splitlines() if l.startswith("  ") and " | " in l]
         assert {c for c, _, _ in listados} == {
             ARQUIVO_RELATORIO, f"dossie/{SP}/arquivo_digital/CAT5_SP_{SP}_1_2024.txt",

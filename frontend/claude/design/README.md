@@ -1,4 +1,4 @@
-# Handoff — Sistema CAT · BMS Consultoria Tributária
+# Handoff — CRM Fiscal · BMS Consultoria Tributária
 
 Reconstrução visual do sistema interno de apuração das obrigações da CAT. Sete telas em alta fidelidade, mesma paleta e logo da versão legada, layout reorganizado.
 
@@ -43,7 +43,7 @@ Login → Trabalhos → (card) Detalhe do trabalho → etapa clicada, ou → His
 - Rótulo "NAVEGAÇÃO": 10px/700, `letter-spacing:.16em`, `#5f7191`, padding `0 10px 8px`.
 - Item inativo: 14px/600 `#9fb0cd`, padding `10px 12px`, radius 10px, bolinha 6px `#3c4a66`; hover `background:rgba(255,255,255,.05)` + `color:#e8edf7`.
 - Item ativo: fundo `linear-gradient(90deg, rgba(242,151,29,.16), rgba(242,151,29,.02))`, borda `1px solid rgba(242,151,29,.28)`, barra esquerda 2px `#f2971d`, bolinha `#f2971d` com `box-shadow:0 0 10px #f2971d`, texto branco 700.
-- Rodapé: card `rgba(255,255,255,.02)` / borda `rgba(255,255,255,.06)` — "Sistema CAT" + "sessão não comercial".
+- Rodapé: card `rgba(255,255,255,.02)` / borda `rgba(255,255,255,.06)` — "CRM Fiscal" + "sessão não comercial".
 
 **Topbar** — `position:sticky; top:0; z-index:20`, padding `16px 28px`, fundo `rgba(8,13,25,.72)` + `backdrop-filter:blur(10px)`, borda inferior `rgba(255,255,255,.07)`. Avatar 30×30 radius 9px `linear-gradient(140deg,#1e3a8a,#0f1e3f)`, nome 14px/700, badge de papel (DEV/GESTOR) 10px/800 `letter-spacing:.1em`, botão **Sair** ghost com hover vermelho (`rgba(239,68,68,.14)` / borda `rgba(239,68,68,.4)` / texto `#fecaca`).
 
@@ -107,7 +107,7 @@ Split 50/50 em `grid-template-columns: 1fr 1fr`.
 - **CTA Entrar:** desabilitado (azul apagado) até usuário e senha preenchidos; habilitado ganha gradiente laranja + faixa `dcSweep` de 35% no topo; estado carregando mostra spinner `dcSpin` e rótulo "Verificando…".
 - **Erro:** faixa vermelha com ícone, título "Usuário ou senha inválidos." e `Código para suporte: <hex12>` em monoespaçada; o card inteiro faz `dcShake .34s`; a senha é limpa. O código é gerado por tentativa e serve para o suporte cruzar com o log — **gerar no backend**.
 - **Primeiro acesso:** avisado por faixa âmbar; campos Nova senha / Confirmar; medidor de força de 4 barras (Muito fraca `#f87171` → Forte `#34d399`); lista de 4 requisitos com check verde (10+ caracteres, maiúsculas e minúsculas, número, símbolo); salvar exige score ≥ 3 e confirmação igual.
-- **Sucesso:** ícone check verde + "Redirecionando para o Sistema CAT…".
+- **Sucesso:** ícone check verde + "Redirecionando para o CRM Fiscal…".
 - Rodapé: "Esqueceu a senha ou o acesso está bloqueado? Procure um gestor da equipe. Por segurança, a redefinição não é automática." + assinatura.
 - **Remover na implementação:** a linha DEMO (Sucesso / Erro / Primeiro acesso) existe só para navegar os estados no protótipo.
 

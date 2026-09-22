@@ -15,8 +15,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from cat.dominio.cat42.enquadramento import VendaAConsumidor
-from cat.dominio.cat42.pre_validacao import validar
+from cat.dominio.icms.cat42.enquadramento import VendaAConsumidor
+from cat.dominio.icms.cat42.pre_validacao import validar
 from cat.dominio.comum.cnpj import digitos_verificadores
 from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO, ARQUIVO_SALDOS, ESQUEMA_APURACAO, ESQUEMA_SALDOS
 from cat.infraestrutura.analitico.arquivo_digital import (

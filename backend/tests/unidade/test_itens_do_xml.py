@@ -13,7 +13,7 @@ from decimal import Decimal
 import pyarrow.parquet as pq
 import pytest
 
-from cat.dominio.cat42.suportado import Fonte
+from cat.dominio.icms.cat42.suportado import Fonte
 from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML, extrair_itens_do_xml
 from cat.infraestrutura.analitico.movimentacao import ARQUIVO_MOVIMENTOS, consolidar
 from cat.infraestrutura.analitico.movimentos import extrair_movimentos

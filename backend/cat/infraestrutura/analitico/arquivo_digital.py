@@ -1,6 +1,6 @@
 """Gera o arquivo digital de cada estabelecimento de SP e mês, e pré-valida.
 
-A escrita é do domínio (`cat.dominio.cat42.arquivo_digital`) e a pré-validação
+A escrita é do domínio (`cat.dominio.icms.cat42.arquivo_digital`) e a pré-validação
 também (`pre_validacao`). Aqui é a parte suja: juntar o que cada etapa deixou e
 decidir, arquivo a arquivo, se ele vai para o envio ou sai como prévia.
 
@@ -51,8 +51,8 @@ import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from cat.dominio.cat42.apuracao import MotivoDeBloqueio
-from cat.dominio.cat42.arquivo_digital import (
+from cat.dominio.icms.cat42.apuracao import MotivoDeBloqueio
+from cat.dominio.icms.cat42.arquivo_digital import (
     FIM_DE_LINHA,
     MODELOS_ELETRONICOS,
     MODELOS_SEM_PARTICIPANTE,
@@ -70,8 +70,8 @@ from cat.dominio.cat42.arquivo_digital import (
     nome_do_arquivo,
     so_digitos,
 )
-from cat.dominio.cat42.enquadramento import VendaAConsumidor
-from cat.dominio.cat42.pre_validacao import Regra, Validacao, validar
+from cat.dominio.icms.cat42.enquadramento import VendaAConsumidor
+from cat.dominio.icms.cat42.pre_validacao import Regra, Validacao, validar
 from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido, ler_cabecalho
 from cat.dominio.sped.participante import ParticipanteDaEfd, ler_participante
 from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO, ARQUIVO_SALDOS

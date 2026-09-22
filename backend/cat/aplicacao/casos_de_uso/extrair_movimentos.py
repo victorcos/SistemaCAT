@@ -38,7 +38,7 @@ from cat.aplicacao.casos_de_uso.historico_do_projeto import (
     exigir_que_ande,
     registrar_de_etapa,
 )
-from cat.dominio.cat42.movimentacao import ResumoDaMovimentacao
+from cat.dominio.icms.cat42.movimentacao import ResumoDaMovimentacao
 from cat.dominio.lote import TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.canceladas import ler_chaves_canceladas

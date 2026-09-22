@@ -1,6 +1,6 @@
 """Pré-validar os arquivos digitais que o cliente já transmitiu.
 
-A pré-validação é a mesma da etapa 7 (`cat.dominio.cat42.pre_validacao`): o
+A pré-validação é a mesma da etapa 7 (`cat.dominio.icms.cat42.pre_validacao`): o
 leiaute, a tabela de natureza e a Ficha 3 recomposta a partir do próprio
 arquivo. O que muda é de onde o arquivo vem — gerado por outra ferramenta,
 solto no lote ou dentro de zip — e o que só se confere com vários meses juntos.
@@ -43,7 +43,7 @@ from decimal import Decimal
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from cat.dominio.cat42.pre_validacao import Regra, Severidade, Validacao, validar
+from cat.dominio.icms.cat42.pre_validacao import Regra, Severidade, Validacao, validar
 from cat.dominio.lote import caminho_de_certificado
 from cat.infraestrutura.analitico.arquivo_digital import (
     ARQUIVO_OCORRENCIAS,

@@ -30,7 +30,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from enum import Enum
 
-from cat.dominio.cat42.arquivo_digital import (
+from cat.dominio.icms.cat42.arquivo_digital import (
     CODIFICACAO,
     LEIAUTE,
     MODELOS_ELETRONICOS,
@@ -39,7 +39,7 @@ from cat.dominio.cat42.arquivo_digital import (
     Campo,
     Natureza,
 )
-from cat.dominio.cat42.razao import (
+from cat.dominio.icms.cat42.razao import (
     EnquadramentoLegal,
     Especie,
     Movimento,

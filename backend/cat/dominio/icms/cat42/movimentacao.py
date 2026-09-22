@@ -24,7 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from cat.dominio.cat42.conferencia import Fatia, _lista, _numero
+from cat.dominio.icms.cat42.conferencia import Fatia, _lista, _numero
 
 ZERO = Decimal("0")
 

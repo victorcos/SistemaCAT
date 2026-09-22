@@ -1,4 +1,4 @@
-# IDENTIDADE VISUAL — Sistema CAT
+# IDENTIDADE VISUAL — CRM Fiscal
 
 > A paleta vem da marca **BMS Consultoria Tributária**.
 > Os tokens ficam em `frontend/src/estilos/tokens.css` e são a única fonte.

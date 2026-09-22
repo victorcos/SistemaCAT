@@ -40,7 +40,7 @@ from cat.aplicacao.casos_de_uso.historico_do_projeto import (
     exigir_que_ande,
     registrar_de_etapa,
 )
-from cat.dominio.cat42.suportado import Pendencia, ResumoDaApuracao
+from cat.dominio.icms.cat42.suportado import Pendencia, ResumoDaApuracao
 from cat.dominio.lote import TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.movimentacao import ARQUIVO_MOVIMENTOS

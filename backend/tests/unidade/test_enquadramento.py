@@ -8,7 +8,7 @@ base real e chutá-lo decidiria a apuração inteira sem base.
 
 import pytest
 
-from cat.dominio.cat42.enquadramento import (
+from cat.dominio.icms.cat42.enquadramento import (
     CFOP_DEVOLUCAO,
     CFOP_TRANSFERENCIA,
     VendaAConsumidor,
@@ -18,7 +18,7 @@ from cat.dominio.cat42.enquadramento import (
     e_interestadual,
     motivo_do_indefinido,
 )
-from cat.dominio.cat42.razao import EnquadramentoLegal as E
+from cat.dominio.icms.cat42.razao import EnquadramentoLegal as E
 
 
 class TestOQueOManualFixa:

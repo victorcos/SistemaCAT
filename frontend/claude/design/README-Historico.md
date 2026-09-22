@@ -1,4 +1,4 @@
-# Handoff — Histórico do projeto (Sistema CAT · BMS)
+# Handoff — Histórico do projeto (CRM Fiscal · BMS)
 
 Complemento ao `README.md` do pacote. Cobre a tela nova e as duas alterações que ela trouxe.
 

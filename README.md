@@ -1,4 +1,4 @@
-# Sistema CAT
+# CRM Fiscal
 
 Sistema de apuração e conferência das obrigações da CAT, começando pela
 Portaria CAT 42/2018 de São Paulo (ressarcimento e complemento do ICMS retido

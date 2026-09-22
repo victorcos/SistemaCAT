@@ -1,6 +1,6 @@
 """Apura o ICMS suportado de cada item de entrada, juntando as fontes.
 
-A regra de qual fonte vale está em `cat.dominio.cat42.suportado`. Aqui é a
+A regra de qual fonte vale está em `cat.dominio.icms.cat42.suportado`. Aqui é a
 parte suja: ler o relatório do cliente, casar com a EFD, gravar o resultado e
 responder à tela — as quebras e o analítico paginado.
 
@@ -57,7 +57,7 @@ from decimal import Decimal
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from cat.dominio.cat42.suportado import (
+from cat.dominio.icms.cat42.suportado import (
     EntradaParaApurar,
     Fonte,
     Pendencia,
