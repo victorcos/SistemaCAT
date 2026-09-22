@@ -66,7 +66,7 @@ public sealed class TrabalhoRepositorio(CatDbContext banco) : IRepositorioDeTrab
     {
         var linha = new ProjetoLinha
         {
-            EmpresaId = novo.EmpresaId, Frente = novo.Frente, Nome = novo.Nome,
+            EmpresaId = novo.EmpresaId, Frente = novo.Frente, Modulo = novo.Modulo, Nome = novo.Nome,
             CompetenciaIni = novo.CompetenciaIni, CompetenciaFim = novo.CompetenciaFim,
             Status = Dominio.Projeto.StatusDoProjeto.EmAndamento, Observacao = novo.Observacao,
             CriadoEm = Utc(agora), CriadoPor = por.Id,
@@ -145,7 +145,7 @@ public sealed class TrabalhoRepositorio(CatDbContext banco) : IRepositorioDeTrab
             .ToDictionary(g => g.Key, g => Situacao(g.MaxBy(x => x.Id)!));
 
         return linhas.Select(l => new ProjetoLido(
-            l.p.Id, l.p.EmpresaId, l.Empresa, l.CnpjMatriz, l.Uf, l.PreCadastro, l.p.Frente, l.p.Nome,
+            l.p.Id, l.p.EmpresaId, l.Empresa, l.CnpjMatriz, l.Uf, l.PreCadastro, l.p.Frente, l.p.Modulo, l.p.Nome,
             l.p.CompetenciaIni, l.p.CompetenciaFim, l.p.Status, l.Autor, l.p.CriadoPor, l.Responsavel, l.p.ResponsavelId,
             comentarios.GetValueOrDefault(l.p.Id), comBase.Contains(l.p.Id),
             ultimas.Where(u => u.Key.ProjetoId == l.p.Id).ToDictionary(u => u.Key.Etapa, u => u.Value),

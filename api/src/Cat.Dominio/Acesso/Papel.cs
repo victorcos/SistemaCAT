@@ -49,6 +49,17 @@ public static class Capacidades
     public static bool IgnoraEscopoDeEmpresa(this Papel papel) => papel is Papel.Dev or Papel.Gestor;
 
     /// <summary>
+    /// Enxerga todo segmento tributário, liberado ou não — e é quem libera os
+    /// outros. Mesma razão de <see cref="IgnoraEscopoDeEmpresa"/>: quem responde
+    /// pela carteira não pode depender de alguém liberá-lo assunto a assunto.
+    /// Separada de propósito: no dia em que uma mudar, a outra não muda junto.
+    /// </summary>
+    public static bool EnxergaTodosOsSegmentos(this Papel papel) => papel is Papel.Dev or Papel.Gestor;
+
+    /// <summary>Quem define os segmentos de quem está abaixo.</summary>
+    public static bool DefineSegmentos(this Papel papel) => papel is Papel.Dev or Papel.Gestor;
+
+    /// <summary>
     /// Dev NÃO conta para o mínimo de gestores: conta técnica não substitui
     /// responsável pelo negócio. Se contasse, dois gestores e um dev pareceriam três.
     /// </summary>

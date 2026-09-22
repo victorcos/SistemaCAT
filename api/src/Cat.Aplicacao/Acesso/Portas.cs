@@ -27,6 +27,14 @@ public interface IRepositorioDeUsuario
     Task DefinirSenha(int id, string novoResumo, bool provisoria, CancellationToken cancelar);
     Task DefinirPapel(int id, Papel papel, CancellationToken cancelar);
     Task DefinirCargo(int id, Cargo cargo, CancellationToken cancelar);
+
+    /// <summary>
+    /// Troca os segmentos liberados pela lista inteira: o que não vem some.
+    /// Substituir em vez de somar é o que permite tirar acesso — e tirar acesso
+    /// tem de ser tão barato quanto dar, senão ninguém tira.
+    /// </summary>
+    Task DefinirSegmentos(int id, IReadOnlyList<string> segmentos, int porUsuarioId,
+        DateTimeOffset agora, CancellationToken cancelar);
     Task DefinirDados(int id, string nomeExibicao, string email, CancellationToken cancelar);
     Task DefinirSituacao(int id, bool ativo, CancellationToken cancelar);
     Task Desbloquear(int id, CancellationToken cancelar);

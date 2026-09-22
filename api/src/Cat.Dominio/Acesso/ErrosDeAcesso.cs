@@ -22,3 +22,15 @@ public sealed class UsuarioBloqueado(int tentativas)
 {
     public int Tentativas { get; } = tentativas;
 }
+
+/// <summary>
+/// A pessoa não trabalha naquele assunto. Separada de <c>SemAcessoAEmpresa</c>
+/// porque a recusa é de outra natureza e a mensagem tem de dizer qual: quem
+/// esbarra nisto precisa saber que o caminho é pedir o segmento ao gestor, e não
+/// que foi alocado na empresa errada.
+/// </summary>
+public sealed class SemAcessoAoSegmento(string segmento)
+    : ErroDeAcesso($"Você não trabalha no segmento {segmento}. Peça acesso a um gestor.")
+{
+    public string Segmento { get; } = segmento;
+}

@@ -19,7 +19,8 @@ public static class AuthRotas
 
     public sealed record RespostaUsuario(
         int Id, string Usuario, string Email, string NomeExibicao, string Papel, string Cargo,
-        IReadOnlyList<int> Empresas, bool SenhaProvisoria, string? UltimoAcesso);
+        IReadOnlyList<int> Empresas, IReadOnlyList<string> Segmentos, string? Entrada,
+        bool SenhaProvisoria, string? UltimoAcesso);
 
     public sealed record RespostaToken(string AccessToken, string TokenType, int ExpiresIn, RespostaUsuario Usuario);
 
@@ -75,7 +76,30 @@ public static class AuthRotas
 
     public static RespostaUsuario ParaResposta(Usuario u) => new(
         u.Id, u.NomeDeUsuario, u.Email, u.NomeExibicao, u.Papel.Valor(), u.Cargo.Valor(),
-        u.Empresas, u.SenhaProvisoria, u.UltimoAcesso is { } acesso ? IsoComoPython(acesso) : null);
+        u.Empresas,
+        // o que a pessoa de fato enxerga — para gestor e dev, todos
+        Dominio.Acesso.Segmentos.De(u).Select(s => s.Chave).ToList(),
+        // e para onde a tela deve mandá-la sem pedir clique nenhum
+        Destino(u),
+        u.SenhaProvisoria, u.UltimoAcesso is { } acesso ? IsoComoPython(acesso) : null);
+
+    /// <summary>
+    /// O caminho em que a tela inicial deve parar, já resolvido no servidor: a
+    /// tela de segmentos, um segmento, ou direto um módulo. Nulo quando a pessoa
+    /// não tem segmento nenhum liberado — aí a tela pede que procure o gestor,
+    /// em vez de mostrar uma página vazia sem explicar por quê.
+    /// </summary>
+    private static string? Destino(Usuario u)
+    {
+        var entrada = Dominio.Acesso.Segmentos.Entrada(u);
+        if (entrada.TodosOsSegmentos)
+            return "/segmentos";
+        if (entrada.Segmento is null)
+            return null;
+        return entrada.Modulo is { } modulo
+            ? $"/modulos/{modulo}"
+            : $"/segmentos/{entrada.Segmento}";
+    }
 
     /// <summary>
     /// O <c>datetime.isoformat()</c> do Python: microssegundos, fuso como

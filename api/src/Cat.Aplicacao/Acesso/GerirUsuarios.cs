@@ -26,6 +26,7 @@ public sealed record UsuarioCriado(Usuario Usuario, string SenhaProvisoria);
 public sealed class GerirUsuarios(
     IRepositorioDeUsuario repositorio,
     IConferidorDeSenha senhas,
+    TimeProvider relogio,
     ILogger<GerirUsuarios> log)
 {
     public Task<IReadOnlyList<Usuario>> Listar(CancellationToken cancelar) => repositorio.Listar(cancelar);
@@ -114,6 +115,31 @@ public sealed class GerirUsuarios(
         await repositorio.DefinirCargo(alvo.Id, cargo, cancelar);
         log.Info("cargo alterado",
             new { usuario_id = alvo.Id, cargo_anterior = alvo.Cargo.Valor(), cargo_novo = cargo.Valor(),
+                  por_usuario_id = por.Id });
+        return await Buscar(alvoId, cancelar);
+    }
+
+    /// <summary>
+    /// Define em que assuntos a pessoa trabalha — a terceira dimensão de acesso,
+    /// ao lado do papel e da alocação por empresa.
+    ///
+    /// Gestor e dev são recusados de propósito: eles enxergam todo segmento por
+    /// papel, e gravar uma lista para eles guardaria um dado que mente sobre o
+    /// acesso real. Quem quiser restringi-los muda o papel primeiro.
+    /// </summary>
+    public async Task<Usuario> DefinirSegmentos(int alvoId, IReadOnlyList<string> segmentos, Usuario por,
+        CancellationToken cancelar)
+    {
+        var alvo = await Buscar(alvoId, cancelar);
+        var limpos = Dominio.Acesso.Segmentos.Limpar(segmentos);
+        if (alvo.Papel.EnxergaTodosOsSegmentos())
+            throw new DadoInvalido(
+                $"{alvo.NomeExibicao} é {alvo.Papel.Valor()} e já enxerga todos os segmentos. " +
+                "Mude o papel antes, se a intenção é restringir.");
+        await repositorio.DefinirSegmentos(alvo.Id, limpos, por.Id, relogio.GetUtcNow(), cancelar);
+        log.Aviso("segmentos definidos",
+            new { usuario_id = alvo.Id, usuario = alvo.NomeDeUsuario,
+                  antes = string.Join(",", alvo.Segmentos), depois = string.Join(",", limpos),
                   por_usuario_id = por.Id });
         return await Buscar(alvoId, cancelar);
     }

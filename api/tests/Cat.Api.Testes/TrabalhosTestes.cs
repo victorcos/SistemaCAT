@@ -234,7 +234,8 @@ public sealed class TrabalhosTestes(BancoDeTeste banco, MotorInternoFalso _motor
         Assert.Equal(HttpStatusCode.Created, r.StatusCode);
         var p = await Json(r);
         Assert.Equal(
-            ["id", "empresa_id", "empresa", "cnpj_matriz", "cnpj_matriz_formatado", "uf", "frente", "frente_rotulo", "nome",
+            ["id", "empresa_id", "empresa", "cnpj_matriz", "cnpj_matriz_formatado", "uf", "frente", "frente_rotulo",
+             "modulo", "modulo_rotulo", "nome",
              "competencia_ini", "competencia_fim", "status", "status_rotulo", "pre_cadastro", "etapas_feitas", "etapas_totais",
              "criado_por", "criado_por_id", "responsavel", "responsavel_id", "comentarios", "venda_a_consumidor",
              "venda_a_consumidor_rotulo"],

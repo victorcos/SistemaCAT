@@ -114,6 +114,27 @@ class AlocacaoDB(Base):
         return self.fim is None
 
 
+class UsuarioSegmentoDB(Base):
+    """Em que assunto a pessoa trabalha: PIS/COFINS, ICMS, IRPJ/CSLL.
+
+    Terceira dimensão de acesso, ao lado do papel e da alocação por empresa.
+    Gestor e dev não têm linha aqui — enxergam todo segmento por papel, como já
+    ignoram o escopo de empresa. Quem decide é a API em C#
+    (`Cat.Dominio/Acesso/Segmento.cs`); aqui só se guarda.
+    """
+
+    __tablename__ = "usuario_segmento"
+    __table_args__ = (UniqueConstraint("usuario_id", "segmento", name="uq_usuario_segmento"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"), nullable=False, index=True)
+    segmento: Mapped[str] = mapped_column(String(30), nullable=False)
+    liberado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    liberado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, nullable=False
+    )
+
+
 class EstabelecimentoDB(Base):
     """Uma filial ou a matriz. Um por CNPJ completo.
 
@@ -152,6 +173,10 @@ class ProjetoDB(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), nullable=False)
     frente: Mapped[str] = mapped_column(String(20), nullable=False)
+    # o segmento tributário a que o trabalho pertence, que é por onde a tela
+    # inicial o encontra. Todo trabalho anterior a esta coluna é de ICMS — o
+    # sistema nasceu na CAT 42 —, e é esse o padrão
+    modulo: Mapped[str] = mapped_column(String(30), nullable=False, default="icms", index=True)
     nome: Mapped[str] = mapped_column(Text, nullable=False)
     competencia_ini: Mapped[date] = mapped_column(Date, nullable=False)
     competencia_fim: Mapped[date] = mapped_column(Date, nullable=False)

@@ -122,6 +122,11 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] Correção à mão: domínio, tabela e aplicação no razão (v0.63.0)
 - [x] Correção à mão: rotas da API, com o antes e o depois no histórico (v0.64.0)
 - [x] Correção à mão: subir planilha editada, com o que mudou à vista antes de gravar (v0.65.0)
+- [x] Acesso por segmento tributário: domínio, tabela, rotas e entrada pós-login (v0.66.0)
+- [ ] Telas do handoff de design (hub de módulos, escolha de frente, coluna de módulos
+      em Usuários) — desenho pronto em `Reconstrução tela listagem usuários/design_handoff`
+- [ ] Resolver a colisão de vocabulário: o handoff chama de "módulo" o nível 1 e de
+      "frente" o nível 2, e `frente` já existe no código como tipo de trabalho
 - [ ] Correção à mão: editar na tela do razão, linha a linha
 - [ ] **Fim da ST de perfumaria e higiene em 1º/04/2026** (Portaria SRE 94/2025):
       trabalho cuja competência cruze 31/03/2026 monta a ficha como se a ST

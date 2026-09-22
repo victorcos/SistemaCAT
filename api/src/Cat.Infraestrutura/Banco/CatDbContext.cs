@@ -14,6 +14,7 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
 {
     public DbSet<UsuarioLinha> Usuarios => Set<UsuarioLinha>();
     public DbSet<AlocacaoLinha> Alocacoes => Set<AlocacaoLinha>();
+    public DbSet<UsuarioSegmentoLinha> UsuariosSegmentos => Set<UsuarioSegmentoLinha>();
     public DbSet<EmpresaLinha> Empresas => Set<EmpresaLinha>();
     public DbSet<EstabelecimentoLinha> Estabelecimentos => Set<EstabelecimentoLinha>();
     public DbSet<ProjetoLinha> Projetos => Set<ProjetoLinha>();
@@ -45,6 +46,7 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
             // NOT NULL sem valor padrão no banco: o SQLAlchemy preenche do lado da aplicação
             e.Property(u => u.CriadoEm).HasColumnName("criado_em");
             e.HasMany(u => u.Alocacoes).WithOne().HasForeignKey(a => a.UsuarioId);
+            e.HasMany(u => u.Segmentos).WithOne().HasForeignKey(s => s.UsuarioId);
         });
 
         modelo.Entity<AlocacaoLinha>(e =>
@@ -59,6 +61,17 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
             e.Property(a => a.Fim).HasColumnName("fim");
             e.Property(a => a.AlocadoPor).HasColumnName("alocado_por");
             e.Property(a => a.MotivoSaida).HasColumnName("motivo_saida");
+        });
+
+        modelo.Entity<UsuarioSegmentoLinha>(e =>
+        {
+            e.ToTable("usuario_segmento");
+            e.HasKey(s => s.Id);
+            e.Property(s => s.Id).HasColumnName("id");
+            e.Property(s => s.UsuarioId).HasColumnName("usuario_id");
+            e.Property(s => s.Segmento).HasColumnName("segmento");
+            e.Property(s => s.LiberadoPor).HasColumnName("liberado_por");
+            e.Property(s => s.LiberadoEm).HasColumnName("liberado_em");
         });
 
         modelo.Entity<EmpresaLinha>(e =>
@@ -99,6 +112,7 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
             e.Property(x => x.Id).HasColumnName("id");
             e.Property(x => x.EmpresaId).HasColumnName("empresa_id");
             e.Property(x => x.Frente).HasColumnName("frente");
+            e.Property(x => x.Modulo).HasColumnName("modulo");
             e.Property(x => x.Nome).HasColumnName("nome");
             e.Property(x => x.CompetenciaIni).HasColumnName("competencia_ini");
             e.Property(x => x.CompetenciaFim).HasColumnName("competencia_fim");
@@ -244,6 +258,7 @@ public sealed class UsuarioLinha
     public DateTime? UltimoAcesso { get; set; }
     public DateTime CriadoEm { get; set; }
     public List<AlocacaoLinha> Alocacoes { get; set; } = [];
+    public List<UsuarioSegmentoLinha> Segmentos { get; set; } = [];
 }
 
 public sealed class AlocacaoLinha
@@ -257,6 +272,20 @@ public sealed class AlocacaoLinha
     public DateTime? Fim { get; set; }
     public int? AlocadoPor { get; set; }
     public string? MotivoSaida { get; set; }
+}
+
+/// <summary>
+/// Em que assunto a pessoa trabalha. Terceira dimensão de acesso, ao lado do
+/// papel e da alocação por empresa. Gestor e dev não têm linha aqui: enxergam
+/// todo segmento por papel.
+/// </summary>
+public sealed class UsuarioSegmentoLinha
+{
+    public int Id { get; set; }
+    public int UsuarioId { get; set; }
+    public string Segmento { get; set; } = "";
+    public int? LiberadoPor { get; set; }
+    public DateTime LiberadoEm { get; set; }
 }
 
 public sealed class EmpresaLinha
@@ -291,6 +320,9 @@ public sealed class ProjetoLinha
     public int Id { get; set; }
     public int EmpresaId { get; set; }
     public string Frente { get; set; } = "";
+    // o segmento tributário a que o trabalho pertence: é por ele que a tela
+    // inicial o encontra. Todo trabalho anterior a esta coluna é de ICMS
+    public string Modulo { get; set; } = Dominio.Acesso.Segmentos.Icms;
     public string Nome { get; set; } = "";
     public DateOnly CompetenciaIni { get; set; }
     public DateOnly CompetenciaFim { get; set; }

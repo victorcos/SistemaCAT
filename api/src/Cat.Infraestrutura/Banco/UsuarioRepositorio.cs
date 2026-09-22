@@ -88,6 +88,30 @@ public sealed class UsuarioRepositorio(CatDbContext banco, TimeProvider relogio,
         return Alterar(id, "definir cargo", s => s.SetProperty(u => u.Cargo, valor), cancelar);
     }
 
+    /// <summary>
+    /// Grava a lista inteira numa transação: o que saiu é apagado, o que entrou é
+    /// criado, e o que ficou não é tocado — preservando quem liberou e quando.
+    /// </summary>
+    public async Task DefinirSegmentos(int id, IReadOnlyList<string> segmentos, int porUsuarioId,
+        DateTimeOffset agora, CancellationToken cancelar)
+    {
+        await using var transacao = await banco.Database.BeginTransactionAsync(cancelar);
+        var atuais = await banco.UsuariosSegmentos.Where(s => s.UsuarioId == id).ToListAsync(cancelar);
+        var querem = segmentos.ToHashSet();
+        foreach (var fora in atuais.Where(s => !querem.Contains(s.Segmento)))
+            banco.UsuariosSegmentos.Remove(fora);
+        // o Postgres guarda microssegundos: o resto dos ticks some ao gravar
+        var quando = new DateTime(agora.UtcTicks - agora.UtcTicks % 10, DateTimeKind.Utc);
+        foreach (var novo in querem.Where(c => atuais.All(s => s.Segmento != c)))
+            banco.UsuariosSegmentos.Add(new UsuarioSegmentoLinha
+            {
+                UsuarioId = id, Segmento = novo, LiberadoPor = porUsuarioId, LiberadoEm = quando,
+            });
+        await banco.SaveChangesAsync(cancelar);
+        await transacao.CommitAsync(cancelar);
+        banco.ChangeTracker.Clear();
+    }
+
     public Task DefinirDados(int id, string nomeExibicao, string email, CancellationToken cancelar) =>
         Alterar(id, "definir dados", s => s
             .SetProperty(u => u.NomeExibicao, nomeExibicao)
@@ -125,7 +149,8 @@ public sealed class UsuarioRepositorio(CatDbContext banco, TimeProvider relogio,
     }
 
     private IQueryable<UsuarioLinha> Consulta() =>
-        banco.Usuarios.AsNoTracking().Include(u => u.Alocacoes.Where(a => a.Fim == null));
+        banco.Usuarios.AsNoTracking().Include(u => u.Alocacoes.Where(a => a.Fim == null))
+                                     .Include(u => u.Segmentos);
 
     private Usuario ParaDominio(UsuarioLinha linha)
     {
@@ -156,6 +181,11 @@ public sealed class UsuarioRepositorio(CatDbContext banco, TimeProvider relogio,
             SenhaProvisoria = linha.SenhaProvisoria,
             // escopo de visibilidade vem SÓ das alocações vigentes
             Empresas = linha.Alocacoes.Select(a => a.EmpresaId).Distinct().Order().ToList(),
+            // segmento desconhecido no banco é ignorado, não derruba o login: a
+            // pessoa entra com menos acesso, que é o lado seguro de errar
+            Segmentos = Cat.Dominio.Acesso.Segmentos.Todos
+                .Where(s => linha.Segmentos.Any(l => l.Segmento == s.Chave))
+                .Select(s => s.Chave).ToList(),
         }.ComTentativas(linha.TentativasFalhas, DoBanco(linha.BloqueadoAte), DoBanco(linha.UltimoAcesso));
     }
 

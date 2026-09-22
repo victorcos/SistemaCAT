@@ -9,6 +9,12 @@ export const ROTAS = {
   login: "/login",
   trocarSenha: "/trocar-senha",
   inicio: "/",
+  /** os cards do primeiro nível: os segmentos tributários que a pessoa enxerga */
+  segmentos: "/segmentos",
+  /** os cards do segundo nível: os módulos de um segmento */
+  segmento: (chave: string) => `/segmentos/${chave}`,
+  /** a lista de trabalhos de um módulo — a tela de demanda */
+  modulo: (chave: string) => `/modulos/${chave}`,
   importar: "/importar",
   usuarios: "/usuarios",
 

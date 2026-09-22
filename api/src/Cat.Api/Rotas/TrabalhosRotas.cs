@@ -20,7 +20,8 @@ public static class TrabalhosRotas
 
     public sealed record ProjetoDto(
         int Id, int EmpresaId, string Empresa, string? CnpjMatriz, string? CnpjMatrizFormatado, string? Uf,
-        string Frente, string FrenteRotulo, string Nome, DateOnly CompetenciaIni, DateOnly CompetenciaFim,
+        string Frente, string FrenteRotulo, string Modulo, string ModuloRotulo,
+        string Nome, DateOnly CompetenciaIni, DateOnly CompetenciaFim,
         string Status, string StatusRotulo, bool PreCadastro, int EtapasFeitas, int EtapasTotais,
         string? CriadoPor, int? CriadoPorId, string? Responsavel, int? ResponsavelId, int Comentarios,
         string VendaAConsumidor, string VendaAConsumidorRotulo);
@@ -39,7 +40,8 @@ public static class TrabalhosRotas
         string? CnpjRaiz, string? CnpjMatriz, string? RazaoSocial, string? Uf, string? InscricaoEstadual, string? GrupoEconomico);
 
     private sealed record PedidoProjeto(
-        int? EmpresaId, string? Frente, string? Nome, string? CompetenciaIni, string? CompetenciaFim, string? Observacao);
+        int? EmpresaId, string? Frente, string? Modulo, string? Nome, string? CompetenciaIni,
+        string? CompetenciaFim, string? Observacao);
 
     private sealed record ConfirmacaoDeExclusao(string? Senha);
 
@@ -61,8 +63,17 @@ public static class TrabalhosRotas
         // aberta como no Python: é a lista fixa das frentes, não dado de cliente
         api.MapGet("/frentes", () => Results.Json(Frentes.Todas.ToDictionary(f => f.Key, f => f.Value)));
 
+        // ?modulo= é o recorte da tela do segmento: sem ele, a lista sai inteira,
+        // como sempre saiu, e nenhuma tela antiga muda de comportamento
         api.MapGet("/projetos", async (HttpContext http, Trabalhos caso) =>
-                Results.Json((await caso.ListarProjetos(http.UsuarioAtual(), http.RequestAborted)).Select(Projeto).ToList()))
+            {
+                var todos = await caso.ListarProjetos(http.UsuarioAtual(), http.RequestAborted);
+                var modulo = http.Request.Query["modulo"].FirstOrDefault();
+                var recorte = string.IsNullOrWhiteSpace(modulo)
+                    ? todos
+                    : todos.Where(p => p.Projeto.Modulo == modulo).ToList();
+                return Results.Json(recorte.Select(Projeto).ToList());
+            })
             .ExigirUsuario();
         api.MapPost("/projetos", CriarProjeto).PodeEscrever();
         api.MapGet("/projetos/{projetoId:int}", async (int projetoId, HttpContext http, Trabalhos caso) =>
@@ -141,7 +152,7 @@ public static class TrabalhosRotas
         return await Traduzir(async () =>
         {
             var p = await caso.CriarProjeto(empresaId, pedido.Frente, pedido.Nome, ini, fim, pedido.Observacao,
-                http.UsuarioAtual(), http.RequestAborted);
+                http.UsuarioAtual(), http.RequestAborted, pedido.Modulo);
             return Results.Json(Projeto(p), statusCode: StatusCodes.Status201Created);
         });
     }
@@ -202,13 +213,18 @@ public static class TrabalhosRotas
         e.Id, e.CnpjRaiz, e.CnpjMatriz, Cnpj.Tentar(e.CnpjMatriz)?.Formatado, e.RazaoSocial, e.Uf, e.InscricaoEstadual,
         e.PreCadastro, e.TemProjeto ? 1 : 0);
 
+    /// <summary>Módulo que saiu do catálogo aparece pela chave, não some da tela.</summary>
+    private static string RotuloDoModulo(string chave) =>
+        Segmentos.Todos.SelectMany(s => s.Modulos).FirstOrDefault(m => m.Chave == chave)?.Rotulo ?? chave;
+
     public static ProjetoDto Projeto(ProjetoComEtapas pe)
     {
         var p = pe.Projeto;
         var (feitas, totais) = pe.Progresso;
         return new ProjetoDto(
             p.Id, p.EmpresaId, p.Empresa, p.CnpjMatriz, Cnpj.Tentar(p.CnpjMatriz)?.Formatado, p.Uf,
-            p.Frente, Frentes.Rotulo(p.Frente), p.Nome, p.CompetenciaIni, p.CompetenciaFim,
+            p.Frente, Frentes.Rotulo(p.Frente), p.Modulo, RotuloDoModulo(p.Modulo),
+            p.Nome, p.CompetenciaIni, p.CompetenciaFim,
             p.Status, StatusDoProjeto.Rotulo(p.Status), p.PreCadastro, feitas, totais,
             p.CriadoPor, p.CriadoPorId, p.Responsavel, p.ResponsavelId, p.Comentarios,
             VendaAConsumidor.DoBanco(p.VendaAConsumidor).Valor, VendaAConsumidor.DoBanco(p.VendaAConsumidor).Rotulo);
@@ -236,7 +252,7 @@ public static class TrabalhosRotas
 
     private static int? Codigo(Exception erro) => erro switch
     {
-        SemAcessoAEmpresa or SenhaNaoConfere => StatusCodes.Status403Forbidden,
+        SemAcessoAEmpresa or SemAcessoAoSegmento or SenhaNaoConfere => StatusCodes.Status403Forbidden,
         ProjetoNaoEncontrado or EmpresaNaoEncontrada => StatusCodes.Status404NotFound,
         EmpresaJaCadastrada or ProjetoRepetido => StatusCodes.Status409Conflict,
         DadoInvalido or RaizNaoConfere or FrenteDesconhecida or CompetenciasInvertidas

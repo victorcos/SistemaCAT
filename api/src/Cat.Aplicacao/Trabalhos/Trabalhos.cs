@@ -90,11 +90,25 @@ public sealed class Trabalhos(
         return ComEtapas(projeto);
     }
 
+    /// <param name="modulo">
+    /// O assunto tributário do trabalho (ver <see cref="Segmentos"/>). Vazio cai em
+    /// ICMS, que é o que todo trabalho criado antes desta coluna é — o sistema
+    /// nasceu na CAT 42. Não se confunde com a frente: frente é o TIPO de trabalho
+    /// (razão, de-para, quebra de SPED), módulo é o TRIBUTO.
+    /// </param>
     public async Task<ProjetoComEtapas> CriarProjeto(int empresaId, string frente, string nome, DateOnly ini, DateOnly fim,
-        string? observacao, Usuario por, CancellationToken cancelar)
+        string? observacao, Usuario por, CancellationToken cancelar, string? modulo = null)
     {
         if (!Frentes.Existe(frente))
             throw new FrenteDesconhecida();
+        var assunto = string.IsNullOrWhiteSpace(modulo) ? Segmentos.Icms : modulo.Trim().ToLowerInvariant();
+        if (Segmentos.Todos.SelectMany(s => s.Modulos).All(m => m.Chave != assunto))
+            throw new DadoInvalido($"Módulo desconhecido: {assunto}.");
+        // criar trabalho num assunto que a pessoa não enxerga é o mesmo tipo de
+        // acidente que criar em empresa fora do escopo: ela não o veria depois
+        var dono = Segmentos.Todos.First(s => s.Modulos.Any(m => m.Chave == assunto));
+        if (!Segmentos.PodeVer(por, dono.Chave))
+            throw new SemAcessoAoSegmento(dono.Rotulo);
         if (fim < ini)
             throw new CompetenciasInvertidas();
         if (!await repositorio.EmpresaExiste(empresaId, cancelar))
@@ -108,14 +122,14 @@ public sealed class Trabalhos(
             throw new ProjetoRepetido();
 
         var agora = relogio.GetUtcNow();
-        var id = await repositorio.CriarProjeto(new NovoProjeto(empresaId, frente, nome, ini, fim, observacao), por, agora,
-            cancelar);
+        var id = await repositorio.CriarProjeto(
+            new NovoProjeto(empresaId, frente, assunto, nome, ini, fim, observacao), por, agora, cancelar);
         try
         {
             await repositorio.RegistrarEvento(id, TipoDeEvento.Criado, $"{Frentes.Rotulo(frente)} · {nome}",
                 new Dictionary<string, object>
                 {
-                    ["frente"] = frente, ["nome"] = nome,
+                    ["frente"] = frente, ["modulo"] = assunto, ["nome"] = nome,
                     ["competencia_ini"] = ini.ToString("yyyy-MM-dd"), ["competencia_fim"] = fim.ToString("yyyy-MM-dd"),
                 }, por, agora, cancelar);
         }

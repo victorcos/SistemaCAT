@@ -30,6 +30,13 @@ public sealed class Usuario
     public DateTimeOffset? UltimoAcesso { get; private set; }
     public IReadOnlyList<int> Empresas { get; init; } = [];
 
+    /// <summary>
+    /// Os segmentos tributários liberados (ver <see cref="Segmentos"/>). Terceira
+    /// dimensão de acesso: papel diz o QUE, empresas dizem SOBRE QUEM, segmento diz
+    /// EM QUE ASSUNTO. Vazia para gestor e dev, que enxergam todos por papel.
+    /// </summary>
+    public IReadOnlyList<string> Segmentos { get; init; } = [];
+
     /// <summary>Reconstitui o estado de tentativas lido do banco.</summary>
     public Usuario ComTentativas(int falhas, DateTimeOffset? bloqueadoAte, DateTimeOffset? ultimoAcesso)
     {

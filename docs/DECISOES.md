@@ -5,6 +5,50 @@
 
 ---
 
+## 2026-09-22 — Acesso por segmento tributário: a terceira dimensão
+
+**O pedido do Victor.** Depois do login, uma tela de cards por tributo —
+PIS/COFINS, ICMS, IRPJ/CSLL —, e dentro de cada um os módulos. Quem é gestor vê
+todos; os demais caem direto no que o gestor liberou. A gestão de usuários passa
+a morar nessa tela principal, e é lá que o gestor indica em que assunto cada
+pessoa trabalha.
+
+**O desenho.** O sistema já separava duas dimensões de acesso: **papel** diz o
+QUE a pessoa pode fazer, a **alocação por empresa** diz SOBRE QUEM. O segmento é
+a terceira e é ortogonal às duas: diz EM QUE ASSUNTO. Um analista alocado na
+carteira inteira e liberado só para PIS/COFINS não vê trabalho de ICMS.
+
+**Quatro escolhas, todas do Victor (22/09/2026):**
+
+* **quem enxerga tudo é o papel `gestor`, não o cargo.** O sistema documenta que
+  cargo é informação organizacional, sem permissão nenhuma; dar permissão a ele
+  criaria dois caminhos para a mesma regra. Gestor e dev enxergam todo segmento
+  pela mesma razão que já ignoram o escopo de empresa;
+* **a reforma casa com o tributo que sucede:** CBS ao lado de PIS/COFINS, **IBS**
+  ao lado de ICMS. O pedido original dizia CBS nos dois; a CBS substitui
+  PIS/COFINS e o IBS substitui ICMS/ISS. De 2027 a 2033 é a mesma equipe
+  apurando os dois lado a lado — segmento separado para a reforma partiria
+  exatamente quem precisa ver os dois juntos;
+* **IRPJ e CSLL são um card só**: apuram juntos, mesma base, mesma ECF;
+* **com dois ou mais segmentos, a pessoa cai na tela de segmentos filtrada.**
+  Com um só, pula essa tela; se esse único segmento tiver um módulo só, pula as
+  duas e vai direto ao trabalho. Escolher entre uma opção não é escolha.
+
+**Onde a decisão de entrada é tomada.** No servidor, e vem pronta no login
+(`usuario.entrada`). A tela obedece. Quem sabe quais segmentos a pessoa tem é
+quem guarda a regra, e repetir a conta em TypeScript daria duas fontes para a
+mesma verdade.
+
+**O que a migração precisou fazer, e quase não fez.** A coluna nova nasce negando
+tudo a todo mundo: no instante em que a tabela é criada, ninguém tem segmento, e
+analista, revisor e leitura ficariam trancados fora do que usam todo dia. Foi um
+teste que acusou. A migração preenche: todo usuário que não é gestor nem dev
+recebe `icms`, porque **todo trabalho que existe é de ICMS** — o sistema nasceu
+na CAT 42. O trabalho ganhou `modulo` com o mesmo padrão, pelo mesmo motivo.
+
+---
+
+
 ## 2026-09-21 — Vigência: o sistema não conhece data de lei, e a ST acaba em 04/2026
 
 **A pergunta do Victor (21/09/2026):** os 25% do art. 55, IV foram conferidos

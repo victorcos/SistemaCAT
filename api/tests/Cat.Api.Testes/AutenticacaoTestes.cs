@@ -74,7 +74,8 @@ public sealed class AutenticacaoTestes(BancoDeTeste banco) : IDisposable
 
         var u = corpo.GetProperty("usuario");
         Assert.Equal(
-            ["id", "usuario", "email", "nome_exibicao", "papel", "cargo", "empresas", "senha_provisoria", "ultimo_acesso"],
+            ["id", "usuario", "email", "nome_exibicao", "papel", "cargo", "empresas", "segmentos", "entrada",
+             "senha_provisoria", "ultimo_acesso"],
             u.EnumerateObject().Select(p => p.Name));
         Assert.Equal(id, u.GetProperty("id").GetInt32());
         Assert.Equal("analista", u.GetProperty("papel").GetString());

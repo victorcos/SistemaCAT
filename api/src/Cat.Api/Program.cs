@@ -123,6 +123,7 @@ app.UseCors();
 app.MapearSaude();
 app.MapearAuth();
 app.MapearUsuarios();
+app.MapearSegmentos();
 app.MapearTrabalhos();
 app.MapearHistorico();
 app.MapearLotes();

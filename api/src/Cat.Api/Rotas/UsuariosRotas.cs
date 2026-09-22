@@ -25,7 +25,7 @@ public static class UsuariosRotas
     public sealed record UsuarioResumo(
         int Id, string Usuario, string Email, string NomeExibicao, string Papel, string Cargo,
         bool Ativo, bool Bloqueado, bool SenhaProvisoria, int TentativasFalhas,
-        IReadOnlyList<int> Empresas, string? UltimoAcesso);
+        IReadOnlyList<int> Empresas, IReadOnlyList<string> Segmentos, string? UltimoAcesso);
 
     public sealed record RespostaCriado(UsuarioResumo Usuario, string SenhaProvisoria, string Aviso);
     public sealed record RespostaSenhaRedefinida(string SenhaProvisoria, string Aviso);
@@ -37,6 +37,7 @@ public static class UsuariosRotas
     private sealed record PedidoCargo(string? Cargo);
     private sealed record PedidoDados(string? NomeExibicao, string? Email);
     private sealed record PedidoDeAcesso(List<int>? Empresas);
+    private sealed record PedidoDeSegmentos(List<string>? Segmentos);
     private sealed record PedidoSituacao(bool? Ativo);
     private sealed record PedidoTrocarSenha(string? SenhaAtual, string? SenhaNova);
 
@@ -61,6 +62,7 @@ public static class UsuariosRotas
         grupo.MapPatch("/{alvoId:int}/papel", AlterarPapel).SoGestor();
         grupo.MapGet("/{alvoId:int}/empresas", ListarAcesso).SoGestor();
         grupo.MapPut("/{alvoId:int}/empresas", DefinirAcesso).SoGestor();
+        grupo.MapPut("/{alvoId:int}/segmentos", DefinirSegmentos).SoGestor();
         grupo.MapPatch("/{alvoId:int}/dados", AlterarDados).SoGestor();
         grupo.MapPatch("/{alvoId:int}/cargo", AlterarCargo).SoGestor();
         grupo.MapPatch("/{alvoId:int}/situacao", DefinirSituacao).SoGestor();
@@ -186,6 +188,17 @@ public static class UsuariosRotas
     /// alocação, encerra: quem tinha acesso a um dado em determinado mês
     /// precisa continuar respondível.
     /// </summary>
+    private static async Task<IResult> DefinirSegmentos(int alvoId, HttpContext http, GerirUsuarios caso,
+        TimeProvider relogio)
+    {
+        var (pedido, recusa) = await CorpoJson.Ler<PedidoDeSegmentos>(http);
+        if (recusa is not null)
+            return recusa;
+        return await Traduzir(http, "definir segmentos", async () => Results.Json(Resumo(
+            await caso.DefinirSegmentos(alvoId, pedido!.Segmentos ?? [], http.UsuarioAtual(),
+                http.RequestAborted), relogio)));
+    }
+
     private static async Task<IResult> DefinirAcesso(int alvoId, HttpContext http, AcessoAEmpresas caso)
     {
         var (pedido, recusa) = await CorpoJson.Ler<PedidoDeAcesso>(http);
@@ -204,6 +217,9 @@ public static class UsuariosRotas
     public static UsuarioResumo Resumo(Usuario u, TimeProvider relogio) => new(
         u.Id, u.NomeDeUsuario, u.Email, u.NomeExibicao, u.Papel.Valor(), u.Cargo.Valor(),
         u.Ativo, u.Bloqueado(relogio.GetUtcNow()), u.SenhaProvisoria, u.TentativasFalhas, u.Empresas,
+        // para gestor e dev a lista gravada é vazia e não diz nada: o que a tela
+        // mostra é o que a pessoa de fato enxerga, que para eles é tudo
+        Dominio.Acesso.Segmentos.De(u).Select(s => s.Chave).ToList(),
         u.UltimoAcesso is { } acesso ? AuthRotas.IsoComoPython(acesso) : null);
 
     /// <summary>

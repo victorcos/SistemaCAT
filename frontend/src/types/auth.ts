@@ -16,6 +16,11 @@ export interface Usuario {
   papel: Papel;
   cargo: Cargo;
   empresas: number[];
+  /** os segmentos tributários que a pessoa enxerga; para gestor e dev, todos */
+  segmentos: string[];
+  /** para onde a tela inicial deve mandá-la, já resolvido no servidor.
+   *  Nulo quando nenhum segmento foi liberado — aí a tela pede que procure o gestor. */
+  entrada: string | null;
   senha_provisoria: boolean;
   ultimo_acesso: string | null;
 }

@@ -54,8 +54,15 @@ public class BancoDeTeste : IAsyncLifetime
         return conexao;
     }
 
+    /// <param name="segmentos">
+    /// Em que assuntos a pessoa trabalha. O padrão é todos, porque é o estado de
+    /// um usuário que o gestor já configurou — que é o que a maioria dos cenários
+    /// supõe. Passe uma lista menor para exercitar a recusa por segmento.
+    /// Gestor e dev não recebem linha: enxergam tudo por papel.
+    /// </param>
     public async Task<int> CriarUsuario(string nome, string papel = "analista", bool ativo = true,
-        string? resumo = null, int tentativas = 0, int[]? empresas = null, string cargo = "analista")
+        string? resumo = null, int tentativas = 0, int[]? empresas = null, string cargo = "analista",
+        string[]? segmentos = null)
     {
         await using var c = await Abrir();
         await using var cmd = new NpgsqlCommand("""
@@ -72,6 +79,11 @@ public class BancoDeTeste : IAsyncLifetime
         cmd.Parameters.AddWithValue("a", ativo);
         cmd.Parameters.AddWithValue("t", tentativas);
         var id = (int)(await cmd.ExecuteScalarAsync())!;
+
+        if (papel is not ("gestor" or "dev"))
+            foreach (var s in segmentos ?? Cat.Dominio.Acesso.Segmentos.Todos.Select(x => x.Chave).ToArray())
+                await Executar(c, $"INSERT INTO usuario_segmento (usuario_id, segmento) "
+                                 + $"VALUES ({id}, '{s}') ON CONFLICT DO NOTHING");
 
         foreach (var empresa in empresas ?? [])
         {

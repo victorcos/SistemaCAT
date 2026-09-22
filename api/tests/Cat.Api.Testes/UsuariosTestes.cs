@@ -122,7 +122,7 @@ public sealed class UsuariosTestes(BancoDeTeste banco) : IDisposable
         var primeiro = (await Json(r)).EnumerateArray().First();
         Assert.Equal(
             ["id", "usuario", "email", "nome_exibicao", "papel", "cargo", "ativo", "bloqueado", "senha_provisoria",
-             "tentativas_falhas", "empresas", "ultimo_acesso"],
+             "tentativas_falhas", "empresas", "segmentos", "ultimo_acesso"],
             primeiro.EnumerateObject().Select(p => p.Name));
     }
 
