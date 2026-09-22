@@ -132,8 +132,7 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       competência: C170 item a item quando houver, senão documento ou XML
 - [x] Roteiro de etapas por módulo, e o critério do que vira tabela (v0.69.0)
 - [x] Quebra de SPED: índice, cache e o join do item (v0.70.0)
-- [ ] Ligar a quebra de SPED à etapa `quebra_de_sped`: fila, pasta de trabalho e
-      a tela que mostra o que o arquivo tem
+- [x] Etapa `quebra_de_sped` ligada à fila, com tela e downloads (v0.75.0)
 - [ ] Exclusão do Tema 69 **sempre pelo cruzamento** das duas EFD: o campo do ICMS
       no C170 das Contribuições é facultativo, e dois caminhos de cálculo dariam
       números diferentes para empresas iguais. Ver DECISOES de 22/09/2026

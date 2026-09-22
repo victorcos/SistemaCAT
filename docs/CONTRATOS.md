@@ -303,6 +303,25 @@ As colunas de enquadramento da planilha levam `abs(icms_suportado)` da linha de
 saída — o imposto baixado da ficha —, não o valor da operação. É delas que o
 valor de confronto (20)/(21) é subtraído para dar ressarcimento e complemento.
 
+### Etapa de quebra de SPED (v0.75.0)
+
+| Método | Rota | Quem |
+|---|---|---|
+| `POST` | `/api/projetos/{id}/quebra-de-sped` | quem escreve |
+| `GET` | `/api/projetos/{id}/quebra-de-sped` | quem vê o trabalho |
+| `GET` | `/api/quebra-de-sped/{execucaoId}` | quem vê o trabalho |
+| `POST` | `/api/quebra-de-sped/{execucaoId}/cancelar` | quem escreve |
+| `GET` | `/api/quebra-de-sped/{execucaoId}/planilhas/{qual}` | quem vê o trabalho |
+
+`qual` vale `entradas` (a 037), `razao-contabil`, `arquivos` e `contagens`, em
+xlsx ou csv. O resumo da execução traz `entradas`, `linhas_do_razao`,
+`contribuicoes`, `ecd`, `ilegiveis`, `por_ramo`, `estabelecimentos`,
+`competencias` e `avisos`.
+
+Em disco, na pasta da execução: `entradas.parquet`, `razao.parquet`,
+`arquivos.parquet`, `contagens.parquet` e a pasta `indices/`, com um índice por
+arquivo lido — cache de leitura, descartável.
+
 ### Correções à mão pela planilha (v0.65.0)
 
 | Método | Rota | Quem |

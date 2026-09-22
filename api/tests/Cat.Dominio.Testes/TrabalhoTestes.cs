@@ -192,10 +192,24 @@ public sealed class RoteiroPorModuloTestes
     public void Etapa_declarada_e_nao_construida_aparece_como_indisponivel()
     {
         var roteiro = Etapas.Montar("piscofins", new HashSet<string>());
+        var apuracao = roteiro.Single(e => e.Definicao.Chave == "apuracao_contribuicoes");
+        Assert.Equal(SituacaoEtapa.NaoDisponivel, apuracao.Situacao);
+        // e não conta no denominador: só entram as que existem
+        Assert.Equal((0, 2), Etapas.Progresso(roteiro));
+    }
+
+    [Fact]
+    public void A_quebra_de_sped_ja_existe_e_espera_a_importacao()
+    {
+        var roteiro = Etapas.Montar("piscofins", new HashSet<string>());
         var quebra = roteiro.Single(e => e.Definicao.Chave == "quebra_de_sped");
-        Assert.Equal(SituacaoEtapa.NaoDisponivel, quebra.Situacao);
-        // e não conta no denominador: "0 de 1" em vez de "0 de 3"
-        Assert.Equal((0, 1), Etapas.Progresso(roteiro));
+        Assert.True(quebra.Definicao.Implementada);
+        // bloqueada, não indisponível: falta a etapa anterior, não o código
+        Assert.Equal(SituacaoEtapa.Bloqueada, quebra.Situacao);
+
+        var comBase = Etapas.Montar("piscofins", new HashSet<string> { "importar" });
+        Assert.Equal(SituacaoEtapa.Pendente,
+            comBase.Single(e => e.Definicao.Chave == "quebra_de_sped").Situacao);
     }
 
     [Fact]

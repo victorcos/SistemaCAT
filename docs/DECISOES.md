@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-09-22 — A etapa de quebra: o par que se confronta sai junto
+
+**O que a etapa faz.** Primeira do módulo de PIS/COFINS depois da importação.
+Lê a EFD-Contribuições e a ECD do lote e escreve quatro parquets — mas dois
+deles são o ponto: a **Consulta de Entradas (037)** e o **razão contábil**.
+
+**Por que os dois saem da mesma rodada.** Porque é o par que se confronta: a 037
+diz o que a escrituração fiscal registrou como entrada, o razão diz o que a
+contabilidade lançou, e onde discordam está o trabalho. Separá-los em duas
+etapas obrigaria a juntar depois, sobre bases que podem ter sido montadas em
+momentos diferentes — e a primeira pergunta de quem confere é "os dois lados são
+da mesma leitura?".
+
+**Por que a extração sai na etapa, e não no download.** A leitura é sequencial e
+custa o arquivo inteiro: gerar a 037 na hora do clique obrigaria a reler 5 GB a
+cada download. O **índice**, esse sim, fica em cache por arquivo — é o que torna
+barato dizer "o que tem aqui dentro" sem reler nada.
+
+**Fora do rito da CAT 42, de propósito.** A quebra não depende de conferência
+nem de movimentos: aquelas são etapas do ICMS. O roteiro de PIS/COFINS é
+importar e quebrar — e foi para isso que o roteiro virou por módulo, na v0.69.
+
+**Arquivo ilegível não derruba a rodada.** Ele é contado, entra na lista com o
+motivo, e a quebra segue. Uma ECD truncada no meio de doze não pode custar as
+outras onze.
+
+**Trabalho sem arquivo nenhum produz parquet vazio, não ausência de parquet.** A
+etapa seguinte não deveria precisar saber a diferença entre "vazio" e "não
+rodou" — e o esquema vem da tabela de registros, não da primeira linha lida.
+
+---
+
+
 ## 2026-09-22 — A Consulta de Entradas (037): porte fiel, e por quê
 
 **O que é.** Equivalente à consulta *037 — Entradas — Todos os Registros —

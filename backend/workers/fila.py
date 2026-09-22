@@ -48,6 +48,7 @@ from cat.aplicacao.casos_de_uso import (
     montar_entrega,
     montar_razao,
     pre_validar_arquivos,
+    quebrar_sped,
 )
 from cat.aplicacao.casos_de_uso.historico_do_projeto import registrar_de_etapa
 from cat.config import obter_config
@@ -70,6 +71,7 @@ EXECUTORES = {
     gerar_arquivo_digital.ETAPA: gerar_arquivo_digital.executar,
     pre_validar_arquivos.ETAPA: pre_validar_arquivos.executar,
     montar_entrega.ETAPA: montar_entrega.executar,
+    quebrar_sped.ETAPA: quebrar_sped.executar,
 }
 
 MOTIVO_INTERRUPCAO = "Interrompida: o motor reiniciou durante a rodada. Rode de novo."

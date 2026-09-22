@@ -19,6 +19,7 @@ from cat.aplicacao.casos_de_uso import (
     montar_entrega,
     montar_razao,
     pre_validar_arquivos,
+    quebrar_sped,
 )
 from cat.infraestrutura.analitico.confronto import (
     ARQUIVO_CONFERIDOS,
@@ -36,6 +37,12 @@ from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO, ARQUIVO_SALD
 from cat.infraestrutura.analitico.arquivo_digital import ARQUIVO_ARQUIVOS, ARQUIVO_OCORRENCIAS
 from cat.infraestrutura.analitico.entrega import ARQUIVO_PACOTE, ARQUIVO_RELATORIO
 from cat.infraestrutura.analitico.pre_validacao_do_cliente import ARQUIVO_ARQUIVOS_DO_CLIENTE
+from cat.infraestrutura.analitico.quebra_de_sped import (
+    ARQUIVO_DAS_CONTAGENS,
+    ARQUIVO_DAS_ENTRADAS,
+    ARQUIVO_DOS_ARQUIVOS,
+    ARQUIVO_DO_RAZAO,
+)
 from cat.infraestrutura.analitico.razao import (
     ARQUIVO_CONFERENCIA_INVENTARIO,
     ARQUIVO_FICHA3,
@@ -62,6 +69,12 @@ from cat.infraestrutura.planilhas.arquivo_digital import (
     gerar_ocorrencias,
     zip_de_envio,
     zip_de_previas,
+)
+from cat.infraestrutura.planilhas.quebra_de_sped import (
+    gerar_arquivos_quebrados,
+    gerar_contagens,
+    gerar_entradas,
+    gerar_razao_contabil,
 )
 from cat.infraestrutura.planilhas.razao import gerar_conferencia, gerar_ficha3, gerar_fichas
 from cat.infraestrutura.planilhas.suportado import gerar_suportado
@@ -95,6 +108,14 @@ PLANILHAS = {
     apurar_suportado.ETAPA: {
         "suportado": ("icms_suportado.xlsx", ARQUIVO_SUPORTADO, gerar_suportado),
     },
+    quebrar_sped.ETAPA: {
+        # a 037 e o razão são o par que se confronta; os outros dois descrevem
+        # o que foi lido, e servem para conferir a base antes de olhar o número
+        "entradas": ("consulta_de_entradas.xlsx", ARQUIVO_DAS_ENTRADAS, gerar_entradas),
+        "razao-contabil": ("razao_contabil.xlsx", ARQUIVO_DO_RAZAO, gerar_razao_contabil),
+        "arquivos": ("sped_quebrados.xlsx", ARQUIVO_DOS_ARQUIVOS, gerar_arquivos_quebrados),
+        "contagens": ("registros_por_arquivo.xlsx", ARQUIVO_DAS_CONTAGENS, gerar_contagens),
+    },
     montar_razao.ETAPA: {
         "ficha3": ("ficha3.xlsx", ARQUIVO_FICHA3, gerar_ficha3),
         "fichas": ("fichas.xlsx", ARQUIVO_FICHAS, gerar_fichas),
@@ -127,6 +148,7 @@ NAO_TERMINOU = {
     extrair_movimentos.ETAPA: "A extração ainda não terminou.",
     apurar_suportado.ETAPA: "A apuração ainda não terminou.",
     montar_razao.ETAPA: "A montagem do razão ainda não terminou.",
+    quebrar_sped.ETAPA: "A quebra dos SPED ainda não terminou.",
     apurar_periodo.ETAPA: "A apuração do período ainda não terminou.",
     gerar_arquivo_digital.ETAPA: "A geração do arquivo digital ainda não terminou.",
     pre_validar_arquivos.ETAPA: "A pré-validação ainda não terminou.",
@@ -184,7 +206,8 @@ def gerar(execucao: ExecucaoDB, etapa_da_rota: str, qual: str,
         if etapa_da_rota == extrair_movimentos.ETAPA:
             raise PlanilhaRecusada(410, "Os arquivos desta extração não estão mais em disco. Rode de novo.")
         if etapa_da_rota in (apurar_suportado.ETAPA, montar_razao.ETAPA, apurar_periodo.ETAPA,
-                             gerar_arquivo_digital.ETAPA, pre_validar_arquivos.ETAPA, montar_entrega.ETAPA):
+                             gerar_arquivo_digital.ETAPA, pre_validar_arquivos.ETAPA, montar_entrega.ETAPA,
+                             quebrar_sped.ETAPA):
             raise PlanilhaRecusada(410, "Os arquivos desta apuração não estão mais em disco. Rode de novo.")
         motivo = ("Esta conferência é de uma versão anterior e não tem esta lista."
                   if os.path.isdir(pasta) else "Os arquivos desta conferência não estão mais em disco.")

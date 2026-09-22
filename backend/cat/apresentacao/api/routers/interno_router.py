@@ -44,6 +44,7 @@ from cat.aplicacao.casos_de_uso import (
     montar_razao,
     planilhas,
     pre_validar_arquivos,
+    quebrar_sped,
     rodada,
 )
 from cat.aplicacao.casos_de_uso.analisar_remessa import RemessaAnalisada, analisar
@@ -335,6 +336,8 @@ PREPARADORES = {
                                  "Já existe uma pré-validação dos arquivos do cliente em andamento neste trabalho."),
     montar_entrega.ETAPA: (montar_entrega.preparar, montar_entrega.NadaParaEntregar,
                            "Já existe uma montagem da entrega em andamento neste trabalho."),
+    quebrar_sped.ETAPA: (quebrar_sped.preparar, quebrar_sped.NadaParaQuebrar,
+                         "Já existe uma quebra de SPED em andamento neste trabalho."),
 }
 
 # "cancelando" ainda está em curso: a rodada só para no próximo ponto seguro, e

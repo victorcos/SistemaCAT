@@ -121,8 +121,9 @@ public static class Etapas
             "Indexar a EFD-Contribuições numa passada — contagem por registro e " +
             "posição em bytes de cada um — e extrair qualquer bloco sob demanda, sem " +
             "reler o arquivo. É o que permite consolidar C170, C190, M210 e os demais " +
-            "de uma base de dezenas de milhões de linhas com memória constante.",
-            Implementada: false),
+            "de uma base de dezenas de milhões de linhas com memória constante. Dela saem a " +
+            "Consulta de Entradas (037) e o razão contábil da ECD — o par que se confronta.",
+            Implementada: true),
         new("apuracao_contribuicoes", "Apurar PIS/COFINS",
             "Os quadros da apuração por competência: receitas e bases por CST, CFOP e " +
             "natureza, ajustes, e o controle de créditos. Inclui a exclusão do ICMS da " +
