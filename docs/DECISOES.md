@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-09-22 — O caminho consolidado, e a armadilha dos filhos não intercalados
+
+**Por que ele existe.** Metade dos clientes escritura a EFD-Contribuições item a
+item, no C170; a outra metade consolida por produto e CFOP, no **C180** (notas
+emitidas) e no **C190** (adquiridas). Não é escolha nossa qual ler: é como o
+arquivo veio, e a apuração tem de ler os dois.
+
+**A armadilha.** Os filhos que detalham PIS e COFINS **não vêm intercalados**.
+Vêm *todos* os de PIS e só depois *todos* os de COFINS, e o casamento é **por
+posição** — `C191[i]` com `C195[i]`. Supor 1:1:1 na leitura sequencial, que é a
+suposição natural de quem lê o leiaute, soma o PIS de um CFOP com o COFINS de
+outro **sem erro nenhum aparecer**: os dois valores existem, os dois são do
+mesmo produto, e só o CFOP denuncia. Fato confirmado em dado real no projeto de
+origem; aqui virou teste.
+
+**E o grupo não é 1:1 nem em quantidade.** Um C180 pode ter mais filhos que o
+vizinho — em base com vários estabelecimentos a contagem de C180 vem menor que a
+de C181. Quando as listas têm tamanhos diferentes, sai uma linha por posição
+existente, com o lado que faltou em branco: perder a linha seria perder valor
+apurado.
+
+**Uma função para os dois.** No projeto de origem eram duas de ~150 linhas quase
+idênticas. C180 e C190 têm o mesmo leiaute e o mesmo par de filhos; o que muda é
+o nome e o fato de os filhos do C190 trazerem `COD_PART` — a aquisição sabe de
+quem se comprou, a venda consolidada não diz para quem se vendeu.
+
+---
+
+
+## 2026-09-22 — Tema 69: cruzar os dois SPED, e não confiar no C170 sozinho
+
+**A dúvida que a v0.70 levantou.** O C170 da EFD-Contribuições tem `VL_BC_ICMS`,
+`ALIQ_ICMS` e `VL_ICMS` no leiaute — é o mesmo registro da EFD ICMS/IPI. Se o
+contribuinte os preenche, a exclusão do ICMS da base sairia do próprio arquivo,
+sem cruzar nada.
+
+**A decisão do Victor (22/09/2026): cruzar sempre.** O preenchimento desses
+campos na EFD-Contribuições **não é obrigatório**. Um arquivo que vem com eles
+em branco é um arquivo correto, não um arquivo com defeito — e por isso a
+ausência não é exceção a tratar, é o caso normal de metade dos clientes.
+
+**Por que isso decide o desenho, e não só o valor.** Uma apuração que lê o C170
+quando ele está preenchido e cruza quando não está teria **dois caminhos de
+cálculo para o mesmo imposto**, e o resultado dependeria de como o ERP do cliente
+foi configurado. Duas empresas idênticas dariam números diferentes, e a
+diferença não estaria em lugar nenhum do relatório. Cruzar sempre custa uma
+leitura a mais e dá uma resposta só.
+
+**O que isso implica.** A exclusão do Tema 69 depende da EFD ICMS/IPI do mesmo
+CNPJ e da mesma competência — e é por isso que a leitura compartilhada entre
+trabalhos (v0.67.0) deixou de ser conveniência e virou requisito: sem ela, o
+trabalho de PIS/COFINS teria de reimportar a base que o de ICMS já tem.
+
+---
+
+
 ## 2026-09-22 — A quebra de SPED entra, e o leitor do 0000 é o que já existia
 
 **O que foi portado.** O núcleo do projeto Quebra de SPED, para

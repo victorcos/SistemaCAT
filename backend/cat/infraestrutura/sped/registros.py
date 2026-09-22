@@ -49,6 +49,41 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "VL_BC_ICMS_ST", "VL_ICMS_ST", "VL_IPI", "VL_PIS", "VL_COFINS",
         "VL_PIS_ST", "VL_COFINS_ST",
     ),
+    # plano de contas; o COD_CTA dos filhos consolidados aponta para cá
+    "0500": (
+        "REG", "DT_ALT", "COD_NAT_CC", "IND_CTA", "NIVEL", "COD_CTA", "NOME_CTA",
+        "COD_CTA_SUP",
+    ),
+    # --- o caminho consolidado: quando o contribuinte não escritura item a item ---
+    # C180 é a consolidação das notas EMITIDAS; C190, das ADQUIRIDAS. Os dois têm
+    # o mesmo leiaute e o mesmo par de filhos (PIS e COFINS), e é por isso que uma
+    # função só lê os dois
+    "C180": (
+        "REG", "COD_MOD", "DT_INI", "DT_FIN", "COD_ITEM", "COD_NCM", "EX_IPI",
+        "VL_TOT_ITEM",
+    ),
+    "C181": (
+        "REG", "CST_PIS", "CFOP", "VL_ITEM", "VL_DESC", "VL_BC_PIS", "ALIQ_PIS_PERC",
+        "QUANT_BC_PIS", "ALIQ_PIS_QUANT", "VL_PIS", "COD_CTA",
+    ),
+    "C185": (
+        "REG", "CST_COFINS", "CFOP", "VL_ITEM", "VL_DESC", "VL_BC_COFINS",
+        "ALIQ_COFINS_PERC", "QUANT_BC_COFINS", "ALIQ_COFINS_QUANT", "VL_COFINS", "COD_CTA",
+    ),
+    "C190": (
+        "REG", "COD_MOD", "DT_INI", "DT_FIN", "COD_ITEM", "COD_NCM", "EX_IPI",
+        "VL_TOT_ITEM",
+    ),
+    # os filhos do C190 trazem COD_PART, que os do C180 não têm: a aquisição sabe
+    # de quem comprou, a venda consolidada não diz para quem vendeu
+    "C191": (
+        "REG", "COD_PART", "CST_PIS", "CFOP", "VL_ITEM", "VL_DESC", "VL_BC_PIS",
+        "ALIQ_PIS_PERC", "QUANT_BC_PIS", "ALIQ_PIS_QUANT", "VL_PIS", "COD_CTA",
+    ),
+    "C195": (
+        "REG", "COD_PART", "CST_COFINS", "CFOP", "VL_ITEM", "VL_DESC", "VL_BC_COFINS",
+        "ALIQ_COFINS_PERC", "QUANT_BC_COFINS", "ALIQ_COFINS_QUANT", "VL_COFINS", "COD_CTA",
+    ),
     "C170": (
         "REG", "NUM_ITEM", "COD_ITEM", "DESCR_COMPL", "QTD", "UNID",
         "VL_ITEM", "VL_DESC", "IND_MOV", "CST_ICMS", "CFOP", "COD_NAT",

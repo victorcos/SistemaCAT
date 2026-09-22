@@ -60,16 +60,22 @@ log = obter_log(__name__)
 
 # Sobe quando muda o que o índice guarda. Índice de versão anterior é ignorado
 # e refeito, em vez de servir um recorte que já não é o que o código espera.
-VERSAO_DO_ESQUEMA = 1
+# 2: entraram os registros do caminho consolidado (C180/C190 e filhos)
+VERSAO_DO_ESQUEMA = 2
 
 # Os registros cujas posições se guardam por padrão. Guardar de todos custaria
 # memória à toa: a contagem já responde a maior parte das perguntas, e posição
 # só serve para quem vai extrair.
 #
-# Estes são os do C170 completo — a nota, o item, o estabelecimento e as três
-# tabelas do bloco 0 que o enriquecem.
+# São os dos dois caminhos que a EFD-Contribuições pode tomar: o item a item
+# (C170 com a nota e as tabelas do bloco 0) e o consolidado por produto e CFOP
+# (C180/C190 com os filhos de PIS e COFINS). Metade dos clientes escritura de um
+# jeito, metade do outro, e a apuração tem de ler os dois.
 ALVOS_PADRAO: tuple[str, ...] = (
-    "0140", "0150", "0200", "0400", "C010", "C100", "C170",
+    "0140", "0150", "0200", "0400", "0500", "C010",
+    "C100", "C170",
+    "C180", "C181", "C185",
+    "C190", "C191", "C195",
 )
 
 ARQUIVO_DO_INDICE = "indice.json"

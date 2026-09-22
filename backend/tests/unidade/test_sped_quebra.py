@@ -41,7 +41,7 @@ EFD = """|0000|006|0|||01062021|30062021|COMERCIO DO TESTE LTDA|11222333000181|S
 |C100|1|0|C09|55|00|1|2002|35210611222333000181550010000020021000020024|15062021|15062021|2000,00|0|0,00|0,00|1800,00|9||||1800,00|324,00|||||||
 |C170|1|SKU1|XAMPU 350ML|30,000|UN|1500,00|0,00|0|000|5102|N01|1500,00|18,00|270,00||||0||||||01|1500,00|1,6500|||24,75|01|1500,00|7,6000|||114,00|3.1.1|
 |C170|2|SKU2|SABONETE 90G|10,000|UN|300,00|0,00|0|000|5102|N01|300,00|18,00|54,00||||0||||||01|300,00|1,6500|||4,95|01|300,00|7,6000|||22,80|3.1.1|
-|C190|000|1102|18,00|900,00|900,00|162,00|||||
+|H010|SKU1|01|10,000|5,00|50,00|0||||
 |9999|15|
 """
 
@@ -79,9 +79,9 @@ class TestIndice:
 
         assert indice.quantos("C170") == 4
         assert indice.quantos("C100") == 2
-        # C190 é contado mesmo sem estar entre os alvos: contar tudo é o ponto
-        assert indice.quantos("C190") == 1
-        assert not indice.tem_posicoes("C190")
+        # o H010 é contado mesmo sem estar entre os alvos: contar tudo é o ponto
+        assert indice.quantos("H010") == 1
+        assert not indice.tem_posicoes("H010")
         assert len(indice.posicoes["C170"]) == 4
         assert indice.linhas == 16
 
@@ -186,8 +186,8 @@ class TestExtracao:
 
     def test_registro_nao_indexado_diz_o_que_foi(self, arquivo):
         indice = indexar(arquivo)
-        with pytest.raises(RegistroNaoIndexado, match="C190"):
-            list(registros(arquivo, indice, "C190"))
+        with pytest.raises(RegistroNaoIndexado, match="H010"):
+            list(registros(arquivo, indice, "H010"))
 
 
 class TestItemCompleto:
@@ -254,4 +254,5 @@ class TestTabelaDeRegistros:
             posicao_do_campo("C170", "CST_PIZ")
 
     def test_registro_fora_da_tabela_nao_derruba_quem_so_conta(self):
-        assert nomes_dos_campos("C190") == ()
+        # o bloco H é de inventário: a quebra o conta sem saber nomear os campos
+        assert nomes_dos_campos("H010") == ()

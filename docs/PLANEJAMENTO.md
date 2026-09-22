@@ -134,10 +134,12 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] Quebra de SPED: índice, cache e o join do item (v0.70.0)
 - [ ] Ligar a quebra de SPED à etapa `quebra_de_sped`: fila, pasta de trabalho e
       a tela que mostra o que o arquivo tem
-- [ ] Medir se o C170 da EFD-Contribuições vem com o ICMS preenchido nas bases que
-      temos — se vier, a exclusão do Tema 69 não precisa cruzar com a EFD ICMS/IPI
-- [ ] Trazer os outros joins do Quebra de SPED (C190, C180, M210, M610…) e o
-      enriquecimento (CFOP, natureza de crédito, município)
+- [ ] Exclusão do Tema 69 **sempre pelo cruzamento** das duas EFD: o campo do ICMS
+      no C170 das Contribuições é facultativo, e dois caminhos de cálculo dariam
+      números diferentes para empresas iguais. Ver DECISOES de 22/09/2026
+- [x] Caminho consolidado: C180/C190 com os filhos de PIS e COFINS casados (v0.71.0)
+- [ ] Joins do bloco M (M210, M610, M105, M505…): a apuração propriamente dita
+- [ ] Enriquecimento: descrição de CFOP, natureza de crédito, município, tipo de item
 - [ ] Apuração das contribuições (`apuracao_contribuicoes`): os 36 quadros da
       Gestão padrão MA, validados em 59 competências
 - [ ] Telas do handoff de design (hub de módulos, escolha de frente, coluna de módulos
