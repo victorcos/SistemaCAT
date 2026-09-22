@@ -94,6 +94,57 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "VL_BC_COFINS", "ALIQ_COFINS_PERC", "QUANT_BC_COFINS",
         "ALIQ_COFINS_REAIS", "VL_COFINS", "COD_CTA",
     ),
+
+    # --- bloco M: a apuração. PIS e COFINS são espelhos, registro a registro ---
+    # crédito
+    "M100": (
+        "REG", "COD_CRED", "IND_CRED_ORI", "VL_BC_PIS", "ALIQ_PIS", "QUANT_BC_PIS",
+        "ALIQ_PIS_REAIS", "VL_CRED", "VL_AJUS_ACRES", "VL_AJUS_REDUC", "VL_CRED_DIF",
+        "VL_CRED_DISP", "IND_DESC_CRED", "VL_CRED_DESC", "SLD_CRED",
+    ),
+    "M105": (
+        "REG", "NAT_BC_CRED", "CST_PIS", "VL_BC_PIS_TOT", "VL_BC_PIS_CUM", "VL_BC_PIS_NC",
+        "VL_BC_PIS", "QUANT_BC_PIS_TOT", "QUANT_BC_PIS", "DESC_CRED",
+    ),
+    "M110": ("REG", "IND_AJ", "VL_AJ", "COD_AJ", "NUM_DOC", "DESCR_AJ", "DT_REF"),
+    # contribuição
+    "M200": (
+        "REG", "VL_TOT_CONT_NC_PER", "VL_TOT_CRED_DESC", "VL_TOT_CRED_DESC_ANT",
+        "VL_TOT_CONT_NC_DEV", "VL_RET_NC", "VL_OUT_DED_NC", "VL_CONT_NC_REC",
+        "VL_TOT_CONT_CUM_PER", "VL_RET_CUM", "VL_OUT_DED_CUM", "VL_CONT_CUM_REC",
+        "VL_TOT_CONT_REC",
+    ),
+    "M210": (
+        "REG", "COD_CONT", "VL_REC_BRT", "VL_BC_CONT", "ALIQ_PIS", "QUANT_BC_PIS",
+        "ALIQ_PIS_REAIS", "VL_CONT_APU", "VL_AJUS_ACRES", "VL_AJUS_REDUC", "VL_CONT_DIF",
+        "VL_CONT_DISP", "IND_DESC_CONT", "VL_CONT_DESC", "SLD_CRED",
+    ),
+    "M220": ("REG", "IND_AJ", "VL_AJ", "COD_AJ", "NUM_DOC", "DESCR_AJ", "DT_REF"),
+    # e o espelho, na COFINS
+    "M500": (
+        "REG", "COD_CRED", "IND_CRED_ORI", "VL_BC_COFINS", "ALIQ_COFINS",
+        "QUANT_BC_COFINS", "ALIQ_COFINS_REAIS", "VL_CRED", "VL_AJUS_ACRES",
+        "VL_AJUS_REDUC", "VL_CRED_DIF", "VL_CRED_DISP", "IND_DESC_CRED", "VL_CRED_DESC",
+        "SLD_CRED",
+    ),
+    "M505": (
+        "REG", "NAT_BC_CRED", "CST_COFINS", "VL_BC_COFINS_TOT", "VL_BC_COFINS_CUM",
+        "VL_BC_COFINS_NC", "VL_BC_COFINS", "QUANT_BC_COFINS_TOT", "QUANT_BC_COFINS",
+        "DESC_CRED",
+    ),
+    "M510": ("REG", "IND_AJ", "VL_AJ", "COD_AJ", "NUM_DOC", "DESCR_AJ", "DT_REF"),
+    "M600": (
+        "REG", "VL_TOT_CONT_NC_PER", "VL_TOT_CRED_DESC", "VL_TOT_CRED_DESC_ANT",
+        "VL_TOT_CONT_NC_DEV", "VL_RET_NC", "VL_OUT_DED_NC", "VL_CONT_NC_REC",
+        "VL_TOT_CONT_CUM_PER", "VL_RET_CUM", "VL_OUT_DED_CUM", "VL_CONT_CUM_REC",
+        "VL_TOT_CONT_REC",
+    ),
+    "M610": (
+        "REG", "COD_CONT", "VL_REC_BRT", "VL_BC_CONT", "ALIQ_COFINS", "QUANT_BC_COFINS",
+        "ALIQ_COFINS_REAIS", "VL_CONT_APU", "VL_AJUS_ACRES", "VL_AJUS_REDUC",
+        "VL_CONT_DIF", "VL_CONT_DISP", "IND_DESC_CONT", "VL_CONT_DESC", "SLD_CRED",
+    ),
+    "M620": ("REG", "IND_AJ", "VL_AJ", "COD_AJ", "NUM_DOC", "DESCR_AJ", "DT_REF"),
 }
 
 

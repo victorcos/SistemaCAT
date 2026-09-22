@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-09-22 — O bloco M: oito joins que eram um
+
+**O que é.** O bloco M da EFD-Contribuições é onde o arquivo diz **no que deu**:
+quanto de PIS e de COFINS se apurou no período, por código de contribuição, e o
+que foi ajustado para mais ou para menos. Os blocos C e D dizem o que aconteceu;
+o M diz o resultado — é dele que sai o número que o cliente pergunta.
+
+**PIS e COFINS são espelhos, registro a registro.**
+
+| | crédito | base do crédito | ajuste | contribuição | detalhe | ajuste |
+|---|---|---|---|---|---|---|
+| **PIS** | M100 | M105 | M110 | M200 | M210 | M220 |
+| **COFINS** | M500 | M505 | M510 | M600 | M610 | M620 |
+
+O projeto de origem tinha **oito funções** para isso, cada uma com suas ~50
+linhas, e elas eram byte a byte a mesma coisa com os nomes trocados. Aqui é uma
+função e uma tabela de cadeias. A regra que as oito escondiam é simples: *cada
+linha sai do registro mais fundo, carregando os de cima, e "o de cima" é o
+último que apareceu* — porque o SPED escreve pai antes de filho.
+
+**O que a leitura ingênua estraga.** Quando dois M210 dividem o mesmo M200, o
+ajuste do segundo não pode sair carregando o primeiro. Guardar "o último pai
+visto" sem limpar os níveis abaixo faz exatamente isso, e o erro é invisível: os
+valores existem, são do mesmo período, e só o código de contribuição denuncia.
+Trocar de pai limpa o que estava aberto abaixo dele — e virou teste.
+
+**Pai ausente sai em branco, a linha não some.** Arquivo de cliente tem bloco
+truncado; perder o ajuste porque o M200 faltou seria perder valor apurado sem
+dizer nada.
+
+---
+
+
 ## 2026-09-22 — O caminho consolidado, e a armadilha dos filhos não intercalados
 
 **Por que ele existe.** Metade dos clientes escritura a EFD-Contribuições item a

@@ -138,7 +138,7 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       no C170 das Contribuições é facultativo, e dois caminhos de cálculo dariam
       números diferentes para empresas iguais. Ver DECISOES de 22/09/2026
 - [x] Caminho consolidado: C180/C190 com os filhos de PIS e COFINS casados (v0.71.0)
-- [ ] Joins do bloco M (M210, M610, M105, M505…): a apuração propriamente dita
+- [x] Bloco M: a apuração e os ajustes, PIS e COFINS na mesma função (v0.72.0)
 - [ ] Enriquecimento: descrição de CFOP, natureza de crédito, município, tipo de item
 - [ ] Apuração das contribuições (`apuracao_contribuicoes`): os 36 quadros da
       Gestão padrão MA, validados em 59 competências
