@@ -139,6 +139,10 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       números diferentes para empresas iguais. Ver DECISOES de 22/09/2026
 - [x] Caminho consolidado: C180/C190 com os filhos de PIS e COFINS casados (v0.71.0)
 - [x] Bloco M: a apuração e os ajustes, PIS e COFINS na mesma função (v0.72.0)
+- [x] Quebra da ECD: plano de contas, índice por conta e razão contábil (v0.73.0)
+- [ ] **Consulta de Entradas (037)**: os oito ramos de documento de entrada da
+      EFD-Contribuições num relatório só. É a saída que se confronta com o razão
+      da ECD — prioridade do Victor, junto com a ECD
 - [ ] Enriquecimento: descrição de CFOP, natureza de crédito, município, tipo de item
 - [ ] Apuração das contribuições (`apuracao_contribuicoes`): os 36 quadros da
       Gestão padrão MA, validados em 59 competências

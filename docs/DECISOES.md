@@ -5,6 +5,43 @@
 
 ---
 
+## 2026-09-22 — A quebra da ECD, e o 0000 que mordeu duas vezes
+
+**Por que ela vem antes da Gestão** (prioridade do Victor, 22/09/2026): a ECD é
+a escrituração **contábil**, e o razão dela é o documento contra o qual se
+confere o que a escrituração fiscal diz. A receita do razão tem de bater com a
+receita da EFD — é daí que sai boa parte do trabalho de PIS/COFINS.
+
+**O desenho que faz isso ser rápido.** Uma passada guarda o plano de contas
+(I050) inteiro em memória, a posição de todo I200 num array ordenado, e a
+posição de cada I250 **agrupada por conta**. Com isso o razão de *uma* conta lê
+só as partidas dela, e o lançamento dono de cada partida sai por **busca
+binária** — é o último I200 antes dela, porque o SPED escreve pai antes de
+filho. Sem isso, o razão de uma conta custaria o arquivo inteiro.
+
+**Três coisas que mudaram em relação ao original:**
+
+* **dinheiro em `Decimal`, não em `float`.** O saldo corre por milhões de
+  partidas, e float acumula centavo que não existe. Centavo inexplicável em
+  documento contábil é o tipo de coisa que ninguém consegue defender depois;
+* **a ordem é a do tempo, não a do arquivo.** O SPED não obriga os lançamentos a
+  virem em ordem de data — e na amostra real eles não vêm;
+* **partida anterior ao recorte não vira linha, mas entra no saldo.** Sem isso o
+  razão do mês começaria do zero, e o saldo seria ficção.
+
+**O 0000 mordeu de novo.** O porte da EFD já tinha caído nisso: ler o registro
+0000 por posição fixa. Na ECD o tropeço se repetiu — um arquivo real trouxe dois
+campos a mais antes das datas, e o índice devolveu a data no lugar do CNPJ, sem
+erro nenhum. A correção foi a mesma da outra vez: **usar
+`dominio/sped/cabecalho.py`**, que acha os campos *pela forma* — o par de datas
+de oito dígitos, o CNPJ de catorze — em vez de contar posição.
+
+A lição, escrita aqui para não precisar de uma terceira vez: **nenhum módulo
+novo lê o 0000 por conta própria.** Só o domínio lê.
+
+---
+
+
 ## 2026-09-22 — O bloco M: oito joins que eram um
 
 **O que é.** O bloco M da EFD-Contribuições é onde o arquivo diz **no que deu**:
