@@ -92,7 +92,7 @@ public sealed class Execucoes(
     /// do trabalho e a consulta que o alimenta liam cada uma a sua, e a etapa
     /// nova que entrasse numa e não na outra ficaria para sempre "pendente".
     /// </summary>
-    public static readonly IReadOnlyList<string> DeProcessamento = [Conferencia, Movimentos, Suportado, Razao, Apuracao, ArquivoDigital, Entrega];
+    public static IReadOnlyList<string> DeProcessamento => Etapas.DeProcessamento;
 
     /// <summary>Ainda não terminou: inclui o pedido de parar que a rodada não atendeu ainda.</summary>
     public static bool EmCurso(string situacao) => situacao is "na_fila" or "rodando" or "cancelando";

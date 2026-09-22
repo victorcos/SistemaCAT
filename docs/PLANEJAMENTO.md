@@ -130,6 +130,12 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       tempo de indexar 119 GB duas vezes
 - [ ] Cruzamento ICMS x PIS/COFINS para a exclusão do Tema 69, com cascata por
       competência: C170 item a item quando houver, senão documento ou XML
+- [x] Roteiro de etapas por módulo, e o critério do que vira tabela (v0.69.0)
+- [ ] **Portar a quebra de SPED** — etapa `quebra_de_sped` já declarada no roteiro
+      de PIS/COFINS, ainda não construída. Fonte: `Quebra de SPED/src/sped/`
+      (indexer 163 linhas, extractor 1.487 com ~20 joins hierárquicos, sem Streamlit)
+- [ ] Apuração das contribuições (`apuracao_contribuicoes`): os 36 quadros da
+      Gestão padrão MA, validados em 59 competências
 - [ ] Telas do handoff de design (hub de módulos, escolha de frente, coluna de módulos
       em Usuários) — desenho pronto em `Reconstrução tela listagem usuários/design_handoff`
 - [ ] Resolver a colisão de vocabulário: o handoff chama de "módulo" o nível 1 e de

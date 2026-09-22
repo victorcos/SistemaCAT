@@ -230,7 +230,7 @@ public sealed class Trabalhos(
         string? emAndamento = null;
         if (p.TemBase)
             concluidas.Add("importar");
-        foreach (var etapa in Execucoes.DeProcessamento)
+        foreach (var etapa in Etapas.DeProcessamento)
         {
             if (!p.UltimaSituacaoPorEtapa.TryGetValue(etapa, out var situacao))
                 continue;
@@ -240,7 +240,7 @@ public sealed class Trabalhos(
             else if ((Execucoes.EmCurso(situacao) || situacao == Execucoes.AguardandoAprovacao) && emAndamento is null)
                 emAndamento = etapa;
         }
-        return new ProjetoComEtapas(p, Etapas.Montar(concluidas, emAndamento));
+        return new ProjetoComEtapas(p, Etapas.Montar(p.Modulo, concluidas, emAndamento));
     }
 }
 

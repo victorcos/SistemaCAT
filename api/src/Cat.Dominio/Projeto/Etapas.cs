@@ -46,12 +46,23 @@ public sealed record EtapaDoProjeto(DefinicaoEtapa Definicao, SituacaoEtapa Situ
 }
 
 /// <summary>
-/// As etapas do trabalho da CAT 42, na ordem em que existem, portadas de
-/// <c>dominio/cat42/etapas.py</c>.
+/// O catálogo de etapas e o roteiro de cada módulo tributário.
 ///
 /// Conhecimento de domínio, não decoração de tela: a ordem vem do manual. Não
 /// dá para montar o razão sem os movimentos, nem apurar ressarcimento sem o
 /// razão, nem gerar o arquivo digital sem a apuração.
+///
+/// **Catálogo e roteiro são coisas diferentes** (22/09/2026, quando o sistema
+/// passou a ter um módulo por tributo). <see cref="Todas"/> é tudo que existe;
+/// <see cref="Roteiros"/> diz quais etapas cada módulo percorre e em que ordem.
+/// Antes havia uma lista só, e ela era a da CAT 42 — um trabalho de PIS/COFINS
+/// herdaria sete etapas de ICMS que nunca rodariam, e o cartão diria "0 de 7"
+/// para sempre.
+///
+/// **Por que em código e não em tabela.** Uma etapa só existe se houver código
+/// que a rode: o roteiro numa tabela permitiria apontar para uma etapa que
+/// ninguém escreveu, e o erro só apareceria quando alguém clicasse. Aqui o
+/// compilador cobra, e o teste abaixo cobra o resto.
 /// </summary>
 public static class Etapas
 {
@@ -104,17 +115,70 @@ public static class Etapas
             "manifesto com o SHA-256 de cada arquivo. Conclui quando um revisor ou " +
             "gestor aprova.",
             Implementada: true),
+
+        // ---- PIS/COFINS: declaradas, ainda não construídas ----
+        new("quebra_de_sped", "Quebra de SPED",
+            "Indexar a EFD-Contribuições numa passada — contagem por registro e " +
+            "posição em bytes de cada um — e extrair qualquer bloco sob demanda, sem " +
+            "reler o arquivo. É o que permite consolidar C170, C190, M210 e os demais " +
+            "de uma base de dezenas de milhões de linhas com memória constante.",
+            Implementada: false),
+        new("apuracao_contribuicoes", "Apurar PIS/COFINS",
+            "Os quadros da apuração por competência: receitas e bases por CST, CFOP e " +
+            "natureza, ajustes, e o controle de créditos. Inclui a exclusão do ICMS da " +
+            "base, que cruza a EFD-Contribuições com a EFD ICMS/IPI pelo documento e " +
+            "pelo item.",
+            Implementada: false),
     ];
 
     /// <summary>
-    /// Monta o roteiro a partir do que já foi feito. Uma etapa fica bloqueada
-    /// enquanto a anterior não concluiu, porque a ordem é de dependência real.
+    /// Qual módulo percorre quais etapas, na ordem. A chave é a do módulo em
+    /// <see cref="Acesso.Segmentos"/>; o valor, chaves de <see cref="Todas"/>.
+    ///
+    /// Acrescentar funcionalidade é acrescentar a etapa ao catálogo e a chave
+    /// dela aqui — nada mais. Etapa declarada e ainda não construída aparece
+    /// como "ainda não disponível", que é deliberado: o usuário vê o caminho
+    /// inteiro e sabe onde o trabalho está.
     /// </summary>
-    public static IReadOnlyList<EtapaDoProjeto> Montar(IReadOnlySet<string> concluidas, string? emAndamento = null)
+    public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> Roteiros =
+        new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["icms"] = ["importar", "conferencia", "movimentos", "st_suportado", "razao",
+                        "apuracao", "arquivo_digital", "entrega"],
+            // o que vem do porte do Quebra de SPED e da Gestão padrão MA
+            ["piscofins"] = ["importar", "quebra_de_sped", "apuracao_contribuicoes"],
+            ["irpj_csll"] = ["importar"],
+        };
+
+    /// <summary>
+    /// O roteiro do módulo. Módulo desconhecido cai no de ICMS, que é o de todo
+    /// trabalho anterior a esta divisão — errar para o lado do que já funciona.
+    /// </summary>
+    public static IReadOnlyList<DefinicaoEtapa> Do(string? modulo)
+    {
+        var chaves = Roteiros.TryGetValue(modulo ?? "", out var r) ? r : Roteiros["icms"];
+        return chaves.Select(c => Todas.First(d => d.Chave == c)).ToList();
+    }
+
+    /// <summary>
+    /// As etapas que concluem com uma rodada do motor, de todos os módulos. É o
+    /// filtro da consulta que lê a última situação de cada uma: ela não sabe de
+    /// qual módulo é o trabalho, e listar demais não faz mal — listar de menos
+    /// deixaria a etapa para sempre "pendente".
+    /// </summary>
+    public static readonly IReadOnlyList<string> DeProcessamento =
+        Roteiros.Values.SelectMany(r => r).Distinct().Where(c => c != "importar").ToList();
+
+    /// <summary>
+    /// Monta o roteiro do módulo a partir do que já foi feito. Uma etapa fica
+    /// bloqueada enquanto a anterior não concluiu: a ordem é de dependência real.
+    /// </summary>
+    public static IReadOnlyList<EtapaDoProjeto> Montar(string? modulo, IReadOnlySet<string> concluidas,
+        string? emAndamento = null)
     {
         var saida = new List<EtapaDoProjeto>();
         var anteriorOk = true;
-        foreach (var d in Todas)
+        foreach (var d in Do(modulo))
         {
             var situacao =
                 !d.Implementada ? SituacaoEtapa.NaoDisponivel

@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-09-22 — Como o banco trata os módulos: o que vira tabela e o que não
+
+**A pergunta do Victor:** com quatro módulos tributários chegando, como ficam as
+tabelas?
+
+**A medição, antes da opinião.** O Postgres inteiro tem **66 MB** em 13 tabelas;
+o dado fiscal em disco tem **32 GB** de parquet. Essa proporção de 500 para 1 já
+é a resposta: nenhuma das 13 tabelas é de CAT 42 — são todas espinha (empresa,
+usuário, alocação, segmento, estabelecimento, trabalho, evento, lote, arquivo,
+execução, de-para, correção). A apuração nunca tocou o banco.
+
+**A regra.** O Postgres guarda **quem, o quê, quando e quem decidiu**. O dado
+fiscal mora em parquet. Dito de outro jeito: *entra no banco o que alguém decide,
+aprova ou precisa auditar — não o que se calcula.*
+
+Daí decorre que **a quebra de SPED não cria tabela nenhuma**: o índice (contagem
+por registro e posição em bytes) é cache de leitura, vai para disco chaveado pelo
+arquivo, com versão de esquema que força reindexar quando o leiaute muda. Pôr
+offsets em Postgres seria guardar milhões de inteiros por arquivo para responder
+o que o `seek()` responde em tempo constante.
+
+**Quando houver tabela de módulo**, três formas e a escolha:
+
+| | quando |
+|---|---|
+| prefixo (`piscofins_bct`) | a forma é própria daquele tributo |
+| genérica com discriminador | a forma é a mesma — é o que `correcao` já faz |
+| schema por módulo | **nunca** |
+
+Schema separado resolve um isolamento que não temos: é uma base, uma casa, e a
+separação que importa é **por empresa**, que já é por linha e já tem barreira
+dura. O que faz a forma genérica funcionar é `projeto.modulo`: toda tabela
+pendurada em `projeto_id` herda o módulo de graça. Por isso `correcao` e
+`depara_item` servem PIS/COFINS no primeiro dia, sem migração — `correcao` guarda
+campo, valor e motivo, e nada ali é de ICMS.
+
+**O acoplamento real não era o esquema: era o roteiro.** `Etapas.Todas` era uma
+lista só, e era a da CAT 42. Um trabalho de PIS/COFINS herdaria sete etapas de
+ICMS que nunca rodariam, e o cartão diria "0 de 7" para sempre. Agora catálogo e
+roteiro são coisas diferentes: `Todas` é tudo que existe, `Roteiros` diz quais
+etapas cada módulo percorre e em que ordem. Acrescentar funcionalidade virou uma
+linha no catálogo e uma chave no roteiro.
+
+**Por que o roteiro em código e não em tabela.** Uma etapa só existe se houver
+código que a rode. Numa tabela, daria para apontar para uma etapa que ninguém
+escreveu, e o erro só apareceria quando alguém clicasse. Em código o compilador
+cobra a maior parte, e um teste cobra o resto — ele falha se algum roteiro citar
+chave fora do catálogo.
+
+**O que vigiar.** `arquivo_do_lote` é 65 dos 66 MB, com 105 mil linhas e só quatro
+trabalhos: ela cresce com arquivos **vezes** trabalhos, porque o mesmo arquivo
+entra no lote de cada um. É a única tabela do sistema que cresce com volume.
+
+---
+
+
 ## 2026-09-22 — Leitura compartilhada entre módulos: cópia x reaproveitamento
 
 **O pedido do Victor.** A exclusão do ICMS da base do PIS/COFINS (Tema 69) só se
