@@ -110,6 +110,27 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
             ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
         }), PrazoLinhas, cancelar);
 
+    public async Task<JsonElement> ContasDoRazaoContabil(int execucaoId, PedidoDeContasContabeis pedido, CancellationToken cancelar) =>
+        await Chamar("interno/razao-contabil/contas", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["execucao_id"] = execucaoId, ["busca"] = pedido.Busca, ["cnpj"] = pedido.Cnpj,
+            ["so"] = pedido.So, ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
+        }), PrazoLinhas, cancelar);
+
+    public async Task<JsonElement> LancamentosDoRazaoContabil(int execucaoId, PedidoDeLancamentos pedido, CancellationToken cancelar) =>
+        await Chamar("interno/razao-contabil/lancamentos", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["execucao_id"] = execucaoId, ["cnpj"] = pedido.Cnpj, ["conta"] = pedido.Conta,
+            ["busca"] = pedido.Busca, ["de"] = pedido.De, ["ate"] = pedido.Ate,
+            ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
+        }), PrazoLinhas, cancelar);
+
+    public async Task<JsonElement> EstabelecimentosDoRazaoContabil(int execucaoId, CancellationToken cancelar) =>
+        await Chamar("interno/razao-contabil/estabelecimentos", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["execucao_id"] = execucaoId,
+        }), PrazoLinhas, cancelar);
+
     /// <summary>
     /// A Ficha 3 corrigida à mão sobe inteira antes de o motor começar a ler: ela
     /// tem o tamanho da ficha do trabalho, e por isso vai no prazo da remessa.

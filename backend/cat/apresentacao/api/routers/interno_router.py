@@ -62,6 +62,7 @@ from cat.infraestrutura.analitico import arquivo_digital as analitico_arquivo_di
 from cat.infraestrutura.analitico import entrega as analitico_entrega
 from cat.infraestrutura.analitico import pre_validacao_do_cliente as analitico_pre_validacao
 from cat.infraestrutura.analitico import razao as analitico_razao
+from cat.infraestrutura.analitico import razao_contabil as analitico_razao_contabil
 from cat.infraestrutura.analitico import suportado as analitico_suportado
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
 from cat.infraestrutura.planilhas import correcoes_da_planilha
@@ -527,6 +528,78 @@ def linhas_do_razao(pedido: PedidoDeFicha, sessao: Annotated[Session, Depends(ob
         return _traduzir_leitura(lambda: analitico_razao.linhas_da_ficha(
             execucao.pasta_de_trabalho or "", pedido.cnpj, pedido.codigo, pedido.pagina,
             pedido.por_pagina))
+
+
+# ---------------------------------------------------------------------------
+# Razão contábil da ECD: o seletor de conta e os lançamentos de uma conta
+#
+# Mesma forma de tela que o razão da CAT 42 acima — escolher e depois olhar —,
+# mas de outra etapa e de outro módulo: sai da quebra de SPED, do PIS/COFINS.
+# ---------------------------------------------------------------------------
+class PedidoDeContas(BaseModel):
+    execucao_id: int
+    busca: str | None = Field(default=None, max_length=100)
+    cnpj: str | None = Field(default=None, max_length=20)
+    so: str | None = None
+    pagina: int = Field(default=1, ge=1)
+    por_pagina: int = Field(default=analitico_razao_contabil.POR_PAGINA_PADRAO, ge=1)
+
+
+class PedidoDeLancamentos(BaseModel):
+    execucao_id: int
+    cnpj: str = Field(min_length=1, max_length=20)
+    conta: str = Field(min_length=1, max_length=60)
+    busca: str | None = Field(default=None, max_length=100)
+    de: str | None = Field(default=None, max_length=10)
+    ate: str | None = Field(default=None, max_length=10)
+    pagina: int = Field(default=1, ge=1)
+    por_pagina: int = Field(default=analitico_razao_contabil.POR_PAGINA_PADRAO, ge=1)
+
+
+class PedidoDoRazaoContabil(BaseModel):
+    execucao_id: int
+
+
+def _quebra_concluida(execucao_id: int, sessao: Session) -> ExecucaoDB:
+    execucao = sessao.get(ExecucaoDB, execucao_id)
+    if execucao is None or execucao.etapa != quebrar_sped.ETAPA:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Quebra de SPED não encontrada.")
+    if execucao.situacao != "concluida":
+        raise HTTPException(status.HTTP_409_CONFLICT, "A quebra de SPED ainda não terminou.")
+    return execucao
+
+
+@router.post("/razao-contabil/contas", dependencies=[Depends(exigir_segredo)])
+def contas_do_razao_contabil(
+    pedido: PedidoDeContas, sessao: Annotated[Session, Depends(obter_sessao)]
+) -> dict:
+    execucao = _quebra_concluida(pedido.execucao_id, sessao)
+    with contexto(etapa=quebrar_sped.ETAPA, execucao_id=execucao.id):
+        return _traduzir_leitura(lambda: analitico_razao_contabil.contas(
+            execucao.pasta_de_trabalho or "", pedido.busca, pedido.cnpj, pedido.so,
+            pedido.pagina, pedido.por_pagina))
+
+
+@router.post("/razao-contabil/lancamentos", dependencies=[Depends(exigir_segredo)])
+def lancamentos_do_razao_contabil(
+    pedido: PedidoDeLancamentos, sessao: Annotated[Session, Depends(obter_sessao)]
+) -> dict:
+    execucao = _quebra_concluida(pedido.execucao_id, sessao)
+    with contexto(etapa=quebrar_sped.ETAPA, execucao_id=execucao.id):
+        return _traduzir_leitura(lambda: analitico_razao_contabil.lancamentos(
+            execucao.pasta_de_trabalho or "", pedido.cnpj, pedido.conta, pedido.busca,
+            pedido.de, pedido.ate, pedido.pagina, pedido.por_pagina))
+
+
+@router.post("/razao-contabil/estabelecimentos", dependencies=[Depends(exigir_segredo)])
+def estabelecimentos_do_razao_contabil(
+    pedido: PedidoDoRazaoContabil, sessao: Annotated[Session, Depends(obter_sessao)]
+) -> dict:
+    execucao = _quebra_concluida(pedido.execucao_id, sessao)
+    with contexto(etapa=quebrar_sped.ETAPA, execucao_id=execucao.id):
+        return _traduzir_leitura(lambda: {
+            "linhas": analitico_razao_contabil.estabelecimentos(
+                execucao.pasta_de_trabalho or "")})
 
 
 # quanto se lê por vez da planilha que sobe. A Ficha 3 de uma base grande passa

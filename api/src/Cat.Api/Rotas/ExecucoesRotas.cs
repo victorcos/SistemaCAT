@@ -135,6 +135,44 @@ public static class ExecucoesRotas
                 }))
             .ExigirUsuario();
 
+        // O razão contábil da ECD: escolher a conta, depois ver os lançamentos.
+        // Pagina no servidor como todo o resto — uma ECD de rede de supermercado
+        // passa de milhão de partidas, e nenhuma delas cabe numa resposta só.
+        api.MapGet("/quebra-de-sped/{execucaoId:int}/contas", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                {
+                    var q = http.Request.Query;
+                    var pedido = new PedidoDeContasContabeis(
+                        q["busca"].FirstOrDefault() is { Length: > 0 } b ? b : null,
+                        q["cnpj"].FirstOrDefault() is { Length: > 0 } c ? c : null,
+                        q["so"].FirstOrDefault() is { Length: > 0 } s ? s : null,
+                        Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 100));
+                    return Results.Json(await caso.ContasDoRazaoContabil(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
+                }))
+            .ExigirUsuario();
+
+        api.MapGet("/quebra-de-sped/{execucaoId:int}/lancamentos", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                {
+                    var q = http.Request.Query;
+                    var cnpj = q["cnpj"].FirstOrDefault() ?? "";
+                    var conta = q["conta"].FirstOrDefault() ?? "";
+                    if (cnpj.Length == 0 || conta.Length == 0)
+                        return CorpoJson.Recusar("Informe o estabelecimento e a conta do razão.", StatusCodes.Status422UnprocessableEntity);
+                    var pedido = new PedidoDeLancamentos(cnpj, conta,
+                        q["busca"].FirstOrDefault() is { Length: > 0 } b ? b : null,
+                        q["de"].FirstOrDefault() is { Length: > 0 } d ? d : null,
+                        q["ate"].FirstOrDefault() is { Length: > 0 } a ? a : null,
+                        Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 100));
+                    return Results.Json(await caso.LancamentosDoRazaoContabil(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
+                }))
+            .ExigirUsuario();
+
+        api.MapGet("/quebra-de-sped/{execucaoId:int}/estabelecimentos", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                    Results.Json(await caso.EstabelecimentosDoRazaoContabil(execucaoId, http.UsuarioAtual(), http.RequestAborted))))
+            .ExigirUsuario();
+
         // o analítico pagina no servidor: numa base real são 8,7 milhões de itens
         api.MapGet("/suportado/{execucaoId:int}/linhas", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>

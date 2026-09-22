@@ -327,6 +327,32 @@ A 037 tem **52 colunas** (v0.76.0: entrou `Município`, ao lado de
 `Natureza do Crédito` é deduzida **do CFOP** nos ramos em que o registro não
 traz `NAT_BC_CRED` (C100/C170 e C190/C191/C195); nos demais é lida do arquivo.
 
+### O razão contábil na tela (v0.77.0)
+
+Três rotas de leitura sobre o `razao.parquet` da mesma execução. Todas exigem
+usuário com acesso ao trabalho, e todas recusam execução que não seja uma
+**quebra de SPED concluída** (404 e 409 respectivamente).
+
+| Método | Rota | Quem |
+| --- | --- | --- |
+| `GET` | `/api/quebra-de-sped/{execucaoId}/contas` | quem vê o trabalho |
+| `GET` | `/api/quebra-de-sped/{execucaoId}/lancamentos` | quem vê o trabalho |
+| `GET` | `/api/quebra-de-sped/{execucaoId}/estabelecimentos` | quem vê o trabalho |
+
+`contas` aceita `busca` (código, nome ou conta referencial), `cnpj`, `so`
+(`devedoras`, `credoras`, `zeradas`, `com_movimento` — outro valor é 422),
+`pagina` e `por_pagina` (teto 500). Devolve, por conta: `lancamentos`,
+`debitos`, `creditos`, `saldo`, `de`, `ate` e `arquivos`.
+
+`lancamentos` exige `cnpj` e `conta` (422 sem eles) e aceita `busca` (histórico,
+número ou participante), `de` e `ate` em `aaaa-mm-dd`, `pagina` e `por_pagina`.
+Devolve as partidas em ordem de `data, numero` — a mesma ordem que gerou o saldo
+corrente —, mais `totais` (da conta inteira, ou do recorte) e `recortado`,
+dizendo qual dos dois é.
+
+Dinheiro atravessa como **texto** com duas casas, aqui como em todo o resto do
+sistema: `Decimal` não é JSON, e `number` perde centavo.
+
 ### Correções à mão pela planilha (v0.65.0)
 
 | Método | Rota | Quem |

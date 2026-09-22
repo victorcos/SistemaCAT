@@ -112,6 +112,16 @@ public interface IMotor
     /// <summary>As linhas de uma ficha do razão.</summary>
     Task<System.Text.Json.JsonElement> LinhasDoRazao(int execucaoId, PedidoDeFicha pedido, CancellationToken cancelar);
 
+    /// <summary>O seletor de conta do razão contábil da ECD, que sai da quebra de SPED.</summary>
+    /// <exception cref="MotorRecusou">não é quebra (404), não terminou (409), material apagado (410), recorte inválido (422)</exception>
+    Task<System.Text.Json.JsonElement> ContasDoRazaoContabil(int execucaoId, PedidoDeContasContabeis pedido, CancellationToken cancelar);
+
+    /// <summary>Os lançamentos de uma conta do razão contábil, em ordem de data.</summary>
+    Task<System.Text.Json.JsonElement> LancamentosDoRazaoContabil(int execucaoId, PedidoDeLancamentos pedido, CancellationToken cancelar);
+
+    /// <summary>Os estabelecimentos que aparecem no razão contábil, para o filtro da tela.</summary>
+    Task<System.Text.Json.JsonElement> EstabelecimentosDoRazaoContabil(int execucaoId, CancellationToken cancelar);
+
     /// <summary>
     /// A Ficha 3 editada à mão, repassada em fluxo, e o que ela muda em relação
     /// ao razão. O motor compara e devolve a proposta; **nada é gravado lá**.

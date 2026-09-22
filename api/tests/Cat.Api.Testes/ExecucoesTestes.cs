@@ -27,6 +27,7 @@ public sealed class MotorDeExecucoesFalso : IAsyncLifetime
     public Func<int, JsonElement, Task<IResult>> AoCancelar { get; set; } = (_, _) => Task.FromResult(Results.StatusCode(500));
     public Func<JsonElement, IResult> AoPedirLinhas { get; set; } = _ => Results.StatusCode(500);
     public Func<string, JsonElement, IResult> AoPedirRazao { get; set; } = (_, _) => Results.StatusCode(500);
+    public Func<string, JsonElement, IResult> AoPedirRazaoContabil { get; set; } = (_, _) => Results.StatusCode(500);
     public Func<JsonElement, IResult> AoPedirCompetencias { get; set; } = _ => Results.StatusCode(500);
     public Func<string, JsonElement, IResult> AoPedirArquivoDigital { get; set; } = (_, _) => Results.StatusCode(500);
 
@@ -93,6 +94,15 @@ public sealed class MotorDeExecucoesFalso : IAsyncLifetime
                 var pedido = await http.Request.ReadFromJsonAsync<JsonElement>();
                 Pedidos.Enqueue(pedido);
                 return AoPedirRazao(rota, pedido);
+            });
+        foreach (var rota in new[] { "contas", "lancamentos", "estabelecimentos" })
+            _app.MapPost($"/interno/razao-contabil/{rota}", async (HttpContext http) =>
+            {
+                if (http.Request.Headers["X-Cat-Motor-Segredo"] != Segredo)
+                    return Results.StatusCode(403);
+                var pedido = await http.Request.ReadFromJsonAsync<JsonElement>();
+                Pedidos.Enqueue(pedido);
+                return AoPedirRazaoContabil(rota, pedido);
             });
         await _app.StartAsync();
         Endereco = new Uri(_app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First());
@@ -494,6 +504,63 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
         Assert.Equal("Informe o estabelecimento e a mercadoria da ficha.", await Detalhe(sem));
         // pela rota do razão, só execução do razão
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/razao/{suportado}/fichas")).StatusCode);
+    }
+
+    // --------------------------------------------------- razão contábil da ECD
+    [Fact]
+    public async Task Contas_do_razao_contabil_repassam_busca_estabelecimento_e_recorte()
+    {
+        var (_, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var id = await Execucao(projeto, "quebra_de_sped");
+        motor.AoPedirRazaoContabil = (rota, _) => Results.Json(new { rota, total = 2, linhas = new[] { new { conta = "3.1.1" } } });
+
+        var r = await c.GetAsync($"/api/quebra-de-sped/{id}/contas?busca=caixa&cnpj=11111111000191&so=devedoras&pagina=2&por_pagina=30");
+
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal("contas", (await Json(r)).GetProperty("rota").GetString());
+        var pedido = motor.Pedidos.Last(x => x.TryGetProperty("so", out _));
+        Assert.Equal((id, "caixa", "11111111000191", "devedoras", 2, 30),
+            (pedido.GetProperty("execucao_id").GetInt32(), pedido.GetProperty("busca").GetString(),
+             pedido.GetProperty("cnpj").GetString(), pedido.GetProperty("so").GetString(),
+             pedido.GetProperty("pagina").GetInt32(), pedido.GetProperty("por_pagina").GetInt32()));
+    }
+
+    [Fact]
+    public async Task Lancamentos_exigem_estabelecimento_e_conta_e_repassam_o_periodo()
+    {
+        var (_, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var id = await Execucao(projeto, "quebra_de_sped");
+        var razao = await Execucao(projeto, "razao");
+        motor.AoPedirRazaoContabil = (rota, p) => Results.Json(new { rota, conta = p.GetProperty("conta").GetString(), total = 0, linhas = Array.Empty<object>() });
+
+        var r = await c.GetAsync($"/api/quebra-de-sped/{id}/lancamentos?cnpj=11111111000191&conta=3.1.1&de=2021-06-01&ate=2021-06-30");
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal("3.1.1", (await Json(r)).GetProperty("conta").GetString());
+        var pedido = motor.Pedidos.Last(x => x.TryGetProperty("conta", out _));
+        Assert.Equal(("2021-06-01", "2021-06-30"),
+            (pedido.GetProperty("de").GetString(), pedido.GetProperty("ate").GetString()));
+
+        var sem = await c.GetAsync($"/api/quebra-de-sped/{id}/lancamentos?conta=3.1.1");
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, sem.StatusCode);
+        Assert.Equal("Informe o estabelecimento e a conta do razão.", await Detalhe(sem));
+        // o razão da CAT 42 é outra etapa: pela rota da quebra, só execução da quebra
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/quebra-de-sped/{razao}/contas")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Estabelecimentos_do_razao_contabil_saem_para_o_filtro()
+    {
+        var (_, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var id = await Execucao(projeto, "quebra_de_sped");
+        motor.AoPedirRazaoContabil = (rota, _) => Results.Json(new { rota, linhas = new[] { new { cnpj = "11111111000191", contas = 4 } } });
+
+        var r = await c.GetAsync($"/api/quebra-de-sped/{id}/estabelecimentos");
+
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal("estabelecimentos", (await Json(r)).GetProperty("rota").GetString());
     }
 
     // ------------------------------------------------------------------ apuração do período

@@ -21,6 +21,14 @@ public sealed record PedidoDeFichas(string? Busca, string? So, int Pagina, int P
 
 public sealed record PedidoDeFicha(string Cnpj, string Codigo, int Pagina, int PorPagina);
 
+/// <summary>O seletor de conta do razão contábil da ECD.</summary>
+/// <param name="So">recorte pelo saldo: devedoras, credoras, zeradas, com_movimento</param>
+public sealed record PedidoDeContasContabeis(string? Busca, string? Cnpj, string? So, int Pagina, int PorPagina);
+
+/// <summary>Os lançamentos de uma conta. <paramref name="De"/> e <paramref name="Ate"/> em aaaa-mm-dd.</summary>
+public sealed record PedidoDeLancamentos(string Cnpj, string Conta, string? Busca, string? De, string? Ate,
+    int Pagina, int PorPagina);
+
 /// <param name="So">aptas, bloqueadas, ou o código de um motivo de bloqueio</param>
 public sealed record PedidoDeCompetencias(string? So, string? Busca, int Pagina, int PorPagina);
 
@@ -166,6 +174,31 @@ public sealed class Execucoes(
     {
         var e = await Detalhar(execucaoId, Razao, usuario, cancelar);
         return await motor.LinhasDoRazao(e.Id, pedido, cancelar);
+    }
+
+    // O razão contábil é outro razão: sai da ECD, pela quebra de SPED, no módulo
+    // de PIS/COFINS. O acima é a Ficha 3 da CAT 42, no de ICMS. Mesma forma de
+    // tela, etapas diferentes — e é por isso que a etapa exigida muda aqui.
+
+    /// <summary>O seletor de conta do razão contábil: uma linha por conta, com saldo.</summary>
+    public async Task<JsonElement> ContasDoRazaoContabil(int execucaoId, PedidoDeContasContabeis pedido, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, QuebraDeSped, usuario, cancelar);
+        return await motor.ContasDoRazaoContabil(e.Id, pedido, cancelar);
+    }
+
+    /// <summary>Uma página dos lançamentos de uma conta, em ordem de data.</summary>
+    public async Task<JsonElement> LancamentosDoRazaoContabil(int execucaoId, PedidoDeLancamentos pedido, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, QuebraDeSped, usuario, cancelar);
+        return await motor.LancamentosDoRazaoContabil(e.Id, pedido, cancelar);
+    }
+
+    /// <summary>Os estabelecimentos do razão contábil, para o filtro da tela.</summary>
+    public async Task<JsonElement> EstabelecimentosDoRazaoContabil(int execucaoId, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, QuebraDeSped, usuario, cancelar);
+        return await motor.EstabelecimentosDoRazaoContabil(e.Id, cancelar);
     }
 
     /// <summary>

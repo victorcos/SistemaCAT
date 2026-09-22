@@ -5,6 +5,51 @@
 
 ---
 
+## 2026-09-22 — A tela do razão da ECD: por que não basta o download
+
+**O problema com o download.** A quebra já entregava `razao.parquet` e a
+planilha do razão contábil inteiro. Numa ECD de rede de supermercado isso é
+milhão de partidas — e quem confronta a escrituração com a contabilidade não
+quer o arquivo: quer **uma conta**. Quer a 3.1.1 de junho, com o saldo correndo,
+para conferir contra a 037. Abrir um xlsx de milhão de linhas para achar uma
+conta é o gesto errado, e é o que a tela existe para evitar.
+
+**Dois passos, não um.** Primeiro o **seletor**: uma linha por conta, com
+partidas, débitos, créditos e saldo, buscável por código, por nome e pela conta
+referencial. Depois os **lançamentos** da conta escolhida, em ordem de data. Foi
+assim que a Ficha 3 da CAT 42 resolveu o mesmo problema, e repetir a forma é o
+que faz a segunda tela não precisar ser aprendida.
+
+**Nada é recalculado na leitura.** O saldo corrente de cada linha veio de
+`sped/ecd.py::razao`, que conhece a ordem certa — a do tempo, não a do arquivo,
+porque o SPED não obriga lançamento a vir em ordem de data. O módulo de leitura
+agrega e recorta; a aritmética contábil já aconteceu. Por isso a listagem
+**ordena por `data, numero`**, que é exatamente a chave que gerou o saldo:
+ordenar por outra coisa faria a coluna de saldo mentir sem dar erro nenhum.
+
+**Os totais são da conta, não da página.** Um total que muda ao virar a página
+não serve para conferir nada. Quando há recorte de data ou busca, os totais são
+os do recorte — e a resposta diz `recortado: true` para que a tela possa dizê-lo
+também, em vez de deixar quem lê achar que aquele é o saldo da conta.
+
+**Saldo devedor e credor, não positivo e negativo.** A coluna mostra o valor
+absoluto com um `D` ou `C` ao lado. Sinal de menos num razão é ruído: o contador
+lê lado, não sinal.
+
+**Tudo é texto no parquet, e a conversão fica à vista.** O escritor da quebra
+grava toda coluna como string de propósito — esquema igual desde a primeira
+linha, sem depender do que apareceu no primeiro arquivo. Somar exige `CAST` para
+`DECIMAL(24,2)`, que o DuckDB faz na varredura. É barato, e é honesto: o arquivo
+guarda o que o SPED escreveu.
+
+**A etapa exigida muda, e o teste cobra.** Há dois razões no sistema, com o
+mesmo nome e de módulos diferentes: a Ficha 3 da CAT 42 (etapa `razao`, no ICMS)
+e o razão contábil da ECD (etapa `quebra_de_sped`, no PIS/COFINS). Pedir um pela
+rota do outro devolve 404, e há teste em C# que o exige — sem isso a confusão
+sairia calada, lendo parquet de outra coisa.
+
+---
+
 ## 2026-09-22 — O enriquecimento, e a natureza do crédito que vinha do campo errado
 
 **O que entrou.** As colunas que traduzem código em texto passam a sair ao lado

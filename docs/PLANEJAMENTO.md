@@ -148,6 +148,8 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       em Usuários) — desenho pronto em `Reconstrução tela listagem usuários/design_handoff`
 - [ ] Resolver a colisão de vocabulário: o handoff chama de "módulo" o nível 1 e de
       "frente" o nível 2, e `frente` já existe no código como tipo de trabalho
+- [x] Tela do razão da ECD, com seletor de conta: busca por código, nome e conta
+      referencial, recorte por saldo e os lançamentos em ordem de data (v0.77.0)
 - [ ] Correção à mão: editar na tela do razão, linha a linha
 - [ ] **Fim da ST de perfumaria e higiene em 1º/04/2026** (Portaria SRE 94/2025):
       trabalho cuja competência cruze 31/03/2026 monta a ficha como se a ST

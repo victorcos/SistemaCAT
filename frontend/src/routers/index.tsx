@@ -15,6 +15,7 @@ import PreValidacao from "@/pages/PreValidacao";
 import QuebraDeSped from "@/pages/QuebraDeSped";
 import Entrega from "@/pages/Entrega";
 import Razao from "@/pages/Razao";
+import RazaoContabil from "@/pages/RazaoContabil";
 import DePara from "@/pages/DePara";
 import Suportado from "@/pages/Suportado";
 import Projeto from "@/pages/Projeto";
@@ -89,6 +90,7 @@ export const roteador = createBrowserRouter([
               { path: "/projetos/:id/arquivo-digital", element: <ArquivoDigital /> },
               { path: "/projetos/:id/pre-validacao", element: <PreValidacao /> },
               { path: "/projetos/:id/quebra-de-sped", element: <QuebraDeSped /> },
+              { path: "/projetos/:id/razao-contabil", element: <RazaoContabil /> },
               { path: "/projetos/:id/entrega", element: <Entrega /> },
               { path: "/projetos/:id/historico", element: <Historico /> },
               {

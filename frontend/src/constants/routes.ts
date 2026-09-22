@@ -29,6 +29,8 @@ export const ROTAS = {
   arquivoDigital: (id: number | string) => `/projetos/${id}/arquivo-digital`,
   preValidacao: (id: number | string) => `/projetos/${id}/pre-validacao`,
   quebraDeSped: (id: number | string) => `/projetos/${id}/quebra-de-sped`,
+  /** o razão da ECD, com seletor de conta — sai da quebra de SPED */
+  razaoContabil: (id: number | string) => `/projetos/${id}/razao-contabil`,
   entrega: (id: number | string) => `/projetos/${id}/entrega`,
   historico: (id: number | string) => `/projetos/${id}/historico`,
 } as const;

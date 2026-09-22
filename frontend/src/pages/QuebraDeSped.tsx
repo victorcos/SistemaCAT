@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { BaixarPlanilha } from "@/components/shared/BaixarPlanilha";
 import {
   BarraFina,
@@ -317,6 +317,14 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaQuebra; resumo: R
             contabilidade lançou.
           </p>
           {par("razao-contabil", "Baixar o razão", true, (resumo.linhas_do_razao ?? 0) === 0)}
+          {(resumo.linhas_do_razao ?? 0) > 0 && (
+            <Link
+              to={ROTAS.razaoContabil(execucao.projeto_id)}
+              className="text-[12px] font-bold text-marca-laranja no-underline hover:underline"
+            >
+              Abrir na tela, conta por conta →
+            </Link>
+          )}
         </Cartao>
       </section>
 
