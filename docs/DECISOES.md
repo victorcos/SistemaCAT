@@ -5,6 +5,72 @@
 
 ---
 
+## 2026-09-22 — A Gestão (36 quadros) entra: o núcleo, e o gabarito que não se versiona
+
+**O que é.** Os mesmos 36 quadros que o Sistema MA exporta na "Gestão" de
+PIS/Pasep e COFINS — receita por CST, contribuição apurada, natureza dos
+créditos, ajustes, controle de saldos —, montados a partir da
+EFD-Contribuições. Cada quadro é uma lista de linhas; cada linha, um valor por
+competência.
+
+**A forma do porte: um resumo por arquivo, e os quadros sobre o resumo.**
+
+```
+EFD-Contribuições ──► agregador ──► ApuracaoEFD ──► quadros ──► Relatorio
+     (1 GB)          uma passada     (poucos MB)      regras     36 quadros
+```
+
+O `ApuracaoEFD` guarda os registros de apuração inteiros (são poucos por
+arquivo), os ajustes somados por código e os itens dos blocos A/C/D/F agregados
+por chave — nunca linha a linha. Cabe em memória quando o arquivo não cabe, e
+é ele que os quadros consomem. **Trocar a regra de um quadro não obriga a reler
+1 GB**, que é a diferença entre iterar numa regra em segundos e em minutos.
+
+**Centavos inteiros, não float.** Somar float de milhões de linhas acumula
+erro, e o MA arredonda o crédito recalculado **por grupo**: um erro de 1e-9 no
+lugar errado vira um centavo de diferença. Valores em centavos, alíquotas em
+décimos-milésimos de ponto percentual.
+
+**O crédito dos quadros 32 e 33 é recalculado, não somado.** O MA não soma o
+`VL_PIS` das linhas: refaz base × alíquota por grupo (registro, CST, CFOP,
+natureza, alíquota), arredonda cada grupo ao centavo e só então soma. Somar o
+campo do arquivo dá outro número, e o relatório deixaria de bater.
+
+**Portado fiel de novo, e pelo mesmo motivo da 037.** As regras aqui não foram
+deduzidas do Guia Prático — foram confrontadas com o export real da Gestão do
+MA em **59 competências**, e o que bateu centavo a centavo está marcado
+`# VALIDADO` ou `# CONFIRMADO` linha a linha. Sem esse export eu não teria como
+redescobri-las nem revalidá-las. Onde eu discordaria, escrevi comentário.
+
+**O 0000 passou pelo domínio, como manda a regra da casa.** O original lia
+`c[5], c[6], c[7], c[8]` — que até acerta na EFD-Contribuições, mas é a forma
+que já devolveu UF no lugar de CNPJ duas vezes neste projeto. Agora quem lê é
+`dominio/sped/cabecalho.py`, que acha cada campo pela forma.
+
+**Uma apuração por competência.** Original e retificadora ficam na mesma pasta,
+e a retificadora substitui a original por inteiro: ler as duas dobraria o mês e
+misturaria valores de antes e depois da retificação. A retificadora vence;
+havendo empate, o arquivo mais novo — e o preterido vira aviso com os dois
+nomes, nunca some calado.
+
+**O gabarito não se versiona, então virou ferramenta.** A validação das 59
+competências tem por gabarito o CSV da Gestão de uma empresa real. Isso é dado
+de cliente: não entra no repositório, e por isso não vira teste automatizado.
+O que entrou foi `tools/validar_gestao.py`, que recebe os caminhos por
+argumento, compara linha a linha com tolerância **zero** e sai com código 1 se
+houver divergência. Foi com tolerância zero que a validação achou as duas
+únicas diferenças de R$ 0,01 que existiam em 22.243 valores de COFINS.
+
+Os testes automatizados cobrem as regras sobre uma amostra sintética montada
+**pelo nome do campo** — e, de quebra, conferem que os índices do leiaute da
+gestão concordam com `sped/registros.py`, que é o leiaute desta casa.
+
+**O que ficou de fora**: IRPJ/CSLL (vem da ECF, é outro leitor e outro conjunto
+de quadros) e a etapa em si — fila, planilha e tela vêm em seguida. O que está
+aqui é o núcleo: ler e montar.
+
+---
+
 ## 2026-09-22 — A tela do razão da ECD: por que não basta o download
 
 **O problema com o download.** A quebra já entregava `razao.parquet` e a
