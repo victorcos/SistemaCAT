@@ -95,6 +95,77 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "ALIQ_COFINS_REAIS", "VL_COFINS", "COD_CTA",
     ),
 
+    # --- os ramos de documento de ENTRADA que a consulta 037 percorre ---
+    # energia, água e gás (C500) · demais documentos (F100) · transporte (D100) ·
+    # comunicação (D500) · ativo imobilizado (F120 depreciação, F130 aquisição)
+    #
+    # O bloco D tem abridor PRÓPRIO por estabelecimento (D010), independente do
+    # C010: sem isso, o documento de uma filial sai com o CNPJ da matriz — bug
+    # real, achado na validação do projeto de origem contra arquivo de cliente.
+    "C500": (
+        "REG", "COD_PART", "COD_MOD", "COD_SIT", "SER", "SUB", "NUM_DOC", "DT_DOC",
+        "DT_ENT", "VL_DOC", "VL_ICMS", "COD_INF", "VL_PIS", "VL_COFINS", "CHV_DOCe",
+    ),
+    "C501": (
+        "REG", "CST_PIS", "VL_ITEM", "NAT_BC_CRED", "VL_BC_PIS", "ALIQ_PIS", "VL_PIS",
+        "COD_CTA",
+    ),
+    "C505": (
+        "REG", "CST_COFINS", "VL_ITEM", "NAT_BC_CRED", "VL_BC_COFINS", "ALIQ_COFINS",
+        "VL_COFINS", "COD_CTA",
+    ),
+    "F010": (
+        "REG", "CNPJ",
+    ),
+    "F100": (
+        "REG", "IND_OPER", "COD_PART", "COD_ITEM", "DT_OPER", "VL_OPER", "CST_PIS",
+        "VL_BC_PIS", "ALIQ_PIS", "VL_PIS", "CST_COFINS", "VL_BC_COFINS", "ALIQ_COFINS",
+        "VL_COFINS", "NAT_BC_CRED", "IND_ORIG_CRED", "COD_CTA", "COD_CCUS",
+        "DESC_DOC_OPER",
+    ),
+    "F120": (
+        "REG", "NAT_BC_CRED", "IDENT_BEM_IMOB", "IND_ORIG_CRED", "IND_UTIL_BEM_IMOB",
+        "VL_OPER_DEP", "PARC_OPER_NAO_BC_CRED", "CST_PIS", "VL_BC_PIS", "ALIQ_PIS",
+        "VL_PIS", "CST_COFINS", "VL_BC_COFINS", "ALIQ_COFINS", "VL_COFINS", "COD_CTA",
+        "COD_CCUS", "DESC_BEM_IMOB",
+    ),
+    "F130": (
+        "REG", "NAT_BC_CRED", "IDENT_BEM_IMOB", "IND_ORIG_CRED", "IND_UTIL_BEM_IMOB",
+        "MES_OPER_AQUIS", "VL_OPER_AQUIS", "PARC_OPER_NAO_BC_CRED", "VL_BC_CRED",
+        "IND_NR_PARC", "CST_PIS", "VL_BC_PIS", "ALIQ_PIS", "VL_PIS", "CST_COFINS",
+        "VL_BC_COFINS", "ALIQ_COFINS", "VL_COFINS", "COD_CTA", "COD_CCUS", "DESC_BEM_IMOB",
+    ),
+    "D010": (
+        "REG", "CNPJ",
+    ),
+    "D100": (
+        "REG", "IND_OPER", "IND_EMIT", "COD_PART", "COD_MOD", "COD_SIT", "SER", "SUB",
+        "NUM_DOC", "CHV_CTE", "DT_DOC", "DT_A_P", "TP_CTE", "CHV_CTE_REF", "VL_DOC",
+        "VL_DESC", "IND_FRT", "VL_SERV", "VL_BC_ICMS", "VL_ICMS", "VL_NT", "COD_INF",
+        "COD_CTA",
+    ),
+    "D101": (
+        "REG", "IND_NAT_FRT", "VL_ITEM", "CST_PIS", "NAT_BC_CRED", "VL_BC_PIS", "ALIQ_PIS",
+        "VL_PIS", "COD_CTA",
+    ),
+    "D105": (
+        "REG", "IND_NAT_FRT", "VL_ITEM", "CST_COFINS", "NAT_BC_CRED", "VL_BC_COFINS",
+        "ALIQ_COFINS", "VL_COFINS", "COD_CTA",
+    ),
+    "D500": (
+        "REG", "IND_OPER", "IND_EMIT", "COD_PART", "COD_MOD", "COD_SIT", "SER", "SUB",
+        "NUM_DOC", "DT_DOC", "DT_A_P", "VL_DOC", "VL_DESC", "VL_SERV", "VL_SERV_NT",
+        "VL_TERC", "VL_DA", "VL_BC_ICMS", "VL_ICMS", "COD_INF", "VL_PIS", "VL_COFINS",
+    ),
+    "D501": (
+        "REG", "CST_PIS", "VL_ITEM", "NAT_BC_CRED", "VL_BC_PIS", "ALIQ_PIS", "VL_PIS",
+        "COD_CTA",
+    ),
+    "D505": (
+        "REG", "CST_COFINS", "VL_ITEM", "NAT_BC_CRED", "VL_BC_COFINS", "ALIQ_COFINS",
+        "VL_COFINS", "COD_CTA",
+    ),
+
     # --- bloco M: a apuração. PIS e COFINS são espelhos, registro a registro ---
     # crédito
     "M100": (

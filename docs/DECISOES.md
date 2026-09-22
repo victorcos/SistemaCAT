@@ -5,6 +5,47 @@
 
 ---
 
+## 2026-09-22 — A Consulta de Entradas (037): porte fiel, e por quê
+
+**O que é.** Equivalente à consulta *037 — Entradas — Todos os Registros —
+Completos* do Sistema MA, gerada **só a partir da EFD-Contribuições**. É a saída
+que se confronta com o razão da ECD: o que a escrituração fiscal diz ter entrado
+contra o que a contabilidade lançou. Prioridade do Victor, junto com a ECD.
+
+**Portado fiel, de propósito.** O que está neste módulo não foi deduzido do
+leiaute — foi **confirmado contra arquivo de referência real de duas empresas**,
+e sem esse arquivo eu não teria como redescobrir nem revalidar. Onde eu
+discordaria, escrevi comentário em vez de mudar a regra. Três coisas que só o
+dado real ensina:
+
+* **o C190 variou de 0% a 95%.** Na primeira empresa validada não havia uma
+  ocorrência; na segunda era o ramo dominante. Quem tratar o C100/C170 como "o
+  caminho normal" acerta num cliente e perde o relatório inteiro no outro;
+* **o `COD_PART` do C191/C195 não referencia o 0150** naquela empresa — é o CNPJ
+  direto, sem cadastro. Esse ramo sai sem nome de participante, e a UF é só a do
+  estabelecimento;
+* **o bloco D tem abridor próprio (D010)**, independente do C010. Sem ele,
+  documento de **filial** saía com CNPJ de **matriz**. Bug real, achado na
+  validação — e agora com teste que o cobra.
+
+**Duas heurísticas, marcadas como tais.** `natureza_do_credito` e
+`debito_ou_credito` não saem do arquivo: são deduzidas. A primeira só tem regra
+confirmada para `TIPO_ITEM = "00"`; a segunda tem ~98% de aderência, com as
+discordâncias em CFOP de devolução. Ficam isoladas em funções com "suposto" no
+nome, para que ninguém as confunda com leitura — e para que corrigi-las um dia
+seja mexer num lugar só.
+
+**O que ficou de fora**: A100/A170, C395/C396 e F150. Nenhuma empresa validada
+teve ocorrência, e inventar regra de preenchimento seria pior que a ausência.
+
+**Uma lição de método.** Montei a amostra de teste contando pipe a olho três
+vezes, e errei as três — no C170, no M210 e aqui. Agora a amostra é **gerada por
+nome de campo** a partir da tabela de registros: nome errado explode na hora de
+montar, em vez de produzir um valor plausível na coluna errada.
+
+---
+
+
 ## 2026-09-22 — A quebra da ECD, e o 0000 que mordeu duas vezes
 
 **Por que ela vem antes da Gestão** (prioridade do Victor, 22/09/2026): a ECD é
