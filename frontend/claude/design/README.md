@@ -1,6 +1,6 @@
 # Handoff — CRM Fiscal · BMS Consultoria Tributária
 
-Reconstrução visual do sistema interno de apuração das obrigações da CAT. Sete telas em alta fidelidade, mesma paleta e logo da versão legada, layout reorganizado.
+Reconstrução visual do CRM Fiscal, o sistema interno de apuração e recuperação de tributos. Sete telas em alta fidelidade, mesma paleta e logo da versão legada, layout reorganizado.
 
 ## Sobre os arquivos de design
 

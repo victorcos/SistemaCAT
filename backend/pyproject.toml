@@ -4,7 +4,7 @@ name = "sistema-cat"
 # motor (cat/versao.py) e pela API em C#. O setuptools exige um número aqui e
 # não aceita buscá-lo fora de backend/; este fica parado de propósito.
 version = "0.0.0"
-description = "Sistema de apuração das obrigações da CAT — BMS Consultoria Tributária"
+description = "CRM Fiscal — apuração e recuperação de tributos · BMS Consultoria Tributária"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

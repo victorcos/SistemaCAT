@@ -52,8 +52,11 @@ export function LeiauteAcesso({
         <div className="relative flex flex-col items-center gap-5">
           <LogoBMS sobre="escuro" alt="" className="w-[min(340px,70%)]" />
           <span className="h-0.5 w-16 rounded-full bg-[linear-gradient(90deg,transparent,var(--marca-laranja),transparent)]" />
-          <p className="m-0 max-w-[30ch] text-center text-[17px] leading-relaxed text-moldura-texto-suave">
-            Sistema de apuração das obrigações da CAT
+          <p className="m-0 text-center text-xl font-extrabold tracking-tight text-moldura-texto">
+            CRM Fiscal
+          </p>
+          <p className="m-0 -mt-3 max-w-[30ch] text-center text-[17px] leading-relaxed text-moldura-texto-suave">
+            Apuração e recuperação de tributos
           </p>
         </div>
       </aside>
