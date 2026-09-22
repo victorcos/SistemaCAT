@@ -5,6 +5,48 @@
 
 ---
 
+## 2026-09-22 — Leitura compartilhada entre módulos: cópia x reaproveitamento
+
+**O pedido do Victor.** A exclusão do ICMS da base do PIS/COFINS (Tema 69) só se
+calcula com o **ICMS destacado**, e ele é autoritativo na EFD ICMS/IPI e no XML —
+não na EFD-Contribuições. Então o trabalho de PIS/COFINS precisa ler o arquivo
+que o trabalho de ICMS já importou.
+
+**O que o código fazia.** A deduplicação olhava só o próprio trabalho
+(`existentes_do_projeto`). Dois trabalhos da mesma empresa liam a mesma EFD do
+zero, sem saber um do outro — e o arquivo bruto nem é copiado pelo sistema, só o
+caminho, então o desperdício nunca foi disco: é **indexação**. Uma base de
+119 GB indexada duas vezes.
+
+**A distinção que passou a existir.** Cópia e reaproveitamento não são a mesma
+coisa, e tratá-los igual estragava um dos dois:
+
+* **dentro do mesmo trabalho**, o arquivo repetido é **cópia** e fica de fora —
+  o mesmo SPED lido duas vezes dobra os documentos;
+* **entre trabalhos da mesma empresa**, é **leitura já feita**. O arquivo
+  **entra** no lote novo, marcado com o nome de quem o leu primeiro. Recusá-lo
+  deixaria o PIS/COFINS sem o dado de que precisa.
+
+**Casa por caminho e por assinatura, nunca por hash.** O hash só é calculado para
+candidato a cópia; exigi-lo aqui obrigaria a ler os 119 GB para descobrir que não
+era preciso ler nada. O caminho resolve o caso real — a mesma pasta do cliente no
+servidor de arquivos —, e a assinatura (tamanho, tipo, CNPJ, competência e
+finalidade) cobre a mesma base copiada para outro lugar.
+
+**A granularidade do cruzamento fica em aberto de propósito** (escolha do Victor,
+22/09/2026): a EFD-Contribuições vem item a item (C170) em uns clientes e
+consolidada (C180/C190) em outros. A etapa terá de escolher a melhor fonte por
+competência, como o razão já faz entre XML e EFD — com o XML como saída quando
+não há item para cruzar.
+
+**O que esta fatia entrega, e o que não.** Entrega o *saber*: a inspeção já diz
+quantos arquivos outro trabalho da empresa leu. **Não** entrega ainda o
+reaproveitamento do material derivado — o parquet extraído continua sendo gerado
+por trabalho. Essa é a fatia seguinte, e é ela que corta o tempo.
+
+---
+
+
 ## 2026-09-22 — Acesso por segmento tributário: a terceira dimensão
 
 **O pedido do Victor.** Depois do login, uma tela de cards por tributo —

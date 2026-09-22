@@ -123,6 +123,13 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] Correção à mão: rotas da API, com o antes e o depois no histórico (v0.64.0)
 - [x] Correção à mão: subir planilha editada, com o que mudou à vista antes de gravar (v0.65.0)
 - [x] Acesso por segmento tributário: domínio, tabela, rotas e entrada pós-login (v0.66.0)
+- [x] Leitura compartilhada entre trabalhos da mesma empresa: a inspeção reconhece
+      o que já foi lido (v0.67.0)
+- [ ] **Reaproveitar o material derivado**: o parquet extraído de um arquivo é
+      gerado uma vez por empresa, não uma vez por trabalho. É a fatia que corta o
+      tempo de indexar 119 GB duas vezes
+- [ ] Cruzamento ICMS x PIS/COFINS para a exclusão do Tema 69, com cascata por
+      competência: C170 item a item quando houver, senão documento ou XML
 - [ ] Telas do handoff de design (hub de módulos, escolha de frente, coluna de módulos
       em Usuários) — desenho pronto em `Reconstrução tela listagem usuários/design_handoff`
 - [ ] Resolver a colisão de vocabulário: o handoff chama de "módulo" o nível 1 e de

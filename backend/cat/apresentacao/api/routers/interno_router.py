@@ -183,6 +183,10 @@ class LoteInspecionado(BaseModel):
     arquivos: list[ArquivoInspecionado]
     de_outra_empresa: int
     copias: int
+    # arquivos que OUTRO trabalho da mesma empresa já leu: entram, mas a
+    # leitura não se repete. É o que permite o PIS/COFINS usar a EFD
+    # ICMS/IPI que o trabalho de ICMS importou
+    reaproveitados: int = 0
     serve: bool
     competencias: list[date]
     cnpjs: list[str]
@@ -218,6 +222,7 @@ def inspecionar_lote(
         ],
         de_outra_empresa=len(resumo.de_outra_empresa),
         copias=len(resumo.copias),
+        reaproveitados=len(resumo.reaproveitados),
         serve=resumo.serve,
         competencias=resumo.competencias,
         cnpjs=resumo.cnpjs,

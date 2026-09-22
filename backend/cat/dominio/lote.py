@@ -215,6 +215,16 @@ class ArquivoDoLote:
     # finalidade. Ler 100 GB inteiros a cada importação não se justifica
     # para um problema que tamanho e cabeçalho já filtram quase todo.
     hash_conteudo: str | None = None
+    # Este mesmo arquivo já foi lido num OUTRO trabalho da mesma empresa —
+    # guarda o nome dele. Não é cópia a recusar: é leitura a reaproveitar.
+    # A exclusão do ICMS da base do PIS/COFINS precisa da EFD ICMS/IPI que o
+    # trabalho de ICMS já importou, e reindexar 119 GB por causa disso seria
+    # pagar duas vezes pelo mesmo byte (decisão do Victor, 22/09/2026).
+    ja_lido_em: str = ""
+
+    @property
+    def reaproveitado(self) -> bool:
+        return bool(self.ja_lido_em)
 
     @property
     def alimenta_a_cat(self) -> bool:
@@ -244,6 +254,16 @@ class ResumoDoLote:
     @property
     def total(self) -> int:
         return len(self.arquivos)
+
+    @property
+    def reaproveitados(self) -> list[ArquivoDoLote]:
+        """Os que outro trabalho desta empresa já leu.
+
+        Entram no lote — o trabalho novo precisa deles —, mas já se sabe que a
+        leitura não custa: o material derivado está em disco. É o que permite o
+        PIS/COFINS usar a EFD ICMS/IPI sem reindexá-la.
+        """
+        return [a for a in self.arquivos if a.reaproveitado]
 
     @property
     def bytes_totais(self) -> int:

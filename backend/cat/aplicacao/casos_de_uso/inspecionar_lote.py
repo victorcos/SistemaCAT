@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -175,9 +175,14 @@ def _conferir_permissao(pasta: str) -> None:
 def inspecionar_pasta(
     pasta: str, cnpj_raiz: str,
     existentes: tuple[ArquivoExistente, ...] = (),
+    ja_lidos: JaLidos | None = None,
 ) -> ResumoDoLote:
     """Classifica tudo que há na pasta, separando o que é de outra empresa
-    e o que é cópia exata — de outro arquivo da pasta ou de um já importado."""
+    e o que é cópia exata — de outro arquivo da pasta ou de um já importado.
+
+    `ja_lidos` diz o que outro trabalho da mesma empresa já leu. Quem está nele
+    **entra** no lote, marcado: não é cópia a recusar, é leitura a não repetir.
+    """
     caminho = os.path.expandvars(os.path.expanduser((pasta or "").strip()))
     if not caminho:
         raise PastaInvalida("Informe a pasta onde estão os arquivos.")
@@ -196,6 +201,7 @@ def inspecionar_pasta(
     _conferir_permissao(caminho)
 
     resumo = ResumoDoLote(pasta=os.path.abspath(caminho))
+    ja_lidos = ja_lidos or JaLidos()
     certificados = CertificadosIgnorados()
     lista = list(percorrer_pasta(caminho, certificados))
     resumo.certificados = certificados
@@ -222,7 +228,11 @@ def inspecionar_pasta(
     ja_importados = [a for a in da_empresa if a.caminho in caminhos_antigos]
     novos = [a for a in da_empresa if a.caminho not in caminhos_antigos]
     entram, resumo.copias = _separar_copias(novos, existentes)
-    resumo.arquivos = sorted(entram + ja_importados, key=lambda a: a.caminho)
+    # o que outro trabalho desta empresa já leu entra marcado: a etapa seguinte
+    # reaproveita o derivado em vez de indexar de novo
+    marcados = [replace(a, ja_lido_em=ja_lidos.trabalho_de(a)) if ja_lidos.trabalho_de(a) else a
+                for a in entram + ja_importados]
+    resumo.arquivos = sorted(marcados, key=lambda a: a.caminho)
     resumo.limite_atingido = len(lista) >= LIMITE_DE_ARQUIVOS
 
     log.info(
@@ -233,6 +243,7 @@ def inspecionar_pasta(
             "uteis": len(resumo.uteis),
             "de_outra_empresa": len(resumo.de_outra_empresa),
             "copias": len(resumo.copias),
+            "reaproveitados": len(resumo.reaproveitados),
             "bytes": resumo.bytes_totais,
             "por_tipo": {t.value: q for t, q in resumo.por_tipo.items()},
             "nao_baixados": resumo.por_tipo.get(TipoDeArquivo.NAO_BAIXADO, 0),
@@ -281,6 +292,54 @@ def existentes_do_projeto(projeto_id: int, sessao: Session) -> tuple[ArquivoExis
     return tuple(ArquivoExistente(*linha) for linha in linhas)
 
 
+@dataclass(frozen=True)
+class JaLidos:
+    """O que OUTROS trabalhos da mesma empresa já leram.
+
+    Não serve para recusar nada: serve para o trabalho novo saber que a leitura
+    daquele arquivo já foi feita e o material derivado está em disco. A exclusão
+    do ICMS da base do PIS/COFINS precisa da EFD ICMS/IPI que o trabalho de ICMS
+    importou, e reindexá-la seria pagar duas vezes pelo mesmo byte.
+
+    **Casa por caminho e por assinatura, nunca por hash.** O hash só é calculado
+    para candidato a cópia — exigi-lo aqui obrigaria a ler 119 GB para descobrir
+    que não era preciso ler nada. O caminho resolve o caso real (a mesma pasta do
+    cliente no servidor de arquivos); a assinatura — tamanho, tipo, CNPJ,
+    competência e finalidade — cobre a mesma base copiada para outro lugar.
+    """
+
+    por_caminho: dict[str, str] = field(default_factory=dict)
+    por_assinatura: dict[tuple, str] = field(default_factory=dict)
+
+    def trabalho_de(self, arquivo: ArquivoDoLote) -> str:
+        """O nome do trabalho que já leu este arquivo, ou vazio."""
+        return (self.por_caminho.get(arquivo.caminho)
+                or self.por_assinatura.get(_assinatura(arquivo), ""))
+
+    def __bool__(self) -> bool:
+        return bool(self.por_caminho or self.por_assinatura)
+
+
+def ja_lidos_na_empresa(empresa_id: int, exceto_projeto_id: int, sessao: Session) -> JaLidos:
+    """Monta o mapa do que a empresa já leu fora deste trabalho."""
+    linhas = sessao.execute(
+        select(ArquivoDoLoteDB.caminho, ArquivoDoLoteDB.tamanho, ArquivoDoLoteDB.tipo,
+               ArquivoDoLoteDB.cnpj, ArquivoDoLoteDB.competencia,
+               ArquivoDoLoteDB.retificadora, ProjetoDB.nome)
+        .join(LoteDB, LoteDB.id == ArquivoDoLoteDB.lote_id)
+        .join(ProjetoDB, ProjetoDB.id == LoteDB.projeto_id)
+        .where(ProjetoDB.empresa_id == empresa_id, ProjetoDB.id != exceto_projeto_id)
+    ).all()
+    achados = JaLidos()
+    for caminho, tamanho, tipo, cnpj, competencia, retificadora, nome in linhas:
+        # o primeiro que leu é o que se cita: é nele que o derivado está
+        achados.por_caminho.setdefault(caminho, nome)
+        if tamanho:
+            achados.por_assinatura.setdefault(
+                (tamanho, tipo, cnpj, competencia, retificadora), nome)
+    return achados
+
+
 def inspecionar_do_projeto(
     projeto_id: int, pasta: str, sessao: Session
 ) -> tuple[ResumoDoLote, dict[str, str]]:
@@ -297,5 +356,7 @@ def inspecionar_do_projeto(
     if projeto is None:
         raise ProjetoInexistente(projeto_id)
     existentes = existentes_do_projeto(projeto_id, sessao)
-    resumo = inspecionar_pasta(pasta, projeto.empresa.cnpj_raiz, existentes=existentes)
+    ja_lidos = ja_lidos_na_empresa(projeto.empresa_id, projeto_id, sessao)
+    resumo = inspecionar_pasta(pasta, projeto.empresa.cnpj_raiz, existentes=existentes,
+                               ja_lidos=ja_lidos)
     return resumo, {e.caminho: e.tipo for e in existentes}

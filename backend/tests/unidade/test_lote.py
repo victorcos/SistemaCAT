@@ -6,11 +6,13 @@ Amigão, e a marca de erro do OneDrive que ocupava 149 dos 284 arquivos de uma
 pasta de trabalho — o defeito que motivou reconhecê-la como tipo próprio.
 """
 
+import os
 from datetime import date
 
 import pytest
 
 from cat.aplicacao.casos_de_uso.inspecionar_lote import (
+    JaLidos,
     PastaInvalida,
     inspecionar_pasta,
 )
@@ -311,3 +313,56 @@ class TestXmlDeFornecedor:
         r = inspecionar_pasta(str(tmp_path), "50948371")
         assert r.total == 0
         assert len(r.de_outra_empresa) == 1
+
+
+class TestLeituraCompartilhadaEntreTrabalhos:
+    """O que outro trabalho da mesma empresa já leu entra marcado, não recusado.
+
+    A exclusão do ICMS da base do PIS/COFINS precisa da EFD ICMS/IPI que o
+    trabalho de ICMS já importou (decisão do Victor, 22/09/2026). Recusá-la como
+    cópia deixaria o trabalho de PIS/COFINS sem o dado; reindexá-la seria pagar
+    duas vezes pelo mesmo byte. Então ela entra, dizendo quem já a leu.
+    """
+
+    def test_o_arquivo_que_outro_trabalho_leu_entra_marcado(self, tmp_path):
+        escrever(tmp_path, "boa.txt", ICMS_IPI)
+        caminho = str(tmp_path / "boa.txt")
+
+        resumo = inspecionar_pasta(
+            str(tmp_path), "50948371",
+            ja_lidos=JaLidos(por_caminho={caminho: "ICMS 2025"}))
+
+        assert resumo.copias == []
+        assert [a.nome for a in resumo.arquivos] == ["boa.txt"]
+        assert resumo.arquivos[0].ja_lido_em == "ICMS 2025"
+        assert resumo.reaproveitados == resumo.arquivos
+
+    def test_a_mesma_base_noutra_pasta_casa_pela_assinatura(self, tmp_path):
+        caminho = escrever(tmp_path, "boa.txt", ICMS_IPI)
+        tamanho = os.path.getsize(caminho)
+
+        resumo = inspecionar_pasta(
+            str(tmp_path), "50948371",
+            ja_lidos=JaLidos(por_assinatura={
+                (tamanho, TipoDeArquivo.SPED_ICMS_IPI.value, "50948371000178",
+                 date(2025, 1, 1), False): "ICMS 2025"}))
+
+        assert resumo.arquivos[0].ja_lido_em == "ICMS 2025"
+
+    def test_sem_nada_lido_antes_nada_fica_marcado(self, tmp_path):
+        escrever(tmp_path, "boa.txt", ICMS_IPI)
+
+        resumo = inspecionar_pasta(str(tmp_path), "50948371")
+
+        assert resumo.reaproveitados == []
+        assert resumo.arquivos[0].ja_lido_em == ""
+
+    def test_o_mapa_vazio_nao_casa_com_nada(self):
+        a = classificar_do_nada()
+        assert JaLidos().trabalho_de(a) == ""
+        assert not JaLidos()
+
+
+def classificar_do_nada():
+    from cat.dominio.lote import ArquivoDoLote
+    return ArquivoDoLote(caminho="x", nome="x", tamanho=1, tipo=TipoDeArquivo.SPED_ICMS_IPI)
