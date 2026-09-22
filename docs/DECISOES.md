@@ -5,6 +5,48 @@
 
 ---
 
+## 2026-09-22 — A quebra de SPED entra, e o leitor do 0000 é o que já existia
+
+**O que foi portado.** O núcleo do projeto Quebra de SPED, para
+`infraestrutura/sped/`: o **índice** (uma passada, contagem de cada registro e
+posição em bytes dos alvos) e o **join do item** (C170 com a nota, o
+estabelecimento e as três tabelas do bloco 0). Fica em `infraestrutura/`, e não
+dentro de um módulo tributário: ler SPED serve a todos.
+
+**Medido em arquivo real** — EFD ICMS/IPI de 31,3 MB, 601.486 linhas:
+
+| | |
+|---|---|
+| indexação | 0,8 s (37,7 MB/s) |
+| índice do cache | 0,13 s |
+| página 5.000 do C170 por `seek` | **0,001 s** |
+| join do item | 0,7 s · 17.129 itens |
+
+**O defeito que o arquivo real achou.** O porte trazia o leiaute do registro
+0000 da **EFD-Contribuições**, e só dele. Apontado a uma EFD ICMS/IPI — em que
+CNPJ, nome e datas ficam em **posições diferentes** —, devolvia a UF no lugar do
+CNPJ e a razão social no lugar da data, sem erro nenhum. Nenhum teste de unidade
+pegaria isso: a amostra era de Contribuições.
+
+A correção não foi consertar as posições: foi **usar o que já existia**.
+`dominio/sped/cabecalho.py` detecta os três leiautes desde sempre, porque a CAT
+42 já lia EFD ICMS/IPI, Contribuições e ECD. Portar um segundo leitor do 0000
+seria exatamente o que a decisão do dia anterior proibiu — dois leitores da mesma
+coisa, que um dia divergem.
+
+**O que ficou de fora desta fatia**, de propósito: o enriquecimento do original
+(descrição de CFOP, natureza de crédito, município) e os outros ~20 joins
+hierárquicos. São tabelas auxiliares e não fazem falta para a exclusão do ICMS
+da base, que é o que motivou o porte.
+
+**Uma pista para a etapa seguinte.** O C170 da EFD-Contribuições tem
+`VL_BC_ICMS`, `ALIQ_ICMS` e `VL_ICMS` no leiaute — é o mesmo registro da EFD
+ICMS/IPI. Se os clientes os preencherem, a exclusão do Tema 69 sai do próprio
+arquivo, sem cruzar nada. Vale medir antes de construir o cruzamento.
+
+---
+
+
 ## 2026-09-22 — Como o banco trata os módulos: o que vira tabela e o que não
 
 **A pergunta do Victor:** com quatro módulos tributários chegando, como ficam as

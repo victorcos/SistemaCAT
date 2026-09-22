@@ -131,9 +131,13 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [ ] Cruzamento ICMS x PIS/COFINS para a exclusão do Tema 69, com cascata por
       competência: C170 item a item quando houver, senão documento ou XML
 - [x] Roteiro de etapas por módulo, e o critério do que vira tabela (v0.69.0)
-- [ ] **Portar a quebra de SPED** — etapa `quebra_de_sped` já declarada no roteiro
-      de PIS/COFINS, ainda não construída. Fonte: `Quebra de SPED/src/sped/`
-      (indexer 163 linhas, extractor 1.487 com ~20 joins hierárquicos, sem Streamlit)
+- [x] Quebra de SPED: índice, cache e o join do item (v0.70.0)
+- [ ] Ligar a quebra de SPED à etapa `quebra_de_sped`: fila, pasta de trabalho e
+      a tela que mostra o que o arquivo tem
+- [ ] Medir se o C170 da EFD-Contribuições vem com o ICMS preenchido nas bases que
+      temos — se vier, a exclusão do Tema 69 não precisa cruzar com a EFD ICMS/IPI
+- [ ] Trazer os outros joins do Quebra de SPED (C190, C180, M210, M610…) e o
+      enriquecimento (CFOP, natureza de crédito, município)
 - [ ] Apuração das contribuições (`apuracao_contribuicoes`): os 36 quadros da
       Gestão padrão MA, validados em 59 competências
 - [ ] Telas do handoff de design (hub de módulos, escolha de frente, coluna de módulos
