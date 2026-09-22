@@ -7,9 +7,9 @@ exportados quanto para o filtro de CFOP na UI (mostra "código - descrição").
 
 Códigos marcados com # CONFIRMADO foram extraídos diretamente de arquivos
 de referência reais:
-  - "037 - Entradas" (Tropical Supermercados, jul-dez/2021) — grupo 1/2/3xxx
-  - "C100, C170, 0200 - Documento e Itens - Nota Fiscal" (MA, Mercadinho e
-    Açougue Jardim Capela, out/2024) — grupo 5/6xxx e alguns 1xxx adicionais
+  - "037 - Entradas" (empresa A, jul-dez/2021) — grupo 1/2/3xxx
+  - "C100, C170, 0200 - Documento e Itens - Nota Fiscal" (empresa C,
+    out/2024) — grupo 5/6xxx e alguns 1xxx adicionais
 Os códigos na seção "Demais códigos oficiais" (uma por grupo) vêm da tabela
 oficial de CFOP (Ajuste SINIEF 07/01), abreviados automaticamente no mesmo
 estilo dos confirmados, e ainda não foram confrontados com um arquivo de

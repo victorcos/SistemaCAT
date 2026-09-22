@@ -26,9 +26,8 @@ F010 > F130 (registro único, sem filhos)      + 0500
 
 ## O que só o dado real ensinou
 
-**O C190 variou de 0% a 95%.** Na primeira empresa validada (Tropical
-Supermercados) não havia uma ocorrência sequer; na segunda (UNISUPER) era o ramo
-dominante, com mais de 95% das linhas. Quem portar este módulo achando que o
+**O C190 variou de 0% a 95%.** Na primeira empresa validada não havia uma
+ocorrência sequer; na segunda era o ramo dominante, com mais de 95% das linhas. Quem portar este módulo achando que o
 C100/C170 é "o caminho normal" e o resto é detalhe vai acertar num cliente e
 perder o relatório inteiro no outro.
 
@@ -51,10 +50,11 @@ seria pior que a ausência.
 ## Duas heurísticas, marcadas como tais
 
 `natureza_do_credito` e `debito_ou_credito` **não saem do arquivo** — são
-deduzidas. A primeira só tem regra confirmada para `TIPO_ITEM = "00"`; a segunda
-tem ~98% de aderência à referência, com as discordâncias concentradas em CFOP de
-devolução. As duas estão isoladas em funções próprias, com o nome dizendo que
-são hipótese, para que ninguém as tome por leitura.
+deduzidas. A primeira sai do CFOP, conferida contra 124.647 linhas de relatórios
+de referência sem uma exceção; a segunda tem ~98% de aderência, com as
+discordâncias concentradas em CFOP de devolução. As duas estão isoladas em
+funções próprias, com o nome dizendo que são dedução, para que ninguém as tome
+por leitura.
 """
 
 from __future__ import annotations
@@ -67,7 +67,13 @@ from datetime import date
 from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido, ler_cabecalho
 from cat.infraestrutura.sped.leitor import BUFFER_DE_REDE, campos, registro_de
 from cat.infraestrutura.sped.registros import nomes_dos_campos
-from cat.infraestrutura.sped.tabelas import tab_437, tab_cfop, tab_municipio, tab_tipo_item
+from cat.infraestrutura.sped.tabelas import (
+    tab_437,
+    tab_cfop,
+    tab_cfop_natureza_credito,
+    tab_municipio,
+    tab_tipo_item,
+)
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -113,6 +119,7 @@ class LinhaDeEntrada:
     cpf_do_participante: str = ""
     nome_do_participante: str = ""
     uf_origem_destino: str = ""
+    municipio_do_participante: str = ""
     numero_do_documento: str = ""
     serie: str = ""
     chave: str = ""
@@ -218,16 +225,29 @@ def _rotulo_da_natureza(codigo: str) -> str:
 # ---------------------------------------------------------------------------
 # as duas heurísticas — deduzidas, não lidas
 # ---------------------------------------------------------------------------
-def _natureza_suposta_pelo_tipo(tipo_do_item: str) -> str:
+def _natureza_deduzida(cfop: str, tipo_do_item: str) -> str:
     """A natureza do crédito quando o registro não tem campo para ela.
 
-    É o caso do C170 e do C191/C195. Confirmado em duas empresas reais:
-    `TIPO_ITEM = "00"` (mercadoria para revenda) corresponde à natureza "01 -
-    Aquisição de bens para revenda" na esmagadora maioria dos casos. **Os demais
-    códigos ficam em branco de propósito** — nenhum outro mapeamento foi
-    confirmado, e chutar aqui encheria o relatório de natureza errada com cara
-    de certa.
+    É o caso do C170 e do C191/C195 — só o C501, o D101, o D501 e o bloco F
+    trazem `NAT_BC_CRED` escrito.
+
+    **A dedução é pelo CFOP.** A natureza descreve a *operação*, e é o CFOP que
+    codifica a operação; o tipo do item descreve a *mercadoria*. A regra foi
+    conferida contra 43.497 linhas de um relatório de referência e reconfirmada
+    contra outras 81.150, em vinte CFOP distintos, sem uma exceção.
+
+    O tipo do item fica como segunda tentativa, e só para `TIPO_ITEM = "00"`.
+    Ele era a regra antes desta — e estava errado: na amostra que derrubou a
+    hipótese, o campo vinha constante em `"99"` em 100% das linhas, o que fazia
+    a natureza sumir de toda a base. Continua servindo para o CFOP que a tabela
+    não conhece, quando o cadastro diz que a mercadoria é de revenda.
+
+    Fora isso, branco de propósito: natureza errada com cara de certa é pior que
+    coluna vazia.
     """
+    pelo_cfop = tab_cfop_natureza_credito.codigo(cfop)
+    if pelo_cfop:
+        return _rotulo_da_natureza(pelo_cfop)
     return _rotulo_da_natureza("01") if (tipo_do_item or "").strip() == "00" else ""
 
 
@@ -297,12 +317,19 @@ class _Contexto:
 
     # ---------- busca nas tabelas do bloco 0 ----------
     def _participante(self, codigo: str) -> dict[str, str]:
+        """Os dados do participante, município incluído.
+
+        O 0150 traz o município como código do IBGE; o nome sai da tabela. Os
+        ramos sem participante — o C190 consolidado, o F120 e o F130 — ficam com
+        a coluna em branco, que é o que ela significa ali: não há de quem.
+        """
         d = _nomeados("0150", self.tabelas[b"0150"].get(codigo, []))
         return {
             "codigo_do_participante": codigo,
             "cnpj_do_participante": d["0150_CNPJ"],
             "cpf_do_participante": d["0150_CPF"],
             "nome_do_participante": d["0150_NOME"],
+            "municipio_do_participante": tab_municipio.descricao(d["0150_COD_MUN"]),
         }
 
     def _conta(self, codigo: str) -> tuple[str, str]:
@@ -427,8 +454,8 @@ class _Contexto:
             valor_do_item=_dinheiro(item["C170_VL_ITEM"]),
             quantidade=_quantidade(item["C170_QTD"]), unidade=item["C170_UNID"],
             desconto_do_item=_dinheiro(item["C170_VL_DESC"]),
-            # o C170 não tem campo de natureza do crédito: é deduzida do tipo do item
-            natureza_do_credito=_natureza_suposta_pelo_tipo(cadastro["tipo"]),
+            # o C170 não tem campo de natureza do crédito: ela é deduzida do CFOP
+            natureza_do_credito=_natureza_deduzida(item["C170_CFOP"], cadastro["tipo"]),
             cfop=item["C170_CFOP"], descricao_do_cfop=tab_cfop.descricao(item["C170_CFOP"]),
             icms=_dinheiro(item["C170_VL_ICMS"]), icms_st=_dinheiro(item["C170_VL_ICMS_ST"]),
             ipi=_dinheiro(item["C170_VL_IPI"]),
@@ -501,7 +528,7 @@ class _Contexto:
             tipo_do_item=_rotulo_do_tipo(cadastro["tipo"]),
             valor_do_item=_dinheiro(pis["C191_VL_ITEM"]),
             desconto_do_item=_dinheiro(pis["C191_VL_DESC"]),
-            natureza_do_credito=_natureza_suposta_pelo_tipo(cadastro["tipo"]),
+            natureza_do_credito=_natureza_deduzida(pis["C191_CFOP"], cadastro["tipo"]),
             cfop=pis["C191_CFOP"], descricao_do_cfop=tab_cfop.descricao(pis["C191_CFOP"]),
             cst_pis=pis["C191_CST_PIS"], base_do_pis=_dinheiro(pis["C191_VL_BC_PIS"]),
             quantidade_base_do_pis=pis["C191_QUANT_BC_PIS"],

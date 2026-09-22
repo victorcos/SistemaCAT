@@ -18,6 +18,7 @@ from cat.infraestrutura.sped.entradas import (
     RAMO_F100,
     RAMO_F120,
     RAMO_F130,
+    _natureza_deduzida,
     colunas_da_entrada,
     entradas,
 )
@@ -164,14 +165,39 @@ class TestAConsolidacao:
 
 
 class TestAsHeuristicas:
-    def test_a_natureza_e_deduzida_do_tipo_do_item_so_no_codigo_00(self, linhas):
+    def test_a_natureza_e_deduzida_do_cfop(self, linhas):
+        """Do CFOP da operação, não do tipo da mercadoria.
+
+        A regra pelo TIPO_ITEM veio antes desta e estava errada: numa amostra de
+        81.150 linhas o campo vinha constante em "99", o que apagava a natureza
+        da base inteira. Trocada em 22/09/2026 pela regra do CFOP, conferida
+        contra 124.647 linhas de relatórios de referência.
+        """
         nota = next(l for l in linhas if l.registros == RAMO_C100)
-        assert nota.tipo_do_item.startswith("00")
+        assert nota.cfop == "1102"
         assert nota.natureza_do_credito.startswith("01 -")
+
+    def test_cfop_fora_da_tabela_cai_no_tipo_do_item(self, linhas):
+        """A regra antiga vira a segunda tentativa, e só para o código 00."""
+        assert _natureza_deduzida("9999", "00").startswith("01 -")
+        assert _natureza_deduzida("9999", "99") == ""
+        # e o CFOP manda mesmo quando o tipo do item diria outra coisa
+        assert _natureza_deduzida("1202", "00").startswith("12 -")
 
     def test_quando_o_registro_traz_a_natureza_ela_nao_e_deduzida(self, linhas):
         energia = next(l for l in linhas if l.registros == RAMO_C500)
         assert energia.natureza_do_credito.startswith("09")
+
+    def test_o_municipio_do_participante_sai_ao_lado_da_uf(self, linhas):
+        """Os dois vêm do mesmo código do IBGE do 0150."""
+        nota = next(l for l in linhas if l.registros == RAMO_C100)
+        assert nota.municipio_do_participante == "Rio de Janeiro"
+        assert nota.uf_origem_destino.startswith("RJ/")
+
+    def test_ramo_sem_participante_fica_sem_municipio(self, linhas):
+        """O C190 é consolidado por CFOP: não há de quem ser o município."""
+        consolidada = next(l for l in linhas if l.registros == RAMO_C190)
+        assert consolidada.municipio_do_participante == ""
 
     def test_o_debito_credito_e_hipotese_marcada(self, linhas):
         nota = next(l for l in linhas if l.registros == RAMO_C100)
@@ -198,7 +224,7 @@ class TestOsRamosRaros:
 class TestContrato:
     def test_as_colunas_sao_conhecidas_antes_de_ler(self, linhas):
         colunas = colunas_da_entrada()
-        assert len(colunas) == 51
+        assert len(colunas) == 52
         assert set(linhas[0].como_dicionario()) == set(colunas)
 
     def test_arquivo_sem_entrada_nenhuma_nao_quebra(self, tmp_path):

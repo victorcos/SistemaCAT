@@ -140,7 +140,8 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] Bloco M: a apuração e os ajustes, PIS e COFINS na mesma função (v0.72.0)
 - [x] Quebra da ECD: plano de contas, índice por conta e razão contábil (v0.73.0)
 - [x] Consulta de Entradas (037): os oito ramos de documento de entrada (v0.74.0)
-- [ ] Enriquecimento: descrição de CFOP, natureza de crédito, município, tipo de item
+- [x] Enriquecimento: descrição de CFOP, município, indicadores e tipo de item, e a
+      natureza do crédito deduzida do CFOP — não do tipo do item (v0.76.0)
 - [ ] Apuração das contribuições (`apuracao_contribuicoes`): os 36 quadros da
       Gestão padrão MA, validados em 59 competências
 - [ ] Telas do handoff de design (hub de módulos, escolha de frente, coluna de módulos

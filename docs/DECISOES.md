@@ -5,6 +5,58 @@
 
 ---
 
+## 2026-09-22 — O enriquecimento, e a natureza do crédito que vinha do campo errado
+
+**O que entrou.** As colunas que traduzem código em texto passam a sair ao lado
+das cruas, nunca no lugar delas: descrição do CFOP, município do participante,
+o que cada indicador do C100 quer dizer, o tipo do item por extenso, o período
+da competência e a natureza da base de cálculo do crédito. Quem confere precisa
+ver o `1102` e o "Compra p/comercial" na mesma linha — se a planilha só trouxer
+o texto, ninguém consegue conferir contra o arquivo; se só trouxer o código,
+ninguém consegue ler.
+
+**A correção que importa: a natureza do crédito vem do CFOP, não do TIPO_ITEM.**
+O C170 e o C191/C195 não têm campo `NAT_BC_CRED` — só o C501, o D101, o D501 e
+o bloco F o têm escrito. Nos que não têm, ela é deduzida. Portei do projeto de
+origem a dedução pelo `TIPO_ITEM = "00"`, marcada como heurística, e estava
+**errada**:
+
+* a regra do TIPO_ITEM tinha sido confirmada contra o relatório de referência de
+  duas empresas — uma amostra em que o campo vinha preenchido;
+* a regra do CFOP foi conferida contra **43.497 linhas** de um relatório real e
+  reconfirmada contra outras **81.150**, em vinte CFOP distintos, sem uma
+  exceção. Na segunda amostra o `TIPO_ITEM` vinha constante em `"99"` em **100%**
+  das linhas — a regra antiga teria apagado a natureza da base inteira.
+
+O argumento não é só de volume. A natureza descreve a **operação**; o CFOP é o
+que codifica a operação. O tipo do item descreve a **mercadoria**, que é outra
+coisa. A regra antiga acertava por correlação, não por causa.
+
+**O TIPO_ITEM fica como segunda tentativa**, e só para o código `"00"`: serve ao
+CFOP que a tabela não conhece, quando o cadastro diz que a mercadoria é de
+revenda. Fora isso, branco de propósito — natureza errada com cara de certa é
+pior que coluna vazia.
+
+**Consequência a registrar:** a nossa 037 passa a divergir do relatório de
+referência do Sistema MA nas linhas em que o CFOP e o tipo do item discordam.
+Isso é a mudança dando certo, não um defeito — mas quem comparar as duas saídas
+lado a lado vai ver diferença, e precisa saber por quê.
+
+**O município entrou na 037.** O projeto de origem derivava a UF do código do
+IBGE do 0150 e jogava o município fora. Agora os dois saem, do mesmo código, na
+mesma passada. Os ramos sem participante — o C190 consolidado, o F120 e o F130 —
+ficam com a coluna em branco, que ali é o significado certo: não há de quem.
+A 037 vai de 51 para 52 colunas, e o teste de contrato cobrou a mudança, que é
+exatamente o que ele existe para fazer.
+
+**Nomes: os do relatório de origem.** As treze colunas traduzidas saem com o
+nome de lá, sufixo `_DESC` incluído, e o período em `dd/mm/aaaa` como a 037 já
+usava. Todo o resto daquele relatório já sai com o nome de lá — `C170_CFOP`,
+`0200_COD_NCM` —, e rebatizar só estas treze faria quem compara os dois lado a
+lado tropeçar sem ganhar nada.
+
+---
+
 ## 2026-09-22 — A etapa de quebra: o par que se confronta sai junto
 
 **O que a etapa faz.** Primeira do módulo de PIS/COFINS depois da importação.
@@ -62,11 +114,12 @@ dado real ensina:
   validação — e agora com teste que o cobra.
 
 **Duas heurísticas, marcadas como tais.** `natureza_do_credito` e
-`debito_ou_credito` não saem do arquivo: são deduzidas. A primeira só tem regra
-confirmada para `TIPO_ITEM = "00"`; a segunda tem ~98% de aderência, com as
-discordâncias em CFOP de devolução. Ficam isoladas em funções com "suposto" no
-nome, para que ninguém as confunda com leitura — e para que corrigi-las um dia
-seja mexer num lugar só.
+`debito_ou_credito` não saem do arquivo: são deduzidas. Ficam isoladas em
+funções próprias, para que ninguém as confunda com leitura — e para que
+corrigi-las um dia seja mexer num lugar só. *Foi o que aconteceu com a primeira
+no mesmo dia: a dedução pelo `TIPO_ITEM` estava errada e passou a vir do CFOP —
+ver a decisão do enriquecimento, no topo deste arquivo.* A segunda segue com
+~98% de aderência, com as discordâncias em CFOP de devolução.
 
 **O que ficou de fora**: A100/A170, C395/C396 e F150. Nenhuma empresa validada
 teve ocorrência, e inventar regra de preenchimento seria pior que a ausência.

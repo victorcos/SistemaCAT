@@ -1,7 +1,7 @@
 """Domínio do campo TIPO_ITEM (registro 0200 do EFD-Contribuições).
 
 Códigos marcados com # CONFIRMADO foram extraídos diretamente do arquivo de
-referência "037 - Entradas" (Tropical Supermercados, jul-dez/2021). Os
+referência "037 - Entradas" (empresa A, jul-dez/2021). Os
 demais vêm do Guia Prático e ainda não foram confrontados com um arquivo
 de referência real.
 """

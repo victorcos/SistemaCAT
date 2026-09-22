@@ -45,6 +45,7 @@ COLUNAS_ENTRADAS = (
     Coluna("cpf_do_participante", "CPF", "texto", 16, PARTICIPANTE),
     Coluna("nome_do_participante", "Nome", "texto", 34, PARTICIPANTE),
     Coluna("uf_origem_destino", "UF Origem/Destino", "texto", 12, PARTICIPANTE),
+    Coluna("municipio_do_participante", "Município", "texto", 22, PARTICIPANTE),
 
     Coluna("numero_do_item", "Número", "texto", 8, ITEM),
     Coluna("codigo_do_item", "Código", "texto", 16, ITEM),

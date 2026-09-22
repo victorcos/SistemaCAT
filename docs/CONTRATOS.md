@@ -322,6 +322,11 @@ Em disco, na pasta da execução: `entradas.parquet`, `razao.parquet`,
 `arquivos.parquet`, `contagens.parquet` e a pasta `indices/`, com um índice por
 arquivo lido — cache de leitura, descartável.
 
+A 037 tem **52 colunas** (v0.76.0: entrou `Município`, ao lado de
+`UF Origem/Destino` — as duas saem do mesmo código do IBGE do 0150). A coluna
+`Natureza do Crédito` é deduzida **do CFOP** nos ramos em que o registro não
+traz `NAT_BC_CRED` (C100/C170 e C190/C191/C195); nos demais é lida do arquivo.
+
 ### Correções à mão pela planilha (v0.65.0)
 
 | Método | Rota | Quem |

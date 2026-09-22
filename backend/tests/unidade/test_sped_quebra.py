@@ -11,7 +11,9 @@ import os
 import pytest
 
 from cat.infraestrutura.sped.extracao import (
+    TRADUZIDAS,
     RegistroNaoIndexado,
+    _competencia,
     colunas_do_item,
     itens_completos,
     registros,
@@ -234,9 +236,11 @@ class TestItemCompleto:
         colunas = colunas_do_item()
         item = next(iter(itens_completos(arquivo, "cp1252")))
         assert set(item) == set(colunas)
-        # a ordem agrupa por origem, do estabelecimento ao item
+        # a ordem agrupa por origem, do estabelecimento ao item, e as traduzidas
+        # fecham a linha — depois das cruas, nunca no lugar delas
         assert colunas[0].startswith("0140_")
-        assert colunas[-1].startswith("C170_")
+        assert colunas[-len(TRADUZIDAS) - 1].startswith("C170_")
+        assert tuple(colunas[-len(TRADUZIDAS):]) == TRADUZIDAS
 
     def test_arquivo_sem_item_nao_devolve_nada_e_nao_quebra(self, tmp_path):
         vazio = tmp_path / "so_cabecalho.txt"
@@ -256,3 +260,135 @@ class TestTabelaDeRegistros:
     def test_registro_fora_da_tabela_nao_derruba_quem_so_conta(self):
         # o bloco H é de inventário: a quebra o conta sem saber nomear os campos
         assert nomes_dos_campos("H010") == ()
+
+
+class TestEnriquecimento:
+    """As colunas traduzidas: o código de um lado, o texto do outro.
+
+    A amostra é montada **pelo nome do campo**, não contando pipes a olho — foi
+    contando pipes que três fixtures deste projeto nasceram erradas. Se um nome
+    não existir no leiaute, `posicao_do_campo` explode aqui, e não lá na frente.
+    """
+
+    @staticmethod
+    def _linha(registro: str, **valores: str) -> str:
+        colunas = [""] * len(nomes_dos_campos(registro))
+        colunas[0] = registro
+        for nome, valor in valores.items():
+            colunas[posicao_do_campo(registro, nome)] = valor
+        return "|" + "|".join(colunas) + "|"
+
+    def _arquivo_com(self, tmp_path, nome: str, corpo: list[str]) -> str:
+        caminho = tmp_path / nome
+        caminho.write_bytes((chr(10).join(corpo) + chr(10)).encode("cp1252"))
+        return str(caminho)
+
+    @pytest.fixture
+    def arquivo(self, tmp_path):
+        linha = self._linha
+        return self._arquivo_com(tmp_path, "enriquecido.txt", [
+            "|0000|006|0|||01062021|30062021|COMERCIO DO TESTE|11222333000181|SP|3550308||00|2|",
+            linha("0140", COD_EST="001", NOME="MATRIZ", CNPJ="11222333000181", UF="SP",
+                  COD_MUN="3550308"),
+            # fornecedor em Campinas/SP, cliente no Rio: a UF tem de mudar junto
+            linha("0150", COD_PART="F01", NOME="FORNECEDOR", CNPJ="99888777000166",
+                  COD_MUN="3509502"),
+            linha("0150", COD_PART="C09", NOME="CLIENTE", CNPJ="55666777000122",
+                  COD_MUN="3304557"),
+            linha("0200", COD_ITEM="SKU1", DESCR_ITEM="XAMPU", TIPO_ITEM="00",
+                  COD_NCM="33051000"),
+            linha("C010", CNPJ="11222333000181", IND_ESCRIT="0"),
+            # a compra para revenda
+            linha("C100", IND_OPER="0", IND_EMIT="0", COD_PART="F01", NUM_DOC="1001",
+                  DT_DOC="01062021", IND_PGTO="0", IND_FRT="9"),
+            linha("C170", NUM_ITEM="1", COD_ITEM="SKU1", CFOP="1102", IND_MOV="0",
+                  VL_ITEM="500,00", CST_PIS="50"),
+            # a devolução de venda: entra crédito, e tem CFOP de faturamento
+            linha("C100", IND_OPER="0", IND_EMIT="1", COD_PART="C09", NUM_DOC="2002",
+                  DT_DOC="15072021", IND_PGTO="0", IND_FRT="9"),
+            linha("C170", NUM_ITEM="1", COD_ITEM="SKU1", CFOP="1202", IND_MOV="0",
+                  VL_ITEM="300,00", CST_PIS="50"),
+            # a venda: não gera crédito, e por isso não tem natureza
+            linha("C100", IND_OPER="1", IND_EMIT="0", COD_PART="C09", NUM_DOC="3003",
+                  DT_DOC="20072021", IND_PGTO="1", IND_FRT="0"),
+            linha("C170", NUM_ITEM="1", COD_ITEM="SKU1", CFOP="5102", IND_MOV="0",
+                  VL_ITEM="900,00", CST_PIS="01"),
+        ])
+
+    def test_a_natureza_do_credito_vem_do_cfop(self, arquivo):
+        """Do CFOP, não do TIPO_ITEM.
+
+        O C170 não tem `NAT_BC_CRED`. A regra pelo CFOP foi conferida contra
+        43.497 linhas de um relatório de referência e reconfirmada contra outras
+        81.150, em vinte CFOP distintos, sem uma exceção.
+        """
+        entrada, devolucao, saida = itens_completos(arquivo, "cp1252")
+
+        assert entrada["NATUREZA_CREDITO"] == "01 - Aquisição de bens para revenda"
+        assert devolucao["NATUREZA_CREDITO"] == "12 - Devolução de vendas - Incidência Não-Cumulativa"
+        # saída não entra no mapa: crédito de PIS/COFINS é coisa de entrada
+        assert saida["NATUREZA_CREDITO"] == ""
+
+    def test_o_cfop_de_faturamento_so_aparece_na_devolucao(self, arquivo):
+        entrada, devolucao, saida = itens_completos(arquivo, "cp1252")
+
+        assert devolucao["CFOP_FATURAMENTO"] == "Devolução Faturamento"
+        assert entrada["CFOP_FATURAMENTO"] == ""
+        assert saida["CFOP_FATURAMENTO"] == ""
+
+    def test_o_municipio_e_a_uf_saem_do_codigo_do_ibge(self, arquivo):
+        """O 0150 não tem campo de UF: ela vem dos dois primeiros dígitos."""
+        entrada, _, saida = itens_completos(arquivo, "cp1252")
+
+        assert entrada["MUNICIPIO"] == "Campinas"
+        assert entrada["UF_ORIGEM_DESTINO"] == "SP/SP"
+        assert saida["MUNICIPIO"] == "Rio de Janeiro"
+        assert saida["UF_ORIGEM_DESTINO"] == "RJ/SP"
+
+    def test_o_periodo_e_o_primeiro_dia_do_mes_do_documento(self, arquivo):
+        entrada, devolucao, _ = itens_completos(arquivo, "cp1252")
+
+        assert entrada["PERIODO"] == "01/06/2021"
+        assert devolucao["PERIODO"] == "01/07/2021"
+
+    def test_data_torta_vira_competencia_vazia_em_vez_de_excecao(self):
+        assert _competencia("") == ""
+        assert _competencia("01/06/2021") == ""
+        assert _competencia("0106") == ""
+
+    def test_os_indicadores_saem_traduzidos_ao_lado_do_codigo(self, arquivo):
+        entrada = next(iter(itens_completos(arquivo, "cp1252")))
+
+        assert entrada["C100_IND_OPER"] == "0"
+        assert entrada["TIPO_OPERACAO_DESC"] == "0 - Entrada"
+        assert entrada["INDICADOR_EMITENTE_DESC"] == "0 - Emissão própria"
+        assert entrada["INDICADOR_ESCRITURACAO_DESC"] == "0 - Consolidada"
+        assert entrada["INDICADOR_PAGAMENTO_DESC"] == "0 - À vista"
+        assert entrada["INDICADOR_FRETE_DESC"] == "9 - Sem ocorrência de transporte"
+        assert entrada["INDICADOR_MOVIMENTO_ITEM_DESC"] == "0 - Sim"
+
+    def test_o_cfop_e_o_tipo_do_item_ganham_descricao(self, arquivo):
+        entrada = next(iter(itens_completos(arquivo, "cp1252")))
+
+        assert entrada["C170_CFOP"] == "1102"
+        assert entrada["DESCRICAO_CFOP"] == "Compra p/comercial"
+        assert entrada["TIPO_ITEM_DESC"] == "00 Mercadoria para Revenda"
+
+    def test_codigo_desconhecido_sai_vazio_em_vez_de_quebrar(self, tmp_path):
+        """O cliente usa um CFOP que a tabela não tem. A linha sai assim mesmo."""
+        linha = self._linha
+        caminho = self._arquivo_com(tmp_path, "desconhecido.txt", [
+            "|0000|006|0|||01062021|30062021|X|11222333000181|SP|3550308||00|2|",
+            linha("C010", CNPJ="11222333000181", IND_ESCRIT="0"),
+            linha("C100", IND_OPER="0", COD_PART="ZZZ", NUM_DOC="1", DT_DOC="01062021"),
+            linha("C170", NUM_ITEM="1", COD_ITEM="SEM_CADASTRO", CFOP="9999",
+                  VL_ITEM="1,00"),
+        ])
+
+        item = next(iter(itens_completos(caminho, "cp1252")))
+
+        assert item["DESCRICAO_CFOP"] == ""
+        assert item["NATUREZA_CREDITO"] == ""
+        assert item["MUNICIPIO"] == ""
+        assert item["UF_ORIGEM_DESTINO"] == ""
+        assert set(item) == set(colunas_do_item())

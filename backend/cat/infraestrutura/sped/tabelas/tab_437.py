@@ -3,7 +3,7 @@ Cálculo dos Créditos (registros C170/C181/C185/C191/C195/C501/C505/D101/
 D105/D501/D505/F100, campo NAT_BC_CRED).
 
 Entradas marcadas com # CONFIRMADO foram extraídas diretamente do arquivo
-de referência "037 - Entradas" (Tropical Supermercados, jul-dez/2021) —
+de referência "037 - Entradas" (empresa A, jul-dez/2021) —
 valores garantidamente iguais aos usados pelo Sistema MA. As demais vêm do
 texto oficial do Guia Prático e ainda não foram confrontadas com nenhum
 arquivo de referência real — confirmar antes de tratar como definitivas.

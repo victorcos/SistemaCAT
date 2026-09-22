@@ -28,10 +28,20 @@ montá-las durante a mesma passada funciona: quando o primeiro C170 aparece, as
 três já estão completas. O C010 e o C100 são contexto corrente: valem até o
 próximo aparecer.
 
-Portado do projeto Quebra de SPED em 22/09/2026, com os nomes desta casa. O
-enriquecimento que o original faz por cima — descrição de CFOP, natureza de
-crédito, município — ficou de fora desta primeira fatia: são tabelas auxiliares
-e não fazem falta para a exclusão do ICMS da base, que é o que motivou o porte.
+## O enriquecimento
+
+Além das colunas cruas, cada item sai com as colunas **traduzidas**: a descrição
+do CFOP, o município do participante, o que cada indicador quer dizer, e a
+natureza da base de cálculo do crédito. Nenhuma delas substitui a coluna crua —
+todas são acrescentadas ao lado, para que quem confere possa ver o código e o
+texto na mesma linha.
+
+**A natureza do crédito vem do CFOP.** O C170 não tem campo `NAT_BC_CRED`, e a
+regra foi validada contra 43.497 linhas de um relatório real e reconfirmada
+contra outras 81.150, em vinte CFOP distintos, sem uma exceção. Saída não entra
+no mapa de propósito: crédito de PIS/COFINS só se aplica a entrada.
+
+Portado do projeto Quebra de SPED em 22/09/2026, com os nomes desta casa.
 """
 
 from __future__ import annotations
@@ -47,6 +57,15 @@ from cat.infraestrutura.sped.leitor import (
     registro_de,
 )
 from cat.infraestrutura.sped.registros import nomes_dos_campos
+from cat.infraestrutura.sped.tabelas import (
+    tab_437,
+    tab_cfop,
+    tab_cfop_natureza_credito,
+    tab_ind_escrit,
+    tab_indicadores_c100,
+    tab_municipio,
+    tab_tipo_item,
+)
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -139,6 +158,8 @@ def itens_completos(caminho: str, codificacao: str) -> Iterator[dict[str, str]]:
             linha_pronta.update(_nomeados("0400", tabelas[b"0400"].get(cod_nat, []), nomes["0400"]))
             linha_pronta.update(_nomeados("0200", tabelas[b"0200"].get(cod_item, []), nomes["0200"]))
             linha_pronta.update(_nomeados("C170", valores, nomes["C170"]))
+            linha_pronta.update(_traduzido(linha_pronta, tabelas[b"0150"].get(cod_part, []),
+                                           nomes["0150"]))
             lidos += 1
             yield linha_pronta
 
@@ -146,6 +167,79 @@ def itens_completos(caminho: str, codificacao: str) -> Iterator[dict[str, str]]:
         "arquivo": os.path.basename(caminho), "itens": lidos,
         "mercadorias": len(tabelas[b"0200"]), "participantes": len(tabelas[b"0150"]),
     })
+
+
+# As colunas traduzidas, na ordem em que saem. Ficam **ao lado** das cruas, nunca
+# no lugar delas: quem confere precisa ver o código e o texto na mesma linha.
+#
+# Os nomes são os do relatório de origem, com o sufixo `_DESC` onde ele o usa.
+# Todo o resto deste relatório já sai com o nome de lá — `C170_CFOP`,
+# `0200_COD_NCM` —, e trocar o nome só destas treze faria quem compara os dois
+# lado a lado tropeçar sem ganhar nada.
+TRADUZIDAS = (
+    "PERIODO", "TIPO_OPERACAO_DESC", "INDICADOR_EMITENTE_DESC",
+    "INDICADOR_ESCRITURACAO_DESC", "INDICADOR_PAGAMENTO_DESC",
+    "INDICADOR_FRETE_DESC", "INDICADOR_MOVIMENTO_ITEM_DESC", "UF_ORIGEM_DESTINO",
+    "MUNICIPIO", "TIPO_ITEM_DESC", "DESCRICAO_CFOP", "CFOP_FATURAMENTO",
+    "NATUREZA_CREDITO",
+)
+
+
+def _competencia(bruto: str) -> str:
+    """O primeiro dia do mês da data do documento, em dd/mm/aaaa.
+
+    Mesmo formato que a 037 usa para o período (`entradas.py`), para que as duas
+    planilhas agrupem pela mesma chave sem ninguém ter de converter nada.
+    """
+    b = (bruto or "").strip()
+    if len(b) != 8 or not b.isdigit():
+        return ""
+    return f"01/{b[2:4]}/{b[4:]}"
+
+
+def _rotulo_do_tipo(codigo: str) -> str:
+    """O código e a descrição juntos — `00 Mercadoria para Revenda`."""
+    codigo = (codigo or "").strip()
+    descricao = tab_tipo_item.descricao(codigo) if codigo else ""
+    return f"{codigo} {descricao}" if descricao else codigo
+
+
+def _traduzido(linha: dict[str, str], participante: list[str],
+               nomes_0150: tuple[str, ...]) -> dict[str, str]:
+    """As colunas que traduzem código em texto, e a natureza do crédito.
+
+    O município sai do 0150 do participante — que não tem campo de UF, só o
+    código do IBGE; a UF vem dos dois primeiros dígitos dele, que é convenção
+    pública e fixa.
+    """
+    cfop = linha.get("C170_CFOP", "")
+    do_participante = dict(zip(nomes_0150, list(participante)
+                               + [""] * max(0, len(nomes_0150) - len(participante))))
+    municipio = do_participante.get("COD_MUN", "")
+    uf_do_participante = tab_municipio.uf_do_municipio(municipio)
+    uf_do_estabelecimento = linha.get("0140_UF", "")
+    return {
+        "PERIODO": _competencia(linha.get("C100_DT_DOC", "")),
+        "TIPO_OPERACAO_DESC": tab_indicadores_c100.tipo_operacao(
+            linha.get("C100_IND_OPER", "")),
+        "INDICADOR_EMITENTE_DESC": tab_indicadores_c100.indicador_emitente(
+            linha.get("C100_IND_EMIT", "")),
+        "INDICADOR_ESCRITURACAO_DESC": tab_ind_escrit.rotulo(
+            linha.get("C010_IND_ESCRIT", "")),
+        "INDICADOR_PAGAMENTO_DESC": tab_indicadores_c100.indicador_pagamento(
+            linha.get("C100_IND_PGTO", "")),
+        "INDICADOR_FRETE_DESC": tab_indicadores_c100.indicador_frete(
+            linha.get("C100_IND_FRT", "")),
+        "INDICADOR_MOVIMENTO_ITEM_DESC": tab_indicadores_c100.indicador_movimento_item(
+            linha.get("C170_IND_MOV", "")),
+        "UF_ORIGEM_DESTINO": (f"{uf_do_participante}/{uf_do_estabelecimento}"
+                              if (uf_do_participante or uf_do_estabelecimento) else ""),
+        "MUNICIPIO": tab_municipio.descricao(municipio),
+        "TIPO_ITEM_DESC": _rotulo_do_tipo(linha.get("0200_TIPO_ITEM", "")),
+        "DESCRICAO_CFOP": tab_cfop.descricao(cfop),
+        "CFOP_FATURAMENTO": tab_cfop_natureza_credito.cfop_faturamento(cfop),
+        "NATUREZA_CREDITO": tab_437.rotulo(tab_cfop_natureza_credito.codigo(cfop)),
+    }
 
 
 def colunas_do_item() -> list[str]:
@@ -156,6 +250,5 @@ def colunas_do_item() -> list[str]:
     não ter esquema nenhum.
     """
     ordem = ("0140", "C010", "C100", "0150", "0400", "0200", "C170")
-    return [f"{prefixo}_{nome}"
-            for prefixo in ordem
-            for nome in nomes_dos_campos(prefixo)]
+    cruas = [f"{prefixo}_{nome}" for prefixo in ordem for nome in nomes_dos_campos(prefixo)]
+    return cruas + list(TRADUZIDAS)
