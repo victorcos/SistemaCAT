@@ -172,6 +172,9 @@ class ArquivoInspecionado(BaseModel):
     ja_no_trabalho: bool = False
     # o tipo gravado no trabalho; diferente de `tipo`, a API reclassifica
     tipo_no_trabalho: str | None = None
+    # se o trabalho DESTE módulo lê o arquivo — quem decide é o motor, que
+    # conhece o tipo; a API só repassa
+    alimenta: bool = False
 
 
 class LoteInspecionado(BaseModel):
@@ -183,6 +186,8 @@ class LoteInspecionado(BaseModel):
     """
 
     pasta: str
+    # o módulo do trabalho: é contra ele que "alimenta" e "serve" são medidos
+    modulo: str
     arquivos: list[ArquivoInspecionado]
     de_outra_empresa: int
     copias: int
@@ -213,6 +218,7 @@ def inspecionar_lote(
 
     return LoteInspecionado(
         pasta=resumo.pasta,
+        modulo=resumo.modulo,
         arquivos=[
             ArquivoInspecionado(
                 nome=a.nome, caminho=a.caminho, tamanho=a.tamanho, tipo=a.tipo.value,
@@ -220,6 +226,7 @@ def inspecionar_lote(
                 motivo=a.motivo, retificadora=a.retificadora,
                 hash_conteudo=a.hash_conteudo, ja_no_trabalho=a.caminho in ja,
                 tipo_no_trabalho=ja.get(a.caminho),
+                alimenta=a.tipo.alimenta(resumo.modulo),
             )
             for a in resumo.arquivos
         ],

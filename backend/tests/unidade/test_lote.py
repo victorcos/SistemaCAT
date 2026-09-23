@@ -28,6 +28,10 @@ CONTRIBUICOES = (
     "|0000|006|0|||01062021|30062021|IRMAOS BOA LTDA"
     "|50948371000178|SP|3550308||00|2|"
 )
+# a ECF põe o CNPJ antes das datas — é o quarto leiaute do registro 0000
+ECF = (
+    "|0000|LECF|0009|50948371000178|IRMAOS BOA LTDA|0||||01012024|31122024|0|||||"
+)
 # outra empresa, para provar que a separação por CNPJ funciona
 DE_OUTRA_EMPRESA = (
     "|0000|018|0|01012025|31012025|OUTRA EMPRESA LTDA|11222333000181||MG"
@@ -201,10 +205,38 @@ class TestInspecionarPasta:
         assert not r.de_outra_empresa
 
     def test_avisa_quando_nada_serve(self, tmp_path):
+        """Pasta só de Contribuições não serve a um trabalho de ICMS."""
         escrever(tmp_path, "contrib.txt", CONTRIBUICOES)
         r = inspecionar_pasta(str(tmp_path), "50948371")
         assert not r.serve
-        assert any("alimenta a CAT 42" in a for a in r.avisos)
+        assert any("alimenta o trabalho de ICMS" in a for a in r.avisos)
+
+    def test_a_mesma_pasta_serve_ao_trabalho_de_piscofins(self, tmp_path):
+        """Útil é em relação ao trabalho: a EFD-Contribuições é o arquivo do
+        PIS/COFINS, e a importação era recusada por medir tudo pela CAT 42."""
+        escrever(tmp_path, "contrib.txt", CONTRIBUICOES)
+        r = inspecionar_pasta(str(tmp_path), "50948371", modulo="piscofins")
+        assert r.serve
+        assert len(r.uteis) == 1
+        assert not any("alimenta o trabalho" in a for a in r.avisos)
+
+    def test_efd_icms_ipi_serve_aos_dois_trabalhos(self, tmp_path):
+        """É a base da CAT 42 e é dela que sai a exclusão do ICMS da base."""
+        escrever(tmp_path, "boa.txt", ICMS_IPI)
+        for modulo in ("icms", "piscofins"):
+            assert inspecionar_pasta(str(tmp_path), "50948371", modulo=modulo).serve
+
+    def test_pasta_de_ecf_so_serve_ao_irpj_csll(self, tmp_path):
+        escrever(tmp_path, "ecf.txt", ECF)
+        assert not inspecionar_pasta(str(tmp_path), "50948371").serve
+        assert inspecionar_pasta(str(tmp_path), "50948371", modulo="irpj_csll").serve
+
+    def test_competencias_sao_as_do_que_o_trabalho_le(self, tmp_path):
+        """Num trabalho de PIS/COFINS, o período vem da Contribuições — a mesma
+        pasta num trabalho de ICMS anunciaria período nenhum."""
+        escrever(tmp_path, "contrib.txt", CONTRIBUICOES)
+        assert inspecionar_pasta(str(tmp_path), "50948371").competencias == []
+        assert inspecionar_pasta(str(tmp_path), "50948371", modulo="piscofins").competencias
 
     def test_avisa_o_que_nao_baixou(self, tmp_path):
         escrever(tmp_path, "boa.txt", ICMS_IPI)

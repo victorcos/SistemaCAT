@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cat.config import obter_config
+from cat.dominio.comum.modulos import MODULO_PADRAO
 from cat.dominio.lote import (
     ArquivoDoLote,
     CertificadosIgnorados,
@@ -176,12 +177,17 @@ def inspecionar_pasta(
     pasta: str, cnpj_raiz: str,
     existentes: tuple[ArquivoExistente, ...] = (),
     ja_lidos: JaLidos | None = None,
+    modulo: str = MODULO_PADRAO,
 ) -> ResumoDoLote:
     """Classifica tudo que há na pasta, separando o que é de outra empresa
     e o que é cópia exata — de outro arquivo da pasta ou de um já importado.
 
     `ja_lidos` diz o que outro trabalho da mesma empresa já leu. Quem está nele
     **entra** no lote, marcado: não é cópia a recusar, é leitura a não repetir.
+
+    `modulo` é o do trabalho que vai receber a pasta, e decide quais arquivos
+    contam como úteis: a EFD-Contribuições não serve à CAT 42 e é o arquivo do
+    trabalho de PIS/COFINS.
     """
     caminho = os.path.expandvars(os.path.expanduser((pasta or "").strip()))
     if not caminho:
@@ -200,7 +206,7 @@ def inspecionar_pasta(
         )
     _conferir_permissao(caminho)
 
-    resumo = ResumoDoLote(pasta=os.path.abspath(caminho))
+    resumo = ResumoDoLote(pasta=os.path.abspath(caminho), modulo=modulo)
     ja_lidos = ja_lidos or JaLidos()
     certificados = CertificadosIgnorados()
     lista = list(percorrer_pasta(caminho, certificados))
@@ -358,5 +364,5 @@ def inspecionar_do_projeto(
     existentes = existentes_do_projeto(projeto_id, sessao)
     ja_lidos = ja_lidos_na_empresa(projeto.empresa_id, projeto_id, sessao)
     resumo = inspecionar_pasta(pasta, projeto.empresa.cnpj_raiz, existentes=existentes,
-                               ja_lidos=ja_lidos)
+                               ja_lidos=ja_lidos, modulo=projeto.modulo or MODULO_PADRAO)
     return resumo, {e.caminho: e.tipo for e in existentes}

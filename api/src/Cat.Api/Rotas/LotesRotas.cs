@@ -1,4 +1,4 @@
-using Cat.Api.Infra;
+﻿using Cat.Api.Infra;
 using Cat.Aplicacao.Trabalhos;
 using Cat.Dominio.Acesso;
 using Cat.Dominio.Lote;
@@ -17,10 +17,12 @@ public static class LotesRotas
     public const int AmostraNaTela = 40;
 
     // ---------- contratos ----------
-    public sealed record ContagemDto(string Tipo, string Rotulo, string Grupo, bool AlimentaACat, int Quantidade);
+    // `Alimenta` é sempre em relação ao trabalho desta tela: a EFD-Contribuições
+    // não alimenta a CAT 42 e alimenta o trabalho de PIS/COFINS
+    public sealed record ContagemDto(string Tipo, string Rotulo, string Grupo, bool Alimenta, int Quantidade);
 
     public sealed record ArquivoDto(
-        string Nome, string Caminho, long Tamanho, string Tipo, string TipoRotulo, string Grupo, bool AlimentaACat,
+        string Nome, string Caminho, long Tamanho, string Tipo, string TipoRotulo, string Grupo, bool Alimenta,
         string? Cnpj, DateOnly? Competencia, string Uf, string Detalhe, string Motivo);
 
     public sealed record ResumoDto(
@@ -126,40 +128,41 @@ public static class LotesRotas
     }
 
     // ---------- tradução ----------
-    private static ContagemDto Contagem(string tipo, int quantidade)
+    private static ContagemDto Contagem(string tipo, int quantidade, string modulo)
     {
         var t = TiposDeArquivo.Buscar(tipo);
-        return new ContagemDto(tipo, t.Rotulo, t.Grupo, t.AlimentaACat, quantidade);
+        return new ContagemDto(tipo, t.Rotulo, t.Grupo, t.Alimenta(modulo), quantidade);
     }
 
     /// <summary>O que serve primeiro e, dentro disso, o mais numeroso primeiro.</summary>
-    private static IReadOnlyList<ContagemDto> Contagens(IEnumerable<(string Tipo, int Quantidade)> porTipo) =>
-        porTipo.Select(c => Contagem(c.Tipo, c.Quantidade))
-            .OrderBy(c => !c.AlimentaACat).ThenByDescending(c => c.Quantidade).ToList();
+    private static IReadOnlyList<ContagemDto> Contagens(IEnumerable<(string Tipo, int Quantidade)> porTipo,
+        string modulo) =>
+        porTipo.Select(c => Contagem(c.Tipo, c.Quantidade, modulo))
+            .OrderBy(c => !c.Alimenta).ThenByDescending(c => c.Quantidade).ToList();
 
     public static ResumoDto Resumo(LoteInspecionado r)
     {
         // a amostra mostra primeiro o que NÃO entrou: é o que o usuário precisa ver
-        var amostra = r.Arquivos.OrderBy(a => a.AlimentaACat).ThenBy(a => a.Nome, StringComparer.Ordinal)
+        var amostra = r.Arquivos.OrderBy(a => a.Alimenta).ThenBy(a => a.Nome, StringComparer.Ordinal)
             .Take(AmostraNaTela)
             .Select(a =>
             {
                 var t = TiposDeArquivo.Buscar(a.Tipo);
-                return new ArquivoDto(a.Nome, a.Caminho, a.Tamanho, a.Tipo, t.Rotulo, t.Grupo, t.AlimentaACat, a.Cnpj,
+                return new ArquivoDto(a.Nome, a.Caminho, a.Tamanho, a.Tipo, t.Rotulo, t.Grupo, a.Alimenta, a.Cnpj,
                     a.Competencia, a.Uf, a.Detalhe, a.Motivo);
             }).ToList();
         return new ResumoDto(
-            r.Pasta, r.Arquivos.Count, r.Arquivos.Count(a => a.AlimentaACat), r.Arquivos.Sum(a => a.Tamanho),
+            r.Pasta, r.Arquivos.Count, r.Arquivos.Count(a => a.Alimenta), r.Arquivos.Sum(a => a.Tamanho),
             r.DeOutraEmpresa, r.Serve,
             r.Competencias.Count > 0 ? r.Competencias[0] : null, r.Competencias.Count > 0 ? r.Competencias[^1] : null,
             r.Cnpjs.Take(20).ToList(),
-            Contagens(r.Arquivos.GroupBy(a => a.Tipo).Select(g => (g.Key, g.Count()))),
+            Contagens(r.Arquivos.GroupBy(a => a.Tipo).Select(g => (g.Key, g.Count())), r.Modulo),
             r.Avisos, amostra, r.Arquivos.Count(a => a.JaNoTrabalho), r.Copias, r.Arquivos.Count(a => a.Reclassificado));
     }
 
     public static LoteDto Lote(LoteLido l) => new(
         l.Id, l.ProjetoId, l.Pasta, l.TotalArquivos, l.ArquivosUteis, l.BytesTotais, l.CompetenciaIni, l.CompetenciaFim,
-        l.Observacao, AuthRotas.IsoComoPython(l.CriadoEm), Contagens(l.Contagens));
+        l.Observacao, AuthRotas.IsoComoPython(l.CriadoEm), Contagens(l.Contagens, l.Modulo));
 
     private static async Task<IResult> Traduzir(Func<Task<IResult>> operacao)
     {
@@ -186,7 +189,7 @@ public static class LotesRotas
         SemAcessoAEmpresa => StatusCodes.Status403Forbidden,
         ProjetoNaoEncontrado or LoteNaoEncontrado => StatusCodes.Status404NotFound,
         SoCopias or TudoJaNoTrabalho => StatusCodes.Status409Conflict,
-        NadaParaACat => StatusCodes.Status422UnprocessableEntity,
+        NadaParaOTrabalho => StatusCodes.Status422UnprocessableEntity,
         _ => null,
     };
 }

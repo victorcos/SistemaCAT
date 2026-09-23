@@ -28,6 +28,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
 
+from cat.dominio.comum.modulos import MODULO_PADRAO, rotulo as rotulo_do_modulo
+
 # ---------------------------------------------------------------------------
 # Certificado digital: não se abre, não se lista
 # ---------------------------------------------------------------------------
@@ -170,26 +172,50 @@ class TipoDeArquivo(str, Enum):
         return Grupo.OUTRO
 
     @property
-    def alimenta_a_cat(self) -> bool:
-        """Se a apuração da CAT 42 lê este arquivo.
+    def modulos(self) -> tuple[str, ...]:
+        """Os módulos de trabalho que leem este arquivo.
 
-        A EFD Contribuições e a ECD entram na mesma pasta o tempo todo e não
-        servem: PIS/COFINS e contabilidade não têm ICMS-ST. Aceitar sem
-        distinguir faria o sistema dizer que a base está completa quando não
-        está.
+        Não existe arquivo "útil" no absoluto: útil é sempre em relação ao
+        trabalho. A EFD Contribuições não tem ICMS-ST e não serve à CAT 42 —
+        mas é o arquivo do trabalho de PIS/COFINS. Enquanto isto era um
+        sim/não da CAT, a importação de uma pasta de PIS/COFINS era recusada
+        inteira, com "nada aqui alimenta a CAT 42".
         """
-        return self in _ALIMENTAM
+        return _MODULOS_POR_TIPO.get(self, ())
+
+    def alimenta(self, modulo: str) -> bool:
+        """Se o trabalho deste módulo lê este arquivo."""
+        return modulo in self.modulos
+
+    @property
+    def alimenta_a_cat(self) -> bool:
+        """Atalho do módulo de ICMS, que é o da CAT 42."""
+        return self.alimenta("icms")
 
 
-_ALIMENTAM = frozenset({
-    TipoDeArquivo.SPED_ICMS_IPI,
-    TipoDeArquivo.XML_NFE,
-    TipoDeArquivo.GERENCIAL_MOVIMENTO,
-    TipoDeArquivo.GERENCIAL_INVENTARIO,
-    TipoDeArquivo.XML_CANCELAMENTO,
-    TipoDeArquivo.XML_COMPACTADO,
-    TipoDeArquivo.LISTA_DE_CANCELADAS,
-})
+# As chaves são as do catálogo de módulos (Cat.Dominio/Acesso/Segmento.cs). A
+# EFD ICMS/IPI serve a dois: é a base da CAT 42 e é dela que sai a exclusão do
+# ICMS da base do PIS/COFINS. A ECD também: razão contábil na quebra de SPED e
+# base contábil do lucro real.
+_MODULOS_POR_TIPO: dict[TipoDeArquivo, tuple[str, ...]] = {
+    TipoDeArquivo.SPED_ICMS_IPI: ("icms", "piscofins"),
+    TipoDeArquivo.SPED_CONTRIBUICOES: ("piscofins",),
+    TipoDeArquivo.SPED_ECD: ("piscofins", "irpj_csll"),
+    TipoDeArquivo.SPED_ECF: ("irpj_csll",),
+    TipoDeArquivo.XML_NFE: ("icms",),
+    TipoDeArquivo.XML_CANCELAMENTO: ("icms",),
+    TipoDeArquivo.XML_COMPACTADO: ("icms",),
+    TipoDeArquivo.GERENCIAL_MOVIMENTO: ("icms",),
+    TipoDeArquivo.GERENCIAL_INVENTARIO: ("icms",),
+    TipoDeArquivo.LISTA_DE_CANCELADAS: ("icms",),
+}
+
+# O que cada trabalho espera receber, para a mensagem de pasta que não serve.
+FALTA_POR_MODULO: dict[str, str] = {
+    "icms": "Falta a EFD ICMS/IPI, o XML das notas ou o relatório gerencial.",
+    "piscofins": "Falta a EFD-Contribuições, a ECD ou a EFD ICMS/IPI.",
+    "irpj_csll": "Falta a ECF ou a ECD.",
+}
 
 
 @dataclass(frozen=True)
@@ -245,6 +271,10 @@ class ResumoDoLote:
     """
 
     pasta: str = ""
+    # o módulo do trabalho que vai receber esta pasta: é ele que decide quais
+    # arquivos são úteis. "icms" por padrão, que é o de todo trabalho anterior
+    # à divisão por tributo
+    modulo: str = MODULO_PADRAO
     arquivos: list[ArquivoDoLote] = field(default_factory=list)
     de_outra_empresa: list[ArquivoDoLote] = field(default_factory=list)
     # cópias exatas: (a cópia, de quem ela é cópia). Ficam fora de
@@ -274,7 +304,8 @@ class ResumoDoLote:
 
     @property
     def uteis(self) -> list[ArquivoDoLote]:
-        return [a for a in self.arquivos if a.alimenta_a_cat]
+        """Os que o trabalho DESTE módulo lê."""
+        return [a for a in self.arquivos if a.tipo.alimenta(self.modulo)]
 
     @property
     def por_tipo(self) -> dict[TipoDeArquivo, int]:
@@ -285,11 +316,12 @@ class ResumoDoLote:
 
     @property
     def competencias(self) -> list[date]:
-        """Só do que a CAT lê.
+        """Só do que este trabalho lê.
 
-        A EFD Contribuições de 2021 na mesma pasta faria o lote anunciar que
-        cobre desde 2021, quando a apuração não vai olhar aquele arquivo. O
-        período que interessa é o do dado que entra no trabalho.
+        Num trabalho de ICMS, a EFD Contribuições de 2021 na mesma pasta faria
+        o lote anunciar que cobre desde 2021, quando a apuração não vai olhar
+        aquele arquivo. O período que interessa é o do dado que entra no
+        trabalho — e qual dado é esse depende do módulo.
         """
         return sorted({a.competencia for a in self.uteis if a.competencia})
 
@@ -313,8 +345,8 @@ class ResumoDoLote:
 
     @property
     def serve(self) -> bool:
-        """O lote só vale a pena se traz algo que a CAT 42 lê."""
-        return any(a.alimenta_a_cat for a in self.arquivos)
+        """O lote só vale a pena se traz algo que este trabalho lê."""
+        return any(a.tipo.alimenta(self.modulo) for a in self.arquivos)
 
     @property
     def avisos(self) -> list[str]:
@@ -384,7 +416,8 @@ class ResumoDoLote:
             )
         if not self.serve and self.arquivos:
             avisos.append(
-                "Nenhum arquivo desta pasta alimenta a CAT 42. Falta a EFD "
-                "ICMS/IPI, o XML das notas ou o relatório gerencial."
+                f"Nenhum arquivo desta pasta alimenta o trabalho de "
+                f"{rotulo_do_modulo(self.modulo)}. "
+                + FALTA_POR_MODULO.get(self.modulo, "")
             )
         return avisos

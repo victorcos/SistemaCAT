@@ -43,6 +43,14 @@ import type { ErroApi } from "@/types/erro";
  * A tela pede um caminho de pasta, não um arquivo. A maior base que medimos
  * tem 7.036 arquivos, e um relatório gerencial sozinho tem 194 MB.
  */
+/** O que cada trabalho espera achar na pasta. Mandar quem apura PIS/COFINS
+ *  procurar "a EFD ICMS/IPI e os XML" é mandar procurar a pasta errada. */
+const ARQUIVOS_DO_MODULO: Record<string, string> = {
+  icms: "a EFD ICMS/IPI, os XML e os relatórios do ERP",
+  piscofins: "a EFD-Contribuições, a ECD e a EFD ICMS/IPI",
+  irpj_csll: "a ECF e a ECD",
+};
+
 export default function Lote() {
   const { id } = useParams<{ id: string }>();
   const projetoId = Number(id);
@@ -143,8 +151,8 @@ export default function Lote() {
           p ? (
             <>
               Base de trabalho de <strong className="text-texto">{p.empresa}</strong>. Aponte a
-              pasta onde estão a EFD ICMS/IPI, os XML e os relatórios do ERP. Nada é copiado: o
-              sistema registra onde os arquivos estão e o que cada um é.
+              pasta onde estão {ARQUIVOS_DO_MODULO[p.modulo] ?? ARQUIVOS_DO_MODULO.icms}. Nada é
+              copiado: o sistema registra onde os arquivos estão e o que cada um é.
             </>
           ) : (
             "Carregando…"
@@ -212,6 +220,7 @@ export default function Lote() {
       {resumo && (
         <ConferenciaDaPasta
           resumo={resumo}
+          modulo={p?.modulo_rotulo ?? "ICMS"}
           observacao={observacao}
           aoMudarObservacao={setObservacao}
           aoImportar={importar}
@@ -264,7 +273,7 @@ export default function Lote() {
                   </span>
                   <span>
                     <strong className="font-mono text-texto">{numero(l.arquivos_uteis)}</strong>{" "}
-                    para a CAT
+                    para {p?.modulo_rotulo ?? "a CAT"}
                   </span>
                   <span className="font-mono">{tamanho(l.bytes_totais)}</span>
                   {l.competencia_ini && (
@@ -274,7 +283,11 @@ export default function Lote() {
                   )}
                 </div>
 
-                <EtiquetasDeTipo contagens={l.contagens} className="mt-2.5" />
+                <EtiquetasDeTipo
+                  contagens={l.contagens}
+                  modulo={p?.modulo_rotulo ?? "ICMS"}
+                  className="mt-2.5"
+                />
 
                 {l.observacao && (
                   <p className="m-0 mt-2.5 text-[13px] italic text-texto-fraco">{l.observacao}</p>
@@ -290,13 +303,15 @@ export default function Lote() {
 
 /* ------------------------------------------------------------------ */
 
-/** Uma pílula por tipo de arquivo. O que a CAT lê ganha a cor da marca; o
- *  resto fica neutro — a diferença é o que importa nesta tela. */
+/** Uma pílula por tipo de arquivo. O que ESTE trabalho lê ganha a cor da marca;
+ *  o resto fica neutro — a diferença é o que importa nesta tela. */
 function EtiquetasDeTipo({
   contagens,
+  modulo,
   className,
 }: {
   contagens: Contagem[];
+  modulo: string;
   className?: string;
 }) {
   if (contagens.length === 0) return null;
@@ -305,10 +320,10 @@ function EtiquetasDeTipo({
       {contagens.map((c) => (
         <span
           key={c.tipo}
-          title={c.alimenta_a_cat ? "Alimenta a apuração" : "Não é lido pela CAT 42"}
+          title={c.alimenta ? "Alimenta a apuração" : `Não é lido no trabalho de ${modulo}`}
           className={cn(
             "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs",
-            c.alimenta_a_cat
+            c.alimenta
               ? "border-laranja-500/35 bg-laranja-500/10 text-laranja-800 escuro:text-laranja-300"
               : "border-borda bg-superficie-alt text-texto-fraco",
           )}
@@ -323,6 +338,7 @@ function EtiquetasDeTipo({
 
 function ConferenciaDaPasta({
   resumo,
+  modulo,
   observacao,
   aoMudarObservacao,
   aoImportar,
@@ -330,6 +346,8 @@ function ConferenciaDaPasta({
   ocupado,
 }: {
   resumo: ResumoDoLote;
+  /** o tributo do trabalho, para dizer a quem a pasta serve ou deixa de servir */
+  modulo: string;
   observacao: string;
   aoMudarObservacao: (v: string) => void;
   aoImportar: () => void;
@@ -354,7 +372,7 @@ function ConferenciaDaPasta({
       <div className="mt-4">
         <Metricas>
           <Metrica rotulo="Arquivos" valor={resumo.total_arquivos} />
-          <Metrica rotulo="A CAT 42 lê" valor={resumo.arquivos_uteis} tom="destaque" />
+          <Metrica rotulo={`${modulo} lê`} valor={resumo.arquivos_uteis} tom="destaque" />
           <Metrica rotulo="Tamanho" valor={tamanho(resumo.bytes_totais)} />
           <Metrica
             rotulo="Competências"
@@ -369,7 +387,7 @@ function ConferenciaDaPasta({
         </Metricas>
       </div>
 
-      <EtiquetasDeTipo contagens={resumo.contagens} className="mt-4" />
+      <EtiquetasDeTipo contagens={resumo.contagens} modulo={modulo} className="mt-4" />
 
       <div className="mt-4 flex flex-col gap-2">
         {resumo.avisos.map((a) => (
@@ -392,7 +410,7 @@ function ConferenciaDaPasta({
       </h3>
       <Tabela colunas={["Arquivo", "Reconhecido como", "CNPJ", "Competência", "Tamanho"]}>
         {resumo.amostra.map((a) => (
-          <Linha key={a.caminho} apagada={!a.alimenta_a_cat}>
+          <Linha key={a.caminho} apagada={!a.alimenta}>
             <Celula title={a.caminho}>{a.nome}</Celula>
             <Celula nota={a.detalhe || a.motivo}>{a.tipo_rotulo}</Celula>
             <Celula mono>{a.cnpj ?? "—"}</Celula>
@@ -432,7 +450,7 @@ function ConferenciaDaPasta({
         </Botao>
         {!resumo.serve && (
           <span className="text-[13px] text-texto-fraco">
-            Nada aqui alimenta a CAT 42, então não há o que importar.
+            Nada aqui alimenta o trabalho de {modulo}, então não há o que importar.
           </span>
         )}
       </div>

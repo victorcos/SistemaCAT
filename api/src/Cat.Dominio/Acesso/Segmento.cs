@@ -1,4 +1,4 @@
-namespace Cat.Dominio.Acesso;
+﻿namespace Cat.Dominio.Acesso;
 
 /// <summary>
 /// O que a pessoa toca dentro de um segmento. É o segundo nível da tela
@@ -56,6 +56,22 @@ public static class Segmentos
             new("irpj_csll", "IRPJ/CSLL", "Apuração trimestral ou anual pela ECF."),
         ]),
     ];
+
+    /// <summary>Módulo que saiu do catálogo aparece pela chave, em vez de sumir da frase.</summary>
+    public static string RotuloDoModulo(string? chave) =>
+        Todos.SelectMany(s => s.Modulos).FirstOrDefault(m => m.Chave == chave)?.Rotulo ?? chave ?? "";
+
+    /// <summary>
+    /// O que falta numa pasta que não serve ao trabalho. Fica aqui, junto do
+    /// catálogo, porque é a frase que a pessoa lê quando a importação recusa —
+    /// e ela precisa dizer o arquivo daquele tributo, não o da CAT 42.
+    /// </summary>
+    public static string FaltaNoLote(string? modulo) => modulo switch
+    {
+        PisCofins => "Falta a EFD-Contribuições, a ECD ou a EFD ICMS/IPI.",
+        IrpjCsll => "Falta a ECF ou a ECD.",
+        _ => "Falta a EFD ICMS/IPI, o XML das notas ou o relatório gerencial.",
+    };
 
     public static Segmento? Buscar(string? chave) => Todos.FirstOrDefault(s => s.Chave == chave);
 

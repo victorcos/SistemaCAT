@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text.Json;
 using Cat.Aplicacao.Acesso;
 using Cat.Dominio.Acesso;
@@ -184,17 +184,22 @@ public sealed class CruzamentoComOPythonTestes
     [Fact]
     public async Task Tabela_de_tipos_de_arquivo_e_a_mesma_do_motor()
     {
-        // o motor reconhece o tipo; a API descreve. Tipo que alimenta a CAT num
-        // lado e não no outro faria a tela dizer que a base serve quando não serve.
+        // o motor reconhece o tipo; a API descreve. Tipo que alimenta um trabalho
+        // num lado e não no outro faria a tela dizer que a base serve quando não
+        // serve — ou recusar a importação de uma pasta que serve.
         var saida = await Python("""
             import json
             from cat.dominio.lote import TipoDeArquivo
-            print(json.dumps([[t.value, t.rotulo, t.grupo.value, t.alimenta_a_cat] for t in TipoDeArquivo]))
+            print(json.dumps([[t.value, t.rotulo, t.grupo.value, t.alimenta_a_cat,
+                               list(t.modulos)] for t in TipoDeArquivo]))
             """, new { });
 
         var doPython = saida.EnumerateArray()
-            .Select(t => (t[0].GetString(), t[1].GetString(), t[2].GetString(), t[3].GetBoolean())).ToList();
-        var doCsharp = Cat.Dominio.Lote.TiposDeArquivo.Todos.Select(t => ((string?)t.Valor, (string?)t.Rotulo, (string?)t.Grupo, t.AlimentaACat)).ToList();
+            .Select(t => (t[0].GetString(), t[1].GetString(), t[2].GetString(), t[3].GetBoolean(),
+                          string.Join(",", t[4].EnumerateArray().Select(m => m.GetString())))).ToList();
+        var doCsharp = Cat.Dominio.Lote.TiposDeArquivo.Todos
+            .Select(t => ((string?)t.Valor, (string?)t.Rotulo, (string?)t.Grupo, t.AlimentaACat,
+                          string.Join(",", t.Modulos))).ToList();
         Assert.Equal(doPython, doCsharp);
     }
 

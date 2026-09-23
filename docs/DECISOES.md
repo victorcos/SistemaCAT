@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-09-23 — Arquivo útil é útil para um trabalho, não no absoluto
+
+**O bloqueio.** Apontar uma pasta de EFD-Contribuições num trabalho de
+PIS/COFINS trazia o botão de importar **desabilitado**, com "Nada aqui alimenta
+a CAT 42, então não há o que importar". Não era aviso: era recusa. A base do
+trabalho de PIS/COFINS não entrava no sistema — e a API respondia 422 mesmo se
+alguém chamasse direto.
+
+A causa é a mesma da entrada anterior, um passo adiante: `alimenta_a_cat` era
+um sim/não do arquivo, quando a pergunta certa é *para qual trabalho*.
+
+**A mudança.** `TipoDeArquivo` passa a declarar os módulos que leem cada
+arquivo, nos dois domínios — `dominio/lote.py` e `TiposDeArquivo.cs` —, e o
+teste de compatibilidade agora confere **também esse mapa**, além de rótulo,
+grupo e a CAT. Divergir os dois lados voltaria a recusar pasta que serve.
+
+Com isso, o que era medido contra a CAT 42 passa a ser medido contra o módulo
+do trabalho: o que o lote conta como útil, o período que ele anuncia, o que a
+tela pinta como aproveitável, e a recusa — que agora nomeia o trabalho e diz o
+arquivo que falta *nele* ("Falta a EFD-Contribuições, a ECD ou a EFD
+ICMS/IPI").
+
+**Quem decide continua sendo um só.** O motor conhece o tipo do arquivo e o
+módulo do trabalho, então é ele que responde `alimenta` por arquivo e `modulo`
+no resumo; a API repassa. A tabela do C# entra só onde o motor não está: o lote
+já gravado, que a tela relista por tipo.
+
+**O contrato mudou de nome**: `alimenta_a_cat` virou `alimenta` no DTO do lote.
+O nome antigo passaria a mentir no primeiro trabalho de PIS/COFINS, e nome que
+mente custa mais caro que renomear cedo.
+
+---
+
 ## 2026-09-23 — A remessa deixa de ser medida só pela CAT 42
 
 **O defeito.** Quem enviava uma EFD-Contribuições para abrir um trabalho de

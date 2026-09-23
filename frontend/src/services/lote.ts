@@ -19,7 +19,8 @@ export interface ArquivoDoLote {
   tipo: string;
   tipo_rotulo: string;
   grupo: string;
-  alimenta_a_cat: boolean;
+  /** se o trabalho DESTA tela lê o arquivo — não é o mesmo em todo módulo */
+  alimenta: boolean;
   cnpj: string | null;
   competencia: string | null;
   uf: string;
@@ -31,7 +32,7 @@ export interface Contagem {
   tipo: string;
   rotulo: string;
   grupo: string;
-  alimenta_a_cat: boolean;
+  alimenta: boolean;
   quantidade: number;
 }
 

@@ -14,9 +14,8 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from cat.dominio.comum.cnpj import Cnpj
+from cat.dominio.comum.modulos import MODULOS_EM_ORDEM, ROTULO_DO_MODULO
 from cat.dominio.sped.cabecalho import (
-    MODULOS_EM_ORDEM,
-    ROTULO_DO_MODULO,
     ArquivoNaoReconhecido,
     CabecalhoSped,
     TipoSped,

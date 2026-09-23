@@ -102,16 +102,6 @@ _MODULOS_POR_TIPO: dict[TipoSped, tuple[str, ...]] = {
     TipoSped.ECF: ("irpj_csll",),
 }
 
-# Ordem do catálogo de módulos, e o nome de cada um na tela. A lista canônica
-# está em Cat.Dominio/Acesso/Segmento.cs; esta cópia existe porque a mensagem
-# do cadastro é escrita aqui, e um nome de módulo é vocabulário estável.
-MODULOS_EM_ORDEM: tuple[str, ...] = ("piscofins", "icms", "irpj_csll")
-ROTULO_DO_MODULO: dict[str, str] = {
-    "piscofins": "PIS/COFINS",
-    "icms": "ICMS",
-    "irpj_csll": "IRPJ/CSLL",
-}
-
 
 class ArquivoNaoReconhecido(ValueError):
     def __init__(self, motivo: str) -> None:

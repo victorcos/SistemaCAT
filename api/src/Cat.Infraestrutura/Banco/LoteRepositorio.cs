@@ -1,4 +1,4 @@
-using Cat.Aplicacao.Trabalhos;
+﻿using Cat.Aplicacao.Trabalhos;
 using Cat.Dominio.Acesso;
 using Cat.Dominio.Lote;
 using Microsoft.EntityFrameworkCore;
@@ -7,6 +7,11 @@ namespace Cat.Infraestrutura.Banco;
 
 public sealed class LoteRepositorio(CatDbContext banco) : IRepositorioDeLotes
 {
+    /// <summary>O módulo do trabalho: é ele que diz quais arquivos do lote são úteis.</summary>
+    private async Task<string> Modulo(int projetoId, CancellationToken cancelar) =>
+        await banco.Projetos.AsNoTracking().Where(p => p.Id == projetoId).Select(p => p.Modulo)
+            .FirstOrDefaultAsync(cancelar) ?? Segmentos.Icms;
+
     public async Task<IReadOnlyList<LoteLido>> Listar(int projetoId, CancellationToken cancelar)
     {
         var linhas = await banco.Lotes.AsNoTracking()
@@ -25,21 +30,22 @@ public sealed class LoteRepositorio(CatDbContext banco) : IRepositorioDeLotes
             .GroupBy(c => c.LoteId)
             .ToDictionary(g => g.Key, g => g.Select(c => (c.Tipo, c.Quantidade)).ToList());
 
-        return linhas.Select(l => Lido(l, contagens.GetValueOrDefault(l.Id) ?? [])).ToList();
+        var modulo = await Modulo(projetoId, cancelar);
+        return linhas.Select(l => Lido(l, contagens.GetValueOrDefault(l.Id) ?? [], modulo)).ToList();
     }
 
     public async Task<LoteLido> Criar(int projetoId, string pasta, IReadOnlyList<ArquivoInspecionado> arquivos,
         string? observacao, Usuario por, DateTimeOffset agora, CancellationToken cancelar)
     {
-        // o período é o do que a CAT lê, não o de tudo que estava na pasta
-        var competencias = arquivos.Where(a => a.Competencia is not null && a.AlimentaACat)
+        // o período é o do que ESTE trabalho lê, não o de tudo que estava na pasta
+        var competencias = arquivos.Where(a => a.Competencia is not null && a.Alimenta)
             .Select(a => a.Competencia!.Value).Distinct().Order().ToList();
         var lote = new LoteLinha
         {
             ProjetoId = projetoId,
             Pasta = pasta,
             TotalArquivos = arquivos.Count,
-            ArquivosUteis = arquivos.Count(a => a.AlimentaACat),
+            ArquivosUteis = arquivos.Count(a => a.Alimenta),
             BytesTotais = arquivos.Sum(a => a.Tamanho),
             CompetenciaIni = competencias.Count > 0 ? competencias[0] : null,
             CompetenciaFim = competencias.Count > 0 ? competencias[^1] : null,
@@ -73,10 +79,11 @@ public sealed class LoteRepositorio(CatDbContext banco) : IRepositorioDeLotes
         banco.ChangeTracker.Clear();
 
         var contagens = arquivos.GroupBy(a => a.Tipo).Select(g => (g.Key, g.Count())).ToList();
-        return Lido(lote, contagens);
+        return Lido(lote, contagens, await Modulo(projetoId, cancelar));
     }
 
     public async Task<Reclassificacao> Reclassificar(int projetoId, IReadOnlyList<ArquivoInspecionado> arquivos,
+        string modulo,
         CancellationToken cancelar)
     {
         var porCaminho = arquivos.ToDictionary(a => a.Caminho, StringComparer.Ordinal);
@@ -98,13 +105,13 @@ public sealed class LoteRepositorio(CatDbContext banco) : IRepositorioDeLotes
         }
         await banco.SaveChangesAsync(cancelar);
 
-        // o que a CAT lê e o período de cada lote tocado, como no registro
+        // o que ESTE trabalho lê e o período de cada lote tocado, como no registro
         var tocados = linhas.GroupBy(l => l.LoteId).OrderByDescending(g => g.Count()).Select(g => g.Key).ToList();
         foreach (var loteId in tocados)
         {
             var dele = await banco.ArquivosDoLote.AsNoTracking().Where(a => a.LoteId == loteId)
                 .Select(a => new { a.Tipo, a.Competencia }).ToListAsync(cancelar);
-            var uteis = dele.Where(a => TiposDeArquivo.Buscar(a.Tipo).AlimentaACat).ToList();
+            var uteis = dele.Where(a => TiposDeArquivo.Buscar(a.Tipo).Alimenta(modulo)).ToList();
             var competencias = uteis.Where(a => a.Competencia is not null).Select(a => a.Competencia!.Value)
                 .Distinct().Order().ToList();
             await banco.Lotes.Where(l => l.Id == loteId).ExecuteUpdateAsync(s => s
@@ -132,7 +139,8 @@ public sealed class LoteRepositorio(CatDbContext banco) : IRepositorioDeLotes
         return new LoteRemovido(lote.Pasta, arquivos, conferencias);
     }
 
-    private static LoteLido Lido(LoteLinha l, IReadOnlyList<(string Tipo, int Quantidade)> contagens) => new(
+    private static LoteLido Lido(LoteLinha l, IReadOnlyList<(string Tipo, int Quantidade)> contagens,
+        string modulo) => new(
         l.Id, l.ProjetoId, l.Pasta, l.TotalArquivos, l.ArquivosUteis, l.BytesTotais, l.CompetenciaIni, l.CompetenciaFim,
-        l.Observacao, new DateTimeOffset(DateTime.SpecifyKind(l.CriadoEm, DateTimeKind.Utc)), contagens);
+        l.Observacao, new DateTimeOffset(DateTime.SpecifyKind(l.CriadoEm, DateTimeKind.Utc)), contagens, modulo);
 }

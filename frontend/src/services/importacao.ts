@@ -48,6 +48,9 @@ export interface Projeto {
   uf: string | null;
   frente: string;
   frente_rotulo: string;
+  /** o tributo do trabalho: decide as etapas e o que a base precisa trazer */
+  modulo: string;
+  modulo_rotulo: string;
   nome: string;
   competencia_ini: string;
   competencia_fim: string;

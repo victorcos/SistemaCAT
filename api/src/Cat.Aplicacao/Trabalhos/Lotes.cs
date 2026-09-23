@@ -1,6 +1,7 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.Json.Nodes;
 using Cat.Aplicacao.Log;
+using Cat.Dominio.Acesso;
 using Cat.Dominio.Acesso;
 using Cat.Dominio.Lote;
 using Cat.Dominio.Projeto;
@@ -11,9 +12,10 @@ namespace Cat.Aplicacao.Trabalhos;
 public sealed record ArquivoInspecionado(
     string Nome, string Caminho, long Tamanho, string Tipo, string? Cnpj, DateOnly? Competencia, string Uf,
     string Detalhe, string Motivo, bool Retificadora, string? HashConteudo, bool JaNoTrabalho,
-    string? TipoNoTrabalho = null)
+    string? TipoNoTrabalho = null,
+    // quem decide é o motor, que já sabe o módulo do trabalho e o tipo do arquivo
+    bool Alimenta = false)
 {
-    public bool AlimentaACat => TiposDeArquivo.Buscar(Tipo).AlimentaACat;
 
     /// <summary>
     /// Já está no trabalho com outro tipo: a classificação mudou desde a importação
@@ -25,12 +27,16 @@ public sealed record ArquivoInspecionado(
 /// <summary>O que o motor leu da pasta. Os avisos vêm prontos: dependem do que só a leitura sabe.</summary>
 public sealed record LoteInspecionado(
     string Pasta, IReadOnlyList<ArquivoInspecionado> Arquivos, int DeOutraEmpresa, int Copias, bool Serve,
-    IReadOnlyList<DateOnly> Competencias, IReadOnlyList<string> Cnpjs, IReadOnlyList<string> Avisos);
+    IReadOnlyList<DateOnly> Competencias, IReadOnlyList<string> Cnpjs, IReadOnlyList<string> Avisos,
+    // o módulo do trabalho: é contra ele que "serve" e "alimenta" foram medidos
+    string Modulo = Segmentos.Icms);
 
 public sealed record LoteLido(
     int Id, int ProjetoId, string Pasta, int TotalArquivos, int ArquivosUteis, long BytesTotais,
     DateOnly? CompetenciaIni, DateOnly? CompetenciaFim, string? Observacao, DateTimeOffset CriadoEm,
-    IReadOnlyList<(string Tipo, int Quantidade)> Contagens);
+    IReadOnlyList<(string Tipo, int Quantidade)> Contagens,
+    // o módulo do trabalho dono do lote: decide o que conta como útil na tela
+    string Modulo = Segmentos.Icms);
 
 public sealed record LoteRemovido(string Pasta, int Arquivos, int ConferenciasInvalidadas);
 
@@ -55,7 +61,7 @@ public interface IRepositorioDeLotes
     /// Regrava tipo, CNPJ, competência, UF, detalhe e finalidade dos arquivos que já estão no
     /// trabalho, pelo caminho, e refaz a contagem do que a CAT lê e o período de cada lote tocado.
     /// </summary>
-    Task<Reclassificacao> Reclassificar(int projetoId, IReadOnlyList<ArquivoInspecionado> arquivos,
+    Task<Reclassificacao> Reclassificar(int projetoId, IReadOnlyList<ArquivoInspecionado> arquivos, string modulo,
         CancellationToken cancelar);
 
     /// <summary>Tira os arquivos e o lote. Os arquivos em disco não são tocados.</summary>
@@ -71,8 +77,14 @@ public sealed class SoCopias(int quantas) : RecusaDeRegra(
     $"Os {quantas} arquivo(s) desta pasta são cópias exatas de arquivos que já estão neste trabalho. " +
     "Nada novo para importar.");
 
-public sealed class NadaParaACat() : RecusaDeRegra(
-    "Nenhum arquivo desta pasta alimenta a CAT 42. Falta a EFD ICMS/IPI, o XML das notas ou o relatório gerencial.");
+/// <summary>
+/// Pasta que não traz nada do que ESTE trabalho lê. Não existe pasta inútil no
+/// absoluto: uma pasta de EFD-Contribuições não serve à CAT 42 e é a base do
+/// trabalho de PIS/COFINS.
+/// </summary>
+public sealed class NadaParaOTrabalho(string modulo) : RecusaDeRegra(
+    $"Nenhum arquivo desta pasta alimenta o trabalho de {Segmentos.RotuloDoModulo(modulo)}. " +
+    Segmentos.FaltaNoLote(modulo));
 
 public sealed class TudoJaNoTrabalho() : RecusaDeRegra("Todos os arquivos desta pasta já estão neste trabalho.");
 
@@ -117,7 +129,7 @@ public sealed class Lotes(
         if (inspecao.Arquivos.Count == 0 && inspecao.Copias > 0)
             throw new SoCopias(inspecao.Copias);
         if (!inspecao.Serve)
-            throw new NadaParaACat();
+            throw new NadaParaOTrabalho(inspecao.Modulo);
         // arquivo que já está no trabalho não entra de novo: o mesmo SPED
         // contado duas vezes dobraria movimento na apuração. Mas, se a
         // classificação de hoje diz outro tipo, ele é atualizado onde está
@@ -129,7 +141,8 @@ public sealed class Lotes(
         var agora = relogio.GetUtcNow();
         Reclassificacao? reclassificacao = null;
         if (mudaram.Count > 0)
-            reclassificacao = await ReclassificarArquivos(projetoId, inspecao.Pasta, mudaram, por, agora, cancelar);
+            reclassificacao = await ReclassificarArquivos(projetoId, inspecao.Pasta, mudaram, inspecao.Modulo,
+                por, agora, cancelar);
         if (novos.Count == 0)
         {
             var principal = (await lotes.Listar(projetoId, cancelar)).First(l => l.Id == reclassificacao!.Lotes[0]);
@@ -152,9 +165,10 @@ public sealed class Lotes(
     }
 
     private async Task<Reclassificacao> ReclassificarArquivos(int projetoId, string pasta,
-        IReadOnlyList<ArquivoInspecionado> mudaram, Usuario por, DateTimeOffset agora, CancellationToken cancelar)
+        IReadOnlyList<ArquivoInspecionado> mudaram, string modulo, Usuario por, DateTimeOffset agora,
+        CancellationToken cancelar)
     {
-        var feita = await lotes.Reclassificar(projetoId, mudaram, cancelar);
+        var feita = await lotes.Reclassificar(projetoId, mudaram, modulo, cancelar);
         var trocas = mudaram.GroupBy(a => (De: a.TipoNoTrabalho!, Para: a.Tipo))
             .OrderByDescending(g => g.Count())
             .Select(g => new Dictionary<string, object?>
@@ -166,7 +180,7 @@ public sealed class Lotes(
             new Dictionary<string, object?>
             {
                 ["pasta"] = pasta, ["arquivos"] = feita.Arquivos, ["lotes"] = feita.Lotes,
-                ["uteis"] = mudaram.Count(a => a.AlimentaACat), ["trocas"] = trocas,
+                ["uteis"] = mudaram.Count(a => a.Alimenta), ["trocas"] = trocas,
             }, por, agora, cancelar);
         log.Info("arquivos reclassificados no trabalho",
             new { projeto_id = projetoId, pasta, arquivos = feita.Arquivos, lotes = feita.Lotes,

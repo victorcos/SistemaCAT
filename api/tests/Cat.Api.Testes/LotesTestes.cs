@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -27,12 +27,19 @@ public sealed class MotorDeLotesFalso : IAsyncLifetime
     public Uri Endereco { get; private set; } = null!;
     public ConcurrentQueue<long> BytesDeRemessa { get; } = new();
 
+    /// <summary>
+    /// Como o motor devolve um arquivo. `alimenta` sai de lá pronto, medido
+    /// contra o módulo do trabalho — aqui o do lote, que é ICMS salvo quando o
+    /// teste pede outro.
+    /// </summary>
     public static object Arquivo(string nome, string tipo, string? competencia = "2025-01-01", bool ja = false,
-        bool retificadora = false, string? hash = null, long tamanho = 100, string? noTrabalho = null) => new
+        bool retificadora = false, string? hash = null, long tamanho = 100, string? noTrabalho = null,
+        string modulo = "icms") => new
     {
         nome, caminho = $"Z:/base/{nome}", tamanho, tipo, cnpj = "77665544000105", competencia, uf = "SP",
         detalhe = tipo == "xml_compactado" ? "3577 XML" : "", motivo = tipo == "desconhecido" ? "sem cabeçalho" : "",
         retificadora, hash_conteudo = hash, ja_no_trabalho = ja || noTrabalho is not null, tipo_no_trabalho = noTrabalho,
+        alimenta = Cat.Dominio.Lote.TiposDeArquivo.Buscar(tipo).Alimenta(modulo),
     };
 
     public async Task InitializeAsync()
@@ -56,6 +63,8 @@ public sealed class MotorDeLotesFalso : IAsyncLifetime
                 "Z:/nao-existe" => [],
                 "Z:/so-copias" => [],
                 "Z:/sem-cat" => [Arquivo("contribuicoes.txt", "sped_contribuicoes")],
+                // a MESMA Contribuições, num trabalho de PIS/COFINS: ali ela alimenta
+                "Z:/piscofins" => [Arquivo("contribuicoes.txt", "sped_contribuicoes", modulo: "piscofins")],
                 "Z:/ja-no-trabalho" => [Arquivo("efd.txt", "sped_icms_ipi", ja: true)],
                 "Z:/metade" => [Arquivo("efd.txt", "sped_icms_ipi", ja: true), Arquivo("junho.txt", "sped_icms_ipi", "2025-06-01")],
                 "Z:/grande" => Enumerable.Range(0, 1500).Select(i => Arquivo($"nota{i:0000}.xml", "xml_nfe", tamanho: 10)).ToArray(),
@@ -77,9 +86,10 @@ public sealed class MotorDeLotesFalso : IAsyncLifetime
             if (pasta == "Z:/nao-existe")
                 return Results.Json(new { detail = "'Z:/nao-existe' não existe ou não está acessível desta máquina." }, statusCode: 422);
             var serve = pasta is not ("Z:/sem-cat" or "Z:/so-copias");
+            var modulo = pasta == "Z:/piscofins" ? "piscofins" : "icms";
             return Results.Json(new
             {
-                pasta, arquivos, de_outra_empresa = pasta == "Z:/base" ? 1 : 0, copias = pasta == "Z:/so-copias" ? 3 : 0,
+                pasta, modulo, arquivos, de_outra_empresa = pasta == "Z:/base" ? 1 : 0, copias = pasta == "Z:/so-copias" ? 3 : 0,
                 serve, competencias = serve ? new[] { "2025-01-01", "2025-03-01" } : [], cnpjs = new[] { "77665544000105" },
                 avisos = new[] { "1 arquivo(s) são de outra empresa (11222333000181) e ficaram de fora." },
             });
@@ -171,13 +181,13 @@ public sealed class LotesTestes(BancoDeTeste banco, MotorDeLotesFalso motor) : I
         return (id, Cliente(token));
     }
 
-    private static async Task<(int Empresa, int Projeto)> Trabalho(HttpClient c)
+    private static async Task<(int Empresa, int Projeto)> Trabalho(HttpClient c, string modulo = "icms")
     {
         var raiz = Random.Shared.Next(10_000_000, 99_999_999).ToString();
         var doze = raiz + "0001";
         var r = await c.PostAsJsonAsync("/api/empresas", new { cnpj_raiz = raiz, cnpj_matriz = doze + Cat.Dominio.Comum.Cnpj.DigitosVerificadores(doze), razao_social = "EMPRESA DO LOTE", uf = "SP" });
         var empresa = (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
-        r = await c.PostAsJsonAsync("/api/projetos", new { empresa_id = empresa, frente = "cat42", nome = "Lote " + Guid.NewGuid().ToString("N")[..6], competencia_ini = "2025-01-01", competencia_fim = "2025-12-01" });
+        r = await c.PostAsJsonAsync("/api/projetos", new { empresa_id = empresa, frente = "cat42", modulo, nome = "Lote " + Guid.NewGuid().ToString("N")[..6], competencia_ini = "2025-01-01", competencia_fim = "2025-12-01" });
         return (empresa, (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32());
     }
 
@@ -187,6 +197,42 @@ public sealed class LotesTestes(BancoDeTeste banco, MotorDeLotesFalso motor) : I
         c.PostAsJsonAsync($"/api/projetos/{projeto}/lotes/inspecionar", new { pasta });
     private static Task<HttpResponseMessage> Registrar(HttpClient c, int projeto, string pasta, string? observacao = null) =>
         c.PostAsJsonAsync($"/api/projetos/{projeto}/lotes", new { pasta, observacao });
+
+    // ------------------------------------------------------------------ o trabalho decide o que é útil
+    [Fact]
+    public async Task Pasta_de_contribuicoes_entra_no_trabalho_de_piscofins()
+    {
+        // a MESMA pasta que a CAT 42 recusa: num trabalho de PIS/COFINS ela é a base.
+        // Antes o sistema media tudo pela CAT e recusava a importação inteira.
+        var (_, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c, "piscofins");
+
+        var inspecao = await Json(await Inspecionar(c, projeto, "Z:/piscofins"));
+        Assert.True(inspecao.GetProperty("serve").GetBoolean());
+        Assert.Equal(1, inspecao.GetProperty("arquivos_uteis").GetInt32());
+        Assert.True(inspecao.GetProperty("contagens")[0].GetProperty("alimenta").GetBoolean());
+
+        var r = await Registrar(c, projeto, "Z:/piscofins");
+        Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        var lote = await Json(r);
+        Assert.Equal(1, lote.GetProperty("arquivos_uteis").GetInt32());
+        // o período do lote é o do arquivo que ESTE trabalho lê
+        Assert.Equal("2025-01-01", lote.GetProperty("competencia_ini").GetString());
+    }
+
+    [Fact]
+    public async Task A_mesma_pasta_continua_recusada_no_trabalho_de_icms()
+    {
+        var (_, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+
+        var r = await Registrar(c, projeto, "Z:/sem-cat");
+
+        Assert.Equal(HttpStatusCode.UnprocessableContent, r.StatusCode);
+        var detalhe = await Detalhe(r);
+        Assert.Contains("alimenta o trabalho de ICMS", detalhe);
+        Assert.Contains("EFD ICMS/IPI", detalhe);
+    }
 
     // ------------------------------------------------------------------ inspecionar
     [Fact]
@@ -213,14 +259,14 @@ public sealed class LotesTestes(BancoDeTeste banco, MotorDeLotesFalso motor) : I
         // o que serve primeiro, e dentro disso o mais numeroso
         var contagens = corpo.GetProperty("contagens").EnumerateArray().ToList();
         Assert.Equal(["sped_icms_ipi", "sped_contribuicoes", "desconhecido"], contagens.Select(x => x.GetProperty("tipo").GetString()));
-        Assert.Equal(["tipo", "rotulo", "grupo", "alimenta_a_cat", "quantidade"], contagens[0].EnumerateObject().Select(p => p.Name));
+        Assert.Equal(["tipo", "rotulo", "grupo", "alimenta", "quantidade"], contagens[0].EnumerateObject().Select(p => p.Name));
         Assert.Equal("EFD ICMS/IPI", contagens[0].GetProperty("rotulo").GetString());
         Assert.Equal(2, contagens[0].GetProperty("quantidade").GetInt32());
 
         // a amostra mostra primeiro o que NÃO entrou: é o que a pessoa precisa ver
         var amostra = corpo.GetProperty("amostra").EnumerateArray().ToList();
         Assert.Equal(["contribuicoes_2021.txt", "lixo.bin", "efd_jan.txt", "efd_mar_retif.txt"], amostra.Select(a => a.GetProperty("nome").GetString()));
-        Assert.Equal(["nome", "caminho", "tamanho", "tipo", "tipo_rotulo", "grupo", "alimenta_a_cat", "cnpj", "competencia", "uf", "detalhe", "motivo"],
+        Assert.Equal(["nome", "caminho", "tamanho", "tipo", "tipo_rotulo", "grupo", "alimenta", "cnpj", "competencia", "uf", "detalhe", "motivo"],
             amostra[0].EnumerateObject().Select(p => p.Name));
         Assert.Equal("sem cabeçalho", amostra[1].GetProperty("motivo").GetString());
 
@@ -296,7 +342,7 @@ public sealed class LotesTestes(BancoDeTeste banco, MotorDeLotesFalso motor) : I
 
     [Theory]
     [InlineData("Z:/so-copias", 409, "Os 3 arquivo(s) desta pasta são cópias exatas")]
-    [InlineData("Z:/sem-cat", 422, "Nenhum arquivo desta pasta alimenta a CAT 42")]
+    [InlineData("Z:/sem-cat", 422, "Nenhum arquivo desta pasta alimenta o trabalho de ICMS")]
     [InlineData("Z:/ja-no-trabalho", 409, "Todos os arquivos desta pasta já estão neste trabalho.")]
     public async Task Registrar_recusa_com_a_mensagem_certa(string pasta, int status, string pedaco)
     {
