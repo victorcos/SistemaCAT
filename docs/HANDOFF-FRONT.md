@@ -1,6 +1,6 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.91.0**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.91.2**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
@@ -134,7 +134,7 @@ Pré-validar os arquivos digitais que o cliente já transmitiu.
 
 ### Projeto
 
-`src/pages/Projeto.tsx` · 584 linhas
+`src/pages/Projeto.tsx` · 585 linhas
 
 Para onde cada funcionalidade leva, e com que palavras. A tela não decide o que está disponível — isso vem do domínio, em
 

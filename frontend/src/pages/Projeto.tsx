@@ -80,14 +80,8 @@ const DESTINOS: Record<
       padrao: "Apurar o ICMS suportado",
     },
   },
-  historico: {
-    rota: ROTAS.historico,
-    rotulos: {
-      concluida: "Ver tudo o que aconteceu",
-      em_andamento: "Ver tudo o que aconteceu",
-      padrao: "Ver tudo o que aconteceu",
-    },
-  },
+  // o histórico não está aqui de propósito: o caminho dele é o botão do canto
+  // superior, e não uma funcionalidade da barra — ver `funcionalidades` abaixo
   quebra_de_sped: {
     rota: ROTAS.quebraDeSped,
     rotulos: {
@@ -184,8 +178,12 @@ export default function Projeto() {
   if (!d) return <Carregando texto="Carregando o trabalho…" />;
 
   const p = d.projeto;
-  const disponiveis = d.etapas.filter((e) => e.implementada);
-  const feitas = disponiveis.filter((e) => e.situacao === "concluida").length;
+  /* O histórico sai da barra e dos cards: o caminho dele é o botão do canto
+     superior, que está sempre ali. Repetir o mesmo destino em três lugares
+     fazia o trabalho parecer ter uma funcionalidade a mais do que tem — e o
+     histórico não é etapa: ele nunca conclui, que é por isso que o servidor já
+     o deixa fora do progresso (`DefinicaoEtapa.Conta`). 23/09/2026. */
+  const funcionalidades = d.etapas.filter((e) => e.chave !== "historico");
   const status = p.status as Status;
   // trabalho parado não roda etapa — a API recusa, e a tela diz antes
   const anda = aceitaProcessamento(status);
@@ -257,10 +255,13 @@ export default function Projeto() {
           </div>
         }
       >
+        {/* o progresso é o do servidor (`Etapas.Progresso`): ele já ignora o que
+            não foi construído e o que não conclui. Recontar aqui dava uma
+            segunda verdade — e ela discordava, somando o histórico. */}
         <div className="flex flex-wrap items-center gap-3">
-          <Barra de={feitas} para={disponiveis.length} className="min-w-[200px] flex-1" />
+          <Barra de={p.etapas_feitas} para={p.etapas_totais} className="min-w-[200px] flex-1" />
           <span className="text-[13px] font-semibold text-texto-suave">
-            {feitas} de {disponiveis.length} etapas concluídas
+            {p.etapas_feitas} de {p.etapas_totais} etapas concluídas
           </span>
         </div>
       </CabecalhoDePagina>
@@ -307,7 +308,7 @@ export default function Projeto() {
       )}
 
       <BarraDeFuncionalidades
-        etapas={d.etapas}
+        etapas={funcionalidades}
         rota={(chave: string) => {
           const destino = DESTINOS[chave];
           return destino ? destino.rota(Number(id)) : null;
@@ -321,7 +322,7 @@ export default function Projeto() {
       {p.modulo === "piscofins" ? (
         <PainelDoTrabalho
           projetoId={Number(id)}
-          etapas={d.etapas}
+          etapas={funcionalidades}
           rota={(chave: string) => {
             const destino = DESTINOS[chave];
             return destino ? destino.rota(Number(id)) : null;
@@ -334,7 +335,7 @@ export default function Projeto() {
           sub="A barra acima leva direto a cada uma. Aqui vai o que cada uma faz, em que pé está e o que ela produz."
         >
           <ol className="m-0 mt-4 flex list-none flex-col gap-2.5 p-0">
-            {d.etapas.map((e, i) => (
+            {funcionalidades.map((e, i) => (
               <LinhaDeEtapa
                 key={e.chave}
                 e={e}

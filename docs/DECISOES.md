@@ -5,6 +5,41 @@
 
 ---
 
+## 2026-09-23 — Um caminho por funcionalidade: o card perde o "Abrir", o histórico sai da barra
+
+**Duas repetições, a mesma regra.** Quem olha a tela do trabalho precisa
+conseguir contar as funcionalidades e chegar ao número certo. Duas coisas
+atrapalhavam isso.
+
+**O "Abrir →" do card.** O card inteiro já é um `<Link>` — a chamada no rodapé
+repetia o que o cartão inteiro é, e a etiqueta do topo ("Pendente",
+"Concluída") já diz em que pé a coisa está. Saiu. O rodapé ficou **só no card
+indisponível**, e ali o que vai nele não é chamada, é o motivo: "Ainda não
+construída". É o único lugar do corpo do card onde essa razão aparece.
+
+**O histórico aparecia três vezes**: botão no canto superior, aba na barra e
+card na grade — os três levando ao mesmo lugar. Ficou **só o botão do canto**,
+que está sempre ali, em qualquer módulo, inclusive quando o trabalho está
+parado.
+
+**Por que o botão, e não o card.** O histórico não é etapa do trabalho: ele
+**nunca conclui**. Entre cards que dizem "Pendente" e "Concluída" ele mentiria
+sobre si mesmo todo dia. O servidor já sabia disso — `DefinicaoEtapa.Conta:
+false` o mantém fora do progresso desde que a aba nasceu —, e a tela agora
+concorda com o servidor em vez de só herdar a lista dele.
+
+**O que isso corrigiu de quebra.** A tela recontava o progresso no navegador
+(`etapas.filter(implementada)`), o que era uma segunda verdade sobre a mesma
+coisa — e ela **discordava**: contava o histórico no denominador. Agora o
+número exibido é o do servidor (`Etapas.Progresso`, via `etapas_feitas` e
+`etapas_totais`), que ignora o que não foi construído e o que não conclui.
+
+Fica em aberto a repetição maior, que é escolha de desenho e não de código: a
+barra (`BarraDeFuncionalidades`) e os cards (`PainelDoTrabalho`) ainda
+navegam para os mesmos lugares, na mesma tela.
+
+---
+
 ## 2026-09-23 — O front ganhou testes, por uma pergunta que o código não respondia
 
 **A pergunta.** "Filtrar, marcar uma conta, trocar de filtro, marcar outra — a
