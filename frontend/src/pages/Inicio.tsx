@@ -16,6 +16,7 @@ import {
   Vazio,
 } from "@/components/ui/Pagina";
 import { FRENTES, type Frente } from "@/constants/fronts";
+import { meusSegmentos, type Segmento } from "@/services/segmentos";
 import { IconeNovo } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
 import { BARRA_DO_STATUS, TOM_DO_STATUS, type Status } from "@/constants/status";
@@ -323,6 +324,16 @@ const OPCOES_DE_FRENTE: OpcaoDeCombobox<Frente>[] = (
   Object.keys(FRENTES) as Frente[]
 ).map((f) => ({ valor: f, rotulo: FRENTES[f] }));
 
+/** O módulo padrão: ICMS quando a pessoa o enxerga, senão o primeiro que ela vê.
+ *
+ *  ICMS é o padrão porque é o que todo trabalho anterior à divisão por segmento
+ *  é. Mas quem só enxerga PIS/COFINS não pode receber um padrão que o servidor
+ *  vai recusar — daí o "senão". */
+function moduloPadrao(segmentos: Segmento[]): string {
+  const todos = segmentos.flatMap((s) => s.modulos);
+  return todos.some((m) => m.chave === "icms") ? "icms" : (todos[0]?.chave ?? "icms");
+}
+
 /**
  * Novo trabalho para empresa **já cadastrada**.
  *
@@ -341,6 +352,9 @@ function ModalNovoTrabalho({
   const [empresas, setEmpresas] = useState<Empresa[] | null>(null);
   const [empresa, setEmpresa] = useState("");
   const [frente, setFrente] = useState<Frente>("cat42");
+  // o módulo decide o roteiro de etapas do trabalho; sem ele tudo nascia ICMS
+  const [segmentos, setSegmentos] = useState<Segmento[]>([]);
+  const [modulo, setModulo] = useState("icms");
   const [nome, setNome] = useState("");
   const [ini, setIni] = useState("");
   const [fim, setFim] = useState("");
@@ -358,6 +372,14 @@ function ModalNovoTrabalho({
     listarEmpresas()
       .then(setEmpresas)
       .catch((e) => setErro(comoErro(e).message));
+    // só os módulos que a pessoa enxerga: criar trabalho num assunto que ela
+    // não vê é criar algo que ela não encontraria depois
+    meusSegmentos()
+      .then((s) => {
+        setSegmentos(s);
+        setModulo(moduloPadrao(s));
+      })
+      .catch(() => undefined);
   }, [aberto]);
 
   const opcoesDeEmpresa = useMemo<OpcaoDeCombobox<string>[]>(
@@ -393,6 +415,7 @@ function ModalNovoTrabalho({
       await criarProjeto({
         empresa_id: Number(empresa),
         frente,
+        modulo,
         nome: nome.trim(),
         competencia_ini: paraIso(ini)!,
         competencia_fim: paraIso(fim, true)!,
@@ -464,6 +487,22 @@ function ModalNovoTrabalho({
               )}
             </Campo>
           </div>
+          <Campo
+            rotulo="Tributo"
+            dica="Decide as etapas do trabalho: ICMS percorre a CAT 42; PIS/COFINS, a quebra de SPED."
+          >
+            {(props) => (
+              <Combobox
+                {...props}
+                valor={modulo}
+                opcoes={segmentos.flatMap((s) =>
+                  s.modulos.map((m) => ({ valor: m.chave, rotulo: m.rotulo })),
+                )}
+                aoMudar={setModulo}
+                disabled={segmentos.length === 0}
+              />
+            )}
+          </Campo>
           <Campo rotulo="Frente de trabalho">
             {(props) => (
               <Combobox {...props} valor={frente} opcoes={OPCOES_DE_FRENTE} aoMudar={setFrente} />

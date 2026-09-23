@@ -75,6 +75,14 @@ const DESTINOS: Record<
       padrao: "Apurar o ICMS suportado",
     },
   },
+  quebra_de_sped: {
+    rota: ROTAS.quebraDeSped,
+    rotulos: {
+      concluida: "Ver o par que se confronta e baixar as planilhas",
+      em_andamento: "Acompanhar a quebra",
+      padrao: "Quebrar os SPED",
+    },
+  },
   razao: {
     rota: ROTAS.razao,
     rotulos: {

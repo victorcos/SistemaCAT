@@ -5,6 +5,49 @@
 
 ---
 
+## 2026-09-23 — Rota registrada não é tela alcançável
+
+**O defeito.** As telas de PIS/COFINS estavam prontas, testadas e no roteador —
+e **ninguém conseguia chegar nelas**. Três buracos em série, todos meus, e cada
+um sozinho bastava para esconder tudo:
+
+1. **Todo trabalho nascia no módulo de ICMS.** A coluna `modulo` existe desde a
+   v0.66.0 e o roteiro de etapas sai dela, mas o `criarProjeto` da tela nunca
+   mandava o campo — e o padrão do banco é `icms`. O roteiro de ICMS não tem a
+   quebra de SPED, então a etapa nem aparecia na lista;
+2. **A etapa `quebra_de_sped` não tinha destino.** O cartão do trabalho traduz
+   etapa em rota por uma tabela (`DESTINOS`, em `Projeto.tsx`), e eu registrei a
+   rota no roteador sem acrescentar a linha ali. O cartão renderizava — sem
+   botão. Um beco;
+3. **O razão contábil só abria de dentro de uma quebra concluída com ECD.**
+   Como nenhum trabalho tem ECD importada ainda, a porta nunca existiu.
+
+**O que ficou:** um seletor de **Tributo** no formulário de novo trabalho, nos
+dois caminhos que criam trabalho (o de empresa já cadastrada e o do cadastro por
+SPED), alimentado pelos segmentos que a pessoa enxerga — criar trabalho num
+assunto que ela não vê é criar algo que ela não encontraria depois. O padrão é
+ICMS quando ela o enxerga; senão, o primeiro módulo que ela vê.
+
+Mais a linha faltante em `DESTINOS`, e o link do razão contábil solto do dado:
+a tela já sabia dizer "nenhuma quebra concluída" e "nenhuma ECD neste lote", e
+uma tela que explica o que falta é melhor que um link que não existe.
+
+**A lição, que vale para as próximas.** Passei três versões dando por concluído
+"ligar as etapas e construir as telas" com base em rota registrada, teste verde
+e build limpo. Nenhuma dessas três coisas prova que existe **caminho**: o
+roteador aceita rota órfã, o teste testa o componente isolado e o compilador não
+sabe o que é navegação. A pergunta que faltou é a mais simples — *partindo da
+tela inicial, em quantos cliques se chega lá?* Se a resposta não existir, a tela
+não existe.
+
+**O que continua sem caminho, e está anotado:** as rotas `/segmentos` e
+`/modulos/:chave` existem em `routes.ts` desde a v0.66.0 e **não estão no
+roteador** — o hub de cards do handoff nunca foi construído. E a Gestão
+(`apuracao_contribuicoes`) segue `Implementada: false`: sem tela, o cartão sai
+como "não disponível", que é o que ele deve dizer.
+
+---
+
 ## 2026-09-22 — A ECF entra, e o 0000 ganha um quarto leiaute
 
 **O que entrou.** A Escrituração Contábil Fiscal e o bloco de IRPJ/CSLL do

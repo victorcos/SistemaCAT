@@ -153,6 +153,19 @@ export const listarEmpresas = () => chamar<Empresa[]>("/empresas");
 export const criarProjeto = (dados: {
   empresa_id: number;
   frente: Frente;
+  /**
+   * O tributo — `icms`, `piscofins`, `irpj_csll`.
+   *
+   * Não se confunde com a frente: frente é o TIPO de trabalho (razão, de-para,
+   * quebra de SPED), módulo é o TRIBUTO. É o módulo que decide o **roteiro de
+   * etapas**: um trabalho de ICMS percorre as oito da CAT 42; um de PIS/COFINS,
+   * a quebra de SPED e a apuração das contribuições.
+   *
+   * Omitir cai em `icms` no servidor, que é o que todo trabalho anterior a esta
+   * coluna é. Foi o que aconteceu até aqui — e por isso nenhum trabalho chegava
+   * às telas de PIS/COFINS.
+   */
+  modulo: string;
   nome: string;
   competencia_ini: string;
   competencia_fim: string;

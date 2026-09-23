@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useRef,
   useState,
   type DragEvent,
@@ -12,6 +13,7 @@ import { Campo, Entrada } from "@/components/ui/Campo";
 import { Combobox, type OpcaoDeCombobox } from "@/components/ui/Combobox";
 import { CabecalhoDePagina, Secao } from "@/components/ui/Pagina";
 import { FRENTES, type Frente } from "@/constants/fronts";
+import { meusSegmentos, type Segmento } from "@/services/segmentos";
 import { IconeConfirma, IconeEnviar, IconeTentarDeNovo } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
 import { cn } from "@/lib/cn";
@@ -415,6 +417,12 @@ function Fato({
 
 /* ------------------------------------------------------------------ */
 
+/** ICMS quando a pessoa o enxerga; senão o primeiro módulo que ela vê. */
+function moduloPadrao(segmentos: Segmento[]): string {
+  const todos = segmentos.flatMap((s) => s.modulos);
+  return todos.some((m) => m.chave === "icms") ? "icms" : (todos[0]?.chave ?? "icms");
+}
+
 const OPCOES_DE_FRENTE: OpcaoDeCombobox<Frente>[] = (Object.keys(FRENTES) as Frente[]).map(
   (f) => ({ valor: f, rotulo: FRENTES[f] }),
 );
@@ -431,6 +439,23 @@ function FormularioDeProjeto({
   aoFalhar: (e: ErroApi) => void;
 }) {
   const [frente, setFrente] = useState<Frente>("cat42");
+  // o módulo decide o roteiro de etapas; sem ele todo trabalho nascia ICMS
+  const [segmentos, setSegmentos] = useState<Segmento[]>([]);
+  const [modulo, setModulo] = useState("icms");
+
+  useEffect(() => {
+    let vivo = true;
+    meusSegmentos()
+      .then((s) => {
+        if (!vivo) return;
+        setSegmentos(s);
+        setModulo(moduloPadrao(s));
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, []);
   const [nome, setNome] = useState(
     `Ressarcimento ST ${remessa.primeira_competencia?.slice(0, 4) ?? ""}`.trim(),
   );
@@ -462,6 +487,7 @@ function FormularioDeProjeto({
         await criarProjeto({
           empresa_id: empresaId,
           frente,
+          modulo,
           nome: nome.trim(),
           competencia_ini: paraIso(ini)!,
           competencia_fim: paraIso(fim, true)!,
@@ -485,6 +511,22 @@ function FormularioDeProjeto({
         noValidate
         className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-[18px]"
       >
+        <Campo
+          rotulo="Tributo"
+          dica="Decide as etapas do trabalho: ICMS percorre a CAT 42; PIS/COFINS, a quebra de SPED."
+        >
+          {(props) => (
+            <Combobox
+              {...props}
+              valor={modulo}
+              opcoes={segmentos.flatMap((s) =>
+                s.modulos.map((m) => ({ valor: m.chave, rotulo: m.rotulo })),
+              )}
+              aoMudar={setModulo}
+              disabled={segmentos.length === 0}
+            />
+          )}
+        </Campo>
         <Campo rotulo="Frente de trabalho">
           {(props) => (
             <Combobox {...props} valor={frente} opcoes={OPCOES_DE_FRENTE} aoMudar={setFrente} />

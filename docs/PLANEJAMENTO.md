@@ -151,8 +151,12 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       leitor do 0000 do domínio, como quarto leiaute (v0.79.0)
 - [ ] Conferir a suspeita da compensação do próprio período (`_compensacoes`):
       o valor derivado repete a compensação de períodos anteriores
+- [x] Caminho até as telas de PIS/COFINS: seletor de tributo ao criar o trabalho,
+      destino da etapa `quebra_de_sped` e link do razão contábil (v0.80.0)
 - [ ] Telas do handoff de design (hub de módulos, escolha de frente, coluna de módulos
-      em Usuários) — desenho pronto em `Reconstrução tela listagem usuários/design_handoff`
+      em Usuários) — desenho pronto em `Reconstrução tela listagem usuários/design_handoff`.
+      **As rotas `/segmentos` e `/modulos/:chave` estão em `routes.ts` e não no
+      roteador**: hoje não há hub, e a tela inicial lista todos os trabalhos
 - [ ] Resolver a colisão de vocabulário: o handoff chama de "módulo" o nível 1 e de
       "frente" o nível 2, e `frente` já existe no código como tipo de trabalho
 - [x] Tela do razão da ECD, com seletor de conta: busca por código, nome e conta
