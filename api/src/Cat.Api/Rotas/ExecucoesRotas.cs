@@ -32,6 +32,8 @@ public static class ExecucoesRotas
             "quebrar os SPED");
         Etapa(api, Execucoes.ApuracaoContribuicoes, "apuracao-contribuicoes", detalheExigeEtapa: true,
             "apurar as contribuições");
+        Etapa(api, Execucoes.ApuracaoPisCofins, "apuracao-piscofins", detalheExigeEtapa: true,
+            "apurar PIS/COFINS");
 
         api.MapGet("/entrega/{execucaoId:int}/estabelecimentos", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>
@@ -138,9 +140,11 @@ public static class ExecucoesRotas
             .ExigirUsuario();
 
         // O razão contábil da ECD: escolher a conta, depois ver os lançamentos.
+        // Sai da apuração de PIS/COFINS, e não da quebra — as duas se separaram
+        // em 23/09/2026, e o parquet do razão foi junto.
         // Pagina no servidor como todo o resto — uma ECD de rede de supermercado
         // passa de milhão de partidas, e nenhuma delas cabe numa resposta só.
-        api.MapGet("/quebra-de-sped/{execucaoId:int}/contas", async (int execucaoId, HttpContext http, Execucoes caso) =>
+        api.MapGet("/apuracao-piscofins/{execucaoId:int}/contas", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>
                 {
                     var q = http.Request.Query;
@@ -153,7 +157,7 @@ public static class ExecucoesRotas
                 }))
             .ExigirUsuario();
 
-        api.MapGet("/quebra-de-sped/{execucaoId:int}/lancamentos", async (int execucaoId, HttpContext http, Execucoes caso) =>
+        api.MapGet("/apuracao-piscofins/{execucaoId:int}/lancamentos", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>
                 {
                     var q = http.Request.Query;
@@ -170,7 +174,7 @@ public static class ExecucoesRotas
                 }))
             .ExigirUsuario();
 
-        api.MapGet("/quebra-de-sped/{execucaoId:int}/estabelecimentos", async (int execucaoId, HttpContext http, Execucoes caso) =>
+        api.MapGet("/apuracao-piscofins/{execucaoId:int}/estabelecimentos", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>
                     Results.Json(await caso.EstabelecimentosDoRazaoContabil(execucaoId, http.UsuarioAtual(), http.RequestAborted))))
             .ExigirUsuario();

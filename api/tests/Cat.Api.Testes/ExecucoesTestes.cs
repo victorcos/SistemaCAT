@@ -512,10 +512,10 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
     {
         var (_, _, c) = await Pessoa("dev");
         var (_, projeto) = await Trabalho(c);
-        var id = await Execucao(projeto, "quebra_de_sped");
+        var id = await Execucao(projeto, "apuracao_piscofins");
         motor.AoPedirRazaoContabil = (rota, _) => Results.Json(new { rota, total = 2, linhas = new[] { new { conta = "3.1.1" } } });
 
-        var r = await c.GetAsync($"/api/quebra-de-sped/{id}/contas?busca=caixa&cnpj=11111111000191&so=devedoras&pagina=2&por_pagina=30");
+        var r = await c.GetAsync($"/api/apuracao-piscofins/{id}/contas?busca=caixa&cnpj=11111111000191&so=devedoras&pagina=2&por_pagina=30");
 
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         Assert.Equal("contas", (await Json(r)).GetProperty("rota").GetString());
@@ -531,22 +531,22 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
     {
         var (_, _, c) = await Pessoa("dev");
         var (_, projeto) = await Trabalho(c);
-        var id = await Execucao(projeto, "quebra_de_sped");
+        var id = await Execucao(projeto, "apuracao_piscofins");
         var razao = await Execucao(projeto, "razao");
         motor.AoPedirRazaoContabil = (rota, p) => Results.Json(new { rota, conta = p.GetProperty("conta").GetString(), total = 0, linhas = Array.Empty<object>() });
 
-        var r = await c.GetAsync($"/api/quebra-de-sped/{id}/lancamentos?cnpj=11111111000191&conta=3.1.1&de=2021-06-01&ate=2021-06-30");
+        var r = await c.GetAsync($"/api/apuracao-piscofins/{id}/lancamentos?cnpj=11111111000191&conta=3.1.1&de=2021-06-01&ate=2021-06-30");
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         Assert.Equal("3.1.1", (await Json(r)).GetProperty("conta").GetString());
         var pedido = motor.Pedidos.Last(x => x.TryGetProperty("conta", out _));
         Assert.Equal(("2021-06-01", "2021-06-30"),
             (pedido.GetProperty("de").GetString(), pedido.GetProperty("ate").GetString()));
 
-        var sem = await c.GetAsync($"/api/quebra-de-sped/{id}/lancamentos?conta=3.1.1");
+        var sem = await c.GetAsync($"/api/apuracao-piscofins/{id}/lancamentos?conta=3.1.1");
         Assert.Equal(HttpStatusCode.UnprocessableEntity, sem.StatusCode);
         Assert.Equal("Informe o estabelecimento e a conta do razão.", await Detalhe(sem));
         // o razão da CAT 42 é outra etapa: pela rota da quebra, só execução da quebra
-        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/quebra-de-sped/{razao}/contas")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/apuracao-piscofins/{razao}/contas")).StatusCode);
     }
 
     [Fact]
@@ -554,10 +554,10 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
     {
         var (_, _, c) = await Pessoa("dev");
         var (_, projeto) = await Trabalho(c);
-        var id = await Execucao(projeto, "quebra_de_sped");
+        var id = await Execucao(projeto, "apuracao_piscofins");
         motor.AoPedirRazaoContabil = (rota, _) => Results.Json(new { rota, linhas = new[] { new { cnpj = "11111111000191", contas = 4 } } });
 
-        var r = await c.GetAsync($"/api/quebra-de-sped/{id}/estabelecimentos");
+        var r = await c.GetAsync($"/api/apuracao-piscofins/{id}/estabelecimentos");
 
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         Assert.Equal("estabelecimentos", (await Json(r)).GetProperty("rota").GetString());

@@ -1,6 +1,6 @@
 """Ler o razão da ECD na tela: escolher a conta, depois ver os lançamentos.
 
-A quebra de SPED já deixou `razao.parquet` em disco, com **todas** as partidas
+A apuração de PIS/COFINS já deixou `razao.parquet` em disco, com **todas** as partidas
 de **todas** as contas analíticas de **todas** as ECD do lote. Numa empresa de
 verdade isso é milhão de linhas: não cabe numa resposta, e não cabe na cabeça de
 ninguém. A tela precisa de dois passos, e este módulo é o que os atende:
@@ -31,7 +31,7 @@ import os
 from decimal import Decimal
 
 from cat.infraestrutura.analitico.confronto import _escapar
-from cat.infraestrutura.analitico.quebra_de_sped import ARQUIVO_DO_RAZAO
+from cat.infraestrutura.analitico.piscofins import ARQUIVO_DO_RAZAO
 from cat.infraestrutura.analitico.suportado import _leitura
 from cat.log import obter_log
 

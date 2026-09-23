@@ -17,14 +17,14 @@ import {
   contasDoRazaoContabil,
   estabelecimentosDoRazaoContabil,
   lancamentosDaConta,
-  listarQuebras,
+  listarApuracoes,
   type ContaContabil,
   type EstabelecimentoDoRazao,
-  type ExecucaoDaQuebra,
+  type ExecucaoDaApuracao,
   type Pagina,
   type PaginaDeLancamentos,
   type RecorteDeConta,
-} from "@/services/quebraDeSped";
+} from "@/services/apuracaoPisCofins";
 import type { ErroApi } from "@/types/erro";
 
 /**
@@ -74,7 +74,7 @@ export default function RazaoContabil() {
   const projetoId = Number(id);
 
   const [projeto, setProjeto] = useState<ProjetoDetalhe | null>(null);
-  const [quebra, setQuebra] = useState<ExecucaoDaQuebra | null>(null);
+  const [quebra, setQuebra] = useState<ExecucaoDaApuracao | null>(null);
   const [carregado, setCarregado] = useState(false);
   const [erro, setErro] = useState<ErroApi | null>(null);
 
@@ -83,7 +83,7 @@ export default function RazaoContabil() {
     detalharProjeto(projetoId)
       .then((p) => vivo && setProjeto(p))
       .catch(() => undefined);
-    listarQuebras(projetoId)
+    listarApuracoes(projetoId)
       .then((lista) => {
         if (!vivo) return;
         setQuebra(lista.find((e) => e.situacao === "concluida") ?? null);
@@ -97,7 +97,7 @@ export default function RazaoContabil() {
 
   return (
     <>
-      <Voltar para={ROTAS.quebraDeSped(projetoId)}>Quebra de SPED</Voltar>
+      <Voltar para={ROTAS.apuracaoPisCofins(projetoId)}>Apuração de PIS/COFINS</Voltar>
       <CabecalhoDePagina
         eyebrow={projeto?.projeto.nome ? `PIS/COFINS · ${projeto.projeto.nome}` : "PIS/COFINS"}
         titulo="Razão contábil"
@@ -110,20 +110,20 @@ export default function RazaoContabil() {
 
       {carregado && !quebra && (
         <Vazio
-          titulo="Nenhuma quebra de SPED concluída neste trabalho"
+          titulo="Nenhuma apuração de PIS/COFINS concluída neste trabalho"
           acao={
-            <Link to={ROTAS.quebraDeSped(projetoId)}>
-              <Botao variante="secundario">Ir para a quebra</Botao>
+            <Link to={ROTAS.apuracaoPisCofins(projetoId)}>
+              <Botao variante="secundario">Ir para a apuração</Botao>
             </Link>
           }
         >
-          O razão contábil sai da quebra. Rode a etapa com pelo menos uma ECD no lote e volte aqui.
+          O razão contábil sai da apuração. Rode a etapa com pelo menos uma ECD no lote e volte aqui.
         </Vazio>
       )}
 
       {carregado && quebra && (quebra.resumo?.linhas_do_razao ?? 0) === 0 && (
-        <Vazio titulo="A quebra não encontrou nenhuma ECD">
-          Esta execução leu só EFD-Contribuições. Importe a ECD do período e rode a quebra de novo.
+        <Vazio titulo="A apuração não encontrou nenhuma ECD">
+          Esta execução leu só EFD-Contribuições. Importe a ECD do período e rode a apuração de novo.
         </Vazio>
       )}
 

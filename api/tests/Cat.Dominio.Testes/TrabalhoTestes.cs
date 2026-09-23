@@ -62,17 +62,15 @@ public sealed class EtapasTestes
         e.Single(x => x.Definicao.Chave == chave).Situacao;
 
     [Fact]
-    public void Projeto_novo_so_tem_importar_pendente()
+    public void Projeto_novo_tem_tudo_pendente_e_nada_barrado()
     {
+        // até 23/09/2026 as sete seguintes saíam "bloqueadas". A ordem do
+        // manual continua real — não se monta razão sem movimentos —, mas quem
+        // a cobra é o servidor, com a frase que explica o que falta. Aba
+        // apagada não explica nada.
         var e = Montar([]);
-        Assert.Equal(SituacaoEtapa.Pendente, Situacao(e, "importar"));
-        Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "conferencia"));
-        Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "movimentos"));
-        Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "st_suportado"));
-        Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "razao"));
-        Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "apuracao"));
-        Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "arquivo_digital"));
-        Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "entrega"));
+        Assert.All(e, x => Assert.Equal(SituacaoEtapa.Pendente, x.Situacao));
+        Assert.All(e, x => Assert.True(x.Acessivel));
         Assert.Equal((0, 8), Etapas.Progresso(e));
     }
 
@@ -82,28 +80,26 @@ public sealed class EtapasTestes
         var e = Montar(["importar"]);
         Assert.Equal(SituacaoEtapa.Concluida, Situacao(e, "importar"));
         Assert.Equal(SituacaoEtapa.Pendente, Situacao(e, "conferencia"));
-        Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "movimentos"));
+        Assert.Equal(SituacaoEtapa.Pendente, Situacao(e, "movimentos"));
         Assert.Equal((1, 8), Etapas.Progresso(e));
     }
 
     [Fact]
-    public void Em_andamento_aparece_e_nao_libera_a_seguinte()
+    public void Em_andamento_aparece_como_tal()
     {
         var e = Montar(["importar"], "conferencia");
         Assert.Equal(SituacaoEtapa.EmAndamento, Situacao(e, "conferencia"));
-        Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "movimentos"));
         Assert.True(e.Single(x => x.Definicao.Chave == "conferencia").Acessivel);
-        Assert.False(e.Single(x => x.Definicao.Chave == "movimentos").Acessivel);
     }
 
     [Fact]
-    public void Concluida_fora_de_ordem_conta_mas_nao_desbloqueia_o_resto()
+    public void Concluida_fora_de_ordem_conta_e_o_resto_segue_pendente()
     {
-        // movimentos concluídos com a conferência pendente: a conta é honesta,
-        // o roteiro não pula a dependência
+        // movimentos concluídos com a conferência pendente: acontece, e a
+        // conta é honesta — uma feita de oito
         var e = Montar(["movimentos"]);
         Assert.Equal(SituacaoEtapa.Concluida, Situacao(e, "movimentos"));
-        Assert.Equal(SituacaoEtapa.Bloqueada, Situacao(e, "conferencia"));
+        Assert.Equal(SituacaoEtapa.Pendente, Situacao(e, "conferencia"));
         Assert.Equal((1, 8), Etapas.Progresso(e));
     }
 
@@ -115,7 +111,7 @@ public sealed class EtapasTestes
         Assert.Equal(
             ["importar", "conferencia", "movimentos", "st_suportado", "razao", "apuracao", "arquivo_digital", "entrega"],
             Etapas.Do("icms").Select(e => e.Chave));
-        Assert.Equal("Aguardando etapa anterior", SituacaoEtapa.Bloqueada.Rotulo());
+        Assert.Equal("Ainda não disponível", SituacaoEtapa.NaoDisponivel.Rotulo());
         Assert.Equal("nao_disponivel", SituacaoEtapa.NaoDisponivel.Valor());
     }
 
@@ -206,31 +202,45 @@ public sealed class RoteiroPorModuloTestes
     }
 
     [Fact]
-    public void O_roteiro_de_piscofins_esta_inteiro_construido()
+    public void A_barra_de_piscofins_tem_as_cinco_funcionalidades_na_ordem()
     {
         var roteiro = Etapas.Montar("piscofins", new HashSet<string> { "importar" });
 
-        Assert.All(roteiro, e => Assert.True(e.Definicao.Implementada));
-        Assert.Equal((1, 3), Etapas.Progresso(roteiro));
-        // com a importação feita, a quebra abre; a apuração espera a vez dela
-        Assert.Equal(SituacaoEtapa.Pendente,
-            roteiro.Single(e => e.Definicao.Chave == "quebra_de_sped").Situacao);
-        Assert.Equal(SituacaoEtapa.Bloqueada,
-            roteiro.Single(e => e.Definicao.Chave == "apuracao_contribuicoes").Situacao);
+        Assert.Equal(
+            ["Arquivos", "Quebras", "Apuração", "Gestão", "Quebra XML"],
+            roteiro.Select(e => e.Definicao.Rotulo));
+        // a quebra XML ainda não existe, e só ela fica de fora
+        Assert.Equal((1, 4), Etapas.Progresso(roteiro));
+        Assert.False(roteiro.Single(e => e.Definicao.Chave == "quebra_xml").Acessivel);
+        Assert.All(roteiro.Where(e => e.Definicao.Chave != "quebra_xml"),
+            e => Assert.True(e.Acessivel));
     }
 
     [Fact]
-    public void A_quebra_de_sped_ja_existe_e_espera_a_importacao()
+    public void Quebrar_sped_e_apurar_piscofins_sao_funcionalidades_distintas()
     {
+        // eu as tinha empacotado na mesma etapa porque as portei no mesmo dia.
+        // A quebra abre os arquivos; a apuração confronta a 037 com o razão da
+        // ECD. Ver DECISOES de 23/09/2026.
+        var chaves = Etapas.Do("piscofins").Select(d => d.Chave).ToList();
+
+        Assert.Contains("quebra_de_sped", chaves);
+        Assert.Contains("apuracao_piscofins", chaves);
+        Assert.NotEqual(
+            chaves.IndexOf("quebra_de_sped"), chaves.IndexOf("apuracao_piscofins"));
+    }
+
+    [Fact]
+    public void A_quebra_de_sped_abre_sem_esperar_a_importacao()
+    {
+        // e quem recusa, se não houver SPED no lote, é o motor — com a frase
+        // que diz onde importar
         var roteiro = Etapas.Montar("piscofins", new HashSet<string>());
         var quebra = roteiro.Single(e => e.Definicao.Chave == "quebra_de_sped");
-        Assert.True(quebra.Definicao.Implementada);
-        // bloqueada, não indisponível: falta a etapa anterior, não o código
-        Assert.Equal(SituacaoEtapa.Bloqueada, quebra.Situacao);
 
-        var comBase = Etapas.Montar("piscofins", new HashSet<string> { "importar" });
-        Assert.Equal(SituacaoEtapa.Pendente,
-            comBase.Single(e => e.Definicao.Chave == "quebra_de_sped").Situacao);
+        Assert.True(quebra.Definicao.Implementada);
+        Assert.Equal(SituacaoEtapa.Pendente, quebra.Situacao);
+        Assert.True(quebra.Acessivel);
     }
 
     [Fact]

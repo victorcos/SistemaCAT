@@ -163,6 +163,45 @@ de trabalho pendente é perdê-lo no dia em que o trabalho acaba.
 
 ---
 
+## 2026-09-23 — Quebrar e apurar são coisas distintas, e a barra diz isso
+
+**O erro.** Eu tinha empacotado duas funcionalidades na mesma etapa porque as
+portei no mesmo dia. A `quebra_de_sped` produzia quatro parquets, e eles
+pertenciam a dois assuntos:
+
+| `arquivos.parquet` · `contagens.parquet` · `indices/` | **quebra**: abrir os arquivos |
+| `entradas.parquet` (037) · `razao.parquet` (ECD)      | **apuração**: confrontar fiscal × contábil |
+
+Quem quer olhar um C170 não quer esperar a 037 de um ano inteiro; quem quer a
+037 não precisa do índice de todos os blocos. Apontado pelo Victor.
+
+**A separação.** `quebra_de_sped` fica com o inventário e o índice; nasce
+`apuracao_piscofins` com o par que se confronta. O custo é reler os arquivos —
+uma passada a mais sobre a EFD e outra sobre a ECD, porque nenhuma guarda
+estado para a outra. É o preço de serem independentes, e é consciente: foi
+amarrá-las para economizar leitura que as fundiu numa coisa só.
+
+O que as duas compartilham desceu para `analitico/escrita.py` — gravar parquet
+em lotes, parar quando pedem, anotar de quem é o arquivo. Em módulo próprio para
+que nenhuma importe o privado da outra e as duas voltem a ser uma pela porta dos
+fundos.
+
+**O roteiro linear virou barra.** `| Arquivos | Quebras | Apuração | Gestão |
+Quebra XML |`. A lista numerada dizia que o trabalho é uma fila, e não é: a
+pessoa vai à funcionalidade de que precisa.
+
+**E nada trava mais.** A situação `Bloqueada` saiu do domínio. A ordem da CAT 42
+continua real — não se monta razão sem movimentos —, mas quem a cobra é o
+servidor, com a frase que diz o que falta. Uma frase explica; uma aba apagada,
+não. Só o que ainda não existe sai inacessível, e a `quebra_xml` é hoje o único
+caso.
+
+**Dois testes perderam o caso e foram reescritos**, não apagados: os que
+provavam o travamento passaram a provar que nada trava, e o do `EtapaDto`
+ganhou o `nome_curto` que a barra usa.
+
+---
+
 ## 2026-09-23 — O hub de cards: a porta de entrada que faltava
 
 **O que entrou.** Três telas e um endereço:

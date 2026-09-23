@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { BarraDeFuncionalidades } from "@/components/shared/BarraDeFuncionalidades";
+import { PainelDoTrabalho } from "@/components/shared/PainelDoTrabalho";
 import { Aviso } from "@/components/ui/Aviso";
 import { Botao, BotaoLink } from "@/components/ui/Botao";
 import { Campo, CampoSenha } from "@/components/ui/Campo";
@@ -38,8 +40,11 @@ import type { ErroApi } from "@/types/erro";
 
 /* ------------------------------------------------------------------ */
 
-/** Para onde cada etapa leva, e com que palavras. A tela não decide o que
- *  está disponível — isso vem do domínio, em `etapa.acessivel`. */
+/** Para onde cada funcionalidade leva, e com que palavras.
+ *
+ *  A tela não decide o que está disponível — isso vem do domínio, em
+ *  `etapa.acessivel`. Chave sem entrada aqui aparece na barra e no cartão sem
+ *  botão, o que é o certo para uma funcionalidade ainda sem tela. */
 const DESTINOS: Record<
   string,
   { rota: (id: number) => string; rotulos: Record<string, string> }
@@ -78,9 +83,17 @@ const DESTINOS: Record<
   quebra_de_sped: {
     rota: ROTAS.quebraDeSped,
     rotulos: {
-      concluida: "Ver o par que se confronta e baixar as planilhas",
+      concluida: "Ver o que foi lido e baixar as contagens",
       em_andamento: "Acompanhar a quebra",
       padrao: "Quebrar os SPED",
+    },
+  },
+  apuracao_piscofins: {
+    rota: ROTAS.apuracaoPisCofins,
+    rotulos: {
+      concluida: "Ver o par que se confronta e baixar as planilhas",
+      em_andamento: "Acompanhar a apuração",
+      padrao: "Apurar PIS/COFINS",
     },
   },
   apuracao_contribuicoes: {
@@ -285,23 +298,47 @@ export default function Projeto() {
         </Aviso>
       )}
 
-      <Secao
-        titulo="Etapas do processamento"
-        sub="A ordem é de dependência real: sem os movimentos não há razão, e sem o razão não há apuração."
-      >
-        <ol className="m-0 mt-4 flex list-none flex-col gap-2.5 p-0">
-          {d.etapas.map((e, i) => (
-            <LinhaDeEtapa
-              key={e.chave}
-              e={e}
-              numero={i + 1}
-              projetoId={Number(id)}
-              bloqueada={!anda}
-              motivo={parado?.titulo ?? ""}
-            />
-          ))}
-        </ol>
-      </Secao>
+      <BarraDeFuncionalidades
+        etapas={d.etapas}
+        rota={(chave: string) => {
+          const destino = DESTINOS[chave];
+          return destino ? destino.rota(Number(id)) : null;
+        }}
+      />
+
+      {/* Em PIS/COFINS as funcionalidades são independentes, e a grade diz isso:
+          cada uma é um card, com os leiautes da base em cima. Na CAT 42 a ordem
+          é dependência real — sem movimentos não há razão —, e ali a lista
+          numerada continua sendo a leitura certa. */}
+      {p.modulo === "piscofins" ? (
+        <PainelDoTrabalho
+          projetoId={Number(id)}
+          etapas={d.etapas}
+          rota={(chave: string) => {
+            const destino = DESTINOS[chave];
+            return destino ? destino.rota(Number(id)) : null;
+          }}
+          bloqueio={anda ? undefined : parado?.titulo}
+        />
+      ) : (
+        <Secao
+          titulo="As funcionalidades, em detalhe"
+          sub="A barra acima leva direto a cada uma. Aqui vai o que cada uma faz, em que pé está e o que ela produz."
+        >
+          <ol className="m-0 mt-4 flex list-none flex-col gap-2.5 p-0">
+            {d.etapas.map((e, i) => (
+              <LinhaDeEtapa
+                key={e.chave}
+                e={e}
+                numero={i + 1}
+                projetoId={Number(id)}
+                bloqueada={!anda}
+                motivo={parado?.titulo ?? ""}
+              />
+            ))}
+          </ol>
+        </Secao>
+      )}
 
       <section className="flex flex-wrap items-center gap-4 rounded-cartao border border-borda bg-superficie-vidro p-6">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border border-laranja-500/30 bg-laranja-500/14 text-laranja-700 escuro:text-laranja-300">

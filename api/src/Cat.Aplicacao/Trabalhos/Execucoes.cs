@@ -85,6 +85,7 @@ public sealed class Execucoes(
     /// <summary>Primeira etapa do módulo de PIS/COFINS depois da importação.</summary>
     public const string QuebraDeSped = "quebra_de_sped";
     public const string ApuracaoContribuicoes = "apuracao_contribuicoes";
+    public const string ApuracaoPisCofins = "apuracao_piscofins";
 
     /// <summary>
     /// A entrega montada e ainda não aprovada. Não é situação gravada: é como o
@@ -184,21 +185,21 @@ public sealed class Execucoes(
     /// <summary>O seletor de conta do razão contábil: uma linha por conta, com saldo.</summary>
     public async Task<JsonElement> ContasDoRazaoContabil(int execucaoId, PedidoDeContasContabeis pedido, Usuario usuario, CancellationToken cancelar)
     {
-        var e = await Detalhar(execucaoId, QuebraDeSped, usuario, cancelar);
+        var e = await Detalhar(execucaoId, ApuracaoPisCofins, usuario, cancelar);
         return await motor.ContasDoRazaoContabil(e.Id, pedido, cancelar);
     }
 
     /// <summary>Uma página dos lançamentos de uma conta, em ordem de data.</summary>
     public async Task<JsonElement> LancamentosDoRazaoContabil(int execucaoId, PedidoDeLancamentos pedido, Usuario usuario, CancellationToken cancelar)
     {
-        var e = await Detalhar(execucaoId, QuebraDeSped, usuario, cancelar);
+        var e = await Detalhar(execucaoId, ApuracaoPisCofins, usuario, cancelar);
         return await motor.LancamentosDoRazaoContabil(e.Id, pedido, cancelar);
     }
 
     /// <summary>Os estabelecimentos do razão contábil, para o filtro da tela.</summary>
     public async Task<JsonElement> EstabelecimentosDoRazaoContabil(int execucaoId, Usuario usuario, CancellationToken cancelar)
     {
-        var e = await Detalhar(execucaoId, QuebraDeSped, usuario, cancelar);
+        var e = await Detalhar(execucaoId, ApuracaoPisCofins, usuario, cancelar);
         return await motor.EstabelecimentosDoRazaoContabil(e.Id, cancelar);
     }
 

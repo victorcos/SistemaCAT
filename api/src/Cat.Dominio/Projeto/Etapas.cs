@@ -5,8 +5,6 @@ public enum SituacaoEtapa
     Concluida,
     EmAndamento,
     Pendente,
-    /// <summary>Falta a etapa anterior.</summary>
-    Bloqueada,
     /// <summary>Ainda não construída no sistema.</summary>
     NaoDisponivel,
 }
@@ -19,7 +17,6 @@ public static class SituacoesDeEtapa
         SituacaoEtapa.Concluida => "concluida",
         SituacaoEtapa.EmAndamento => "em_andamento",
         SituacaoEtapa.Pendente => "pendente",
-        SituacaoEtapa.Bloqueada => "bloqueada",
         _ => "nao_disponivel",
     };
 
@@ -28,21 +25,36 @@ public static class SituacoesDeEtapa
         SituacaoEtapa.Concluida => "Concluída",
         SituacaoEtapa.EmAndamento => "Em andamento",
         SituacaoEtapa.Pendente => "Pendente",
-        SituacaoEtapa.Bloqueada => "Aguardando etapa anterior",
         _ => "Ainda não disponível",
     };
 }
 
 /// <param name="Implementada">
-/// Falso enquanto a funcionalidade não existe. Mostrar a etapa mesmo assim é
-/// deliberado: o usuário vê o caminho inteiro e sabe onde o trabalho está.
+/// Falso enquanto a funcionalidade não existe. Mostrar a funcionalidade mesmo
+/// assim é deliberado: o usuário vê o caminho inteiro e sabe onde o trabalho
+/// está.
 /// </param>
-public sealed record DefinicaoEtapa(string Chave, string Nome, string Descricao, bool Implementada = false);
+/// <param name="Aba">
+/// O rótulo curto da barra do trabalho. Uma ou duas palavras: "Arquivos",
+/// "Quebras", "Apuração". O <paramref name="Nome"/> continua sendo a frase
+/// inteira, que a tela usa no cabeçalho e no cartão. Vazio cai no Nome.
+/// </param>
+public sealed record DefinicaoEtapa(string Chave, string Nome, string Descricao,
+    bool Implementada = false, string Aba = "")
+{
+    public string Rotulo => string.IsNullOrWhiteSpace(Aba) ? Nome : Aba;
+}
 
 public sealed record EtapaDoProjeto(DefinicaoEtapa Definicao, SituacaoEtapa Situacao)
 {
-    /// <summary>Se vale a pena o usuário clicar.</summary>
-    public bool Acessivel => Situacao is SituacaoEtapa.Concluida or SituacaoEtapa.EmAndamento or SituacaoEtapa.Pendente;
+    /// <summary>
+    /// Se vale a pena o usuário clicar.
+    ///
+    /// Só o que não existe fica de fora. Falta de base **não** barra mais: a
+    /// pessoa entra na funcionalidade e a tela diz o que falta, em vez de uma
+    /// aba apagada que não explica nada.
+    /// </summary>
+    public bool Acessivel => Situacao is not SituacaoEtapa.NaoDisponivel;
 }
 
 /// <summary>
@@ -74,62 +86,71 @@ public static class Etapas
             "notas e relatórios do ERP. O sistema identifica cada arquivo e " +
             "separa o que é de outra empresa. Pode voltar quantas vezes a " +
             "empresa mandar arquivo — o cadastro é que acontece uma vez só.",
-            Implementada: true),
+            Implementada: true, Aba: "Arquivos"),
         new("conferencia", "Conferir documentos",
             "Cruzar o que a EFD escriturou (C100 e C800) com o XML e o " +
             "relatório do cliente. Sai daqui o que está na pasta e não foi " +
             "escriturado — que fica fora da análise — e o que foi escriturado " +
             "sem documento, que é o que se cobra do cliente.",
-            Implementada: true),
+            Implementada: true, Aba: "Conferência"),
         new("movimentos", "Extrair movimentos",
             "Ler os itens de cada documento (C170), o analítico (C190/C850), o " +
             "cadastro de item (0200) e o inventário (Bloco H), que dá o saldo " +
             "de abertura — cada movimento marcado pela conferência.",
-            Implementada: true),
+            Implementada: true, Aba: "Movimentos"),
         new("st_suportado", "Apurar o ICMS suportado",
             "Determinar o imposto suportado de cada entrada pela cascata de " +
             "quatro fontes — destacado na nota, informado pelo fornecedor, " +
             "reconstruído por base e alíquota, ou não apurável — e marcar de " +
             "onde veio cada valor. Quando o ERP e o XML divergem, vale o XML.",
-            Implementada: true),
+            Implementada: true, Aba: "Suportado"),
         new("razao", "Montar o razão dos itens",
             "A Ficha 3: uma ficha por estabelecimento e mercadoria com ST, custo " +
             "médio ponderado móvel, entradas e devoluções antes das saídas no mesmo " +
             "dia. As saídas sem item na EFD vêm do relatório do cliente.",
-            Implementada: true),
+            Implementada: true, Aba: "Razão"),
         new("apuracao", "Apurar ressarcimento e complemento",
             "Fechar o período por estabelecimento e mês: ressarcimento a pedir e " +
             "complemento a recolher, separados, com os saldos de cada mercadoria e " +
             "a conferência contra o inventário. Só a competência sem pendência " +
             "segue para o arquivo digital.",
-            Implementada: true),
+            Implementada: true, Aba: "Apuração"),
         new("arquivo_digital", "Gerar o arquivo digital",
             "Um arquivo por estabelecimento de SP e por mês, com os registros 0000 a " +
             "1200 no leiaute da CAT 42, e a pré-validação que recompõe a Ficha 3 a " +
             "partir do próprio arquivo. Só a competência apta e sem erro vai para o " +
             "envio; as outras saem como prévia.",
-            Implementada: true),
+            Implementada: true, Aba: "Arquivo digital"),
         new("entrega", "Relatórios e entrega",
             "O relatório executivo com todas as competências — prontas ou não, com o " +
             "que falta —, o dossiê de cada estabelecimento com o que vai à SEFAZ e o " +
             "manifesto com o SHA-256 de cada arquivo. Conclui quando um revisor ou " +
             "gestor aprova.",
-            Implementada: true),
+            Implementada: true, Aba: "Entrega"),
 
-        // ---- PIS/COFINS: declaradas, ainda não construídas ----
-        new("quebra_de_sped", "Quebra de SPED",
-            "Indexar a EFD-Contribuições numa passada — contagem por registro e " +
-            "posição em bytes de cada um — e extrair qualquer bloco sob demanda, sem " +
-            "reler o arquivo. É o que permite consolidar C170, C190, M210 e os demais " +
-            "de uma base de dezenas de milhões de linhas com memória constante. Dela saem a " +
-            "Consulta de Entradas (037) e o razão contábil da ECD — o par que se confronta.",
-            Implementada: true),
-        new("apuracao_contribuicoes", "Apurar PIS/COFINS",
-            "Os quadros da apuração por competência: receitas e bases por CST, CFOP e " +
-            "natureza, ajustes, e o controle de créditos. Inclui a exclusão do ICMS da " +
-            "base, que cruza a EFD-Contribuições com a EFD ICMS/IPI pelo documento e " +
-            "pelo item.",
-            Implementada: true),
+        // ---- PIS/COFINS ----
+        new("quebra_de_sped", "Quebrar os SPED",
+            "Abrir os arquivos: quantos de cada registro cada SPED tem, e o índice " +
+            "com a posição em bytes de cada um — que é o que permite extrair " +
+            "qualquer registro depois sem reler o arquivo. Numa base de dezenas de " +
+            "milhões de linhas, é a diferença entre olhar um C170 em segundos e em " +
+            "minutos.",
+            Implementada: true, Aba: "Quebras"),
+        new("apuracao_piscofins", "Apurar PIS/COFINS",
+            "O par que se confronta: a Consulta de Entradas (037), do lado fiscal, e " +
+            "o razão contábil da ECD, do lado da contabilidade. Onde os dois " +
+            "discordam é onde está o trabalho.",
+            Implementada: true, Aba: "Apuração"),
+        new("apuracao_contribuicoes", "Gestão Fiscal",
+            "Os quadros no padrão do MA: da EFD-Contribuições saem PIS e COFINS, nos " +
+            "36 quadros; da ECF saem IRPJ e CSLL do Lucro Real. Receitas e bases por " +
+            "CST, natureza dos créditos, ajustes e controle de saldos, competência a " +
+            "competência.",
+            Implementada: true, Aba: "Gestão"),
+        new("quebra_xml", "Quebrar os XML",
+            "Abrir os XML das notas do lote item a item, como a quebra faz com o " +
+            "SPED. Ainda não construída.",
+            Implementada: false, Aba: "Quebra XML"),
     ];
 
     /// <summary>
@@ -146,8 +167,9 @@ public static class Etapas
         {
             ["icms"] = ["importar", "conferencia", "movimentos", "st_suportado", "razao",
                         "apuracao", "arquivo_digital", "entrega"],
-            // o que vem do porte do Quebra de SPED e da Gestão padrão MA
-            ["piscofins"] = ["importar", "quebra_de_sped", "apuracao_contribuicoes"],
+            // a barra do trabalho de PIS/COFINS, na ordem em que aparece
+            ["piscofins"] = ["importar", "quebra_de_sped", "apuracao_piscofins",
+                             "apuracao_contribuicoes", "quebra_xml"],
             ["irpj_csll"] = ["importar"],
         };
 
@@ -190,17 +212,18 @@ public static class Etapas
         IReadOnlySet<string> concluidas, string? emAndamento = null)
     {
         var saida = new List<EtapaDoProjeto>();
-        var anteriorOk = true;
         foreach (var d in roteiro)
         {
+            // nada trava mais: a funcionalidade abre e, faltando base, a tela
+            // diz o que falta. A dependência real continua no servidor, que
+            // recusa com a frase certa — e uma frase explica; uma aba apagada,
+            // não. Ver DECISOES de 23/09/2026.
             var situacao =
                 !d.Implementada ? SituacaoEtapa.NaoDisponivel
                 : concluidas.Contains(d.Chave) ? SituacaoEtapa.Concluida
                 : d.Chave == emAndamento ? SituacaoEtapa.EmAndamento
-                : anteriorOk ? SituacaoEtapa.Pendente
-                : SituacaoEtapa.Bloqueada;
+                : SituacaoEtapa.Pendente;
             saida.Add(new EtapaDoProjeto(d, situacao));
-            anteriorOk = anteriorOk && situacao == SituacaoEtapa.Concluida;
         }
         return saida;
     }

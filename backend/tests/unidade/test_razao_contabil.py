@@ -7,7 +7,8 @@ entre estabelecimentos apareça. Tudo texto, como a quebra grava.
 
 import pytest
 
-from cat.infraestrutura.analitico.quebra_de_sped import ARQUIVO_DO_RAZAO, _Escritor
+from cat.infraestrutura.analitico.escrita import Escritor
+from cat.infraestrutura.analitico.piscofins import ARQUIVO_DO_RAZAO
 from cat.infraestrutura.analitico.razao_contabil import (
     POR_PAGINA_MAXIMO,
     RazaoNaoGerado,
@@ -61,7 +62,7 @@ PARTIDAS = [
 
 @pytest.fixture
 def pasta(tmp_path):
-    escritor = _Escritor(str(tmp_path / ARQUIVO_DO_RAZAO), COLUNAS)
+    escritor = Escritor(str(tmp_path / ARQUIVO_DO_RAZAO), COLUNAS)
     for partida in PARTIDAS:
         escritor.escrever(partida)
     escritor.fechar()

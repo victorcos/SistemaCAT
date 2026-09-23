@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { BaixarPlanilha } from "@/components/shared/BaixarPlanilha";
 import {
   BarraFina,
@@ -26,51 +26,45 @@ import { numero } from "@/lib/format";
 import { EM_CURSO, type Formato } from "@/services/conferencia";
 import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
 import {
-  baixarPlanilhaDaQuebra,
-  cancelarQuebra,
-  detalharQuebra,
-  iniciarQuebra,
-  listarQuebras,
-  type ExecucaoDaQuebra,
-  type PlanilhaDaQuebra,
-  type ResumoDaQuebra,
-} from "@/services/quebraDeSped";
+  baixarPlanilhaDaApuracao,
+  cancelarApuracao,
+  detalharApuracao,
+  iniciarApuracao,
+  listarApuracoes,
+  type ExecucaoDaApuracao,
+  type PlanilhaDaApuracao,
+  type ResumoDaApuracao,
+} from "@/services/apuracaoPisCofins";
 import type { ErroApi } from "@/types/erro";
 
 /**
- * Quebrar os SPED — abrir os arquivos e dizer o que há dentro.
+ * Apuração de PIS/COFINS — o par que se confronta.
  *
- * Duas planilhas: **o que foi lido** (um arquivo por linha, com empresa,
- * período e tamanho) e **o que há dentro** (quantos de cada registro em cada
- * arquivo). O índice fica em disco, e é dele que sai a extração de um registro
- * qualquer — sem reler o arquivo.
+ * A tela existe para entregar **um par**: a Consulta de Entradas (037), do lado
+ * fiscal, e o razão contábil da ECD, do lado da contabilidade. Por isso os dois
+ * downloads aparecem juntos e em destaque, e o resto da tela serve para dizer
+ * se a base que os gerou está inteira.
  *
- * A Consulta de Entradas e o razão contábil saíram daqui em 23/09/2026 e viraram
- * a apuração de PIS/COFINS. Não eram quebra: eram o confronto entre o fiscal e
- * o contábil.
+ * Era parte da quebra de SPED até 23/09/2026. A quebra abre os arquivos; esta
+ * confronta — e quem quer olhar um registro não precisa esperar a 037 de um ano
+ * inteiro.
  */
 
 const ESPERA_PARA_CANCELAR_MS = 400;
 
-const tamanho = (bytes: number | undefined) => {
-  const b = bytes ?? 0;
-  if (b >= 1 << 30) return `${(b / (1 << 30)).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} GB`;
-  if (b >= 1 << 20) return `${(b / (1 << 20)).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB`;
-  return `${Math.ceil(b / 1024).toLocaleString("pt-BR")} KB`;
-};
 
 const cnpjFormatado = (c: string) =>
   c.length === 14
     ? `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}`
     : c;
 
-export default function QuebraDeSped() {
+export default function ApuracaoPisCofins() {
   const { id } = useParams<{ id: string }>();
   const projetoId = Number(id);
 
   const [projeto, setProjeto] = useState<ProjetoDetalhe | null>(null);
-  const [atual, setAtual] = useState<ExecucaoDaQuebra | null>(null);
-  const [resultado, setResultado] = useState<ExecucaoDaQuebra | null>(null);
+  const [atual, setAtual] = useState<ExecucaoDaApuracao | null>(null);
+  const [resultado, setResultado] = useState<ExecucaoDaApuracao | null>(null);
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [podeCancelar, setPodeCancelar] = useState(false);
@@ -85,7 +79,7 @@ export default function QuebraDeSped() {
 
   const acompanhar = useCallback(async (execucaoId: number) => {
     try {
-      const e = await detalharQuebra(execucaoId);
+      const e = await detalharApuracao(execucaoId);
       setAtual(e);
       if (e.situacao === "concluida") setResultado(e);
       if (!EM_CURSO.includes(e.situacao)) parar();
@@ -105,7 +99,7 @@ export default function QuebraDeSped() {
   useEffect(() => {
     if (!projetoId) return;
     detalharProjeto(projetoId).then(setProjeto).catch((x) => setErro(comoErro(x)));
-    listarQuebras(projetoId)
+    listarApuracoes(projetoId)
       .then((lista) => {
         const ultima = lista[0] ?? null;
         setAtual(ultima);
@@ -129,7 +123,7 @@ export default function QuebraDeSped() {
     setOcupado(true);
     setErro(null);
     try {
-      const nova = await iniciarQuebra(projetoId);
+      const nova = await iniciarApuracao(projetoId);
       setAtual(nova);
       seguir(nova.id);
     } catch (x) {
@@ -142,7 +136,7 @@ export default function QuebraDeSped() {
   async function interromper() {
     if (!atual) return;
     try {
-      const e = await cancelarQuebra(atual.id);
+      const e = await cancelarApuracao(atual.id);
       setAtual(e);
       if (!EM_CURSO.includes(e.situacao)) parar();
     } catch (x) {
@@ -166,7 +160,7 @@ export default function QuebraDeSped() {
           Cancelar
         </Botao>
       ) : (
-        <Botao carregando>Quebrando…</Botao>
+        <Botao carregando>Apurando…</Botao>
       );
   } else {
     acao = (
@@ -177,7 +171,7 @@ export default function QuebraDeSped() {
         disabled={!anda}
         className="shadow-acao"
       >
-        {resultado ? "Quebrar de novo" : "Quebrar os SPED"}
+        {resultado ? "Apurar de novo" : "Apurar PIS/COFINS"}
       </Botao>
     );
   }
@@ -187,9 +181,9 @@ export default function QuebraDeSped() {
       <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
 
       <CabecalhoDePagina
-        eyebrow="PIS/COFINS · Etapa 1"
-        titulo="Quebrar os SPED"
-        sub="Abre os SPED do lote: quantos de cada registro cada arquivo tem, e o índice com a posição de cada um — que é o que permite extrair qualquer registro depois sem reler o arquivo."
+        eyebrow="PIS/COFINS · Apuração"
+        titulo="Apurar PIS/COFINS"
+        sub="Lê a EFD-Contribuições e a ECD do lote e monta o par que se confronta: a Consulta de Entradas (037), do lado fiscal, e o razão contábil, do lado da contabilidade. Onde os dois discordam é onde está o trabalho."
         acao={
           <div className="flex flex-col items-end gap-2.5">
             {acao}
@@ -217,7 +211,7 @@ export default function QuebraDeSped() {
       {erro && <Aviso titulo={erro.message} codigo={erro.requisicaoId} aoFechar={() => setErro(null)} />}
 
       {atual?.situacao === "falhou" && (
-        <Aviso titulo="A quebra falhou">
+        <Aviso titulo="A apuração falhou">
           <span className="block">{atual.erro}</span>
           <code className="mt-2 inline-block rounded-lg border border-dashed border-erro/40 bg-erro/5 px-2.5 py-1.5 font-mono text-xs">
             execução #{atual.id}
@@ -235,7 +229,7 @@ export default function QuebraDeSped() {
       {rodando && atual && <EmCurso e={atual} />}
 
       {!rodando && !atual && (
-        <Faixa titulo="Nada quebrado ainda">
+        <Faixa titulo="Nada apurado ainda">
           Importe a pasta com a EFD-Contribuições e a ECD que o cliente transmitiu à Receita e rode
           a quebra. Nenhuma outra etapa precisa vir antes.
         </Faixa>
@@ -246,34 +240,34 @@ export default function QuebraDeSped() {
   );
 }
 
-function EmCurso({ e }: { e: ExecucaoDaQuebra }) {
+function EmCurso({ e }: { e: ExecucaoDaApuracao }) {
   const a = e.resumo?.andamento;
   return (
     <Cartao className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
-        <h2 className="m-0 flex-1 text-base font-extrabold text-texto">{e.passo ?? "Quebrando"}</h2>
+        <h2 className="m-0 flex-1 text-base font-extrabold text-texto">{e.passo ?? "Apurando"}</h2>
         <code className="font-mono text-[11px] text-texto-fraco">execução #{e.id}</code>
       </div>
       <BarraFina fracao={e.fracao} classe="bg-marca-laranja" />
       <p className="m-0 font-mono text-xs text-texto-fraco">
         {numero(e.arquivos_lidos ?? 0)} de {numero(e.arquivos_totais ?? 0)} arquivos
-        {a ? ` · ${numero(a.registros)} registros indexados` : ""}
+        {a ? ` · ${numero(a.entradas)} entradas · ${numero(a.razao)} linhas de razão` : ""}
       </p>
     </Cartao>
   );
 }
 
-function Concluido({ execucao, resumo }: { execucao: ExecucaoDaQuebra; resumo: ResumoDaQuebra }) {
+function Concluido({ execucao, resumo }: { execucao: ExecucaoDaApuracao; resumo: ResumoDaApuracao }) {
   const download = useAcao();
-  const [baixando, setBaixando] = useState<{ qual: PlanilhaDaQuebra; formato: Formato } | null>(null);
+  const [baixando, setBaixando] = useState<{ qual: PlanilhaDaApuracao; formato: Formato } | null>(null);
 
-  async function baixar(qual: PlanilhaDaQuebra, formato: Formato) {
+  async function baixar(qual: PlanilhaDaApuracao, formato: Formato) {
     setBaixando({ qual, formato });
-    await download.executar((sinal) => baixarPlanilhaDaQuebra(execucao.id, qual, formato, sinal));
+    await download.executar((sinal) => baixarPlanilhaDaApuracao(execucao.id, qual, formato, sinal));
     setBaixando(null);
   }
 
-  const par = (qual: PlanilhaDaQuebra, rotulo: string, destaque?: boolean, vazio?: boolean) => (
+  const par = (qual: PlanilhaDaApuracao, rotulo: string, destaque?: boolean, vazio?: boolean) => (
     <BaixarPlanilha
       destaque={destaque}
       aoBaixar={(formato) => baixar(qual, formato)}
@@ -284,6 +278,7 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaQuebra; resumo: R
     />
   );
 
+  const ramos = Object.entries(resumo.por_ramo ?? {}).sort((a, b) => b[1] - a[1]);
   const competencias = resumo.competencias ?? [];
 
   return (
@@ -296,37 +291,44 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaQuebra; resumo: R
         />
       )}
 
-      {/* o que a quebra entrega: o inventário do que foi lido */}
+      {/* o par que se confronta vem primeiro, e em destaque */}
       <section className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
         <Cartao className="flex flex-col gap-3">
-          <Rotulo>Arquivos abertos</Rotulo>
+          <Rotulo>Consulta de Entradas (037)</Rotulo>
           <p className="m-0 font-mono text-[32px] leading-none text-texto">
-            {numero(resumo.arquivos ?? 0)}
+            {numero(resumo.entradas ?? 0)}
           </p>
           <p className="m-0 text-xs leading-relaxed text-texto-fraco">
-            Um por linha, com empresa, período, tamanho e o que rendeu. É por aqui que se
-            confere se a base está inteira antes de olhar qualquer número.
+            Linhas de entrada da EFD-Contribuições, nos oito ramos de documento. É o que a
+            escrituração fiscal registrou como entrada.
           </p>
-          {par("arquivos", "Baixar o que foi lido", true, (resumo.arquivos ?? 0) === 0)}
+          {par("entradas", "Baixar as entradas", true, (resumo.entradas ?? 0) === 0)}
         </Cartao>
 
         <Cartao className="flex flex-col gap-3">
-          <Rotulo>Registros distintos</Rotulo>
+          <Rotulo>Razão contábil (ECD)</Rotulo>
           <p className="m-0 font-mono text-[32px] leading-none text-texto">
-            {numero(resumo.registros ?? 0)}
+            {numero(resumo.linhas_do_razao ?? 0)}
           </p>
           <p className="m-0 text-xs leading-relaxed text-texto-fraco">
-            Quantos de cada registro cada arquivo tem — C100, C170, M200, I250. O índice com a
-            posição de cada um fica em disco, para extrair qualquer bloco depois.
+            Partidas das contas analíticas, em ordem de data, com saldo correndo. É o que a
+            contabilidade lançou.
           </p>
-          {par("contagens", "Baixar as contagens", true, (resumo.arquivos ?? 0) === 0)}
+          {par("razao-contabil", "Baixar o razão", true, (resumo.linhas_do_razao ?? 0) === 0)}
+          <Link
+            to={ROTAS.razaoContabil(execucao.projeto_id)}
+            className="text-[12px] font-bold text-marca-laranja no-underline hover:underline"
+          >
+            Abrir na tela, conta por conta →
+          </Link>
         </Cartao>
       </section>
 
       <section className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3">
         <Metrica rotulo="Arquivos lidos" valor={numero(resumo.arquivos ?? 0)}
                  nota={`${numero(resumo.contribuicoes ?? 0)} EFD-Contribuições · ${numero(resumo.ecd ?? 0)} ECD`} />
-        <Metrica rotulo="Linhas lidas" valor={numero(resumo.linhas ?? 0)} nota={tamanho(resumo.bytes)} />
+        <Metrica rotulo="Linhas da 037" valor={numero(resumo.entradas ?? 0)}
+                 nota={`${numero(resumo.linhas_do_razao ?? 0)} linhas de razão`} />
         <Metrica rotulo="Estabelecimentos" valor={numero((resumo.estabelecimentos ?? []).length)}
                  nota={(resumo.estabelecimentos ?? []).slice(0, 2).map(cnpjFormatado).join(" · ")} />
         <Metrica
@@ -343,6 +345,25 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaQuebra; resumo: R
           atencao={(resumo.ilegiveis ?? 0) > 0}
         />
       </section>
+
+      {ramos.length > 0 && (
+        <Cartao className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="m-0 flex-1 text-base font-extrabold text-texto">De onde vêm as entradas</h2>
+            <span className="text-[11px] text-texto-fraco">
+              o mesmo cliente pode escriturar por um ramo só
+            </span>
+          </div>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+            {ramos.map(([ramo, quantas]) => (
+              <li key={ramo} className="flex items-baseline gap-3 text-[13px] leading-relaxed">
+                <span className="min-w-[92px] text-right font-mono text-texto">{numero(quantas)}</span>
+                <span className="text-texto-suave">{ramo}</span>
+              </li>
+            ))}
+          </ul>
+        </Cartao>
+      )}
 
       {(resumo.avisos ?? []).length > 0 && (
         <section className="rounded-cartao border border-atencao/25 border-l-[3px] border-l-atencao bg-atencao-fundo px-5 py-4.5">
@@ -365,8 +386,6 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaQuebra; resumo: R
             Serve para conferir a base antes de olhar o número.
           </p>
         </div>
-        {par("arquivos", "Baixar os arquivos")}
-        {par("contagens", "Baixar as contagens")}
       </Cartao>
 
       {(resumo.log ?? []).length > 0 && (

@@ -37,6 +37,7 @@ from sqlalchemy.orm import Session
 from cat.aplicacao.casos_de_uso import (
     apurar_contribuicoes,
     apurar_periodo,
+    apurar_piscofins,
     apurar_suportado,
     conferir_documentos,
     extrair_movimentos,
@@ -353,6 +354,9 @@ PREPARADORES = {
     apurar_contribuicoes.ETAPA: (
         apurar_contribuicoes.preparar, apurar_contribuicoes.NadaParaApurar,
         "Já existe uma apuração das contribuições em andamento neste trabalho."),
+    apurar_piscofins.ETAPA: (
+        apurar_piscofins.preparar, apurar_piscofins.NadaParaApurar,
+        "Já existe uma apuração de PIS/COFINS em andamento neste trabalho."),
     quebrar_sped.ETAPA: (quebrar_sped.preparar, quebrar_sped.NadaParaQuebrar,
                          "Já existe uma quebra de SPED em andamento neste trabalho."),
 }
@@ -577,11 +581,17 @@ class PedidoDoRazaoContabil(BaseModel):
 
 
 def _quebra_concluida(execucao_id: int, sessao: Session) -> ExecucaoDB:
+    """A execução da apuração de PIS/COFINS, que é de onde o razão sai.
+
+    Era a quebra até 23/09/2026, quando as duas se separaram. O nome da função
+    ficou por ser o que as rotas chamam; o que ela exige mudou.
+    """
     execucao = sessao.get(ExecucaoDB, execucao_id)
-    if execucao is None or execucao.etapa != quebrar_sped.ETAPA:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Quebra de SPED não encontrada.")
+    if execucao is None or execucao.etapa != apurar_piscofins.ETAPA:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Apuração de PIS/COFINS não encontrada.")
     if execucao.situacao != "concluida":
-        raise HTTPException(status.HTTP_409_CONFLICT, "A quebra de SPED ainda não terminou.")
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "A apuração de PIS/COFINS ainda não terminou.")
     return execucao
 
 

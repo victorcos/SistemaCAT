@@ -1,12 +1,13 @@
-"""O razão contábil pelo canal interno: quebrar a ECD e depois lê-la na tela.
+"""O razão contábil pelo canal interno: apurar e depois ler na tela.
 
 Uma ECD pequena, duas contas analíticas, lançamentos **fora de ordem de data** —
 o SPED não obriga ordem, e é isso que separa um razão de uma lista de partidas.
-O caminho inteiro: lote → quebra de SPED → seletor de conta → lançamentos.
+O caminho inteiro: lote → apuração de PIS/COFINS → seletor → lançamentos.
 
 O que os testes cobram aqui e o teste de unidade não cobre: que a rota só
-responda sobre execução **concluída** da etapa **certa**, e que o segredo do
-canal seja obrigatório. Ler parquet é problema do módulo analítico.
+responda sobre execução **concluída** da etapa **certa** — que desde 23/09/2026
+é a apuração, e não mais a quebra —, e que o segredo do canal seja obrigatório.
+Ler parquet é problema do módulo analítico.
 """
 
 import pytest
@@ -79,7 +80,7 @@ def projeto_id(cliente, tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def quebra(cliente, projeto_id):
-    r = iniciar(cliente, "quebra_de_sped", projeto_id, "ecd_analista")
+    r = iniciar(cliente, "apuracao_piscofins", projeto_id, "ecd_analista")
     assert r.status_code == 202, r.text
     rodar_fila()
     d = execucao(r.json()["id"])
@@ -165,9 +166,9 @@ class TestOQueAsRotasRecusam:
         assert r.status_code == 403
 
     def test_execucao_de_outra_etapa_nao_e_um_razao(self, cliente, projeto_id):
-        """A conferência é execução também. Ler o razão dela seria ler outra coisa."""
+        """A quebra é execução também — e desde a separação não é a que tem o razão."""
         with Sessao() as s:
-            outra = ExecucaoDB(projeto_id=projeto_id, etapa="conferencia",
+            outra = ExecucaoDB(projeto_id=projeto_id, etapa="quebra_de_sped",
                                situacao="concluida", passo="Concluída")
             s.add(outra)
             s.commit()
@@ -177,11 +178,11 @@ class TestOQueAsRotasRecusam:
                                 json={"execucao_id": outra_id})
         assert resposta.status_code == 404
 
-    def test_quebra_que_ainda_nao_terminou(self, cliente, projeto_id):
-        """Ler o razão de uma quebra em andamento leria parquet pela metade."""
+    def test_apuracao_que_ainda_nao_terminou(self, cliente, projeto_id):
+        """Ler o razão de uma apuração em andamento leria parquet pela metade."""
         with Sessao() as s:
-            andando = ExecucaoDB(projeto_id=projeto_id, etapa="quebra_de_sped",
-                                 situacao="rodando", passo="Quebrando")
+            andando = ExecucaoDB(projeto_id=projeto_id, etapa="apuracao_piscofins",
+                                 situacao="rodando", passo="Apurando")
             s.add(andando)
             s.commit()
             andando_id = andando.id

@@ -162,6 +162,13 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       "frente" o nível 2, e `frente` já existe no código como tipo de trabalho
 - [x] Tela do razão da ECD, com seletor de conta: busca por código, nome e conta
       referencial, recorte por saldo e os lançamentos em ordem de data (v0.77.0)
+- [x] Separar quebra de apuração, e trocar o roteiro linear pela barra de
+      funcionalidades — nada trava mais (v0.86.0)
+- [ ] Em Quebras: escolher um registro e baixá-lo. O índice já guarda a posição
+      de cada um; falta a rota e a tela
+- [ ] `quebra_xml`: declarada e sem código. Abrir os XML do lote item a item
+- [ ] Escolher entre a barra (`BarraDeFuncionalidades`) e os cards
+      (`PainelDoTrabalho`): as duas foram construídas para o mesmo lugar
 - [ ] Correção à mão: editar na tela do razão, linha a linha
 - [ ] **Fim da ST de perfumaria e higiene em 1º/04/2026** (Portaria SRE 94/2025):
       trabalho cuja competência cruze 31/03/2026 monta a ficha como se a ST

@@ -73,6 +73,8 @@ export interface Projeto {
 export interface Etapa {
   chave: string;
   nome: string;
+  /** o rótulo da barra do trabalho: "Arquivos", "Quebras", "Apuração" */
+  nome_curto: string;
   descricao: string;
   situacao: string;
   situacao_rotulo: string;

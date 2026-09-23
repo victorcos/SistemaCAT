@@ -26,8 +26,10 @@ public static class TrabalhosRotas
         string? CriadoPor, int? CriadoPorId, string? Responsavel, int? ResponsavelId, int Comentarios,
         string VendaAConsumidor, string VendaAConsumidorRotulo);
 
+    /// <param name="NomeCurto">o rótulo da barra do trabalho: "Arquivos", "Quebras"…</param>
     public sealed record EtapaDto(
-        string Chave, string Nome, string Descricao, string Situacao, string SituacaoRotulo, bool Implementada, bool Acessivel);
+        string Chave, string Nome, string NomeCurto, string Descricao, string Situacao,
+        string SituacaoRotulo, bool Implementada, bool Acessivel);
 
     public sealed record ProjetoDetalheDto(ProjetoDto Projeto, IReadOnlyList<EtapaDto> Etapas, BaseDto Base);
 
@@ -231,7 +233,8 @@ public static class TrabalhosRotas
     }
 
     private static EtapaDto Etapa(EtapaDoProjeto e) => new(
-        e.Definicao.Chave, e.Definicao.Nome, e.Definicao.Descricao, e.Situacao.Valor(), e.Situacao.Rotulo(),
+        e.Definicao.Chave, e.Definicao.Nome, e.Definicao.Rotulo, e.Definicao.Descricao,
+        e.Situacao.Valor(), e.Situacao.Rotulo(),
         e.Definicao.Implementada, e.Acessivel);
 
     private static OQueSeraApagadoDto Apagado(OQueSeraApagado o) => new(o.Projeto, o.Empresa, o.Lotes, o.Arquivos, o.Execucoes);

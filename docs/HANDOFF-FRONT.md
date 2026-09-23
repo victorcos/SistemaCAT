@@ -1,12 +1,12 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.83.1**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.86.0**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
 errado é o código — não este documento.
 
-## 1. Rotas (24)
+## 1. Rotas (25)
 
 O endereço, a tela que o atende e se exige papel específico.
 
@@ -30,6 +30,7 @@ O endereço, a tela que o atende e se exige papel específico.
 | `/projetos/:id/arquivo-digital` | ArquivoDigital | — |
 | `/projetos/:id/pre-validacao` | PreValidacao | — |
 | `/projetos/:id/quebra-de-sped` | QuebraDeSped | — |
+| `/projetos/:id/apuracao-piscofins` | ApuracaoPisCofins | — |
 | `/projetos/:id/razao-contabil` | RazaoContabil | — |
 | `/projetos/:id/apuracao-contribuicoes` | Gestao | — |
 | `/projetos/:id/entrega` | Entrega | — |
@@ -37,7 +38,7 @@ O endereço, a tela que o atende e se exige papel específico.
 | `/usuarios` | Usuarios | sim |
 | `*` | NaoEncontrada | — |
 
-## 2. Telas (22)
+## 2. Telas (23)
 
 O resumo é o que o próprio arquivo diz de si no comentário do topo.
 
@@ -46,6 +47,12 @@ O resumo é o que o próprio arquivo diz de si no comentário do topo.
 `src/pages/Apuracao.tsx` · 628 linhas
 
 Etapa 6 — apurar ressarcimento e complemento. O fechamento por estabelecimento e mês, que é a unidade do arquivo digital.
+
+### ApuracaoPisCofins
+
+`src/pages/ApuracaoPisCofins.tsx` · 429 linhas
+
+Apuração de PIS/COFINS — o par que se confronta. A tela existe para entregar **um par**: a Consulta de Entradas (037), do lado
 
 ### ArquivoDigital
 
@@ -127,15 +134,15 @@ Pré-validar os arquivos digitais que o cliente já transmitiu.
 
 ### Projeto
 
-`src/pages/Projeto.tsx` · 539 linhas
+`src/pages/Projeto.tsx` · 576 linhas
 
-Para onde cada etapa leva, e com que palavras. A tela não decide o que
+Para onde cada funcionalidade leva, e com que palavras. A tela não decide o que está disponível — isso vem do domínio, em
 
 ### QuebraDeSped
 
-`src/pages/QuebraDeSped.tsx` · 432 linhas
+`src/pages/QuebraDeSped.tsx` · 410 linhas
 
-Quebra de SPED — a primeira etapa do módulo de PIS/COFINS. A tela existe para entregar **um par**: a Consulta de Entradas, do lado
+Quebrar os SPED — abrir os arquivos e dizer o que há dentro.
 
 ### Razao
 
@@ -173,7 +180,7 @@ Troca obrigatória da senha provisória. Aparece no lugar da aplicação, sem me
 
 O que se diz da pessoa numa linha: uma situação só, na ordem de
 
-## 3. Componentes (25 arquivos)
+## 3. Componentes (28 arquivos)
 
 O que já existe e pode ser reaproveitado. Desenhar um componente que já
 está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
@@ -202,10 +209,13 @@ está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
 | Componente | Exporta | Propriedades | Para que serve |
 | --- | --- | --- | --- |
 | `BaixarPlanilha.tsx` | BaixarPlanilha | `aoBaixar, desabilitado, rotulo = "Baixar planilha", destaque, baixando = null, aoCancelar` | O par de botões de download: a planilha e o CSV da mesma lista. |
+| `BarraDeFuncionalidades.tsx` | BarraDeFuncionalidades | `etapas, rota` | A barra do trabalho: as funcionalidades, lado a lado. \| Arquivos \| Quebras \| Apuração \| Gestão \| Quebra XML \| |
 | `CardDeEscolha.tsx` | CardDeEscolha | `escolha` | O card das telas de entrada — segmentos e módulos. Os dois níveis mostram a mesma coisa com palavras diferentes: uma sigla, um |
+| `CardDeFuncionalidade.tsx` | CardDeFuncionalidade | `etapa` | Uma funcionalidade do trabalho, como card. É o card do hub (`CardDeEscolha`) um nível abaixo: lá se escolhe o tributo, |
 | `CorrecoesAMao.tsx` | CorrecoesAMao | `projetoId` | Correção à mão do trabalho: a porta da planilha e a lista do que já foi |
 | `EditarCadastro.tsx` | EditarCadastro | `projeto, aberto, aoFechar, aoSalvar` | Nome e período do trabalho. Existe porque o período muda de verdade: o trabalho do Amigão nasceu como |
 | `OcorrenciasDoArquivo.tsx` | OcorrenciasDoArquivo | `chave, carregar, cabecalho` | O que a pré-validação achou num arquivo digital. Serve às duas telas que pré-validam — a do arquivo que o sistema gerou e a |
+| `PainelDoTrabalho.tsx` | PainelDoTrabalho | `projetoId, etapas, rota, bloqueio` | O painel do trabalho: o que há para ler, e o que dá para fazer. |
 | `Rodada.tsx` | quando, duracao, Faixa, Rotulo, Cartao, BarraFina, ListaDoLog | `titulo` | As peças das telas de etapa que rodam no servidor e mostram o resultado em |
 | `TrabalhoParado.tsx` | TrabalhoParado | `status, projetoId` | A faixa que explica por que a etapa não roda. Aparece nas três telas de etapa e no detalhe do trabalho, sempre com a |
 | `VendaAConsumidor.tsx` | EscolhaDaVendaAConsumidor | `projeto, usadaNoRazao, bloqueada, aoMudar` | Como o trabalho enquadra a venda a consumidor final. É escolha do trabalho (decisão de 16/09/2026): o manual põe o cupom no |
@@ -486,7 +496,7 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 | `--borda-sutil` | `rgb(255 255 255 / 8%)` | — |
 | `--brilho-acao` | `0 12px 28px rgb(255 127 0 / 30%)` | — |
 
-## 5. O que a tela pede ao servidor (84 chamadas)
+## 5. O que a tela pede ao servidor (88 chamadas)
 
 Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 `:id`, qualquer que seja o nome no código.
@@ -500,6 +510,18 @@ Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 | GET | `/api/apuracao/:id/competencias` |
 | GET | `/api/apuracao/:id/planilhas/:id` |
 | POST | `/api/projetos/:id/apuracao` |
+
+### `apuracaoPisCofins`
+
+| Método | Rota |
+| --- | --- |
+| GET | `/api/apuracao-piscofins/:id` |
+| POST | `/api/apuracao-piscofins/:id/cancelar` |
+| GET | `/api/apuracao-piscofins/:id/contas` |
+| GET | `/api/apuracao-piscofins/:id/estabelecimentos` |
+| GET | `/api/apuracao-piscofins/:id/lancamentos` |
+| GET | `/api/apuracao-piscofins/:id/planilhas/:id` |
+| POST | `/api/projetos/:id/apuracao-piscofins` |
 
 ### `arquivoDigital`
 
@@ -619,9 +641,6 @@ Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 | POST | `/api/projetos/:id/quebra-de-sped` |
 | GET | `/api/quebra-de-sped/:id` |
 | POST | `/api/quebra-de-sped/:id/cancelar` |
-| GET | `/api/quebra-de-sped/:id/contas` |
-| GET | `/api/quebra-de-sped/:id/estabelecimentos` |
-| GET | `/api/quebra-de-sped/:id/lancamentos` |
 | GET | `/api/quebra-de-sped/:id/planilhas/:id` |
 
 ### `razao`

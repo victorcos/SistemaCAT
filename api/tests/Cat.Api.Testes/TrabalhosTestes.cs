@@ -397,7 +397,9 @@ public sealed class TrabalhosTestes(BancoDeTeste banco, MotorInternoFalso _motor
         var e = await Etapas();
         Assert.Equal("concluida", e["importar"]);
         Assert.Equal("em_andamento", e["conferencia"]);
-        Assert.Equal("bloqueada", e["movimentos"]);
+        // pendente, não bloqueada: desde 23/09/2026 nada trava por falta da
+        // etapa anterior — quem cobra a dependência é o motor, com a frase
+        Assert.Equal("pendente", e["movimentos"]);
 
         // vale a ÚLTIMA rodada: uma concluída depois de uma que falhou conclui
         await banco.Comando($"UPDATE execucao SET situacao = 'falhou' WHERE projeto_id = {projeto}");
@@ -418,7 +420,9 @@ public sealed class TrabalhosTestes(BancoDeTeste banco, MotorInternoFalso _motor
         var cartao = (await Json(await c.GetAsync($"/api/projetos/{projeto}"))).GetProperty("projeto");
         Assert.Equal(2, cartao.GetProperty("etapas_feitas").GetInt32());
         var etapa = (await Json(await c.GetAsync($"/api/projetos/{projeto}"))).GetProperty("etapas")[0];
-        Assert.Equal(["chave", "nome", "descricao", "situacao", "situacao_rotulo", "implementada", "acessivel"], etapa.EnumerateObject().Select(p => p.Name));
+        Assert.Equal(["chave", "nome", "nome_curto", "descricao", "situacao", "situacao_rotulo",
+                      "implementada", "acessivel"],
+            etapa.EnumerateObject().Select(p => p.Name));
     }
 
     [Fact]

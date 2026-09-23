@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from cat.aplicacao.casos_de_uso import (
     apurar_contribuicoes,
     apurar_periodo,
+    apurar_piscofins,
     apurar_suportado,
     conferir_documentos,
     extrair_movimentos,
@@ -39,11 +40,13 @@ from cat.infraestrutura.analitico.arquivo_digital import ARQUIVO_ARQUIVOS, ARQUI
 from cat.infraestrutura.analitico.entrega import ARQUIVO_PACOTE, ARQUIVO_RELATORIO
 from cat.infraestrutura.analitico.pre_validacao_do_cliente import ARQUIVO_ARQUIVOS_DO_CLIENTE
 from cat.infraestrutura.analitico.gestao import ARQUIVO_DOS_QUADROS
+from cat.infraestrutura.analitico.piscofins import (
+    ARQUIVO_DAS_ENTRADAS,
+    ARQUIVO_DO_RAZAO,
+)
 from cat.infraestrutura.analitico.quebra_de_sped import (
     ARQUIVO_DAS_CONTAGENS,
-    ARQUIVO_DAS_ENTRADAS,
     ARQUIVO_DOS_ARQUIVOS,
-    ARQUIVO_DO_RAZAO,
 )
 from cat.infraestrutura.analitico.razao import (
     ARQUIVO_CONFERENCIA_INVENTARIO,
@@ -112,12 +115,14 @@ PLANILHAS = {
         "suportado": ("icms_suportado.xlsx", ARQUIVO_SUPORTADO, gerar_suportado),
     },
     quebrar_sped.ETAPA: {
-        # a 037 e o razão são o par que se confronta; os outros dois descrevem
-        # o que foi lido, e servem para conferir a base antes de olhar o número
-        "entradas": ("consulta_de_entradas.xlsx", ARQUIVO_DAS_ENTRADAS, gerar_entradas),
-        "razao-contabil": ("razao_contabil.xlsx", ARQUIVO_DO_RAZAO, gerar_razao_contabil),
+        # o que a quebra entrega: o que foi lido e o que há dentro de cada um
         "arquivos": ("sped_quebrados.xlsx", ARQUIVO_DOS_ARQUIVOS, gerar_arquivos_quebrados),
         "contagens": ("registros_por_arquivo.xlsx", ARQUIVO_DAS_CONTAGENS, gerar_contagens),
+    },
+    apurar_piscofins.ETAPA: {
+        # o par que se confronta: o fiscal de um lado, o contábil do outro
+        "entradas": ("consulta_de_entradas.xlsx", ARQUIVO_DAS_ENTRADAS, gerar_entradas),
+        "razao-contabil": ("razao_contabil.xlsx", ARQUIVO_DO_RAZAO, gerar_razao_contabil),
     },
     apurar_contribuicoes.ETAPA: {
         # uma planilha só: os quadros dos quatro tributos, uma aba cada, no
@@ -157,6 +162,7 @@ NAO_TERMINOU = {
     apurar_suportado.ETAPA: "A apuração ainda não terminou.",
     montar_razao.ETAPA: "A montagem do razão ainda não terminou.",
     quebrar_sped.ETAPA: "A quebra dos SPED ainda não terminou.",
+    apurar_piscofins.ETAPA: "A apuração de PIS/COFINS ainda não terminou.",
     apurar_contribuicoes.ETAPA: "A apuração das contribuições ainda não terminou.",
     apurar_periodo.ETAPA: "A apuração do período ainda não terminou.",
     gerar_arquivo_digital.ETAPA: "A geração do arquivo digital ainda não terminou.",

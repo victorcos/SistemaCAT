@@ -1,8 +1,8 @@
-"""A etapa de quebra: EFD-Contribuições e ECD na mesma rodada.
+"""A quebra: abrir os SPED e dizer o que há dentro.
 
-O que importa aqui é o par que sai: a Consulta de Entradas de um lado e o razão
-contábil do outro. É esse par que se confronta — e por isso os dois têm de sair
-da mesma rodada, sobre a mesma base, sem ninguém precisar juntar depois.
+O que sai daqui é o inventário — que arquivos entraram, que registros cada um
+tem e quantos de cada. A **Consulta de Entradas** e o **razão** saíram desta
+rodada em 23/09/2026 e têm teste próprio, em `test_piscofins_analitico.py`.
 """
 
 import pyarrow.parquet as pq
@@ -10,9 +10,7 @@ import pytest
 
 from cat.infraestrutura.analitico.quebra_de_sped import (
     ARQUIVO_DAS_CONTAGENS,
-    ARQUIVO_DAS_ENTRADAS,
     ARQUIVO_DOS_ARQUIVOS,
-    ARQUIVO_DO_RAZAO,
     QuebraCancelada,
     quebrar,
     serializar,
@@ -51,45 +49,17 @@ def _ler(pasta: str, nome: str) -> list[dict]:
     return pq.read_table(f"{pasta}/{nome}").to_pylist()
 
 
-class TestOParQueSeConfronta:
-    def test_a_mesma_rodada_produz_as_entradas_e_o_razao(self, base):
-        contrib, ecd, destino = base
-
-        resumo = quebrar([contrib], [ecd], destino)
-
-        assert resumo.entradas == 1
-        assert resumo.linhas_do_razao == 2
-        entradas = _ler(destino, ARQUIVO_DAS_ENTRADAS)
-        razao = _ler(destino, ARQUIVO_DO_RAZAO)
-        assert entradas[0]["numero_do_documento"] == "1001"
-        assert entradas[0]["nome_do_participante"] == "FORNECEDOR ALFA"
-        assert [l["historico"] for l in razao] == ["RECEBIMENTO", "PAGAMENTO"]
-        # o saldo corre no razão: 1000 a débito, 400 a crédito
-        assert [l["saldo"] for l in razao] == ["1000.00", "600.00"]
-
-    def test_o_resumo_conta_os_dois_lados(self, base):
-        contrib, ecd, destino = base
-
-        resumo = quebrar([contrib], [ecd], destino)
-
-        assert (resumo.contribuicoes, resumo.ecd, resumo.arquivos) == (1, 1, 2)
-        assert resumo.estabelecimentos == ["11222333000181"]
-        assert resumo.competencias == ["2021-06"]
-        assert sum(resumo.por_ramo.values()) == 1
-
-
 class TestOQueFoiLido:
-    def test_cada_arquivo_vira_uma_linha_com_o_que_rendeu(self, base):
+    def test_cada_arquivo_vira_uma_linha_com_o_que_tem_dentro(self, base):
         contrib, ecd, destino = base
 
         quebrar([contrib], [ecd], destino)
 
         arquivos = {a["tipo"]: a for a in _ler(destino, ARQUIVO_DOS_ARQUIVOS)}
         assert arquivos["contribuicoes"]["itens"] == 1
-        assert arquivos["contribuicoes"]["entradas_geradas"] == 1
+        assert arquivos["contribuicoes"]["empresa"] == "COMERCIO DO TESTE LTDA"
         assert arquivos["ecd"]["contas"] == 1
         assert arquivos["ecd"]["partidas"] == 2
-        assert arquivos["ecd"]["linhas_do_razao"] == 2
         assert all(not a["erro"] for a in arquivos.values())
 
     def test_a_contagem_por_registro_sai_por_arquivo(self, base):
@@ -101,8 +71,21 @@ class TestOQueFoiLido:
         por_registro = {c["registro"]: c["quantidade"] for c in contagens}
         assert por_registro["C170"] == 1
         assert por_registro["C100"] == 1
-        # só a EFD entra na contagem: a ECD tem índice próprio
-        assert {c["arquivo"] for c in contagens} == {"contribuicoes.txt"}
+        # a ECD não tem contagem por registro como a EFD; o que ela tem de
+        # contável são os dois blocos que importam — um lançamento com duas
+        # partidas, que é a partida dobrada de sempre
+        assert por_registro["I200"] == 1
+        assert por_registro["I250"] == 2
+
+    def test_o_resumo_conta_os_dois_tipos_de_arquivo(self, base):
+        contrib, ecd, destino = base
+
+        resumo = quebrar([contrib], [ecd], destino)
+
+        assert (resumo.contribuicoes, resumo.ecd, resumo.arquivos) == (1, 1, 2)
+        assert resumo.estabelecimentos == ["11222333000181"]
+        assert resumo.competencias == ["2021-06"]
+        assert resumo.registros > 0
 
 
 class TestOQueDaErrado:
@@ -116,7 +99,8 @@ class TestOQueDaErrado:
         assert resumo.ilegiveis == 1
         assert resumo.arquivos == 0
         assert "I050" in resumo.avisos[0]
-        # a linha do arquivo sai mesmo assim, dizendo o que houve
+        # a linha do arquivo sai mesmo assim, dizendo o que houve: sumir da
+        # lista seria a pessoa procurar por que o total não fecha
         assert _ler(destino, ARQUIVO_DOS_ARQUIVOS)[0]["erro"]
 
     def test_trabalho_sem_arquivo_nenhum_produz_parquet_legivel(self, tmp_path):
@@ -125,10 +109,10 @@ class TestOQueDaErrado:
         resumo = quebrar([], [], destino)
 
         assert resumo.arquivos == 0
-        # os parquets existem e têm esquema: a etapa seguinte não precisa
-        # saber a diferença entre "vazio" e "não rodou"
-        assert _ler(destino, ARQUIVO_DAS_ENTRADAS) == []
-        assert _ler(destino, ARQUIVO_DO_RAZAO) == []
+        # os parquets existem e têm esquema: a etapa seguinte não precisa saber
+        # a diferença entre "vazio" e "não rodou"
+        assert _ler(destino, ARQUIVO_DOS_ARQUIVOS) == []
+        assert _ler(destino, ARQUIVO_DAS_CONTAGENS) == []
 
     def test_cancelar_interrompe_antes_do_arquivo_seguinte(self, base):
         contrib, ecd, destino = base
@@ -142,7 +126,9 @@ class TestOResumoSerializado:
 
         serializado = serializar(quebrar([contrib], [ecd], destino))
 
-        assert serializado["versao"] == 1
-        assert serializado["entradas"] == 1
-        assert serializado["linhas_do_razao"] == 2
+        assert serializado["versao"] == 2
+        assert serializado["arquivos"] == 2
         assert serializado["competencias"] == ["2021-06"]
+        # o que saiu daqui não pode reaparecer no resumo
+        assert "entradas" not in serializado
+        assert "linhas_do_razao" not in serializado
