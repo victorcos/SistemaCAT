@@ -5,6 +5,45 @@
 
 ---
 
+## 2026-09-23 — O SQLite aceitava a consulta que o Postgres recusa
+
+**O erro.** "Quebrar os SPED" respondia **"O motor do sistema não respondeu"**.
+O motor estava de pé e a saúde dizia `ok`: o que não respondia era a etapa. A
+consulta que lista o que abrir era
+
+```sql
+SELECT DISTINCT caminho ... ORDER BY competencia, caminho
+```
+
+e o Postgres recusa isso — `for SELECT DISTINCT, ORDER BY expressions must
+appear in select list`. O `ProgrammingError` subia como 500 no canal interno, e
+500 não é recusa com motivo: o C# o traduz para `MotorIndisponivel`, que na tela
+vira "o motor não respondeu". A mensagem estava certa sobre o canal e calada
+sobre a causa.
+
+**Por que a suíte inteira passou.** Os testes rodam em SQLite, que aceita essa
+consulta. Havia teste de integração iniciando as duas etapas, e ele passava. O
+erro só existia no banco em que o sistema roda.
+
+**A correção.** A consulta traz a competência no `SELECT` — com `DISTINCT`, tudo
+que ordena precisa estar selecionado — e vive num lugar só,
+`rodada.caminhos_do_lote`, usada pela quebra de SPED e pela apuração das
+contribuições. As duas tinham a mesma consulta copiada, e portanto o mesmo erro:
+a segunda etapa de PIS/COFINS morreria igual assim que alguém chegasse nela.
+Repetição some no caminho (o mesmo arquivo pode vir em dois lotes) e vai para o
+log com contador, como todo descarte.
+
+**O teste que faltava.** `test_fontes_da_etapa.py` compila a consulta no dialeto
+do **Postgres** e exige que todo `ORDER BY` esteja no `SELECT DISTINCT`. É a
+única forma de pegar isso sem subir um Postgres na bateria: conferir o resultado
+não adianta, porque no SQLite ele sai certo mesmo com a consulta errada.
+
+**Regra que fica.** Consulta nova com `DISTINCT` ordena só por coluna que ela
+seleciona. Quando o banco de teste e o de produção discordam, o teste tem de
+olhar a consulta, não o resultado.
+
+---
+
 ## 2026-09-23 — Arquivo útil é útil para um trabalho, não no absoluto
 
 **O bloqueio.** Apontar uma pasta de EFD-Contribuições num trabalho de

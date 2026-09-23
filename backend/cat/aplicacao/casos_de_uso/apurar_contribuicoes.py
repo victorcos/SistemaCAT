@@ -28,18 +28,19 @@ import os
 import time
 from datetime import datetime, timezone
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cat.aplicacao.casos_de_uso.conferir_documentos import pasta_da_execucao
 from cat.aplicacao.casos_de_uso.historico_do_projeto import exigir_que_ande, registrar_de_etapa
-from cat.aplicacao.casos_de_uso.rodada import Diario, Freio, duracao, milhar, nome_de
+from cat.aplicacao.casos_de_uso.rodada import (
+    Diario, Freio, caminhos_do_lote, duracao, milhar, nome_de,
+)
 from cat.dominio.lote import TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.gestao import Andamento, apurar, serializar
 from cat.infraestrutura.gestao.montagem import GestaoCancelada
 from cat.infraestrutura.repositorios.banco import Sessao
-from cat.infraestrutura.repositorios.modelos import ArquivoDoLoteDB, ExecucaoDB, LoteDB, ProjetoDB
+from cat.infraestrutura.repositorios.modelos import ExecucaoDB, ProjetoDB
 from cat.log import contexto, obter_log
 
 log = obter_log(__name__)
@@ -54,14 +55,8 @@ class NadaParaApurar(ValueError):
 
 def fontes_do_projeto(projeto_id: int, sessao: Session) -> tuple[list[str], list[str]]:
     """As EFD-Contribuições e as ECF do lote, em duas listas."""
-    def _do_tipo(tipo: TipoDeArquivo) -> list[str]:
-        return list(sessao.scalars(
-            select(ArquivoDoLoteDB.caminho)
-            .join(LoteDB, LoteDB.id == ArquivoDoLoteDB.lote_id)
-            .where(LoteDB.projeto_id == projeto_id, ArquivoDoLoteDB.tipo == tipo.value)
-            .order_by(ArquivoDoLoteDB.competencia, ArquivoDoLoteDB.caminho).distinct()))
-
-    return _do_tipo(TipoDeArquivo.SPED_CONTRIBUICOES), _do_tipo(TipoDeArquivo.SPED_ECF)
+    return (caminhos_do_lote(projeto_id, TipoDeArquivo.SPED_CONTRIBUICOES, sessao),
+            caminhos_do_lote(projeto_id, TipoDeArquivo.SPED_ECF, sessao))
 
 
 def preparar(projeto_id: int, usuario_id: int, sessao: Session) -> ExecucaoDB:

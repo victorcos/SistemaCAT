@@ -10,11 +10,14 @@ from __future__ import annotations
 import time
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
+from cat.dominio.lote import TipoDeArquivo
 from cat.infraestrutura.repositorios.banco import Sessao
-from cat.infraestrutura.repositorios.modelos import ExecucaoDB, UsuarioDB
+from cat.infraestrutura.repositorios.modelos import (
+    ArquivoDoLoteDB, ExecucaoDB, LoteDB, UsuarioDB,
+)
 from cat.log import contexto, obter_log
 
 log = obter_log(__name__)
@@ -121,6 +124,43 @@ def cancelar(execucao_id: int, usuario_id: int, sessao: Session) -> ExecucaoDB:
         sessao.commit()
         log.info("cancelamento pedido", extra={"situacao": execucao.situacao})
     return execucao
+
+
+# ---------------------------------------------------------------------------
+# as fontes que a etapa vai abrir
+# ---------------------------------------------------------------------------
+def consulta_de_caminhos(projeto_id: int, tipo: TipoDeArquivo) -> Select:
+    """Os arquivos de um tipo no lote do trabalho, na ordem em que se lê.
+
+    A competência viaja no SELECT de propósito. `SELECT DISTINCT caminho ORDER
+    BY competencia` o SQLite aceita — e é nele que a suíte roda —, mas o
+    Postgres recusa: com DISTINCT, tudo que ordena tem de estar selecionado. O
+    sistema roda em Postgres, então a etapa morria de 500 no canal interno e a
+    tela só dizia que o motor não respondeu.
+    """
+    return (select(ArquivoDoLoteDB.competencia, ArquivoDoLoteDB.caminho)
+            .join(LoteDB, LoteDB.id == ArquivoDoLoteDB.lote_id)
+            .where(LoteDB.projeto_id == projeto_id, ArquivoDoLoteDB.tipo == tipo.value)
+            .distinct()
+            .order_by(ArquivoDoLoteDB.competencia, ArquivoDoLoteDB.caminho))
+
+
+def caminhos_do_lote(projeto_id: int, tipo: TipoDeArquivo, sessao: Session) -> list[str]:
+    """Só os caminhos, sem repetir: o mesmo arquivo pode ter vindo em dois lotes."""
+    caminhos: list[str] = []
+    vistos: set[str] = set()
+    repetidos = 0
+    for _, caminho in sessao.execute(consulta_de_caminhos(projeto_id, tipo)):
+        if caminho in vistos:
+            repetidos += 1
+            continue
+        vistos.add(caminho)
+        caminhos.append(caminho)
+    if repetidos:
+        log.info("arquivo repetido em mais de um lote descartado",
+                 extra={"projeto_id": projeto_id, "tipo": tipo.value,
+                        "descartados": repetidos, "mantidos": len(caminhos)})
+    return caminhos
 
 
 # ---------------------------------------------------------------------------
