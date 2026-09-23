@@ -327,6 +327,25 @@ A 037 tem **52 colunas** (v0.76.0: entrou `Município`, ao lado de
 `Natureza do Crédito` é deduzida **do CFOP** nos ramos em que o registro não
 traz `NAT_BC_CRED` (C100/C170 e C190/C191/C195); nos demais é lida do arquivo.
 
+### Apuração das contribuições — a Gestão (v0.83.0)
+
+| Método | Rota | Quem |
+| --- | --- | --- |
+| `POST` | `/api/projetos/{id}/apuracao-contribuicoes` | quem escreve |
+| `GET` | `/api/projetos/{id}/apuracao-contribuicoes` | quem vê o trabalho |
+| `GET` | `/api/apuracao-contribuicoes/{execucaoId}` | quem vê o trabalho |
+| `POST` | `/api/apuracao-contribuicoes/{execucaoId}/cancelar` | quem escreve |
+| `GET` | `/api/apuracao-contribuicoes/{execucaoId}/planilhas/quadros` | quem vê o trabalho |
+
+Uma planilha só (`quadros`), em xlsx ou csv. O resumo traz `contribuicoes`,
+`ecf`, `quadros`, `linhas`, `tributos`, `competencias`, `cnpj`, `razao_social`,
+`ilegiveis` e `avisos`.
+
+Em disco, na pasta da execução: `quadros.parquet`, no formato **longo** — uma
+linha por (`tributo`, `quadro`, `ordem`, `rotulo`, `competencia`) com `valor` em
+centavos. `valor` nulo quer dizer fonte externa (DCTF, e-CAC), e não zero;
+`unidade` distingue dinheiro de percentual.
+
 ### Resumo por módulo (v0.81.0)
 
 | Método | Rota | Quem |

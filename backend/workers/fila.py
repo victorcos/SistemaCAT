@@ -40,6 +40,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from cat.aplicacao.casos_de_uso import (
+    apurar_contribuicoes,
     apurar_periodo,
     apurar_suportado,
     conferir_documentos,
@@ -72,6 +73,7 @@ EXECUTORES = {
     pre_validar_arquivos.ETAPA: pre_validar_arquivos.executar,
     montar_entrega.ETAPA: montar_entrega.executar,
     quebrar_sped.ETAPA: quebrar_sped.executar,
+    apurar_contribuicoes.ETAPA: apurar_contribuicoes.executar,
 }
 
 MOTIVO_INTERRUPCAO = "Interrompida: o motor reiniciou durante a rodada. Rode de novo."

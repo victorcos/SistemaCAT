@@ -47,6 +47,13 @@ interface Props<T extends string> {
  * cabeçalho, que tem `overflow-hidden` para conter o brilho: a lista
  * aparecia pela metade e a última opção sumia.
  *
+ * O destino do portal é o `<dialog>` mais próximo, quando existe, e só fora
+ * dele o `document.body`. `showModal()` coloca o diálogo na *top layer* do
+ * navegador, uma camada acima de todo o documento: um painel no body fica
+ * atrás dela por mais alto que seja o z-index, e ainda vira conteúdo inerte
+ * (o diálogo modal desliga o resto da página), então nem clicar nas opções
+ * dava. Era o dropdown de Papel/Cargo sumindo atrás do modal de usuários.
+ *
  * Abre para baixo; quando não há espaço abaixo, abre para cima. A posição é
  * recalculada em rolagem e redimensionamento, porque `fixed` não acompanha o
  * que se move debaixo dele.
@@ -65,6 +72,8 @@ export function Combobox<T extends string>({
   const [busca, setBusca] = useState("");
   const [ativo, setAtivo] = useState(0);
   const [posicao, setPosicao] = useState<CSSProperties>({});
+  /** onde o painel é montado: o <dialog> ancestral, se houver, senão o body */
+  const [destino, setDestino] = useState<HTMLElement | null>(null);
   const raiz = useRef<HTMLDivElement>(null);
   const painel = useRef<HTMLDivElement>(null);
   const campo = useRef<HTMLInputElement>(null);
@@ -103,6 +112,9 @@ export function Combobox<T extends string>({
     if (disabled) return;
     setBusca("");
     setAtivo(Math.max(0, opcoes.findIndex((o) => o.valor === valor)));
+    // resolvido a cada abertura: o mesmo combobox pode viver solto na página
+    // ou dentro de um modal, e o diálogo só existe no DOM enquanto está aberto
+    setDestino(raiz.current?.closest("dialog") ?? document.body);
     medir();
     setAberto(true);
     // o input só existe depois do render do painel
@@ -228,6 +240,7 @@ export function Combobox<T extends string>({
       </button>
 
       {aberto &&
+        destino &&
         createPortal(
           <div
             ref={painel}
@@ -299,7 +312,7 @@ export function Combobox<T extends string>({
             })}
           </ul>
           </div>,
-          document.body,
+          destino,
         )}
     </div>
   );

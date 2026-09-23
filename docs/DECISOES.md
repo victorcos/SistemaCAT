@@ -5,6 +5,57 @@
 
 ---
 
+## 2026-09-23 — A Gestão vira etapa, e o formato longo no meio do caminho
+
+**O que entrou.** `apuracao_contribuicoes`, a segunda etapa do módulo de
+PIS/COFINS: lê a EFD-Contribuições e a ECF do lote e entrega **uma planilha**
+com os quatro tributos em abas — PIS e COFINS nos 36 quadros, IRPJ e CSLL do
+Lucro Real.
+
+**As duas fontes são independentes, e a etapa roda com o que houver.** Um
+trabalho que só tem ECF ainda tem IRPJ/CSLL para mostrar; faltarem as duas é que
+é motivo para recusar. Cada ausência vira aviso na rodada — descobrir que a ECF
+não entrou só ao abrir a planilha é tarde.
+
+**Não depende da quebra de SPED.** As duas leem os mesmos arquivos, para coisas
+diferentes: a quebra produz o par que se confronta com a contabilidade, esta
+produz a apuração. Amarrar uma à outra obrigaria a reler 1 GB para ver um
+quadro.
+
+**O parquet é longo; a planilha é larga.** O relatório do MA tem uma coluna por
+mês, e é assim que se lê. Guardar largo em parquet significaria um esquema que
+muda a cada trabalho — doze colunas num, sessenta noutro —, e toda consulta
+teria de descobrir os nomes das colunas antes de somar. Então o disco guarda uma
+linha por (tributo, quadro, linha, competência), com esquema fixo, e o largo
+nasce na saída, que é onde ele faz falta. Quem confere contra o MA baixa o
+largo; quem consulta lê o longo.
+
+**Três coisas que o número sozinho não diz, e que viajam com ele:**
+
+* **`externo`** — a linha existe no relatório do MA mas vem de fonte que não
+  lemos (DCTF, e-CAC). Fica **nula**, não zerada, e a planilha a mostra vazia e
+  cinza. Zero é uma afirmação, e não temos como fazê-la;
+* **`unidade`** — quase tudo é dinheiro em centavos, menos o percentual de
+  rateio de créditos. Formatar os dois igual faria 85% virar R$ 0,85;
+* **`titulo`** — cabeçalho de subquadro, sem valor: sai em negrito e não entra
+  em soma nenhuma.
+
+**A tela diz a confiança antes de mostrar o número.** PIS e COFINS foram
+conferidos contra o export real do MA em 59 competências; IRPJ e CSLL nunca
+passaram por gabarito. Isso aparece em aviso no topo do resultado e em etiqueta
+ao lado de cada tributo — não num rodapé. Quem entrega um número precisa saber
+de onde vem a confiança nele.
+
+**Um teste que perdeu o caso e ganhou uma costura.** `Etapas` tinha um teste
+para a regra "etapa declarada e ainda não construída aparece como indisponível e
+não conta no denominador". Ele se apoiava em `apuracao_contribuicoes` ser a
+etapa por fazer — e hoje **nenhuma** está por fazer. Em vez de apagar a regra ou
+o teste, `Montar` ganhou uma sobrecarga que recebe o roteiro pronto, e o teste
+monta um roteiro com uma etapa inventada. Amarrar um teste de regra à existência
+de trabalho pendente é perdê-lo no dia em que o trabalho acaba.
+
+---
+
 ## 2026-09-23 — O hub de cards: a porta de entrada que faltava
 
 **O que entrou.** Três telas e um endereço:

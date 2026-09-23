@@ -1,12 +1,12 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.81.0**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.83.0**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
 errado é o código — não este documento.
 
-## 1. Rotas (23)
+## 1. Rotas (24)
 
 O endereço, a tela que o atende e se exige papel específico.
 
@@ -31,12 +31,13 @@ O endereço, a tela que o atende e se exige papel específico.
 | `/projetos/:id/pre-validacao` | PreValidacao | — |
 | `/projetos/:id/quebra-de-sped` | QuebraDeSped | — |
 | `/projetos/:id/razao-contabil` | RazaoContabil | — |
+| `/projetos/:id/apuracao-contribuicoes` | Gestao | — |
 | `/projetos/:id/entrega` | Entrega | — |
 | `/projetos/:id/historico` | Historico | — |
 | `/usuarios` | Usuarios | sim |
 | `*` | NaoEncontrada | — |
 
-## 2. Telas (21)
+## 2. Telas (22)
 
 O resumo é o que o próprio arquivo diz de si no comentário do topo.
 
@@ -69,6 +70,12 @@ De-para de códigos do trabalho. O sistema propõe os pares a partir da moviment
 `src/pages/Entrega.tsx` · 733 linhas
 
 Etapa 8 — relatórios e entrega. Três regras mandam na tela: **o relatório mostra tudo e o dossiê só o que vai
+
+### Gestao
+
+`src/pages/Gestao.tsx` · 383 linhas
+
+Apuração das contribuições — a Gestão Fiscal no padrão do MA.
 
 ### Historico
 
@@ -120,7 +127,7 @@ Pré-validar os arquivos digitais que o cliente já transmitiu.
 
 ### Projeto
 
-`src/pages/Projeto.tsx` · 531 linhas
+`src/pages/Projeto.tsx` · 539 linhas
 
 Para onde cada etapa leva, e com que palavras. A tela não decide o que
 
@@ -458,7 +465,7 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 | `--borda-sutil` | `rgb(255 255 255 / 8%)` | — |
 | `--brilho-acao` | `0 12px 28px rgb(255 127 0 / 30%)` | — |
 
-## 5. O que a tela pede ao servidor (80 chamadas)
+## 5. O que a tela pede ao servidor (84 chamadas)
 
 Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 `:id`, qualquer que seja o nome no código.
@@ -525,6 +532,15 @@ Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 | GET | `/api/entrega/:id/planilhas/pacote` |
 | GET | `/api/entrega/:id/planilhas/relatorio` |
 | POST | `/api/projetos/:id/entrega` |
+
+### `gestao`
+
+| Método | Rota |
+| --- | --- |
+| GET | `/api/apuracao-contribuicoes/:id` |
+| POST | `/api/apuracao-contribuicoes/:id/cancelar` |
+| GET | `/api/apuracao-contribuicoes/:id/planilhas/quadros:id` |
+| POST | `/api/projetos/:id/apuracao-contribuicoes` |
 
 ### `historico`
 

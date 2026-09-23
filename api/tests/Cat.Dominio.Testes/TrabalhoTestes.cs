@@ -191,11 +191,32 @@ public sealed class RoteiroPorModuloTestes
     [Fact]
     public void Etapa_declarada_e_nao_construida_aparece_como_indisponivel()
     {
-        var roteiro = Etapas.Montar("piscofins", new HashSet<string>());
-        var apuracao = roteiro.Single(e => e.Definicao.Chave == "apuracao_contribuicoes");
-        Assert.Equal(SituacaoEtapa.NaoDisponivel, apuracao.Situacao);
+        // Em 23/09/2026 a última etapa por fazer ficou pronta, e este teste
+        // perdeu o caso real que o exercia. A regra continua valendo, então
+        // passou a ser exercida sobre um roteiro dado: amarrá-la à existência
+        // de trabalho pendente era perdê-la no dia em que o trabalho acabasse.
+        var porFazer = new DefinicaoEtapa("inventada", "Etapa por fazer", "", Implementada: false);
+        var roteiro = Etapas.Montar(
+            [Etapas.Todas.First(d => d.Chave == "importar"), porFazer],
+            new HashSet<string>());
+
+        Assert.Equal(SituacaoEtapa.NaoDisponivel, roteiro[1].Situacao);
         // e não conta no denominador: só entram as que existem
-        Assert.Equal((0, 2), Etapas.Progresso(roteiro));
+        Assert.Equal((0, 1), Etapas.Progresso(roteiro));
+    }
+
+    [Fact]
+    public void O_roteiro_de_piscofins_esta_inteiro_construido()
+    {
+        var roteiro = Etapas.Montar("piscofins", new HashSet<string> { "importar" });
+
+        Assert.All(roteiro, e => Assert.True(e.Definicao.Implementada));
+        Assert.Equal((1, 3), Etapas.Progresso(roteiro));
+        // com a importação feita, a quebra abre; a apuração espera a vez dela
+        Assert.Equal(SituacaoEtapa.Pendente,
+            roteiro.Single(e => e.Definicao.Chave == "quebra_de_sped").Situacao);
+        Assert.Equal(SituacaoEtapa.Bloqueada,
+            roteiro.Single(e => e.Definicao.Chave == "apuracao_contribuicoes").Situacao);
     }
 
     [Fact]

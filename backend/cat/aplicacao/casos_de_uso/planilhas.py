@@ -11,6 +11,7 @@ import os
 from dataclasses import dataclass
 
 from cat.aplicacao.casos_de_uso import (
+    apurar_contribuicoes,
     apurar_periodo,
     apurar_suportado,
     conferir_documentos,
@@ -37,6 +38,7 @@ from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO, ARQUIVO_SALD
 from cat.infraestrutura.analitico.arquivo_digital import ARQUIVO_ARQUIVOS, ARQUIVO_OCORRENCIAS
 from cat.infraestrutura.analitico.entrega import ARQUIVO_PACOTE, ARQUIVO_RELATORIO
 from cat.infraestrutura.analitico.pre_validacao_do_cliente import ARQUIVO_ARQUIVOS_DO_CLIENTE
+from cat.infraestrutura.analitico.gestao import ARQUIVO_DOS_QUADROS
 from cat.infraestrutura.analitico.quebra_de_sped import (
     ARQUIVO_DAS_CONTAGENS,
     ARQUIVO_DAS_ENTRADAS,
@@ -70,6 +72,7 @@ from cat.infraestrutura.planilhas.arquivo_digital import (
     zip_de_envio,
     zip_de_previas,
 )
+from cat.infraestrutura.planilhas.gestao import gerar_quadros
 from cat.infraestrutura.planilhas.quebra_de_sped import (
     gerar_arquivos_quebrados,
     gerar_contagens,
@@ -116,6 +119,11 @@ PLANILHAS = {
         "arquivos": ("sped_quebrados.xlsx", ARQUIVO_DOS_ARQUIVOS, gerar_arquivos_quebrados),
         "contagens": ("registros_por_arquivo.xlsx", ARQUIVO_DAS_CONTAGENS, gerar_contagens),
     },
+    apurar_contribuicoes.ETAPA: {
+        # uma planilha só: os quadros dos quatro tributos, uma aba cada, no
+        # formato largo do MA — que é o que `tools/validar_gestao.py` compara
+        "quadros": ("gestao_fiscal.xlsx", ARQUIVO_DOS_QUADROS, gerar_quadros),
+    },
     montar_razao.ETAPA: {
         "ficha3": ("ficha3.xlsx", ARQUIVO_FICHA3, gerar_ficha3),
         "fichas": ("fichas.xlsx", ARQUIVO_FICHAS, gerar_fichas),
@@ -149,6 +157,7 @@ NAO_TERMINOU = {
     apurar_suportado.ETAPA: "A apuração ainda não terminou.",
     montar_razao.ETAPA: "A montagem do razão ainda não terminou.",
     quebrar_sped.ETAPA: "A quebra dos SPED ainda não terminou.",
+    apurar_contribuicoes.ETAPA: "A apuração das contribuições ainda não terminou.",
     apurar_periodo.ETAPA: "A apuração do período ainda não terminou.",
     gerar_arquivo_digital.ETAPA: "A geração do arquivo digital ainda não terminou.",
     pre_validar_arquivos.ETAPA: "A pré-validação ainda não terminou.",

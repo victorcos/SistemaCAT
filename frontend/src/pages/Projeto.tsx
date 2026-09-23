@@ -83,6 +83,14 @@ const DESTINOS: Record<
       padrao: "Quebrar os SPED",
     },
   },
+  apuracao_contribuicoes: {
+    rota: ROTAS.gestao,
+    rotulos: {
+      concluida: "Ver os quadros e baixar a Gestão",
+      em_andamento: "Acompanhar a apuração",
+      padrao: "Apurar as contribuições",
+    },
+  },
   razao: {
     rota: ROTAS.razao,
     rotulos: {

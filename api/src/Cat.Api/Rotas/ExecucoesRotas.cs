@@ -30,6 +30,8 @@ public static class ExecucoesRotas
         Etapa(api, Execucoes.Entrega, "entrega", detalheExigeEtapa: true, "montar a entrega");
         Etapa(api, Execucoes.QuebraDeSped, "quebra-de-sped", detalheExigeEtapa: true,
             "quebrar os SPED");
+        Etapa(api, Execucoes.ApuracaoContribuicoes, "apuracao-contribuicoes", detalheExigeEtapa: true,
+            "apurar as contribuições");
 
         api.MapGet("/entrega/{execucaoId:int}/estabelecimentos", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>

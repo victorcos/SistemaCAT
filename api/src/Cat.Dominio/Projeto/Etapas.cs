@@ -129,7 +129,7 @@ public static class Etapas
             "natureza, ajustes, e o controle de créditos. Inclui a exclusão do ICMS da " +
             "base, que cruza a EFD-Contribuições com a EFD ICMS/IPI pelo documento e " +
             "pelo item.",
-            Implementada: false),
+            Implementada: true),
     ];
 
     /// <summary>
@@ -175,11 +175,23 @@ public static class Etapas
     /// bloqueada enquanto a anterior não concluiu: a ordem é de dependência real.
     /// </summary>
     public static IReadOnlyList<EtapaDoProjeto> Montar(string? modulo, IReadOnlySet<string> concluidas,
-        string? emAndamento = null)
+        string? emAndamento = null) => Montar(Do(modulo), concluidas, emAndamento);
+
+    /// <summary>
+    /// O mesmo, sobre um roteiro dado em vez do roteiro de um módulo.
+    ///
+    /// Existe para que a regra da etapa **declarada e ainda não construída**
+    /// continue testável. Ela vale desde sempre, mas só tinha como ser exercida
+    /// enquanto houvesse alguma etapa por fazer — e em 23/09/2026 a última
+    /// ficou pronta. Amarrar um teste de regra à existência de trabalho
+    /// pendente é perdê-lo no dia em que o trabalho acaba.
+    /// </summary>
+    public static IReadOnlyList<EtapaDoProjeto> Montar(IEnumerable<DefinicaoEtapa> roteiro,
+        IReadOnlySet<string> concluidas, string? emAndamento = null)
     {
         var saida = new List<EtapaDoProjeto>();
         var anteriorOk = true;
-        foreach (var d in Do(modulo))
+        foreach (var d in roteiro)
         {
             var situacao =
                 !d.Implementada ? SituacaoEtapa.NaoDisponivel

@@ -35,6 +35,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cat.aplicacao.casos_de_uso import (
+    apurar_contribuicoes,
     apurar_periodo,
     apurar_suportado,
     conferir_documentos,
@@ -337,6 +338,9 @@ PREPARADORES = {
                                  "Já existe uma pré-validação dos arquivos do cliente em andamento neste trabalho."),
     montar_entrega.ETAPA: (montar_entrega.preparar, montar_entrega.NadaParaEntregar,
                            "Já existe uma montagem da entrega em andamento neste trabalho."),
+    apurar_contribuicoes.ETAPA: (
+        apurar_contribuicoes.preparar, apurar_contribuicoes.NadaParaApurar,
+        "Já existe uma apuração das contribuições em andamento neste trabalho."),
     quebrar_sped.ETAPA: (quebrar_sped.preparar, quebrar_sped.NadaParaQuebrar,
                          "Já existe uma quebra de SPED em andamento neste trabalho."),
 }

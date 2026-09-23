@@ -3,6 +3,7 @@ import { ADMINISTRA_USUARIOS } from "@/constants/roles";
 import { ROTAS } from "@/constants/routes";
 import Leiaute from "@/layout/Leiaute";
 import Conferencia from "@/pages/Conferencia";
+import Gestao from "@/pages/Gestao";
 import Historico from "@/pages/Historico";
 import Importar from "@/pages/Importar";
 import Inicio from "@/pages/Inicio";
@@ -100,6 +101,7 @@ export const roteador = createBrowserRouter([
               { path: "/projetos/:id/pre-validacao", element: <PreValidacao /> },
               { path: "/projetos/:id/quebra-de-sped", element: <QuebraDeSped /> },
               { path: "/projetos/:id/razao-contabil", element: <RazaoContabil /> },
+              { path: "/projetos/:id/apuracao-contribuicoes", element: <Gestao /> },
               { path: "/projetos/:id/entrega", element: <Entrega /> },
               { path: "/projetos/:id/historico", element: <Historico /> },
               {

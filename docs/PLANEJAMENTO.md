@@ -144,7 +144,8 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       natureza do crédito deduzida do CFOP — não do tipo do item (v0.76.0)
 - [x] Gestão (36 quadros): o núcleo — agregador da EFD, os quadros de PIS e COFINS,
       a seleção por competência e o oráculo `tools/validar_gestao.py` (v0.78.0)
-- [ ] Etapa `apuracao_contribuicoes`: ligar a Gestão à fila, com planilha e tela
+- [x] Etapa `apuracao_contribuicoes`: a Gestão na fila, com parquet longo, planilha
+      larga (uma aba por tributo) e tela (v0.83.0)
 - [ ] Rodar `tools/validar_gestao.py` contra o export do MA e as EFD reais: é o que
       confirma o porte, e o gabarito não pode ser versionado
 - [x] Gestão de IRPJ/CSLL: leitor da ECF, os quadros do Lucro Real e a ECF no

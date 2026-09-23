@@ -84,6 +84,7 @@ public sealed class Execucoes(
     public const string Entrega = "entrega";
     /// <summary>Primeira etapa do módulo de PIS/COFINS depois da importação.</summary>
     public const string QuebraDeSped = "quebra_de_sped";
+    public const string ApuracaoContribuicoes = "apuracao_contribuicoes";
 
     /// <summary>
     /// A entrega montada e ainda não aprovada. Não é situação gravada: é como o
