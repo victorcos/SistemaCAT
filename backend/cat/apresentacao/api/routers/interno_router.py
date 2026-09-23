@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from cat.aplicacao.casos_de_uso import (
     apurar_contribuicoes,
+    apurar_credito_outorgado,
     apurar_periodo,
     apurar_piscofins,
     apurar_suportado,
@@ -60,6 +61,7 @@ from cat.aplicacao.casos_de_uso.inspecionar_lote import (
 from cat.config import obter_config
 from cat.dominio.comum.cnpj import Cnpj
 from cat.infraestrutura.analitico import apuracao as analitico_apuracao
+from cat.infraestrutura.analitico import credito_outorgado as analitico_credito_outorgado
 from cat.infraestrutura.analitico import arquivo_digital as analitico_arquivo_digital
 from cat.infraestrutura.analitico import entrega as analitico_entrega
 from cat.infraestrutura.analitico import pre_validacao_do_cliente as analitico_pre_validacao
@@ -69,7 +71,11 @@ from cat.infraestrutura.analitico import suportado as analitico_suportado
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
 from cat.infraestrutura.planilhas import correcoes_da_planilha
 from cat.infraestrutura.repositorios.banco import obter_sessao
-from cat.infraestrutura.repositorios.modelos import ExecucaoDB
+from cat.infraestrutura.repositorios.modelos import (
+    ExecucaoDB,
+    FiltroDoCreditoOutorgadoDB,
+    ProjetoDB,
+)
 from cat.log import contexto, obter_log
 from cat.versao import versao
 
@@ -359,6 +365,9 @@ PREPARADORES = {
         "Já existe uma apuração de PIS/COFINS em andamento neste trabalho."),
     quebrar_sped.ETAPA: (quebrar_sped.preparar, quebrar_sped.NadaParaQuebrar,
                          "Já existe uma quebra de SPED em andamento neste trabalho."),
+    apurar_credito_outorgado.ETAPA: (
+        apurar_credito_outorgado.preparar, apurar_credito_outorgado.NadaParaVarrer,
+        "Já existe uma apuração do crédito outorgado em andamento neste trabalho."),
 }
 
 # "cancelando" ainda está em curso: a rodada só para no próximo ponto seguro, e
@@ -818,6 +827,127 @@ def candidatos_de_depara(pedido: PedidoDeDePara, sessao: Annotated[Session, Depe
         except FileNotFoundError:
             raise HTTPException(status.HTTP_410_GONE,
                                 "Os arquivos da última movimentação não estão mais em disco. Rode de novo.") from None
+
+
+# ---------------------------------------------------------------------------
+# Crédito outorgado: o filtro do trabalho, e as listas da tela
+#
+# O filtro tem rota própria porque é **configuração**, e não resultado: ele
+# existe antes da primeira rodada e sobrevive a todas. Quem grava é a API, que
+# sabe quem é a pessoa; quem normaliza é o domínio, chamado no caso de uso.
+# ---------------------------------------------------------------------------
+class PedidoDoFiltro(BaseModel):
+    projeto_id: int
+
+
+class PedidoDeGravarFiltro(BaseModel):
+    projeto_id: int
+    usuario_id: int | None = None
+    ncms: list[str] = Field(default_factory=list, max_length=2000)
+    termos: list[str] = Field(default_factory=list, max_length=2000)
+    sem_filtro: bool = False
+    guardar_descartados: bool = False
+
+
+class FiltroDto(BaseModel):
+    ncms: list[str]
+    termos: list[str]
+    sem_filtro: bool
+    guardar_descartados: bool
+    atualizado_em: str | None = None
+    atualizado_por: int | None = None
+
+
+class PedidoDaLista(BaseModel):
+    execucao_id: int
+    # a lista do que ficou de fora, quando a rodada a guardou
+    descartados: bool = False
+    busca: str | None = Field(default=None, max_length=100)
+    codigo: str | None = Field(default=None, max_length=60)
+    pagina: int = Field(default=1, ge=1)
+    por_pagina: int = Field(default=analitico_credito_outorgado.POR_PAGINA_PADRAO, ge=1)
+
+
+def _filtro_dto(projeto_id: int, sessao: Session) -> FiltroDto:
+    linha = sessao.get(FiltroDoCreditoOutorgadoDB, projeto_id)
+    if linha is None:
+        # trabalho que ainda não configurou nada: o vazio é resposta, não erro
+        return FiltroDto(ncms=[], termos=[], sem_filtro=False, guardar_descartados=False)
+    return FiltroDto(
+        ncms=list(linha.ncms or []), termos=list(linha.termos or []),
+        sem_filtro=bool(linha.sem_filtro),
+        guardar_descartados=bool(linha.guardar_descartados),
+        atualizado_em=linha.atualizado_em.isoformat() if linha.atualizado_em else None,
+        atualizado_por=linha.atualizado_por)
+
+
+@router.post("/credito-outorgado/filtro", response_model=FiltroDto,
+             dependencies=[Depends(exigir_segredo)])
+def ler_filtro_do_credito(
+    pedido: PedidoDoFiltro, sessao: Annotated[Session, Depends(obter_sessao)]
+) -> FiltroDto:
+    return _filtro_dto(pedido.projeto_id, sessao)
+
+
+@router.put("/credito-outorgado/filtro", response_model=FiltroDto,
+            dependencies=[Depends(exigir_segredo)])
+def gravar_filtro_do_credito(
+    pedido: PedidoDeGravarFiltro, sessao: Annotated[Session, Depends(obter_sessao)]
+) -> FiltroDto:
+    if sessao.get(ProjetoDB, pedido.projeto_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Trabalho não encontrado.")
+    with contexto(etapa=apurar_credito_outorgado.ETAPA, projeto_id=pedido.projeto_id,
+                  usuario_id=pedido.usuario_id):
+        apurar_credito_outorgado.gravar_filtro(
+            pedido.projeto_id, pedido.ncms, pedido.termos,
+            sem_filtro=pedido.sem_filtro, guardar_descartados=pedido.guardar_descartados,
+            usuario_id=pedido.usuario_id, sessao=sessao)
+    return _filtro_dto(pedido.projeto_id, sessao)
+
+
+def _credito_concluido(execucao_id: int, sessao: Session) -> ExecucaoDB:
+    execucao = sessao.get(ExecucaoDB, execucao_id)
+    if execucao is None or execucao.etapa != apurar_credito_outorgado.ETAPA:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Apuração do crédito outorgado não encontrada.")
+    if execucao.situacao != "concluida":
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "A apuração do crédito outorgado ainda não terminou.")
+    return execucao
+
+
+def _traduzir_lista(funcao):
+    """A lista que não existe tem motivo próprio — o descartado pode nunca ter
+    sido guardado, e mandar "rode de novo" sem dizer o quê não ajuda."""
+    try:
+        return funcao()
+    except analitico_credito_outorgado.ListaNaoGerada as erro:
+        raise HTTPException(status.HTTP_410_GONE, str(erro)) from None
+    except FileNotFoundError:
+        raise HTTPException(status.HTTP_410_GONE,
+                            "Os arquivos desta apuração não estão mais em disco. "
+                            "Rode de novo.") from None
+
+
+@router.post("/credito-outorgado/produtos", dependencies=[Depends(exigir_segredo)])
+def produtos_do_credito(
+    pedido: PedidoDaLista, sessao: Annotated[Session, Depends(obter_sessao)]
+) -> dict:
+    execucao = _credito_concluido(pedido.execucao_id, sessao)
+    with contexto(etapa=apurar_credito_outorgado.ETAPA, execucao_id=execucao.id):
+        return _traduzir_lista(lambda: analitico_credito_outorgado.produtos(
+            execucao.pasta_de_trabalho or "", pedido.descartados, pedido.busca,
+            pedido.pagina, pedido.por_pagina))
+
+
+@router.post("/credito-outorgado/itens", dependencies=[Depends(exigir_segredo)])
+def itens_do_credito(
+    pedido: PedidoDaLista, sessao: Annotated[Session, Depends(obter_sessao)]
+) -> dict:
+    execucao = _credito_concluido(pedido.execucao_id, sessao)
+    with contexto(etapa=apurar_credito_outorgado.ETAPA, execucao_id=execucao.id):
+        return _traduzir_lista(lambda: analitico_credito_outorgado.itens(
+            execucao.pasta_de_trabalho or "", pedido.descartados, pedido.busca,
+            pedido.codigo, pedido.pagina, pedido.por_pagina))
 
 
 # ---------------------------------------------------------------------------

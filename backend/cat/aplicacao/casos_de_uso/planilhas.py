@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from cat.aplicacao.casos_de_uso import (
     apurar_contribuicoes,
+    apurar_credito_outorgado,
     apurar_periodo,
     apurar_piscofins,
     apurar_suportado,
@@ -40,6 +41,10 @@ from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO, ARQUIVO_SALD
 from cat.infraestrutura.analitico.arquivo_digital import ARQUIVO_ARQUIVOS, ARQUIVO_OCORRENCIAS
 from cat.infraestrutura.analitico.entrega import ARQUIVO_PACOTE, ARQUIVO_RELATORIO
 from cat.infraestrutura.analitico.pre_validacao_do_cliente import ARQUIVO_ARQUIVOS_DO_CLIENTE
+from cat.infraestrutura.analitico.credito_outorgado import (
+    ARQUIVO_DESCARTADOS,
+    ARQUIVO_ELEGIVEIS,
+)
 from cat.infraestrutura.analitico.gestao import ARQUIVO_DOS_QUADROS
 from cat.infraestrutura.analitico.piscofins import (
     ARQUIVO_DAS_ENTRADAS,
@@ -75,6 +80,10 @@ from cat.infraestrutura.planilhas.arquivo_digital import (
     gerar_ocorrencias,
     zip_de_envio,
     zip_de_previas,
+)
+from cat.infraestrutura.planilhas.credito_outorgado import (
+    gerar_descartados,
+    gerar_elegiveis,
 )
 from cat.infraestrutura.planilhas.gestao import gerar_quadros
 from cat.infraestrutura.planilhas.quebra_de_sped import (
@@ -130,6 +139,12 @@ PLANILHAS = {
         # formato largo do MA — que é o que `tools/validar_gestao.py` compara
         "quadros": ("gestao_fiscal.xlsx", ARQUIVO_DOS_QUADROS, gerar_quadros),
     },
+    apurar_credito_outorgado.ETAPA: {
+        # o que entra no benefício e, quando o trabalho pediu para guardar, o
+        # que ficou de fora — as duas com as mesmas colunas, para se comparar
+        "elegiveis": ("credito_outorgado.xlsx", ARQUIVO_ELEGIVEIS, gerar_elegiveis),
+        "descartados": ("credito_outorgado_descartados.xlsx", ARQUIVO_DESCARTADOS, gerar_descartados),
+    },
     montar_razao.ETAPA: {
         "ficha3": ("ficha3.xlsx", ARQUIVO_FICHA3, gerar_ficha3),
         "fichas": ("fichas.xlsx", ARQUIVO_FICHAS, gerar_fichas),
@@ -163,6 +178,7 @@ NAO_TERMINOU = {
     apurar_suportado.ETAPA: "A apuração ainda não terminou.",
     montar_razao.ETAPA: "A montagem do razão ainda não terminou.",
     quebrar_sped.ETAPA: "A quebra dos SPED ainda não terminou.",
+    apurar_credito_outorgado.ETAPA: "A apuração do crédito outorgado ainda não terminou.",
     apurar_piscofins.ETAPA: "A apuração de PIS/COFINS ainda não terminou.",
     apurar_contribuicoes.ETAPA: "A apuração das contribuições ainda não terminou.",
     apurar_periodo.ETAPA: "A apuração do período ainda não terminou.",
@@ -251,9 +267,17 @@ def gerar(execucao: ExecucaoDB, etapa_da_rota: str, qual: str,
         # é de antes de esta lista existir: a pasta está lá, a lista não.
         if etapa_da_rota == extrair_movimentos.ETAPA:
             raise PlanilhaRecusada(410, "Os arquivos desta extração não estão mais em disco. Rode de novo.")
+        # o descartado é opcional, e a rodada pode simplesmente não tê-lo
+        # guardado. Dizer "não está mais em disco" mandaria procurar um arquivo
+        # que nunca existiu
+        if etapa_da_rota == apurar_credito_outorgado.ETAPA and qual == "descartados" \
+                and os.path.isdir(pasta):
+            raise PlanilhaRecusada(
+                410, "Esta rodada não guardou os itens descartados. Ligue \"guardar os "
+                     "descartados\" no filtro e rode de novo.")
         if etapa_da_rota in (apurar_suportado.ETAPA, montar_razao.ETAPA, apurar_periodo.ETAPA,
                              gerar_arquivo_digital.ETAPA, pre_validar_arquivos.ETAPA, montar_entrega.ETAPA,
-                             quebrar_sped.ETAPA):
+                             quebrar_sped.ETAPA, apurar_credito_outorgado.ETAPA):
             raise PlanilhaRecusada(410, "Os arquivos desta apuração não estão mais em disco. Rode de novo.")
         motivo = ("Esta conferência é de uma versão anterior e não tem esta lista."
                   if os.path.isdir(pasta) else "Os arquivos desta conferência não estão mais em disco.")

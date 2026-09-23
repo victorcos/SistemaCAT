@@ -5,6 +5,63 @@
 
 ---
 
+## 2026-09-23 — O crédito outorgado entra no ICMS, vindo do Quebra de SPED
+
+**De onde veio.** A funcionalidade existe e roda no projeto `Quebra de SPED`
+(`src/credito_outorgado/`) sobre 120 mil XML por vez. Ela varre as notas de
+saída e separa, item a item, o que é produto beneficiado pelo crédito outorgado
+— o benefício é da **mercadoria**, e o trabalho do analista é dizer quais das
+milhões de linhas vendidas são da lista que a lei estadual concede.
+
+**A regra foi portada como está: a descrição manda, a NCM confirma.** Item entra
+se a descrição contiver algum termo cadastrado; bater só a NCM **não basta**.
+Não é descuido da origem, é o que a prática ensinou: a NCM é declarada pelo
+emitente e erra (a mesma farinha vem 11010010 num fornecedor e 19019090 noutro),
+enquanto a descrição é o produto que o dono do negócio reconhece. Quando as duas
+batem, o item sai marcado `NCM+DESCRIÇÃO` — e é por esse rótulo que se separa o
+que está redondo do que merece um olhar.
+
+**Duas diferenças conscientes, ambas na comparação de NCM.** Lá, o código
+cadastrado era procurado em qualquer posição (`"690"` achava `21069090`) e os
+zeros à esquerda eram descartados dos dois lados. Aqui casa por **prefixo**, com
+os zeros: NCM é hierárquica, vale da esquerda para a direita. Como a NCM sozinha
+nunca decide elegibilidade, a mudança só pode mexer no **rótulo** de um item já
+elegível pela descrição — nunca em quem entra. O **acento continua contando**
+("PAO" não acha "PÃO"), como na origem: dobrar acento faria entrar aqui item que
+lá fica de fora, e os dois resultados precisam poder ser comparados.
+
+**O que a travessia ganhou de graça.** O leitor é o da casa
+(`dominio/notafiscal/xml`), e não um parser próprio: entram CF-e SAT junto com a
+NF-e, CT-e e evento de cancelamento reconhecidos e ignorados, nota denegada fora
+da conta, XML declarado UTF-8 e gravado em Latin-1 relido em vez de perdido, e o
+zip aberto sem extrair para o disco. E **uma cópia por chave** — a mesma nota vem
+no zip do mês e no do trimestre (28.407 chaves repetidas na Advertising), e
+contar duas vezes inflaria justamente o número que interessa.
+
+**O filtro é do trabalho, e fica no banco.** Na origem era um JSON global, um
+só para todas as empresas. Aqui é uma linha por trabalho
+(`credito_outorgado_filtro`): a lista muda com o estado, com o período e com o
+que a empresa vende. **Sem nenhum termo a etapa se recusa a rodar**, em vez de
+varrer 120 mil arquivos para entregar uma lista vazia; quem quer ver o universo
+antes de escrever o primeiro termo liga `sem_filtro`, que é explícito e marca
+cada linha com o rótulo `SEM FILTRO`.
+
+**Cada rodada guarda o filtro que a produziu**, no resumo da execução. Não é
+redundância com a tabela: lá fica o filtro de hoje, aqui o que produziu aquela
+lista — e é este que responde, meses depois, por que ela tinha aquelas linhas.
+
+**Três listas viraram duas, e nasceu uma terceira coisa.** A origem escrevia
+elegíveis, descartados e "todos"; o "todos" era a soma dos dois, e saiu. O que
+entrou no lugar é a leitura por **produto**: ninguém revisa um filtro lendo três
+milhões de linhas de venda — lê-se a lista de produtos distintos que ele
+capturou, e aí salta aos olhos o que não devia estar ali e o que ficou de fora.
+
+**O PIS e o COFINS do item passaram a ser lidos do XML.** Não servem à CAT 42;
+servem à triagem, onde o CST do produto confirma ou desmente o que a descrição
+diz — cesta básica sai com CST 04 ou 06, e o que sai com 01 merece conferência.
+
+---
+
 ## 2026-09-23 — O cartão de trabalho diz de que tributo é, e a cor do assunto passa a ter uma fonte só
 
 **O que faltava.** Na lista de todos os trabalhos, o cartão dizia a empresa, o

@@ -40,6 +40,11 @@ O grupo do ICMS muda de nome conforme o CST (`ICMS00`, `ICMS10`, `ICMS60`,
 O CST sai como na EFD: origem mais os dois dígitos (`060`), ou origem mais o
 CSOSN do Simples (`0500`) — o domínio do suportado compara só os dois últimos.
 
+Do PIS e do COFINS lê-se o CST, a base, a alíquota e o valor, com a mesma regra
+do grupo que muda de nome (`PISAliq`, `PISOutr`, `COFINSNT`…). Não servem à CAT
+42; servem à triagem do crédito outorgado, onde o CST do produto confirma ou
+desmente o que a descrição diz.
+
 ## O protocolo
 
 O `nfeProc` traz, depois da nota, o `protNFe` com o `cStat` da SEFAZ. Só 100
@@ -89,6 +94,9 @@ class ItemDoXml:
     unidade: str
     quantidade: Decimal
     valor: Decimal
+    # vUnCom, como o emitente declarou. Não é `valor / quantidade`: a NF-e
+    # admite dez casas aqui, e a divisão inventaria um arredondamento
+    valor_unitario: Decimal = ZERO
     desconto: Decimal = ZERO
     # o que o emitente cobrou além da mercadoria e que entra na base do ICMS
     frete: Decimal = ZERO
@@ -112,6 +120,17 @@ class ItemDoXml:
     icms_efetivo: Decimal = ZERO
     # pRedBC: o percentual de redução da base que o emitente declara
     reducao_declarada: Decimal = ZERO
+    # PIS e COFINS do item. Não entram em nada da CAT 42; entram na triagem do
+    # crédito outorgado, onde o CST do produto confirma o que a descrição diz —
+    # cesta básica sai com CST 04 ou 06, e o que sai com 01 merece um olhar
+    cst_pis: str = ""
+    bc_pis: Decimal = ZERO
+    aliq_pis: Decimal = ZERO
+    valor_pis: Decimal = ZERO
+    cst_cofins: str = ""
+    bc_cofins: Decimal = ZERO
+    aliq_cofins: Decimal = ZERO
+    valor_cofins: Decimal = ZERO
 
     @property
     def base_da_operacao(self) -> Decimal:
@@ -162,6 +181,10 @@ class DocumentoXml:
     consumidor_final: bool | None = None
     # cStat do protNFe; None sem protocolo (XML do ERP) e no CF-e
     cstat: str | None = None
+    # a razão social como o XML escreveu. O CNPJ identifica; o nome é o que
+    # alguém lê numa planilha de triagem sem consultar o cadastro
+    emitente_nome: str = ""
+    destinatario_nome: str = ""
 
     @property
     def autorizado(self) -> bool | None:
@@ -247,6 +270,8 @@ def _nfe(inf: ET.Element, cstat: str | None = None) -> DocumentoXml:
         itens=tuple(_item(det) for det in _filhos(inf, "det")),
         consumidor_final=consumidor,
         cstat=cstat,
+        emitente_nome=_nome(_filho(inf, "emit")),
+        destinatario_nome=_nome(_filho(inf, "dest")),
     )
 
 
@@ -267,6 +292,8 @@ def _cfe(inf: ET.Element) -> DocumentoXml:
         emissao=_data(_texto(ide, "dEmi")),
         itens=tuple(_item(det) for det in _filhos(inf, "det")),
         consumidor_final=True,
+        emitente_nome=_nome(_filho(inf, "emit")),
+        destinatario_nome=_nome(_filho(inf, "dest")),
     )
 
 
@@ -276,6 +303,8 @@ def _cfe(inf: ET.Element) -> DocumentoXml:
 def _item(det: ET.Element) -> ItemDoXml:
     prod = _filho(det, "prod")
     icms = _grupo_do_icms(det)
+    pis = _grupo_do_tributo(det, "PIS")
+    cofins = _grupo_do_tributo(det, "COFINS")
     gtin = _texto(prod, "cEAN").strip()
     cest = _texto(prod, "CEST")
     if not cest:
@@ -294,6 +323,7 @@ def _item(det: ET.Element) -> ItemDoXml:
         unidade=_texto(prod, "uCom").strip(),
         quantidade=_decimal(_texto(prod, "qCom")),
         valor=_decimal(_texto(prod, "vProd")),
+        valor_unitario=_decimal(_texto(prod, "vUnCom")),
         desconto=_decimal(_texto(prod, "vDesc")),
         frete=_decimal(_texto(prod, "vFrete")),
         seguro=_decimal(_texto(prod, "vSeg")),
@@ -314,7 +344,27 @@ def _item(det: ET.Element) -> ItemDoXml:
         bc_efetiva=_decimal(_texto(icms, "vBCEfet")),
         aliquota_efetiva=_decimal(_texto(icms, "pICMSEfet")),
         icms_efetivo=_decimal(_texto(icms, "vICMSEfet")),
+        cst_pis=_texto(pis, "CST"),
+        bc_pis=_decimal(_texto(pis, "vBC")),
+        aliq_pis=_decimal(_texto(pis, "pPIS")),
+        valor_pis=_decimal(_texto(pis, "vPIS")),
+        cst_cofins=_texto(cofins, "CST"),
+        bc_cofins=_decimal(_texto(cofins, "vBC")),
+        aliq_cofins=_decimal(_texto(cofins, "pCOFINS")),
+        valor_cofins=_decimal(_texto(cofins, "vCOFINS")),
     )
+
+
+def _grupo_do_tributo(det: ET.Element, nome: str) -> ET.Element | None:
+    """O grupo dentro de `imposto/PIS` ou `imposto/COFINS`.
+
+    Mesma forma do ICMS: o nome do grupo muda com o regime — `PISAliq`,
+    `PISQtde`, `PISOutr`, `PISNT`, e os quatro equivalentes do COFINS —, e o que
+    interessa é o que está dentro dele.
+    """
+    imposto = _filho(det, "imposto")
+    tributo = _filho(imposto, nome) if imposto is not None else None
+    return next(iter(tributo), None) if tributo is not None else None
 
 
 def _grupo_do_icms(det: ET.Element) -> ET.Element | None:
@@ -370,6 +420,11 @@ def _texto(no: ET.Element | None, nome: str) -> str:
 
 def _documento(no: ET.Element | None) -> str:
     return _texto(no, "CNPJ") or _texto(no, "CPF")
+
+
+def _nome(no: ET.Element | None) -> str:
+    """A razão social; o fantasia quando a nota não traz a razão."""
+    return _texto(no, "xNome") or _texto(no, "xFant")
 
 
 def _chave(inf: ET.Element, prefixo: str) -> str:

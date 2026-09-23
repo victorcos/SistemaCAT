@@ -384,6 +384,47 @@ class DeParaDB(Base):
 
 
 
+class FiltroDoCreditoOutorgadoDB(Base):
+    """Quais produtos têm o benefício, neste trabalho.
+
+    É do **trabalho**, e não da empresa nem do sistema: o crédito outorgado é
+    concedido por lei estadual a uma lista de mercadorias, e essa lista muda
+    com o estado, com o período e com o que a empresa vende. Herdá-la de um
+    trabalho para o outro seria repetir sem olhar — o mesmo raciocínio da
+    correção, e o oposto do de-para, que é da empresa.
+
+    Uma linha por trabalho. `ncms` e `termos` são listas de texto: a NCM
+    confirma, o termo da descrição é quem decide (ver
+    `dominio/icms/credito_outorgado`).
+
+    A rodada guarda **uma cópia** deste filtro no próprio resumo da execução.
+    Não é redundância: aqui fica o filtro de hoje, lá fica o que produziu
+    aquela lista — e é o de lá que responde, meses depois, por que ela tinha
+    aquelas linhas.
+    """
+
+    __tablename__ = "credito_outorgado_filtro"
+
+    projeto_id: Mapped[int] = mapped_column(
+        ForeignKey("projeto.id", ondelete="CASCADE"), primary_key=True)
+    ncms: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    termos: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    # rodar sem julgar nada, para ver o universo antes de escrever o primeiro
+    # termo. Tudo sai elegível, marcado "SEM FILTRO" — o rótulo existe para que
+    # ninguém confunda essa lista com uma apuração de benefício
+    sem_filtro: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false")
+    # guardar também o que ficou de fora. É como se revisa o filtro — o produto
+    # que devia ter entrado e não entrou só aparece nessa lista. Custa: numa
+    # base grande, os descartados são a maioria esmagadora das linhas
+    guardar_descartados: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false")
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, server_default=func.now(), nullable=False,
+    )
+    atualizado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+
+
 class CorrecaoDB(Base):
     """Uma correção à mão no que o sistema calculou.
 

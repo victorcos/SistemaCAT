@@ -160,7 +160,7 @@ a pergunta em aberto.
 | De onde | O quê |
 |---|---|
 | ReenquadradorTributario-PISCOFINS | `MotorClassTrib` (hierarquia de prefixo de NCM, exceção com escopo), `MotorRegras` (escala de confiança calibrada), `PreProcessadorTexto` (stopwords de varejo), módulo de autenticação com JWT e papéis |
-| Quebra de SPED | indexador por offset de byte e extrator com seek, registro `C190_ICMS`, leitor de NF-e |
+| Quebra de SPED | indexador por offset de byte e extrator com seek, registro `C190_ICMS`, leitor de NF-e, Gestão Fiscal (36 quadros), Consulta de Entradas (037), **crédito outorgado** (triagem de item por NCM e descrição) |
 
 A base de conhecimento do reenquadrador é de PIS e COFINS e **não serve** para a
 CAT. Reaproveitar estrutura, nunca conteúdo.
