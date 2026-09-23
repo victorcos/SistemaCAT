@@ -112,15 +112,15 @@ export function CardDeFuncionalidade({ etapa, destino, motivo }: Funcionalidade)
         </p>
       </div>
 
-      <div className="relative border-t border-borda-sutil pt-3 text-[13px] font-bold">
-        {morto ? (
-          <span className="text-texto-fraco">{motivo ?? "Indisponível"}</span>
-        ) : (
-          <span className={cn(concluida ? "text-sucesso" : "text-marca-laranja")}>
-            {concluida ? "Ver o resultado" : emCurso ? "Acompanhar" : "Abrir"} →
-          </span>
-        )}
-      </div>
+      {/* Só o card indisponível tem rodapé, e o que vai nele é o motivo.
+          O "Abrir →" saiu em 23/09/2026: o card inteiro é um `<Link>`, então a
+          chamada repetia o que o cartão já é — e a etiqueta de situação, no
+          topo, já diz em que pé a funcionalidade está. */}
+      {morto && (
+        <div className="relative border-t border-borda-sutil pt-3 text-[13px] font-bold text-texto-fraco">
+          {motivo ?? "Indisponível"}
+        </div>
+      )}
     </>
   );
 
