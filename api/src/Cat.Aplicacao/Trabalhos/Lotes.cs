@@ -2,7 +2,6 @@
 using System.Text.Json.Nodes;
 using Cat.Aplicacao.Log;
 using Cat.Dominio.Acesso;
-using Cat.Dominio.Acesso;
 using Cat.Dominio.Lote;
 using Cat.Dominio.Projeto;
 using Microsoft.Extensions.Logging;
