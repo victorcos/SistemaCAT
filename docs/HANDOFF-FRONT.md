@@ -1,12 +1,12 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.92.0**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.94.0**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
 errado é o código — não este documento.
 
-## 1. Rotas (25)
+## 1. Rotas (26)
 
 O endereço, a tela que o atende e se exige papel específico.
 
@@ -30,6 +30,7 @@ O endereço, a tela que o atende e se exige papel específico.
 | `/projetos/:id/arquivo-digital` | ArquivoDigital | — |
 | `/projetos/:id/pre-validacao` | PreValidacao | — |
 | `/projetos/:id/quebra-de-sped` | QuebraDeSped | — |
+| `/projetos/:id/credito-outorgado` | CreditoOutorgado | — |
 | `/projetos/:id/apuracao-piscofins` | ApuracaoPisCofins | — |
 | `/projetos/:id/razao-contabil` | RazaoContabil | — |
 | `/projetos/:id/apuracao-contribuicoes` | Gestao | — |
@@ -38,7 +39,7 @@ O endereço, a tela que o atende e se exige papel específico.
 | `/usuarios` | Usuarios | sim |
 | `*` | NaoEncontrada | — |
 
-## 2. Telas (24)
+## 2. Telas (25)
 
 O resumo é o que o próprio arquivo diz de si no comentário do topo.
 
@@ -65,6 +66,12 @@ Etapa 7 — gerar o arquivo digital. Um arquivo por estabelecimento de SP e por 
 `src/pages/Conferencia.tsx` · 433 linhas
 
 Etapa 2 — conferir documentos. Cruza o que a EFD escriturou (C100 e C800) com o XML e o relatório do
+
+### CreditoOutorgado
+
+`src/pages/CreditoOutorgado.tsx` · 862 linhas
+
+Crédito outorgado — quais itens vendidos são produto beneficiado.
 
 ### DePara
 
@@ -134,7 +141,7 @@ Pré-validar os arquivos digitais que o cliente já transmitiu.
 
 ### Projeto
 
-`src/pages/Projeto.tsx` · 585 linhas
+`src/pages/Projeto.tsx` · 593 linhas
 
 Para onde cada funcionalidade leva, e com que palavras. A tela não decide o que está disponível — isso vem do domínio, em
 
@@ -503,7 +510,7 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 | `--borda-sutil` | `rgb(255 255 255 / 8%)` | — |
 | `--brilho-acao` | `0 12px 28px rgb(255 127 0 / 30%)` | — |
 
-## 5. O que a tela pede ao servidor (88 chamadas)
+## 5. O que a tela pede ao servidor (95 chamadas)
 
 Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 `:id`, qualquer que seja o nome no código.
@@ -564,6 +571,18 @@ Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 | GET | `/api/projetos/:id/correcoes:id` |
 | DELETE | `/api/projetos/:id/correcoes/:id` |
 | POST | `/api/razao/:id/correcoes/planilha` |
+
+### `creditoOutorgado`
+
+| Método | Rota |
+| --- | --- |
+| GET | `/api/credito-outorgado/:id` |
+| POST | `/api/credito-outorgado/:id/cancelar` |
+| GET | `/api/credito-outorgado/:id/itens:id` |
+| GET | `/api/credito-outorgado/:id/planilhas/:id` |
+| GET | `/api/credito-outorgado/:id/produtos:id` |
+| POST | `/api/projetos/:id/credito-outorgado` |
+| PUT | `/api/projetos/:id/credito-outorgado/filtro` |
 
 ### `depara`
 

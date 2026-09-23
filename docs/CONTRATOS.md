@@ -327,6 +327,42 @@ A 037 tem **52 colunas** (v0.76.0: entrou `Município`, ao lado de
 `Natureza do Crédito` é deduzida **do CFOP** nos ramos em que o registro não
 traz `NAT_BC_CRED` (C100/C170 e C190/C191/C195); nos demais é lida do arquivo.
 
+### Crédito outorgado (v0.94.0)
+
+| Método | Rota | Quem |
+| --- | --- | --- |
+| `GET` | `/api/projetos/{id}/credito-outorgado/filtro` | quem vê o trabalho |
+| `PUT` | `/api/projetos/{id}/credito-outorgado/filtro` | quem escreve |
+| `POST` | `/api/projetos/{id}/credito-outorgado` | quem escreve |
+| `GET` | `/api/projetos/{id}/credito-outorgado` | quem vê o trabalho |
+| `GET` | `/api/credito-outorgado/{execucaoId}` | quem vê o trabalho |
+| `POST` | `/api/credito-outorgado/{execucaoId}/cancelar` | quem escreve |
+| `GET` | `/api/credito-outorgado/{execucaoId}/produtos` | quem vê o trabalho |
+| `GET` | `/api/credito-outorgado/{execucaoId}/itens` | quem vê o trabalho |
+| `GET` | `/api/credito-outorgado/{execucaoId}/planilhas/{qual}` | quem vê o trabalho |
+
+**O filtro** (`{ncms, termos, sem_filtro, guardar_descartados}`) é do **trabalho**
+e existe antes da primeira rodada — por isso pende do projeto, e não da execução.
+Trabalho sem filtro responde vazio, e não 404. Quem normaliza é o domínio do
+motor: NCM fica só com dígitos, termo vai para maiúsculas, repetido entra uma vez
+só. O `PUT` aceita até 2.000 de cada. **Sem nenhum termo e com `sem_filtro`
+desligado, o `POST` da rodada recusa com 422** dizendo o que falta.
+
+`produtos` agrupa por código, descrição e NCM (uma linha por produto, maior valor
+primeiro); `itens` traz as linhas, e aceita `codigo` para recortar por produto.
+Os dois aceitam `descartados=true`, `busca`, `pagina` e `por_pagina`; pedir a
+lista de descartados de uma rodada que não os guardou volta **410** dizendo para
+ligar a opção e rodar de novo.
+
+`qual` vale `elegiveis` e `descartados`, em xlsx ou csv, com **as mesmas colunas**
+nas duas. O resumo da execução traz `documentos`, `itens`, `elegiveis`,
+`descartados`, `centavos_elegiveis`, `repetidos`, `nao_autorizados`,
+`nao_sao_documento`, `ilegiveis` e **`filtro`** — o retrato do filtro no momento
+da rodada, que é o que responde depois por que aquela lista tinha aquelas linhas.
+
+Em disco, na pasta da execução: `credito_outorgado_elegiveis.parquet` sempre, e
+`credito_outorgado_descartados.parquet` só quando o trabalho pediu para guardar.
+
 ### Apuração das contribuições — a Gestão (v0.83.0)
 
 | Método | Rota | Quem |

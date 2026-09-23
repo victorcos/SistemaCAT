@@ -43,6 +43,17 @@ public sealed record PedidoDeOcorrencias(string Nome, int Pagina, int PorPagina)
 /// <param name="So">no_dossie, fora_do_dossie, com_previa, fora_de_sp</param>
 public sealed record PedidoDeEstabelecimentos(string? So, string? Busca, int Pagina, int PorPagina);
 
+/// <summary>Quais produtos têm o crédito outorgado, neste trabalho.</summary>
+/// <param name="SemFiltro">rodar sem julgar nada, para ver o universo antes do primeiro termo</param>
+/// <param name="GuardarDescartados">guardar também o que ficou de fora, para revisar o filtro</param>
+public sealed record PedidoDeFiltroOutorgado(IReadOnlyList<string> Ncms, IReadOnlyList<string> Termos,
+    bool SemFiltro, bool GuardarDescartados);
+
+/// <param name="Descartados">a lista do que ficou de fora, quando a rodada a guardou</param>
+/// <param name="Codigo">só os itens de um produto; nulo traz todos</param>
+public sealed record PedidoDaListaOutorgada(bool Descartados, string? Busca, string? Codigo,
+    int Pagina, int PorPagina);
+
 public interface IRepositorioDeExecucoes
 {
     Task<ExecucaoLida?> Buscar(int id, CancellationToken cancelar);
@@ -89,6 +100,8 @@ public sealed class Execucoes(
     public const string QuebraDeSped = "quebra_de_sped";
     public const string ApuracaoContribuicoes = "apuracao_contribuicoes";
     public const string ApuracaoPisCofins = "apuracao_piscofins";
+    /// <summary>Triagem dos itens beneficiados, no módulo de ICMS. Lê os XML, não o SPED.</summary>
+    public const string CreditoOutorgado = "credito_outorgado";
 
     /// <summary>
     /// A entrega montada e ainda não aprovada. Não é situação gravada: é como o
@@ -197,6 +210,48 @@ public sealed class Execucoes(
     {
         var e = await Detalhar(execucaoId, ApuracaoPisCofins, usuario, cancelar);
         return await motor.LancamentosDoRazaoContabil(e.Id, pedido, cancelar);
+    }
+
+    // O crédito outorgado tem duas coisas que as outras etapas não têm: um
+    // filtro que existe **antes** da primeira rodada, e que por isso é do
+    // trabalho e não da execução; e uma leitura por produto, que é como se
+    // revisa esse filtro depois.
+
+    /// <summary>O filtro do trabalho: quais produtos têm o benefício.</summary>
+    public async Task<JsonElement> FiltroDoCreditoOutorgado(int projetoId, Usuario usuario, CancellationToken cancelar)
+    {
+        await Projeto(projetoId, usuario, cancelar);
+        return await motor.FiltroDoCreditoOutorgado(projetoId, cancelar);
+    }
+
+    /// <summary>Grava o filtro. Quem normaliza é o domínio, no motor.</summary>
+    public async Task<JsonElement> GravarFiltroDoCreditoOutorgado(int projetoId, PedidoDeFiltroOutorgado pedido,
+        Usuario por, CancellationToken cancelar)
+    {
+        await Projeto(projetoId, por, cancelar);
+        var json = await motor.GravarFiltroDoCreditoOutorgado(projetoId, pedido, por.Id, cancelar);
+        log.Info("filtro do crédito outorgado gravado", new
+        {
+            projeto_id = projetoId, ncms = pedido.Ncms.Count, termos = pedido.Termos.Count,
+            sem_filtro = pedido.SemFiltro, por_usuario_id = por.Id,
+        });
+        return json;
+    }
+
+    /// <summary>Os produtos capturados pelo filtro, do maior valor para o menor.</summary>
+    public async Task<JsonElement> ProdutosDoCreditoOutorgado(int execucaoId, PedidoDaListaOutorgada pedido,
+        Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, CreditoOutorgado, usuario, cancelar);
+        return await motor.ProdutosDoCreditoOutorgado(e.Id, pedido, cancelar);
+    }
+
+    /// <summary>As linhas, para quem já achou o produto e quer ver as notas dele.</summary>
+    public async Task<JsonElement> ItensDoCreditoOutorgado(int execucaoId, PedidoDaListaOutorgada pedido,
+        Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, CreditoOutorgado, usuario, cancelar);
+        return await motor.ItensDoCreditoOutorgado(e.Id, pedido, cancelar);
     }
 
     /// <summary>Os estabelecimentos do razão contábil, para o filtro da tela.</summary>

@@ -18,6 +18,13 @@ public static class ExecucoesRotas
 
     private sealed record PedidoDeAprovacao(string? Observacao);
 
+    private sealed record PedidoDeFiltro(IReadOnlyList<string>? Ncms, IReadOnlyList<string>? Termos,
+        bool SemFiltro, bool GuardarDescartados);
+
+    /// <summary>Teto do filtro. Não é regra fiscal: é o que impede um colar acidental
+    /// de planilha inteira de virar uma varredura que nunca termina.</summary>
+    private const int LimiteDoFiltro = 2000;
+
     public static void MapearExecucoes(this IEndpointRouteBuilder rotas)
     {
         var api = rotas.MapGroup("/api").WithTags("execuções");
@@ -34,6 +41,8 @@ public static class ExecucoesRotas
             "apurar as contribuições");
         Etapa(api, Execucoes.ApuracaoPisCofins, "apuracao-piscofins", detalheExigeEtapa: true,
             "apurar PIS/COFINS");
+        Etapa(api, Execucoes.CreditoOutorgado, "credito-outorgado", detalheExigeEtapa: true,
+            "apurar o crédito outorgado");
 
         api.MapGet("/entrega/{execucaoId:int}/estabelecimentos", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>
@@ -180,6 +189,46 @@ public static class ExecucoesRotas
                 await Traduzir(async () =>
                     Results.Json(await caso.EstabelecimentosDoRazaoContabil(execucaoId, http.UsuarioAtual(), http.RequestAborted))))
             .ExigirUsuario();
+
+        // O crédito outorgado: o filtro do trabalho, e a leitura do que ele
+        // capturou. O filtro é a única configuração de etapa que a tela grava —
+        // ele existe antes da primeira rodada e sobrevive a todas, e por isso
+        // pende do trabalho, e não da execução.
+        api.MapGet("/projetos/{projetoId:int}/credito-outorgado/filtro", async (int projetoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                    Results.Json(await caso.FiltroDoCreditoOutorgado(projetoId, http.UsuarioAtual(), http.RequestAborted))))
+            .ExigirUsuario();
+
+        api.MapPut("/projetos/{projetoId:int}/credito-outorgado/filtro", async (int projetoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                {
+                    var (corpo, recusa) = await CorpoJson.Ler<PedidoDeFiltro>(http);
+                    if (recusa is not null)
+                        return recusa;
+                    var pedido = new PedidoDeFiltroOutorgado(
+                        corpo!.Ncms ?? [], corpo.Termos ?? [], corpo.SemFiltro, corpo.GuardarDescartados);
+                    if (pedido.Ncms.Count > LimiteDoFiltro || pedido.Termos.Count > LimiteDoFiltro)
+                        return CorpoJson.Recusar($"O filtro aceita até {LimiteDoFiltro} NCM e {LimiteDoFiltro} termos.",
+                            StatusCodes.Status422UnprocessableEntity);
+                    return Results.Json(await caso.GravarFiltroDoCreditoOutorgado(projetoId, pedido, http.UsuarioAtual(), http.RequestAborted));
+                }))
+            .ExigirCapacidade(Capacidades.PodeEscrever, "pode_escrever", "mudar o filtro do crédito outorgado");
+
+        foreach (var (rota, porProduto) in new[] { ("produtos", true), ("itens", false) })
+            api.MapGet($"/credito-outorgado/{{execucaoId:int}}/{rota}", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                    await Traduzir(async () =>
+                    {
+                        var q = http.Request.Query;
+                        var pedido = new PedidoDaListaOutorgada(
+                            q["descartados"].FirstOrDefault() == "true",
+                            q["busca"].FirstOrDefault() is { Length: > 0 } b ? b : null,
+                            q["codigo"].FirstOrDefault() is { Length: > 0 } c ? c : null,
+                            Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 100));
+                        return Results.Json(porProduto
+                            ? await caso.ProdutosDoCreditoOutorgado(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted)
+                            : await caso.ItensDoCreditoOutorgado(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
+                    }))
+                .ExigirUsuario();
 
         // o analítico pagina no servidor: numa base real são 8,7 milhões de itens
         api.MapGet("/suportado/{execucaoId:int}/linhas", async (int execucaoId, HttpContext http, Execucoes caso) =>

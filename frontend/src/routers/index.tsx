@@ -15,6 +15,7 @@ import Apuracao from "@/pages/Apuracao";
 import ApuracaoPisCofins from "@/pages/ApuracaoPisCofins";
 import ArquivoDigital from "@/pages/ArquivoDigital";
 import PreValidacao from "@/pages/PreValidacao";
+import CreditoOutorgado from "@/pages/CreditoOutorgado";
 import QuebraDeSped from "@/pages/QuebraDeSped";
 import Entrega from "@/pages/Entrega";
 import ModulosDoSegmento from "@/pages/ModulosDoSegmento";
@@ -107,6 +108,7 @@ export const roteador = createBrowserRouter([
               { path: "/projetos/:id/arquivo-digital", element: <ArquivoDigital /> },
               { path: "/projetos/:id/pre-validacao", element: <PreValidacao /> },
               { path: "/projetos/:id/quebra-de-sped", element: <QuebraDeSped /> },
+              { path: "/projetos/:id/credito-outorgado", element: <CreditoOutorgado /> },
               { path: "/projetos/:id/apuracao-piscofins", element: <ApuracaoPisCofins /> },
               { path: "/projetos/:id/razao-contabil", element: <RazaoContabil /> },
               { path: "/projetos/:id/apuracao-contribuicoes", element: <Gestao /> },

@@ -1,4 +1,4 @@
-using Cat.Dominio.Acesso;
+﻿using Cat.Dominio.Acesso;
 using Cat.Dominio.Comum;
 using Cat.Dominio.Projeto;
 
@@ -71,7 +71,9 @@ public sealed class EtapasTestes
         var e = Montar([]);
         Assert.All(e, x => Assert.Equal(SituacaoEtapa.Pendente, x.Situacao));
         Assert.All(e, x => Assert.True(x.Acessivel));
-        Assert.Equal((0, 8), Etapas.Progresso(e));
+        // nove: as oito da cadeia da CAT 42 mais o crédito outorgado, que entrou
+        // em 23/09/2026 e conta como trabalho embora não pertença à cadeia
+        Assert.Equal((0, 9), Etapas.Progresso(e));
     }
 
     [Fact]
@@ -81,7 +83,7 @@ public sealed class EtapasTestes
         Assert.Equal(SituacaoEtapa.Concluida, Situacao(e, "importar"));
         Assert.Equal(SituacaoEtapa.Pendente, Situacao(e, "conferencia"));
         Assert.Equal(SituacaoEtapa.Pendente, Situacao(e, "movimentos"));
-        Assert.Equal((1, 8), Etapas.Progresso(e));
+        Assert.Equal((1, 9), Etapas.Progresso(e));
     }
 
     [Fact]
@@ -96,23 +98,24 @@ public sealed class EtapasTestes
     public void Concluida_fora_de_ordem_conta_e_o_resto_segue_pendente()
     {
         // movimentos concluídos com a conferência pendente: acontece, e a
-        // conta é honesta — uma feita de oito
+        // conta é honesta — uma feita de nove
         var e = Montar(["movimentos"]);
         Assert.Equal(SituacaoEtapa.Concluida, Situacao(e, "movimentos"));
         Assert.Equal(SituacaoEtapa.Pendente, Situacao(e, "conferencia"));
-        Assert.Equal((1, 8), Etapas.Progresso(e));
+        Assert.Equal((1, 9), Etapas.Progresso(e));
     }
 
     [Fact]
     public void Ordem_e_textos_iguais_aos_do_python()
     {
-        // a paridade com o Python é do ROTEIRO de ICMS, não do catálogo: desde
-        // 22/09/2026 `Todas` guarda também as etapas dos outros módulos. O
-        // histórico entrou em 23/09/2026 e fica de fora desta conta: é consulta,
-        // não etapa do rito da CAT 42
+        // a paridade com o Python é da CADEIA da CAT 42, não do catálogo nem do
+        // roteiro inteiro: desde 22/09/2026 `Todas` guarda também as etapas dos
+        // outros módulos, e o roteiro de ICMS ganhou duas coisas que não são do
+        // rito — o histórico (consulta, não conta) e o crédito outorgado (conta,
+        // mas não depende de nada). A cadeia é o que vem primeiro, na ordem
         Assert.Equal(
             ["importar", "conferencia", "movimentos", "st_suportado", "razao", "apuracao", "arquivo_digital", "entrega"],
-            Etapas.Do("icms").Where(e => e.Conta).Select(e => e.Chave));
+            Etapas.Do("icms").Select(e => e.Chave).Take(8));
         Assert.Equal("Ainda não disponível", SituacaoEtapa.NaoDisponivel.Rotulo());
         Assert.Equal("nao_disponivel", SituacaoEtapa.NaoDisponivel.Valor());
     }
@@ -171,12 +174,17 @@ public sealed class RoteiroPorModuloTestes
     [Fact]
     public void O_icms_mantem_o_roteiro_da_cat42()
     {
+        var chaves = Etapas.Do("icms").Select(d => d.Chave).ToList();
+
         Assert.Equal(
             ["importar", "conferencia", "movimentos", "st_suportado", "razao", "apuracao",
              "arquivo_digital", "entrega"],
-            Etapas.Do("icms").Where(d => d.Conta).Select(d => d.Chave));
+            chaves.Take(8));
         // o histórico está em todo módulo, e em nenhum conta como trabalho
-        Assert.Contains("historico", Etapas.Do("icms").Select(d => d.Chave));
+        Assert.Contains("historico", chaves);
+        // o crédito outorgado é do módulo, e não da cadeia: fica depois dela,
+        // porque lê os XML do lote direto e não espera etapa nenhuma
+        Assert.Equal("credito_outorgado", chaves[^2]);
     }
 
     [Fact]

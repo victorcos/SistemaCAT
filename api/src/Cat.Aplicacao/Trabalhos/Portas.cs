@@ -1,4 +1,4 @@
-using Cat.Dominio.Acesso;
+﻿using Cat.Dominio.Acesso;
 
 namespace Cat.Aplicacao.Trabalhos;
 
@@ -121,6 +121,24 @@ public interface IMotor
 
     /// <summary>Os estabelecimentos que aparecem no razão contábil, para o filtro da tela.</summary>
     Task<System.Text.Json.JsonElement> EstabelecimentosDoRazaoContabil(int execucaoId, CancellationToken cancelar);
+
+    /// <summary>O filtro do crédito outorgado do trabalho. Trabalho sem filtro responde vazio.</summary>
+    /// <exception cref="MotorRecusou">trabalho não existe (404)</exception>
+    Task<System.Text.Json.JsonElement> FiltroDoCreditoOutorgado(int projetoId, CancellationToken cancelar);
+
+    /// <summary>Grava o filtro e devolve como ficou — já normalizado pelo domínio.</summary>
+    /// <exception cref="MotorRecusou">trabalho não existe (404)</exception>
+    Task<System.Text.Json.JsonElement> GravarFiltroDoCreditoOutorgado(int projetoId, PedidoDeFiltroOutorgado pedido,
+        int usuarioId, CancellationToken cancelar);
+
+    /// <summary>Os produtos que o filtro capturou, agrupados.</summary>
+    /// <exception cref="MotorRecusou">não é a etapa (404), não terminou (409), lista não guardada ou apagada (410)</exception>
+    Task<System.Text.Json.JsonElement> ProdutosDoCreditoOutorgado(int execucaoId, PedidoDaListaOutorgada pedido,
+        CancellationToken cancelar);
+
+    /// <summary>As linhas de item da triagem, com as notas de origem.</summary>
+    Task<System.Text.Json.JsonElement> ItensDoCreditoOutorgado(int execucaoId, PedidoDaListaOutorgada pedido,
+        CancellationToken cancelar);
 
     /// <summary>
     /// A Ficha 3 editada à mão, repassada em fluxo, e o que ela muda em relação

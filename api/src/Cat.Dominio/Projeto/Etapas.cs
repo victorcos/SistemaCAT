@@ -132,6 +132,14 @@ public static class Etapas
             "manifesto com o SHA-256 de cada arquivo. Conclui quando um revisor ou " +
             "gestor aprova.",
             Implementada: true, Aba: "Entrega"),
+        new("credito_outorgado", "Crédito outorgado",
+            "Varre os XML de saída e separa, item a item, o que é produto " +
+            "beneficiado pelo crédito outorgado. A **descrição manda** e a NCM " +
+            "confirma: bater só a NCM não basta, porque a NCM é declarada pelo " +
+            "emitente e erra, enquanto a descrição é o produto que o dono do " +
+            "negócio reconhece. Não depende das etapas acima — lê os XML do " +
+            "lote direto.",
+            Implementada: true, Aba: "Outorgado"),
 
         // ---- PIS/COFINS ----
         new("quebra_de_sped", "Quebrar os SPED",
@@ -186,8 +194,12 @@ public static class Etapas
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> Roteiros =
         new Dictionary<string, IReadOnlyList<string>>
         {
+            // o crédito outorgado fica no fim porque não pertence à cadeia da
+            // CAT 42: ele lê os XML do lote direto, e não depende de nenhuma das
+            // outras. A ordem das oito primeiras é de dependência real
             ["icms"] = ["importar", "conferencia", "movimentos", "st_suportado", "razao",
-                        "apuracao", "arquivo_digital", "entrega", "historico"],
+                        "apuracao", "arquivo_digital", "entrega", "credito_outorgado",
+                        "historico"],
             // a barra do trabalho de PIS/COFINS, na ordem em que aparece
             ["piscofins"] = ["importar", "quebra_de_sped", "apuracao_piscofins",
                              "exclusoes", "apuracao_contribuicoes", "quebra_xml",

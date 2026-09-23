@@ -29,6 +29,8 @@ export const ROTAS = {
   arquivoDigital: (id: number | string) => `/projetos/${id}/arquivo-digital`,
   preValidacao: (id: number | string) => `/projetos/${id}/pre-validacao`,
   quebraDeSped: (id: number | string) => `/projetos/${id}/quebra-de-sped`,
+  /** a triagem dos itens beneficiados pelo crédito outorgado, no ICMS */
+  creditoOutorgado: (id: number | string) => `/projetos/${id}/credito-outorgado`,
   /** a apuração de PIS/COFINS: a 037 e o razão da ECD, o par que se confronta */
   apuracaoPisCofins: (id: number | string) => `/projetos/${id}/apuracao-piscofins`,
   gestao: (id: number | string) => `/projetos/${id}/apuracao-contribuicoes`,

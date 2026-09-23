@@ -132,6 +132,37 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
             ["execucao_id"] = execucaoId,
         }), PrazoLinhas, cancelar);
 
+    public async Task<JsonElement> FiltroDoCreditoOutorgado(int projetoId, CancellationToken cancelar) =>
+        await Chamar("interno/credito-outorgado/filtro", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["projeto_id"] = projetoId,
+        }), PrazoLinhas, cancelar);
+
+    public async Task<JsonElement> GravarFiltroDoCreditoOutorgado(int projetoId, PedidoDeFiltroOutorgado pedido,
+        int usuarioId, CancellationToken cancelar) =>
+        await Chamar("interno/credito-outorgado/filtro", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["projeto_id"] = projetoId, ["usuario_id"] = usuarioId,
+            ["ncms"] = pedido.Ncms, ["termos"] = pedido.Termos,
+            ["sem_filtro"] = pedido.SemFiltro, ["guardar_descartados"] = pedido.GuardarDescartados,
+        }), PrazoLinhas, cancelar, HttpMethod.Put);
+
+    public async Task<JsonElement> ProdutosDoCreditoOutorgado(int execucaoId, PedidoDaListaOutorgada pedido,
+        CancellationToken cancelar) =>
+        await Chamar("interno/credito-outorgado/produtos", CorpoDaLista(execucaoId, pedido), PrazoLinhas, cancelar);
+
+    public async Task<JsonElement> ItensDoCreditoOutorgado(int execucaoId, PedidoDaListaOutorgada pedido,
+        CancellationToken cancelar) =>
+        await Chamar("interno/credito-outorgado/itens", CorpoDaLista(execucaoId, pedido), PrazoLinhas, cancelar);
+
+    private static HttpContent CorpoDaLista(int execucaoId, PedidoDaListaOutorgada pedido) =>
+        JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["execucao_id"] = execucaoId, ["descartados"] = pedido.Descartados,
+            ["busca"] = pedido.Busca, ["codigo"] = pedido.Codigo,
+            ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
+        });
+
     /// <summary>
     /// A Ficha 3 corrigida à mão sobe inteira antes de o motor começar a ler: ela
     /// tem o tamanho da ficha do trabalho, e por isso vai no prazo da remessa.
@@ -192,14 +223,15 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
             ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
         }), PrazoLinhas, cancelar);
 
-    private async Task<JsonElement> Chamar(string rota, HttpContent conteudo, TimeSpan prazo, CancellationToken cancelar)
+    private async Task<JsonElement> Chamar(string rota, HttpContent conteudo, TimeSpan prazo,
+        CancellationToken cancelar, HttpMethod? metodo = null)
     {
         if (string.IsNullOrEmpty(config.MotorSegredo))
             throw new MotorIndisponivel("CAT_MOTOR_SEGREDO não está definido no backend/.env");
 
         using var limite = CancellationTokenSource.CreateLinkedTokenSource(cancelar);
         limite.CancelAfter(prazo);
-        using var pedido = new HttpRequestMessage(HttpMethod.Post, new Uri(config.MotorUrl, rota)) { Content = conteudo };
+        using var pedido = new HttpRequestMessage(metodo ?? HttpMethod.Post, new Uri(config.MotorUrl, rota)) { Content = conteudo };
         pedido.Headers.Add(CabecalhoSegredo, config.MotorSegredo);
 
         HttpResponseMessage resposta;

@@ -80,6 +80,14 @@ const DESTINOS: Record<
       padrao: "Apurar o ICMS suportado",
     },
   },
+  credito_outorgado: {
+    rota: ROTAS.creditoOutorgado,
+    rotulos: {
+      concluida: "Ver os produtos capturados e baixar a lista",
+      em_andamento: "Acompanhar a varredura",
+      padrao: "Triar os itens beneficiados",
+    },
+  },
   // o histórico não está aqui de propósito: o caminho dele é o botão do canto
   // superior, e não uma funcionalidade da barra — ver `funcionalidades` abaixo
   quebra_de_sped: {
