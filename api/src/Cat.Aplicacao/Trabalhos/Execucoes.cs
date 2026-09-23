@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Cat.Aplicacao.Log;
 using Cat.Dominio.Acesso;
 using Cat.Dominio.Projeto;
@@ -23,7 +23,10 @@ public sealed record PedidoDeFicha(string Cnpj, string Codigo, int Pagina, int P
 
 /// <summary>O seletor de conta do razão contábil da ECD.</summary>
 /// <param name="So">recorte pelo saldo: devedoras, credoras, zeradas, com_movimento</param>
-public sealed record PedidoDeContasContabeis(string? Busca, string? Cnpj, string? So, int Pagina, int PorPagina);
+/// <param name="Pai">o galho aberto da árvore do plano referencial</param>
+/// <param name="Arvore">true: galhos e as contas do galho; false: a lista chapada</param>
+public sealed record PedidoDeContasContabeis(string? Busca, string? Cnpj, string? So, int Pagina, int PorPagina,
+    string? Pai = null, bool Arvore = false);
 
 /// <summary>Os lançamentos de uma conta. <paramref name="De"/> e <paramref name="Ate"/> em aaaa-mm-dd.</summary>
 public sealed record PedidoDeLancamentos(string Cnpj, string Conta, string? Busca, string? De, string? Ate,

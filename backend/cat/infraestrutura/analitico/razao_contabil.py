@@ -38,6 +38,9 @@ from cat.log import obter_log
 
 log = obter_log(__name__)
 
+# o galho das contas que a ECD não mapeou a referencial nenhuma
+SEM_REFERENCIAL = "sem-referencial"
+
 POR_PAGINA_PADRAO = 100
 POR_PAGINA_MAXIMO = 500
 
@@ -163,30 +166,64 @@ def estabelecimentos(destino: str) -> list[dict]:
 
 def contas(destino: str, busca: str | None = None, cnpj: str | None = None,
            so: str | None = None, pagina: int = 1,
-           por_pagina: int = POR_PAGINA_PADRAO) -> dict:
-    """O seletor de conta: uma linha por conta, com movimento e saldo.
+           por_pagina: int = POR_PAGINA_PADRAO, pai: str | None = None,
+           arvore: bool = False) -> dict:
+    """O seletor de conta: os galhos do plano referencial e as contas deles.
 
-    A ordem é pelo código da conta, que é a ordem do plano — é assim que o
-    contador procura. Quem quiser a conta que mais movimentou tem a coluna para
-    ordenar na tela; mudar a ordem padrão faria a lista deixar de parecer um
-    plano de contas.
+    Dez mil contas numa lista chapada são cem páginas, e ninguém acha nada
+    virando cem páginas. Então a lista é uma **árvore**: os galhos são a conta
+    referencial da Receita — que a própria ECD declara, conta por conta, no
+    I051 — e as folhas são as contas do cliente.
+
+    `pai` diz de qual galho se querem os filhos. Sem ele, vêm as raízes: numa
+    rede de supermercado de verdade são três (1 Ativo, 2 Passivo, 3 Resultado),
+    contra 10.282 contas. Descendo: 6, 13, 36, 88 — a árvore fecha a lista em
+    três ou quatro cliques.
+
+    **Os galhos não paginam**; as contas sim. É de propósito: galho nenhum
+    passa de uma centena, e o que estoura é folha — 5.659 contas de fornecedor
+    penduradas no mesmo galho, uma por fornecedor, porque é assim que o cliente
+    abriu o plano dele. Aí a tela mostra as primeiras e vai buscando o resto.
+
+    **A busca desmonta a árvore de propósito.** Quem digita "CRBS" quer a conta,
+    não o caminho até ela: com busca, vêm as contas que casam, de qualquer
+    galho, e `nos` volta vazio.
+
+    Sem `arvore`, a lista sai chapada como sempre saiu — é o que o download e
+    quem quer *todas* as contas precisam. A árvore é da tela, e a tela pede.
     """
     if so and so not in RECORTES:
         raise ValueError(f"Recorte desconhecido: {so}. Há {', '.join(sorted(RECORTES))}.")
     pagina, por_pagina = _pagina(pagina, por_pagina)
     caminho = _resumo(destino)
+    procurando = bool(busca and busca.strip())
+    pai = (pai or "").strip() or None
+    # com busca, o galho não tem serventia: procura-se na árvore inteira
+    ramificando = arvore and not procurando
 
     filtros, parametros = [], []
     if cnpj and cnpj.strip():
         filtros.append("cnpj = ?")
         parametros.append(cnpj.strip())
-    if busca and busca.strip():
+    if procurando:
         filtros.append("(conta ILIKE ? OR descricao ILIKE ? OR conta_referencial ILIKE ?)")
         parametros += [f"%{busca.strip()}%"] * 3
     if so:
         filtros.append(RECORTES[so])
-    onde = f"WHERE {' AND '.join(filtros)}" if filtros else ""
 
+    # sem busca, a lista é a de um galho: as contas que ficam aqui são as que
+    # não descem mais — as que descem estão nos galhos filhos, não repetidas
+    nivel = len(pai.split(".")) + 1 if pai else 1
+    if ramificando:
+        if pai == SEM_REFERENCIAL:
+            filtros.append("conta_referencial = ''")
+        elif pai:
+            filtros.append("conta_referencial = ?")
+            parametros.append(pai)
+        else:
+            filtros.append("1 = 0")  # na raiz não há conta solta: tudo está sob um galho
+
+    onde = f"WHERE {' AND '.join(filtros)}" if filtros else ""
     base = f"(SELECT * FROM read_parquet('{_escapar(caminho)}') {onde})"
 
     con = _leitura(destino)
@@ -198,14 +235,71 @@ def contas(destino: str, busca: str | None = None, cnpj: str | None = None,
         """, parametros)
         nomes = [c[0] for c in cursor.description]
         linhas = [_conta_jsonavel(dict(zip(nomes, r))) for r in cursor.fetchall()]
+        nos = _galhos(con, caminho, pai, nivel, cnpj, so) if ramificando else []
     finally:
         con.close()
 
     log.info("contas do razão listadas", extra={
-        "execucao_pasta": os.path.basename(destino), "total": total,
-        "pagina": pagina, "busca": bool(busca), "cnpj": bool(cnpj), "recorte": so or "",
+        "execucao_pasta": os.path.basename(destino), "total": total, "galhos": len(nos),
+        "pagina": pagina, "busca": procurando, "cnpj": bool(cnpj), "recorte": so or "",
+        "pai": pai or "", "arvore": arvore,
     })
-    return {"pagina": pagina, "por_pagina": por_pagina, "total": total, "linhas": linhas}
+    return {"pagina": pagina, "por_pagina": por_pagina, "total": total,
+            "linhas": linhas, "nos": nos, "pai": pai or ""}
+
+
+def _galhos(con, caminho: str, pai: str | None, nivel: int,
+            cnpj: str | None, so: str | None) -> list[dict]:
+    """Os galhos filhos de `pai`, com o que está pendurado em cada um.
+
+    O total de cada galho é de tudo que há **abaixo** dele, não só do primeiro
+    nível: quem olha "1.01" quer saber quantas contas tem o circulante inteiro.
+    """
+    if pai == SEM_REFERENCIAL:
+        return []
+
+    filtros = ["conta_referencial <> ''",
+               f"len(str_split(conta_referencial, '.')) > {nivel}"]
+    parametros: list[object] = []
+    if pai:
+        filtros.append("conta_referencial LIKE ?")
+        parametros.append(f"{pai}.%")
+    if cnpj and cnpj.strip():
+        filtros.append("cnpj = ?")
+        parametros.append(cnpj.strip())
+    if so:
+        filtros.append(RECORTES[so])
+
+    codigo = f"array_to_string(list_slice(str_split(conta_referencial, '.'), 1, {nivel}), '.')"
+    cursor = con.execute(f"""
+        SELECT {codigo}        AS codigo,
+               count(*)        AS contas,
+               sum(lancamentos) AS lancamentos,
+               sum(debitos)    AS debitos,
+               sum(creditos)   AS creditos,
+               sum(saldo)      AS saldo
+        FROM read_parquet('{_escapar(caminho)}')
+        WHERE {' AND '.join(filtros)}
+        GROUP BY 1 ORDER BY 1
+    """, parametros)
+    galhos = [
+        {"codigo": c, "contas": n, "lancamentos": l,
+         "debitos": _texto(d), "creditos": _texto(cr), "saldo": _texto(s)}
+        for c, n, l, d, cr, s in cursor.fetchall()
+    ]
+
+    # as contas que a ECD não mapeou a referencial nenhuma ficariam invisíveis
+    # na árvore — e conta invisível é conta que ninguém confere
+    if pai is None:
+        soltas = con.execute(f"""
+            SELECT count(*), sum(lancamentos), sum(debitos), sum(creditos), sum(saldo)
+            FROM read_parquet('{_escapar(caminho)}') WHERE conta_referencial = ''
+        """).fetchone()
+        if soltas and soltas[0]:
+            n, l, d, cr, s = soltas
+            galhos.append({"codigo": SEM_REFERENCIAL, "contas": n, "lancamentos": l,
+                           "debitos": _texto(d), "creditos": _texto(cr), "saldo": _texto(s)})
+    return galhos
 
 
 def lancamentos(destino: str, cnpj: str, conta: str, busca: str | None = None,

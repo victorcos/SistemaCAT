@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Rotulo } from "@/components/shared/Rodada";
 import { Aviso } from "@/components/ui/Aviso";
@@ -16,6 +16,7 @@ import { dinheiro, numero } from "@/lib/format";
 import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
 import type { Formato } from "@/services/conferencia";
 import {
+  SEM_REFERENCIAL,
   baixarPlanilhaDaApuracao,
   contasDoRazaoContabil,
   estabelecimentosDoRazaoContabil,
@@ -23,8 +24,9 @@ import {
   listarApuracoes,
   type ContaContabil,
   type EstabelecimentoDoRazao,
+  type GalhoDoPlano,
+  type PaginaDeContas,
   type ExecucaoDaApuracao,
-  type Pagina,
   type PaginaDeLancamentos,
   type RecorteDeConta,
 } from "@/services/apuracaoPisCofins";
@@ -138,36 +140,41 @@ export default function RazaoContabil() {
 }
 
 /**
- * O seletor: marcar contas, extrair, e — se quiser — espiar os lançamentos.
+ * O seletor: navegar pelo plano, marcar contas, extrair.
  *
- * O gesto principal desta tela é **marcar e extrair**: quem confronta a
- * contabilidade com a Consulta de Entradas (037) escolhe meia dúzia de contas
- * e leva as partidas delas para comparar por fora. O sistema não cruza as duas
- * pontas sozinho, e é de propósito: casar lançamento contábil com item de nota
- * exige critério que muda de cliente para cliente.
+ * O gesto principal é **marcar e extrair**: quem confronta a contabilidade com
+ * a Consulta de Entradas (037) escolhe meia dúzia de contas e leva as partidas
+ * delas para comparar por fora. O sistema não cruza as duas pontas sozinho, e é
+ * de propósito: casar lançamento contábil com item de nota exige critério que
+ * muda de cliente para cliente.
+ *
+ * **A lista é uma árvore.** Numa rede de supermercado são dez mil contas — cem
+ * páginas, e ninguém acha nada virando cem páginas. Os galhos são a conta
+ * referencial que a própria ECD declara (I051), então três cliques fecham a
+ * lista: 3 raízes, 6, 13, 36. Quem já sabe o nome digita na busca, e aí a
+ * árvore se desfaz: vem a conta, não o caminho até ela.
+ *
+ * Onde a árvore não resolve, a tela não finge que resolve: o cliente abre uma
+ * conta analítica por fornecedor, e um galho só pendura 5.659 delas. Ali vale a
+ * busca — e, para percorrer, "mostrar mais" em vez de trocar de página, que é
+ * o que faz perder o lugar.
  *
  * A marcação é **pelo código da conta**, não pelo par CNPJ+conta: a 3.1.1 é a
  * mesma conta do plano em todo estabelecimento, e quem a escolhe quer as
- * partidas de todos. Com mais de um CNPJ na base a tela diz isso, porque a
- * planilha sai maior do que a linha marcada sugere.
+ * partidas de todos. Com mais de um CNPJ na base a tela diz isso.
  *
- * A seleção atravessa páginas e filtros de propósito: procura-se uma conta,
- * marca-se, procura-se outra. Perder o marcado a cada busca obrigaria a
- * escolher tudo de uma vez, ou a extrair em pedaços.
+ * A seleção atravessa galhos, buscas e páginas de propósito: procura-se uma
+ * conta, marca-se, procura-se outra.
  */
 function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
   const [busca, setBusca] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [recorte, setRecorte] = useState<RecorteDeConta>("todas");
-  const [pagina, setPagina] = useState(1);
-  const [dados, setDados] = useState<Pagina<ContaContabil> | null>(null);
   const [estabelecimentos, setEstabelecimentos] = useState<EstabelecimentoDoRazao[]>([]);
   const [aberta, setAberta] = useState<string | null>(null);
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
   const [baixando, setBaixando] = useState<Formato | null>(null);
-  const leitura = useAcao();
   const download = useAcao();
-  const { executar } = leitura;
 
   useEffect(() => {
     let vivo = true;
@@ -179,30 +186,7 @@ function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
     };
   }, [execucaoId]);
 
-  // a busca troca a lista inteira: voltar para a primeira página é o certo,
-  // senão a pessoa digita e cai numa página 7 que o novo recorte não tem
-  useEffect(() => setPagina(1), [busca, cnpj, recorte]);
-
-  useEffect(() => {
-    let vivo = true;
-    const espera = window.setTimeout(() => {
-      executar((sinal) =>
-        contasDoRazaoContabil(execucaoId, { busca, cnpj, recorte, pagina, porPagina: POR_PAGINA }, sinal),
-      ).then((r) => {
-        if (vivo && r) setDados(r);
-      });
-    }, busca ? 250 : 0);
-    return () => {
-      vivo = false;
-      window.clearTimeout(espera);
-    };
-  }, [execucaoId, busca, cnpj, recorte, pagina, executar]);
-
-  const paginas = dados ? Math.max(1, Math.ceil(dados.total / dados.por_pagina)) : 1;
-  const colunas = "grid-cols-[28px_1.1fr_1.6fr_.7fr_1fr_1fr_1fr]";
-
-  const daPagina = dados?.linhas.map((c) => c.conta) ?? [];
-  const paginaInteira = daPagina.length > 0 && daPagina.every((c) => marcadas.has(c));
+  const procurando = busca.trim().length > 0;
 
   const alternar = (conta: string) =>
     setMarcadas((antes) => {
@@ -212,10 +196,10 @@ function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
       return agora;
     });
 
-  const alternarPagina = (marcar: boolean) =>
+  const marcarVarias = (contas: string[], marcar: boolean) =>
     setMarcadas((antes) => {
       const agora = new Set(antes);
-      for (const c of daPagina) {
+      for (const c of contas) {
         if (marcar) agora.add(c);
         else agora.delete(c);
       }
@@ -229,6 +213,18 @@ function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
     );
     setBaixando(null);
   }
+
+  const lista: PropsDaLista = {
+    execucaoId,
+    busca,
+    cnpj,
+    recorte,
+    marcadas,
+    alternar,
+    marcarVarias,
+    aberta,
+    setAberta,
+  };
 
   return (
     <section className="overflow-hidden rounded-raio-g border border-borda bg-superficie">
@@ -251,7 +247,7 @@ function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
         )}
         <Segmentado opcoes={PELA_CONTA} valor={recorte} aoMudar={setRecorte} rotulo="Recorte pelo saldo" />
         <span className="ml-auto text-[11px] text-texto-fraco">
-          {dados ? `${numero(dados.total)} ${dados.total === 1 ? "conta" : "contas"}` : ""}
+          {procurando ? "buscando em todo o plano" : "plano de contas referencial"}
         </span>
       </Toolbar>
 
@@ -274,8 +270,7 @@ function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
 
         {marcadas.size === 0 && (
           <span className="text-[12px] text-texto-fraco">
-            Marque as contas que vai conferir contra a 037 — a busca e a troca de página não
-            desmarcam.
+            Abra os galhos para achar a conta, ou busque pelo nome — o que você marcar fica marcado.
           </span>
         )}
 
@@ -303,22 +298,11 @@ function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
         </div>
       )}
 
-      {leitura.erro && (
-        <div className="px-5.5 pt-4">
-          <Aviso titulo={leitura.erro.message} codigo={leitura.erro.requisicaoId} />
-        </div>
-      )}
-
-      <div className={cn("overflow-x-auto transition-opacity", leitura.carregando && "opacity-60")}>
+      <div className="overflow-x-auto">
         <div className="min-w-[980px]">
           <div className="grid grid-cols-[30px_1fr] items-center gap-3 bg-tabela-cabecalho-fundo px-5.5 py-3">
-            <input
-              type="checkbox"
-              aria-label="Marcar as contas desta página"
-              checked={paginaInteira}
-              onChange={(e) => alternarPagina(e.target.checked)}
-            />
-            <div className={cn("grid gap-3", colunas)}>
+            <span />
+            <div className={cn("grid gap-3", COLUNAS)}>
               {["", "Conta", "Descrição", "Partidas", "Débitos", "Créditos", "Saldo"].map((c, i) => (
                 <span
                   key={i}
@@ -333,90 +317,275 @@ function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
             </div>
           </div>
 
-          {dados?.linhas.map((c) => {
-            const chave = `${c.cnpj}|${c.conta}`;
-            const abertoAgora = aberta === chave;
-            const marcada = marcadas.has(c.conta);
-            return (
-              <Fragment key={chave}>
-                <div
-                  className={cn(
-                    "grid grid-cols-[30px_1fr] items-center gap-3 border-t border-borda-sutil px-5.5 transition-colors",
-                    abertoAgora
-                      ? "bg-superficie-alt"
-                      : marcada
-                        ? "bg-laranja-500/8"
-                        : "bg-transparent hover:bg-tabela-linha-hover",
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    aria-label={`Marcar a conta ${c.conta}`}
-                    checked={marcada}
-                    onChange={() => alternar(c.conta)}
-                  />
-                  <button
-                    type="button"
-                    aria-expanded={abertoAgora}
-                    onClick={() => setAberta(abertoAgora ? null : chave)}
-                    className={cn(
-                      "grid w-full cursor-pointer items-center gap-3 border-0 bg-transparent py-3 text-left",
-                      colunas,
-                    )}
-                  >
-                    <IconeExpandir
-                      size={13}
-                      strokeWidth={2}
-                      aria-hidden
-                      className={cn("text-texto-fraco transition-transform", abertoAgora && "rotate-90")}
-                    />
-                    <span className="min-w-0">
-                      <span className="block font-mono text-[13px] text-texto">{c.conta}</span>
-                      <span className="mt-0.5 block font-mono text-[11px] text-texto-fraco">
-                        {cnpjFormatado(c.cnpj)}
-                      </span>
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[13px] text-texto" title={c.descricao}>
-                        {c.descricao || "Sem nome no plano de contas"}
-                      </span>
-                      <span className="mt-0.5 block text-[11px] text-texto-fraco">
-                        {c.conta_referencial ? `referencial ${c.conta_referencial} · ` : ""}
-                        {data(c.de)} a {data(c.ate)}
-                        {c.arquivos > 1 ? ` · ${numero(c.arquivos)} ECD` : ""}
-                      </span>
-                    </span>
-                    <span className="text-right font-mono text-[13px] tabular-nums text-texto-suave">
-                      {numero(c.lancamentos)}
-                    </span>
-                    <span className="text-right text-[13px]">{dinheiro(c.debitos)}</span>
-                    <span className="text-right text-[13px]">{dinheiro(c.creditos)}</span>
-                    <span className="text-right text-[13px]">
-                      <Saldo valor={c.saldo} forte />
-                    </span>
-                  </button>
-                </div>
-                {abertoAgora && <Lancamentos execucaoId={execucaoId} conta={c} />}
-              </Fragment>
-            );
-          })}
-
-          {dados && dados.linhas.length === 0 && (
-            <p className="m-0 border-t border-borda-sutil px-5.5 py-10 text-center text-[13px] text-texto-fraco">
-              Nenhuma conta neste recorte.
-            </p>
-          )}
+          {/* a raiz da árvore, ou o resultado da busca: os dois saem da mesma
+              rota, e o que muda é só quem manda paginar */}
+          <Nivel {...lista} pai={null} nivel={0} />
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-borda bg-superficie-vidro px-5.5 py-3.5">
-        <Paginacao pagina={pagina} paginas={paginas} ocupado={leitura.carregando} aoIr={setPagina} />
-        <span className="min-w-[220px] flex-1 text-[11px] text-texto-fraco">
-          Uma página por vez, montada no servidor. Sem conta marcada, o razão inteiro continua
-          saindo pelo download da apuração.
-        </span>
+      <div className="flex flex-wrap items-center gap-3 border-t border-borda bg-superficie-vidro px-5.5 py-3.5 text-[11px] text-texto-fraco">
+        {procurando
+          ? "Busca em todo o plano, montada no servidor."
+          : "Os galhos são a conta referencial declarada pela ECD (I051)."}{" "}
+        Sem conta marcada, o razão inteiro continua saindo pelo download da apuração.
       </div>
     </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+const COLUNAS = "grid-cols-[28px_1.1fr_1.6fr_.7fr_1fr_1fr_1fr]";
+
+interface PropsDaLista {
+  execucaoId: number;
+  busca: string;
+  cnpj: string;
+  recorte: RecorteDeConta;
+  marcadas: Set<string>;
+  alternar: (conta: string) => void;
+  marcarVarias: (contas: string[], marcar: boolean) => void;
+  aberta: string | null;
+  setAberta: (chave: string | null) => void;
+}
+
+/**
+ * Um nível da árvore: os galhos filhos e as contas que param aqui.
+ *
+ * Busca o seu próprio conteúdo, e só quando é aberto — abrir o plano inteiro de
+ * uma vez seria a lista chapada de novo, com mais passos. Quem pagina é a
+ * conta, não o galho: galho nenhum passa de uma centena.
+ */
+function Nivel({ pai, nivel, ...p }: PropsDaLista & { pai: string | null; nivel: number }) {
+  const [dados, setDados] = useState<PaginaDeContas | null>(null);
+  const [contas, setContas] = useState<ContaContabil[]>([]);
+  const [pagina, setPagina] = useState(1);
+  const leitura = useAcao();
+  const { executar } = leitura;
+  const procurando = p.busca.trim().length > 0;
+
+  // busca, estabelecimento ou recorte novos desfazem o que já se leu: o que
+  // está na tela deixou de ser resposta para a pergunta que está sendo feita
+  useEffect(() => {
+    setPagina(1);
+    setContas([]);
+  }, [p.busca, p.cnpj, p.recorte]);
+
+  useEffect(() => {
+    let vivo = true;
+    const espera = window.setTimeout(() => {
+      executar((sinal) =>
+        contasDoRazaoContabil(
+          p.execucaoId,
+          {
+            busca: p.busca,
+            cnpj: p.cnpj,
+            recorte: p.recorte,
+            pagina,
+            porPagina: POR_PAGINA,
+            pai,
+            arvore: true,
+          },
+          sinal,
+        ),
+      ).then((r) => {
+        if (!vivo || !r) return;
+        setDados(r);
+        setContas((antes) => (r.pagina === 1 ? r.linhas : [...antes, ...r.linhas]));
+      });
+    }, p.busca ? 250 : 0);
+    return () => {
+      vivo = false;
+      window.clearTimeout(espera);
+    };
+  }, [p.execucaoId, p.busca, p.cnpj, p.recorte, pagina, pai, executar]);
+
+  if (leitura.erro) {
+    return (
+      <div className="px-5.5 py-4">
+        <Aviso titulo={leitura.erro.message} codigo={leitura.erro.requisicaoId} />
+      </div>
+    );
+  }
+
+  if (!dados) {
+    return (
+      <p className="m-0 border-t border-borda-sutil px-5.5 py-6 text-center text-[12px] text-texto-fraco">
+        Lendo…
+      </p>
+    );
+  }
+
+  const faltam = dados.total - contas.length;
+  const vazio = dados.nos.length === 0 && contas.length === 0;
+
+  return (
+    <>
+      {dados.nos.map((galho) => (
+        <Galho key={galho.codigo} galho={galho} nivel={nivel} {...p} />
+      ))}
+
+      {contas.map((c) => (
+        <LinhaDeConta key={`${c.cnpj}|${c.conta}`} conta={c} nivel={nivel} {...p} />
+      ))}
+
+      {faltam > 0 && (
+        <div
+          className="border-t border-borda-sutil px-5.5 py-3"
+          style={{ paddingLeft: 22 + nivel * 18 }}
+        >
+          <Botao
+            variante="secundario"
+            tamanho="sm"
+            onClick={() => setPagina((n) => n + 1)}
+            disabled={leitura.carregando}
+          >
+            {leitura.carregando
+              ? "Lendo…"
+              : `Mostrar mais ${numero(Math.min(faltam, POR_PAGINA))} de ${numero(faltam)}`}
+          </Botao>
+        </div>
+      )}
+
+      {vazio && (
+        <p className="m-0 border-t border-borda-sutil px-5.5 py-10 text-center text-[13px] text-texto-fraco">
+          {procurando ? "Nenhuma conta com esse texto." : "Nada neste galho."}
+        </p>
+      )}
+    </>
+  );
+}
+
+/** Um galho fechado; abrir busca o que há dentro. */
+function Galho({
+  galho,
+  nivel,
+  ...p
+}: PropsDaLista & { galho: GalhoDoPlano; nivel: number }) {
+  const [aberto, setAberto] = useState(false);
+  const semMapa = galho.codigo === SEM_REFERENCIAL;
+
+  return (
+    <>
+      <div className="grid grid-cols-[30px_1fr] items-center gap-3 border-t border-borda-sutil px-5.5">
+        <span />
+        <button
+          type="button"
+          aria-expanded={aberto}
+          onClick={() => setAberto((x) => !x)}
+          className={cn(
+            "grid w-full cursor-pointer items-center gap-3 border-0 bg-transparent py-3 text-left hover:bg-tabela-linha-hover",
+            COLUNAS,
+          )}
+          style={{ paddingLeft: nivel * 18 }}
+        >
+          <IconeExpandir
+            size={14}
+            strokeWidth={2.5}
+            aria-hidden
+            className={cn("text-texto-suave transition-transform", aberto && "rotate-90")}
+          />
+          <span className="min-w-0">
+            <span className="block font-mono text-[13px] font-bold text-texto">
+              {semMapa ? "—" : galho.codigo}
+            </span>
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[13px] text-texto-suave">
+              {semMapa ? "Contas sem conta referencial na ECD" : "Conta referencial"}
+            </span>
+            <span className="mt-0.5 block text-[11px] text-texto-fraco">
+              {numero(galho.contas)} {galho.contas === 1 ? "conta" : "contas"}
+            </span>
+          </span>
+          <span className="text-right font-mono text-[13px] tabular-nums text-texto-fraco">
+            {numero(galho.lancamentos)}
+          </span>
+          <span className="text-right text-[13px] text-texto-suave">{dinheiro(galho.debitos)}</span>
+          <span className="text-right text-[13px] text-texto-suave">{dinheiro(galho.creditos)}</span>
+          <span className="text-right text-[13px]">
+            <Saldo valor={galho.saldo} />
+          </span>
+        </button>
+      </div>
+
+      {aberto && <Nivel {...p} pai={galho.codigo} nivel={nivel + 1} />}
+    </>
+  );
+}
+
+/** Uma conta: marcar para extrair, ou abrir para ver as partidas. */
+function LinhaDeConta({
+  conta: c,
+  nivel,
+  ...p
+}: PropsDaLista & { conta: ContaContabil; nivel: number }) {
+  const chave = `${c.cnpj}|${c.conta}`;
+  const abertoAgora = p.aberta === chave;
+  const marcada = p.marcadas.has(c.conta);
+
+  return (
+    <>
+      <div
+        className={cn(
+          "grid grid-cols-[30px_1fr] items-center gap-3 border-t border-borda-sutil px-5.5 transition-colors",
+          abertoAgora
+            ? "bg-superficie-alt"
+            : marcada
+              ? "bg-laranja-500/8"
+              : "bg-transparent hover:bg-tabela-linha-hover",
+        )}
+      >
+        <input
+          type="checkbox"
+          aria-label={`Marcar a conta ${c.conta}`}
+          checked={marcada}
+          onChange={() => p.alternar(c.conta)}
+        />
+        <button
+          type="button"
+          aria-expanded={abertoAgora}
+          onClick={() => p.setAberta(abertoAgora ? null : chave)}
+          className={cn(
+            "grid w-full cursor-pointer items-center gap-3 border-0 bg-transparent py-3 text-left",
+            COLUNAS,
+          )}
+          style={{ paddingLeft: nivel * 18 }}
+        >
+          <IconeExpandir
+            size={13}
+            strokeWidth={2}
+            aria-hidden
+            className={cn("text-texto-fraco transition-transform", abertoAgora && "rotate-90")}
+          />
+          <span className="min-w-0">
+            <span className="block font-mono text-[13px] text-texto">{c.conta}</span>
+            <span className="mt-0.5 block font-mono text-[11px] text-texto-fraco">
+              {cnpjFormatado(c.cnpj)}
+            </span>
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[13px] text-texto" title={c.descricao}>
+              {c.descricao || "Sem nome no plano de contas"}
+            </span>
+            <span className="mt-0.5 block text-[11px] text-texto-fraco">
+              {c.conta_referencial ? `referencial ${c.conta_referencial} · ` : ""}
+              {data(c.de)} a {data(c.ate)}
+              {c.arquivos > 1 ? ` · ${numero(c.arquivos)} ECD` : ""}
+            </span>
+          </span>
+          <span className="text-right font-mono text-[13px] tabular-nums text-texto-suave">
+            {numero(c.lancamentos)}
+          </span>
+          <span className="text-right text-[13px]">{dinheiro(c.debitos)}</span>
+          <span className="text-right text-[13px]">{dinheiro(c.creditos)}</span>
+          <span className="text-right text-[13px]">
+            <Saldo valor={c.saldo} forte />
+          </span>
+        </button>
+      </div>
+      {abertoAgora && <Lancamentos execucaoId={p.execucaoId} conta={c} />}
+    </>
   );
 }
 

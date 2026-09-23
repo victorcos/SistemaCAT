@@ -165,16 +165,54 @@ export interface EstabelecimentoDoRazao {
 /** O recorte do seletor é sobre o saldo da conta. */
 export type RecorteDeConta = "todas" | "devedoras" | "credoras" | "zeradas" | "com_movimento";
 
+/** Um galho do plano referencial, com tudo que está pendurado abaixo dele. */
+export interface GalhoDoPlano {
+  /** o código da conta referencial, ou "sem-referencial" para as não mapeadas */
+  codigo: string;
+  contas: number;
+  lancamentos: number;
+  debitos: string;
+  creditos: string;
+  saldo: string;
+}
+
+export interface PaginaDeContas extends Pagina<ContaContabil> {
+  /** os galhos filhos; vazio na busca e na lista chapada */
+  nos: GalhoDoPlano[];
+  pai: string;
+}
+
+/** O galho das contas que a ECD não mapeou a referencial nenhuma. */
+export const SEM_REFERENCIAL = "sem-referencial";
+
+/**
+ * As contas do razão — chapadas, ou o galho da árvore do plano referencial.
+ *
+ * Com `arvore`, vêm os galhos filhos de `pai` e só as contas que param nele:
+ * dez mil contas numa lista são cem páginas, e ninguém acha nada virando cem
+ * páginas. Com `busca`, a árvore se desfaz — quem digita o nome quer a conta,
+ * não o caminho até ela.
+ */
 export function contasDoRazaoContabil(
   execucaoId: number,
-  filtro: { busca: string; cnpj: string; recorte: RecorteDeConta; pagina: number; porPagina: number },
+  filtro: {
+    busca: string;
+    cnpj: string;
+    recorte: RecorteDeConta;
+    pagina: number;
+    porPagina: number;
+    pai?: string | null;
+    arvore?: boolean;
+  },
   sinal?: AbortSignal,
 ) {
   const p = new URLSearchParams({ pagina: String(filtro.pagina), por_pagina: String(filtro.porPagina) });
   if (filtro.busca.trim()) p.set("busca", filtro.busca.trim());
   if (filtro.cnpj) p.set("cnpj", filtro.cnpj);
   if (filtro.recorte !== "todas") p.set("so", filtro.recorte);
-  return chamar<Pagina<ContaContabil>>(`/apuracao-piscofins/${execucaoId}/contas?${p}`, { signal: sinal });
+  if (filtro.arvore) p.set("arvore", "true");
+  if (filtro.pai) p.set("pai", filtro.pai);
+  return chamar<PaginaDeContas>(`/apuracao-piscofins/${execucaoId}/contas?${p}`, { signal: sinal });
 }
 
 export function lancamentosDaConta(

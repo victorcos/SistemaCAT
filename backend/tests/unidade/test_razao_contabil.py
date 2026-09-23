@@ -11,6 +11,7 @@ from cat.infraestrutura.analitico.escrita import Escritor
 from cat.infraestrutura.analitico.piscofins import ARQUIVO_DO_RAZAO
 from cat.infraestrutura.analitico.razao_contabil import (
     POR_PAGINA_MAXIMO,
+    SEM_REFERENCIAL,
     RazaoNaoGerado,
     contas,
     estabelecimentos,
@@ -195,3 +196,71 @@ class TestSemArquivo:
             lancamentos(str(tmp_path), MATRIZ, "1.1.1.01")
         with pytest.raises(RazaoNaoGerado):
             estabelecimentos(str(tmp_path))
+
+
+class TestArvoreDoPlanoReferencial:
+    """A árvore existe para fechar a lista: dez mil contas são cem páginas.
+
+    Os galhos são a conta referencial que a própria ECD declara no I051 — não
+    um palpite sobre o código do cliente, que numa rede real vem sem separador
+    nenhum (`1103010001`) e não diz onde um nível termina.
+    """
+
+    def test_a_raiz_traz_os_galhos_e_nenhuma_conta_solta(self, pasta):
+        resposta = contas(pasta, arvore=True)
+
+        assert [n["codigo"] for n in resposta["nos"]] == ["1", "2"]
+        assert resposta["linhas"] == []
+        # o galho conta tudo que há abaixo dele, não só o primeiro nível
+        ativo = resposta["nos"][0]
+        assert ativo["contas"] == 2 and ativo["lancamentos"] == 4
+
+    def test_descer_um_galho_traz_os_filhos(self, pasta):
+        assert [n["codigo"] for n in contas(pasta, arvore=True, pai="1")["nos"]] == ["1.01"]
+        assert [n["codigo"] for n in contas(pasta, arvore=True, pai="1.01")["nos"]] == ["1.01.01"]
+
+    def test_a_folha_traz_as_contas_e_nenhum_galho(self, pasta):
+        folha = contas(pasta, arvore=True, pai="1.01.01.01")
+
+        assert folha["nos"] == []
+        assert folha["total"] == 2
+        assert {c["cnpj"] for c in folha["linhas"]} == {MATRIZ, FILIAL}
+
+    def test_conta_de_galho_mais_fundo_nao_aparece_no_galho_de_cima(self, pasta):
+        """Senão a mesma conta seria contada duas vezes ao navegar."""
+        assert contas(pasta, arvore=True, pai="1.01")["linhas"] == []
+
+    def test_o_filtro_por_estabelecimento_vale_para_a_arvore(self, pasta):
+        resposta = contas(pasta, arvore=True, cnpj=FILIAL)
+
+        assert [n["codigo"] for n in resposta["nos"]] == ["1"]
+        assert resposta["nos"][0]["contas"] == 1
+
+    def test_a_busca_desmonta_a_arvore(self, pasta):
+        """Quem digita o nome quer a conta, não o caminho até ela."""
+        resposta = contas(pasta, arvore=True, busca="FORNECEDORES")
+
+        assert resposta["nos"] == []
+        assert [c["conta"] for c in resposta["linhas"]] == ["2.1.1.01"]
+
+    def test_conta_sem_referencial_ganha_galho_proprio(self, tmp_path):
+        """Conta invisível é conta que ninguém confere."""
+        escritor = Escritor(str(tmp_path / ARQUIVO_DO_RAZAO), COLUNAS)
+        escritor.escrever(_linha(cnpj=MATRIZ, conta="9.9.9", descricao="SEM MAPA",
+                                 valor="10.00", debito_ou_credito="D", saldo="10.00",
+                                 data="2024-01-01", arquivo="ecd.txt"))
+        escritor.fechar()
+
+        raiz = contas(str(tmp_path), arvore=True)
+        assert [n["codigo"] for n in raiz["nos"]] == [SEM_REFERENCIAL]
+
+        galho = contas(str(tmp_path), arvore=True, pai=SEM_REFERENCIAL)
+        assert galho["nos"] == []
+        assert [c["conta"] for c in galho["linhas"]] == ["9.9.9"]
+
+    def test_sem_pedir_arvore_a_lista_continua_chapada(self, pasta):
+        """O download e quem quer todas as contas dependem disso."""
+        resposta = contas(pasta)
+
+        assert resposta["nos"] == []
+        assert resposta["total"] == 3

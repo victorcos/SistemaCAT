@@ -563,6 +563,10 @@ class PedidoDeContas(BaseModel):
     so: str | None = None
     pagina: int = Field(default=1, ge=1)
     por_pagina: int = Field(default=analitico_razao_contabil.POR_PAGINA_PADRAO, ge=1)
+    # a tela navega pela árvore do plano referencial; `pai` é o galho aberto.
+    # Sem `arvore`, a lista sai chapada, que é o que sempre saiu daqui
+    pai: str | None = Field(default=None, max_length=60)
+    arvore: bool = False
 
 
 class PedidoDeLancamentos(BaseModel):
@@ -603,7 +607,7 @@ def contas_do_razao_contabil(
     with contexto(etapa=quebrar_sped.ETAPA, execucao_id=execucao.id):
         return _traduzir_leitura(lambda: analitico_razao_contabil.contas(
             execucao.pasta_de_trabalho or "", pedido.busca, pedido.cnpj, pedido.so,
-            pedido.pagina, pedido.por_pagina))
+            pedido.pagina, pedido.por_pagina, pedido.pai, pedido.arvore))
 
 
 @router.post("/razao-contabil/lancamentos", dependencies=[Depends(exigir_segredo)])

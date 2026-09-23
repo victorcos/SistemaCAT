@@ -5,6 +5,43 @@
 
 ---
 
+## 2026-09-23 — O seletor de contas vira árvore, pela referencial da ECD
+
+**O problema.** 10.282 contas numa lista de 100 por página são 103 páginas.
+Ninguém acha nada virando 103 páginas, e quem precisa marcar seis contas para
+extrair desistia antes.
+
+**Por que a conta referencial, e não o código do cliente.** O código do cliente
+vem **sem separador** nesta base — `1103010001`, dez ou onze dígitos — e não há
+como saber onde um nível termina sem o I050, que traz nível e conta superior. O
+I050 está nos arquivos, e reler esta base custa 1h18 (foi o que a apuração
+levou). A conta referencial, ao contrário, a própria ECD declara no I051 conta
+por conta, já está no parquet e cobre 99,96% das contas desta base. Árvore feita
+de dado declarado, não de palpite sobre o formato do código.
+
+**O que ela fecha.** Da raiz até a conta: 3 galhos, depois 6, 13, 36, 88. Três
+ou quatro cliques no lugar de 103 páginas. Cada galho mostra quantas contas e
+quantas partidas há **abaixo** dele — quem olha "1.01" quer o circulante
+inteiro, não o primeiro nível.
+
+**Onde a árvore não resolve, a tela não finge que resolve.** O cliente abre uma
+conta analítica por fornecedor: o galho `2.01.01.03.01` pendura 5.659 delas, e
+nenhuma hierarquia quebra isso, porque elas são irmãs de verdade. Ali vale a
+busca — e, para percorrer, **"mostrar mais"** em vez de trocar de página, que é
+o que faz perder o lugar.
+
+**A busca desmonta a árvore de propósito.** Quem digita "CRBS" quer a conta, não
+o caminho até ela: com busca vêm as contas que casam, de qualquer galho.
+
+**Conta sem referencial ganha galho próprio.** São quatro nesta base. Sem isso
+elas sumiriam da árvore — e conta invisível é conta que ninguém confere.
+
+**A lista chapada continua existindo.** `arvore` é opção, e o padrão é o de
+sempre: quem quer todas as contas — o download, um script — não passa a
+depender de navegar.
+
+---
+
 ## 2026-09-23 — O cruzamento com a 037 é do analista, não do sistema
 
 **A decisão.** A apuração de PIS/COFINS monta os dois lados — a Consulta de

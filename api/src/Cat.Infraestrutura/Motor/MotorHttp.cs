@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -115,6 +115,7 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
         {
             ["execucao_id"] = execucaoId, ["busca"] = pedido.Busca, ["cnpj"] = pedido.Cnpj,
             ["so"] = pedido.So, ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
+            ["pai"] = pedido.Pai, ["arvore"] = pedido.Arvore,
         }), PrazoLinhas, cancelar);
 
     public async Task<JsonElement> LancamentosDoRazaoContabil(int execucaoId, PedidoDeLancamentos pedido, CancellationToken cancelar) =>

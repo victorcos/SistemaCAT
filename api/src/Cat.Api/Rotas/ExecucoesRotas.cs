@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Cat.Api.Infra;
 using Cat.Aplicacao.Log;
 using Cat.Aplicacao.Trabalhos;
@@ -152,7 +152,9 @@ public static class ExecucoesRotas
                         q["busca"].FirstOrDefault() is { Length: > 0 } b ? b : null,
                         q["cnpj"].FirstOrDefault() is { Length: > 0 } c ? c : null,
                         q["so"].FirstOrDefault() is { Length: > 0 } s ? s : null,
-                        Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 100));
+                        Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 100),
+                        q["pai"].FirstOrDefault() is { Length: > 0 } p ? p : null,
+                        q["arvore"].FirstOrDefault() == "true");
                     return Results.Json(await caso.ContasDoRazaoContabil(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
                 }))
             .ExigirUsuario();
