@@ -18,6 +18,22 @@ export default defineConfig({
 
   server: {
     port: 5173,
+
+    // Escutar em todas as interfaces, e nao so em ::1.
+    //
+    // A tela roda no micro de quem desenvolve, mas quem confere a apuracao abre
+    // de outra maquina. Fechado, o Vite atende `localhost` e recusa a conexao
+    // vinda da rede — de fora parece servidor fora do ar, sem pista nenhuma.
+    // `CAT_HOST=localhost npm run dev` fecha de novo.
+    host: process.env.CAT_HOST ?? true,
+
+    // Por IP (http://192.168.x.x:5173) o Vite libera sozinho; por NOME de
+    // maquina ele responde "Blocked request" desde a 6.0.9, que e protecao
+    // contra rebind de DNS. CAT_HOSTS aceita a lista, separada por virgula.
+    allowedHosts: (process.env.CAT_HOSTS ?? "")
+      .split(",")
+      .map((h) => h.trim())
+      .filter(Boolean),
     // O front fala com a API por caminho relativo; o proxy evita CORS no dev.
     //
     // Porta 8010 e nao 8000: a 8000 costuma estar ocupada por outro projeto
