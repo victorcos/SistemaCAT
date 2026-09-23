@@ -12,6 +12,10 @@ import { LogoBMS } from "@/components/ui/LogoBMS";
  * ambos `aria-hidden`: um halo laranja que deriva devagar e uma grade de
  * 56px esmaecida nas bordas por máscara radial. Quem pediu menos movimento
  * ao sistema operacional não vê a deriva (styles/animations.css).
+ *
+ * O fundo é `moldura-fundo`, e não o azul da marca escrito à mão: assim ele
+ * acompanha o tema — marinho no claro, preto no escuro. Fixo, a tela de
+ * entrada era a única que não obedecia à escolha de tema da pessoa.
  */
 export function LeiauteAcesso({
   titulo,
@@ -28,7 +32,7 @@ export function LeiauteAcesso({
     <div className="grid min-h-screen grid-cols-1 md:grid-cols-2">
       <aside
         aria-hidden
-        className="relative hidden flex-col items-center justify-center gap-6 overflow-hidden border-r border-laranja-500/30 bg-marca-azul p-12 md:flex"
+        className="relative hidden flex-col items-center justify-center gap-6 overflow-hidden border-r border-laranja-500/30 bg-moldura-fundo p-12 md:flex"
       >
         {/* grade de 56px, apagando nas bordas */}
         <div

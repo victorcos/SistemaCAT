@@ -1,6 +1,6 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.83.0**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.83.1**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
@@ -85,7 +85,7 @@ Apuração das contribuições — a Gestão Fiscal no padrão do MA.
 
 ### Importar
 
-`src/pages/Importar.tsx` · 591 linhas
+`src/pages/Importar.tsx` · 655 linhas
 
 Cadastrar trabalho — o wizard de quatro passos. O cadastro começa por um arquivo do SPED porque é ele que traz CNPJ, razão
 
@@ -103,7 +103,7 @@ _(sem comentário de topo)_
 
 ### Lote
 
-`src/pages/Lote.tsx` · 442 linhas
+`src/pages/Lote.tsx` · 460 linhas
 
 Etapa 1 — importar a base de dados de um trabalho que já existe.
 
@@ -218,7 +218,7 @@ está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
 | `LeiauteAcesso.tsx` | LeiauteAcesso | `titulo, sub, rodape, children` | A moldura das telas de acesso (login e troca de senha). Metade marinho com o logotipo, metade formulário. Em tela estreita o lado |
 | `MenuLateral.tsx` | MenuLateral | `papel` | O menu lateral. Fica marinho porque é a moldura da identidade — ver docs/IDENTIDADE.md |
 
-## 4. Tokens de design (196)
+## 4. Tokens de design (217)
 
 Em `src/styles/tokens.css`. Toda cor, raio e sombra da tela sai daqui —
 nenhum valor literal no componente. Um desenho que precise de uma cor nova
@@ -257,6 +257,20 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 | `--laranja-200` | `#FFD1A0` | — |
 | `--laranja-100` | `#FFE8D1` | — |
 | `--laranja-050` | `#FFF5EB` | — |
+
+### preto, escala neutra
+
+| Token | Valor | Nota |
+| --- | --- | --- |
+| `--preto-950` | `#09090B` | o fundo da página |
+| `--preto-900` | `#101012` | superfície: cartão, painel |
+| `--preto-850` | `#17171A` | superfície alternada, linha ímpar |
+| `--preto-800` | `#1C1C20` | elevada: o que flutua sobre a superfície |
+| `--preto-700` | `#26262B` | borda |
+| `--preto-600` | `#33333A` | borda forte |
+| `--preto-100` | `#EDEDEF` | texto |
+| `--preto-200` | `#A8A8B3` | texto suave |
+| `--preto-300` | `#76767F` | texto fraco |
 
 ### dourado, escala derivada
 
@@ -298,6 +312,10 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 | `--fiscal-verificar` | `#A15C00` | anomalia, exige julgamento |
 | `--fiscal-sem-valor` | `var(--cinza-500)` | — |
 | `--fiscal-estoque` | `var(--azul-600)` | — |
+| `--etiqueta-neutra-texto` | `var(--cinza-700)` | — |
+| `--etiqueta-neutra-fundo` | `var(--cinza-200)` | — |
+| `--etiqueta-destaque-texto` | `var(--dourado-800)` | — |
+| `--etiqueta-destaque-fundo` | `var(--dourado-200)` | — |
 | `--fundo` | `var(--cinza-050)` | — |
 | `--superficie` | `var(--marca-branco)` | — |
 | `--superficie-alt` | `var(--cinza-100)` | — |
@@ -309,18 +327,13 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 | `--borda` | `var(--cinza-200)` | — |
 | `--borda-forte` | `var(--cinza-300)` | — |
 | `--borda-foco` | `var(--azul-500)` | — |
-
-### moldura: cabeçalho e menu lateral, em azul da marca
-
-| Token | Valor | Nota |
-| --- | --- | --- |
-| `--moldura-fundo` | `var(--marca-azul)` | — |
-| `--moldura-texto` | `var(--marca-branco)` | — |
-| `--moldura-texto-suave` | `#A8C0E2` | — |
+| `--moldura-fundo` | `#0C0C0E` | — |
+| `--moldura-texto` | `var(--preto-100)` | — |
+| `--moldura-texto-suave` | `var(--preto-300)` | — |
 | `--moldura-ativo` | `var(--marca-laranja)` | — |
-| `--moldura-borda` | `#0E2A5C` | — |
+| `--moldura-borda` | `var(--preto-700)` | — |
 | `--acao-fundo` | `var(--marca-laranja)` | — |
-| `--acao-texto` | `var(--marca-azul)` | — |
+| `--acao-texto` | `var(--preto-950)` | — |
 | `--acao-hover` | `var(--laranja-600)` | — |
 | `--acao-ativo` | `var(--laranja-700)` | — |
 | `--acao-inativo-fundo` | `var(--cinza-300)` | — |
@@ -365,37 +378,37 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 | `--raio-cartao` | `18px` | cartão grande do redesenho; o 6px é de botão |
 | `--fonte` | `"Inter Variable", "Inter", "Segoe UI", system-ui, -apple-system, sans-serif` | — |
 | `--fonte-num` | `"IBM Plex Mono", "Consolas", ui-monospace, monospace` | — |
-| `--fundo` | `var(--azul-900)` | — |
-| `--superficie` | `var(--marca-azul)` | — |
-| `--superficie-alt` | `#0B2149` | — |
-| `--superficie-elevada` | `var(--azul-700)` | — |
-| `--texto` | `#E8EEF7` | — |
-| `--texto-suave` | `#A8C0E2` | — |
-| `--texto-fraco` | `#6D93CE` | — |
-| `--texto-invertido` | `var(--azul-900)` | — |
-| `--borda` | `#14315F` | — |
-| `--borda-forte` | `#1D4275` | — |
+| `--fundo` | `var(--preto-950)` | — |
+| `--superficie` | `var(--preto-900)` | — |
+| `--superficie-alt` | `var(--preto-850)` | — |
+| `--superficie-elevada` | `var(--preto-800)` | — |
+| `--texto` | `var(--preto-100)` | — |
+| `--texto-suave` | `var(--preto-200)` | — |
+| `--texto-fraco` | `var(--preto-300)` | — |
+| `--texto-invertido` | `var(--preto-950)` | — |
+| `--borda` | `var(--preto-700)` | — |
+| `--borda-forte` | `var(--preto-600)` | — |
 | `--borda-foco` | `var(--laranja-400)` | — |
-| `--moldura-fundo` | `var(--azul-900)` | — |
-| `--moldura-texto` | `#E8EEF7` | — |
-| `--moldura-texto-suave` | `#6D93CE` | — |
-| `--moldura-borda` | `#14315F` | — |
+| `--moldura-fundo` | `#0C0C0E` | — |
+| `--moldura-texto` | `var(--preto-100)` | — |
+| `--moldura-texto-suave` | `var(--preto-300)` | — |
+| `--moldura-borda` | `var(--preto-700)` | — |
 | `--acao-hover` | `var(--laranja-400)` | — |
 | `--acao-ativo` | `var(--laranja-300)` | — |
-| `--acao-inativo-fundo` | `#14315F` | — |
-| `--acao-inativo-texto` | `#6D93CE` | — |
-| `--acao2-texto` | `#A8C0E2` | — |
-| `--acao2-borda` | `#1D4275` | — |
-| `--acao2-hover` | `#0E2A5C` | — |
+| `--acao-inativo-fundo` | `var(--preto-700)` | — |
+| `--acao-inativo-texto` | `var(--preto-300)` | — |
+| `--acao2-texto` | `var(--preto-200)` | — |
+| `--acao2-borda` | `var(--preto-600)` | — |
+| `--acao2-hover` | `var(--preto-800)` | — |
 | `--link` | `var(--laranja-400)` | — |
 | `--link-hover` | `var(--laranja-300)` | — |
-| `--tabela-cabecalho-fundo` | `var(--azul-700)` | — |
-| `--tabela-linha` | `var(--marca-azul)` | — |
-| `--tabela-linha-alt` | `#0B2149` | — |
-| `--tabela-linha-hover` | `var(--azul-700)` | — |
+| `--tabela-cabecalho-fundo` | `var(--preto-800)` | — |
+| `--tabela-linha` | `var(--preto-900)` | — |
+| `--tabela-linha-alt` | `var(--preto-850)` | — |
+| `--tabela-linha-hover` | `var(--preto-800)` | — |
 | `--tabela-linha-marcada` | `#3A2410` | — |
-| `--tabela-borda` | `#14315F` | — |
-| `--tabela-numero` | `#E8EEF7` | — |
+| `--tabela-borda` | `var(--preto-700)` | — |
+| `--tabela-numero` | `var(--preto-100)` | — |
 | `--sucesso` | `#4ECB8B` | — |
 | `--sucesso-fundo` | `#0C2E1F` | — |
 | `--atencao` | `#E0A44A` | — |
@@ -403,12 +416,16 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 | `--erro` | `#F58179` | — |
 | `--erro-fundo` | `#3A1512` | — |
 | `--info` | `#7FA9E8` | — |
-| `--info-fundo` | `#0E2A5C` | — |
+| `--info-fundo` | `#16181D` | — |
 | `--fiscal-ressarcimento` | `#4ECB8B` | — |
 | `--fiscal-complemento` | `#F58179` | — |
 | `--fiscal-verificar` | `#E0A44A` | — |
-| `--fiscal-sem-valor` | `#6D93CE` | — |
+| `--fiscal-sem-valor` | `var(--preto-300)` | — |
 | `--fiscal-estoque` | `#7FA9E8` | — |
+| `--etiqueta-neutra-texto` | `var(--preto-200)` | — |
+| `--etiqueta-neutra-fundo` | `var(--preto-700)` | — |
+| `--etiqueta-destaque-texto` | `var(--dourado-400)` | — |
+| `--etiqueta-destaque-fundo` | `#2A2213` | — |
 | `--sombra` | `0 1px 2px rgb(0 0 0 / 40%), 0 2px 8px rgb(0 0 0 / 30%)` | — |
 | `--sombra-elevada` | `0 4px 12px rgb(0 0 0 / 50%), 0 12px 32px rgb(0 0 0 / 40%)` | — |
 | `--superficie-vidro` | `rgb(255 255 255 / 4%)` | — |
@@ -419,37 +436,37 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 
 | Token | Valor | Nota |
 | --- | --- | --- |
-| `--fundo` | `var(--azul-900)` | — |
-| `--superficie` | `var(--marca-azul)` | — |
-| `--superficie-alt` | `#0B2149` | — |
-| `--superficie-elevada` | `var(--azul-700)` | — |
-| `--texto` | `#E8EEF7` | — |
-| `--texto-suave` | `#A8C0E2` | — |
-| `--texto-fraco` | `#6D93CE` | — |
-| `--texto-invertido` | `var(--azul-900)` | — |
-| `--borda` | `#14315F` | — |
-| `--borda-forte` | `#1D4275` | — |
+| `--fundo` | `var(--preto-950)` | — |
+| `--superficie` | `var(--preto-900)` | — |
+| `--superficie-alt` | `var(--preto-850)` | — |
+| `--superficie-elevada` | `var(--preto-800)` | — |
+| `--texto` | `var(--preto-100)` | — |
+| `--texto-suave` | `var(--preto-200)` | — |
+| `--texto-fraco` | `var(--preto-300)` | — |
+| `--texto-invertido` | `var(--preto-950)` | — |
+| `--borda` | `var(--preto-700)` | — |
+| `--borda-forte` | `var(--preto-600)` | — |
 | `--borda-foco` | `var(--laranja-400)` | — |
-| `--moldura-fundo` | `var(--azul-900)` | — |
-| `--moldura-texto` | `#E8EEF7` | — |
-| `--moldura-texto-suave` | `#6D93CE` | — |
-| `--moldura-borda` | `#14315F` | — |
+| `--moldura-fundo` | `#0C0C0E` | — |
+| `--moldura-texto` | `var(--preto-100)` | — |
+| `--moldura-texto-suave` | `var(--preto-300)` | — |
+| `--moldura-borda` | `var(--preto-700)` | — |
 | `--acao-hover` | `var(--laranja-400)` | — |
 | `--acao-ativo` | `var(--laranja-300)` | — |
-| `--acao-inativo-fundo` | `#14315F` | — |
-| `--acao-inativo-texto` | `#6D93CE` | — |
-| `--acao2-texto` | `#A8C0E2` | — |
-| `--acao2-borda` | `#1D4275` | — |
-| `--acao2-hover` | `#0E2A5C` | — |
+| `--acao-inativo-fundo` | `var(--preto-700)` | — |
+| `--acao-inativo-texto` | `var(--preto-300)` | — |
+| `--acao2-texto` | `var(--preto-200)` | — |
+| `--acao2-borda` | `var(--preto-600)` | — |
+| `--acao2-hover` | `var(--preto-800)` | — |
 | `--link` | `var(--laranja-400)` | — |
 | `--link-hover` | `var(--laranja-300)` | — |
-| `--tabela-cabecalho-fundo` | `var(--azul-700)` | — |
-| `--tabela-linha` | `var(--marca-azul)` | — |
-| `--tabela-linha-alt` | `#0B2149` | — |
-| `--tabela-linha-hover` | `var(--azul-700)` | — |
+| `--tabela-cabecalho-fundo` | `var(--preto-800)` | — |
+| `--tabela-linha` | `var(--preto-900)` | — |
+| `--tabela-linha-alt` | `var(--preto-850)` | — |
+| `--tabela-linha-hover` | `var(--preto-800)` | — |
 | `--tabela-linha-marcada` | `#3A2410` | — |
-| `--tabela-borda` | `#14315F` | — |
-| `--tabela-numero` | `#E8EEF7` | — |
+| `--tabela-borda` | `var(--preto-700)` | — |
+| `--tabela-numero` | `var(--preto-100)` | — |
 | `--sucesso` | `#4ECB8B` | — |
 | `--atencao` | `#E0A44A` | — |
 | `--erro` | `#F58179` | — |
@@ -457,8 +474,12 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 | `--fiscal-ressarcimento` | `#4ECB8B` | — |
 | `--fiscal-complemento` | `#F58179` | — |
 | `--fiscal-verificar` | `#E0A44A` | — |
-| `--fiscal-sem-valor` | `#6D93CE` | — |
+| `--fiscal-sem-valor` | `var(--preto-300)` | — |
 | `--fiscal-estoque` | `#7FA9E8` | — |
+| `--etiqueta-neutra-texto` | `var(--preto-200)` | — |
+| `--etiqueta-neutra-fundo` | `var(--preto-700)` | — |
+| `--etiqueta-destaque-texto` | `var(--dourado-400)` | — |
+| `--etiqueta-destaque-fundo` | `#2A2213` | — |
 | `--sombra` | `0 1px 2px rgb(0 0 0 / 40%), 0 2px 8px rgb(0 0 0 / 30%)` | — |
 | `--sombra-elevada` | `0 4px 12px rgb(0 0 0 / 50%), 0 12px 32px rgb(0 0 0 / 40%)` | — |
 | `--superficie-vidro` | `rgb(255 255 255 / 4%)` | — |

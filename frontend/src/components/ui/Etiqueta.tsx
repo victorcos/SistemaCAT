@@ -11,13 +11,19 @@ export type TomDeEtiqueta =
   | "erro"
   | "destaque";
 
+/** Cada tom é um par de tokens, e não uma cor da escala escrita à mão.
+ *
+ *  Três deles vinham da escala clara direto — `bg-cinza-200`, `bg-azul-100`,
+ *  `bg-dourado-200` — e por isso não seguiam o tema: no escuro viravam chips
+ *  claros, gritando no meio de uma tela preta. Os outros três já usavam token
+ *  e sempre estiveram certos. */
 const TONS: Record<TomDeEtiqueta, string> = {
-  neutro: "text-cinza-700 bg-cinza-200",
-  info: "text-azul-700 bg-azul-100",
+  neutro: "text-etiqueta-neutra-texto bg-etiqueta-neutra-fundo",
+  info: "text-info bg-info-fundo",
   sucesso: "text-sucesso bg-sucesso-fundo",
   atencao: "text-atencao bg-atencao-fundo",
   erro: "text-erro bg-erro-fundo",
-  destaque: "text-dourado-800 bg-dourado-200",
+  destaque: "text-etiqueta-destaque-texto bg-etiqueta-destaque-fundo",
 };
 
 interface Props {

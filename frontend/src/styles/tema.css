@@ -145,6 +145,10 @@
 
   --color-moldura-fundo: var(--moldura-fundo);
   --color-moldura-texto: var(--moldura-texto);
+  --color-etiqueta-neutra-texto: var(--etiqueta-neutra-texto);
+  --color-etiqueta-neutra-fundo: var(--etiqueta-neutra-fundo);
+  --color-etiqueta-destaque-texto: var(--etiqueta-destaque-texto);
+  --color-etiqueta-destaque-fundo: var(--etiqueta-destaque-fundo);
   --color-moldura-texto-suave: var(--moldura-texto-suave);
   --color-moldura-ativo: var(--moldura-ativo);
   --color-moldura-borda: var(--moldura-borda);

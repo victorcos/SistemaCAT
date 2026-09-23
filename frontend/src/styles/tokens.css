@@ -45,6 +45,20 @@
   --laranja-100: #FFE8D1;
   --laranja-050: #FFF5EB;
 
+  /* ---------- preto, escala neutra ---------- */
+  /* Neutra de propósito: com um viés azul, o laranja da marca disputava a
+     atenção com o próprio fundo. Aqui ele fica sozinho no palco. Serve aos
+     dois temas — o fundo inteiro no escuro, a moldura no claro. */
+  --preto-950: #09090B;        /* o fundo da página */
+  --preto-900: #101012;        /* superfície: cartão, painel */
+  --preto-850: #17171A;        /* superfície alternada, linha ímpar */
+  --preto-800: #1C1C20;        /* elevada: o que flutua sobre a superfície */
+  --preto-700: #26262B;        /* borda */
+  --preto-600: #33333A;        /* borda forte */
+  --preto-100: #EDEDEF;        /* texto */
+  --preto-200: #A8A8B3;        /* texto suave */
+  --preto-300: #76767F;        /* texto fraco */
+
   /* ---------- dourado, escala derivada ---------- */
   --dourado-800: #6B5222;
   --dourado-700: #8A6B2E;      /* 4,97:1 sobre branco */
@@ -87,10 +101,18 @@
   --fiscal-sem-valor:     var(--cinza-500);
   --fiscal-estoque:       var(--azul-600);
 
+  /* etiquetas: os pares que não tinham token e eram escritos na escala clara
+     direto no componente — no tema escuro viravam chips claros, gritando */
+  --etiqueta-neutra-texto:   var(--cinza-700);
+  --etiqueta-neutra-fundo:   var(--cinza-200);
+  --etiqueta-destaque-texto: var(--dourado-800);
+  --etiqueta-destaque-fundo: var(--dourado-200);
+
   /* ==========================================================================
      Papéis — tema claro, o padrão.
      Fundo claro porque o analista passa horas lendo tabela.
-     O azul da marca fica na moldura: cabeçalho e menu lateral.
+     A moldura — cabeçalho e menu lateral — é preta nos dois temas. O azul da
+     marca segue no logotipo, no foco do campo e na escala derivada.
      ========================================================================== */
   --fundo:              var(--cinza-050);
   --superficie:         var(--marca-branco);
@@ -106,17 +128,19 @@
   --borda-forte:        var(--cinza-300);
   --borda-foco:         var(--azul-500);
 
-  /* moldura: cabeçalho e menu lateral, em azul da marca */
-  --moldura-fundo:      var(--marca-azul);
-  --moldura-texto:      var(--marca-branco);
-  --moldura-texto-suave:#A8C0E2;
+  /* moldura: cabeçalho e menu lateral.
+     Preta também aqui, e não só no tema escuro: em marinho ela disputava com o
+     laranja da ação, que é o que precisa saltar. O preto cala o fundo. */
+  --moldura-fundo:      #0C0C0E;
+  --moldura-texto:      var(--preto-100);
+  --moldura-texto-suave:var(--preto-300);
   --moldura-ativo:      var(--marca-laranja);
-  --moldura-borda:      #0E2A5C;
+  --moldura-borda:      var(--preto-700);
 
-  /* ação primária: laranja da marca com texto marinho (6,57:1).
-     Branco sobre este laranja daria 2,53:1 e reprovaria. */
+  /* ação primária: laranja da marca com texto preto (10,4:1 — era 6,57:1 em
+     marinho). Branco sobre este laranja daria 2,53:1 e reprovaria. */
   --acao-fundo:         var(--marca-laranja);
-  --acao-texto:         var(--marca-azul);
+  --acao-texto:         var(--preto-950);
   --acao-hover:         var(--laranja-600);
   --acao-ativo:         var(--laranja-700);
   --acao-inativo-fundo: var(--cinza-300);
@@ -172,44 +196,44 @@
    ========================================================================== */
 @media (prefers-color-scheme: dark) {
   :root:not([data-tema="claro"]) {
-    --fundo:              var(--azul-900);
-    --superficie:         var(--marca-azul);
-    --superficie-alt:     #0B2149;
-    --superficie-elevada: var(--azul-700);
+    --fundo:              var(--preto-950);
+    --superficie:         var(--preto-900);
+    --superficie-alt:     var(--preto-850);
+    --superficie-elevada: var(--preto-800);
 
-    --texto:              #E8EEF7;
-    --texto-suave:        #A8C0E2;
-    --texto-fraco:        #6D93CE;
-    --texto-invertido:    var(--azul-900);
+    --texto:              var(--preto-100);
+    --texto-suave:        var(--preto-200);
+    --texto-fraco:        var(--preto-300);
+    --texto-invertido:    var(--preto-950);
 
-    --borda:              #14315F;
-    --borda-forte:        #1D4275;
+    --borda:              var(--preto-700);
+    --borda-forte:        var(--preto-600);
     --borda-foco:         var(--laranja-400);
 
-    --moldura-fundo:      var(--azul-900);
-    --moldura-texto:      #E8EEF7;
-    --moldura-texto-suave:#6D93CE;
-    --moldura-borda:      #14315F;
+    --moldura-fundo:      #0C0C0E;
+    --moldura-texto:      var(--preto-100);
+    --moldura-texto-suave:var(--preto-300);
+    --moldura-borda:      var(--preto-700);
 
     --acao-hover:         var(--laranja-400);
     --acao-ativo:         var(--laranja-300);
-    --acao-inativo-fundo: #14315F;
-    --acao-inativo-texto: #6D93CE;
+    --acao-inativo-fundo: var(--preto-700);
+    --acao-inativo-texto: var(--preto-300);
 
-    --acao2-texto:        #A8C0E2;
-    --acao2-borda:        #1D4275;
-    --acao2-hover:        #0E2A5C;
+    --acao2-texto:        var(--preto-200);
+    --acao2-borda:        var(--preto-600);
+    --acao2-hover:        var(--preto-800);
 
     --link:               var(--laranja-400);
     --link-hover:         var(--laranja-300);
 
-    --tabela-cabecalho-fundo: var(--azul-700);
-    --tabela-linha:           var(--marca-azul);
-    --tabela-linha-alt:       #0B2149;
-    --tabela-linha-hover:     var(--azul-700);
+    --tabela-cabecalho-fundo: var(--preto-800);
+    --tabela-linha:           var(--preto-900);
+    --tabela-linha-alt:       var(--preto-850);
+    --tabela-linha-hover:     var(--preto-800);
     --tabela-linha-marcada:   #3A2410;
-    --tabela-borda:           #14315F;
-    --tabela-numero:          #E8EEF7;
+    --tabela-borda:           var(--preto-700);
+    --tabela-numero:          var(--preto-100);
 
     --sucesso:        #4ECB8B;
     --sucesso-fundo:  #0C2E1F;
@@ -218,13 +242,18 @@
     --erro:           #F58179;
     --erro-fundo:     #3A1512;
     --info:           #7FA9E8;
-    --info-fundo:     #0E2A5C;
+    --info-fundo:     #16181D;
 
     --fiscal-ressarcimento: #4ECB8B;
     --fiscal-complemento:   #F58179;
     --fiscal-verificar:     #E0A44A;
-    --fiscal-sem-valor:     #6D93CE;
+    --fiscal-sem-valor:     var(--preto-300);
     --fiscal-estoque:       #7FA9E8;
+  --etiqueta-neutra-texto:   var(--preto-200);
+  --etiqueta-neutra-fundo:   var(--preto-700);
+  --etiqueta-destaque-texto: var(--dourado-400);
+  --etiqueta-destaque-fundo: #2A2213;
+
 
     --sombra:         0 1px 2px rgb(0 0 0 / 40%), 0 2px 8px rgb(0 0 0 / 30%);
     --sombra-elevada: 0 4px 12px rgb(0 0 0 / 50%), 0 12px 32px rgb(0 0 0 / 40%);
@@ -234,52 +263,57 @@
     --brilho-acao:      0 12px 28px rgb(255 127 0 / 30%);
     --fundo-aurora:
       radial-gradient(900px 500px at 18% -10%, rgb(255 127 0 / 10%), transparent 60%),
-      radial-gradient(900px 600px at 90% 0%, rgb(34 80 155 / 14%), transparent 65%);
+      radial-gradient(900px 600px at 90% 0%, rgb(255 255 255 / 5%), transparent 65%);
   }
 }
 
 /* escolha explícita do usuário vence o sistema, nos dois sentidos */
 :root[data-tema="escuro"] {
-  --fundo:              var(--azul-900);
-  --superficie:         var(--marca-azul);
-  --superficie-alt:     #0B2149;
-  --superficie-elevada: var(--azul-700);
-  --texto:              #E8EEF7;
-  --texto-suave:        #A8C0E2;
-  --texto-fraco:        #6D93CE;
-  --texto-invertido:    var(--azul-900);
-  --borda:              #14315F;
-  --borda-forte:        #1D4275;
+  --fundo:              var(--preto-950);
+  --superficie:         var(--preto-900);
+  --superficie-alt:     var(--preto-850);
+  --superficie-elevada: var(--preto-800);
+  --texto:              var(--preto-100);
+  --texto-suave:        var(--preto-200);
+  --texto-fraco:        var(--preto-300);
+  --texto-invertido:    var(--preto-950);
+  --borda:              var(--preto-700);
+  --borda-forte:        var(--preto-600);
   --borda-foco:         var(--laranja-400);
-  --moldura-fundo:      var(--azul-900);
-  --moldura-texto:      #E8EEF7;
-  --moldura-texto-suave:#6D93CE;
-  --moldura-borda:      #14315F;
+  --moldura-fundo:      #0C0C0E;
+  --moldura-texto:      var(--preto-100);
+  --moldura-texto-suave:var(--preto-300);
+  --moldura-borda:      var(--preto-700);
   --acao-hover:         var(--laranja-400);
   --acao-ativo:         var(--laranja-300);
-  --acao-inativo-fundo: #14315F;
-  --acao-inativo-texto: #6D93CE;
-  --acao2-texto:        #A8C0E2;
-  --acao2-borda:        #1D4275;
-  --acao2-hover:        #0E2A5C;
+  --acao-inativo-fundo: var(--preto-700);
+  --acao-inativo-texto: var(--preto-300);
+  --acao2-texto:        var(--preto-200);
+  --acao2-borda:        var(--preto-600);
+  --acao2-hover:        var(--preto-800);
   --link:               var(--laranja-400);
   --link-hover:         var(--laranja-300);
-  --tabela-cabecalho-fundo: var(--azul-700);
-  --tabela-linha:           var(--marca-azul);
-  --tabela-linha-alt:       #0B2149;
-  --tabela-linha-hover:     var(--azul-700);
+  --tabela-cabecalho-fundo: var(--preto-800);
+  --tabela-linha:           var(--preto-900);
+  --tabela-linha-alt:       var(--preto-850);
+  --tabela-linha-hover:     var(--preto-800);
   --tabela-linha-marcada:   #3A2410;
-  --tabela-borda:           #14315F;
-  --tabela-numero:          #E8EEF7;
+  --tabela-borda:           var(--preto-700);
+  --tabela-numero:          var(--preto-100);
   --sucesso: #4ECB8B; --sucesso-fundo: #0C2E1F;
   --atencao: #E0A44A; --atencao-fundo: #33240C;
   --erro:    #F58179; --erro-fundo:    #3A1512;
-  --info:    #7FA9E8; --info-fundo:    #0E2A5C;
+  --info:    #7FA9E8; --info-fundo:    #16181D;
   --fiscal-ressarcimento: #4ECB8B;
   --fiscal-complemento:   #F58179;
   --fiscal-verificar:     #E0A44A;
-  --fiscal-sem-valor:     #6D93CE;
+  --fiscal-sem-valor:     var(--preto-300);
   --fiscal-estoque:       #7FA9E8;
+  --etiqueta-neutra-texto:   var(--preto-200);
+  --etiqueta-neutra-fundo:   var(--preto-700);
+  --etiqueta-destaque-texto: var(--dourado-400);
+  --etiqueta-destaque-fundo: #2A2213;
+
   --sombra:         0 1px 2px rgb(0 0 0 / 40%), 0 2px 8px rgb(0 0 0 / 30%);
   --sombra-elevada: 0 4px 12px rgb(0 0 0 / 50%), 0 12px 32px rgb(0 0 0 / 40%);
   --superficie-vidro: rgb(255 255 255 / 4%);
@@ -287,7 +321,7 @@
   --brilho-acao:      0 12px 28px rgb(255 127 0 / 30%);
   --fundo-aurora:
     radial-gradient(900px 500px at 18% -10%, rgb(255 127 0 / 10%), transparent 60%),
-    radial-gradient(900px 600px at 90% 0%, rgb(34 80 155 / 14%), transparent 65%);
+    radial-gradient(900px 600px at 90% 0%, rgb(255 255 255 / 5%), transparent 65%);
 }
 
 /* ---------- base ---------- */
