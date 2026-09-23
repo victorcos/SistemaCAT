@@ -10,6 +10,11 @@ coisas acontecem aqui, e as duas mudam número no relatório:
 2. **O preterido nunca some calado.** Cada exclusão vira aviso com os dois
    nomes, para que quem confere saiba qual arquivo produziu o número.
 
+Duas fontes, dois pares de relatórios: a EFD-Contribuições dá PIS e COFINS; a
+ECF dá IRPJ e CSLL. Cada uma se lê uma vez e produz os dois relatórios dela —
+o bloco M é espelhado e a ECF traz e-Lalur e e-Lacs no mesmo arquivo, então ler
+duas vezes seria pagar o dobro pelo mesmo byte.
+
 Portado do projeto Quebra de SPED em 22/09/2026. O paralelismo por processos
 que o original tinha ficou de fora: lá a leitura acontecia dentro de uma página
 Streamlit, que precisava de threads para não travar; aqui a etapa já roda fora
@@ -24,13 +29,16 @@ import time
 from collections.abc import Callable, Iterable
 
 from cat.infraestrutura.gestao.agregador import agregar_efd
+from cat.infraestrutura.gestao.ecf import ApuracaoECF, ArquivoECFInvalido, ler_ecf
 from cat.infraestrutura.gestao.modelos import ApuracaoEFD, Relatorio
 from cat.infraestrutura.gestao.quadros import montar_relatorio_piscofins
+from cat.infraestrutura.gestao.quadros_irpj_csll import montar_relatorio_irpj_csll
 from cat.log import obter_log
 
 log = obter_log(__name__)
 
-TRIBUTOS = ("PIS", "COFINS")
+TRIBUTOS_DA_EFD = ("PIS", "COFINS")
+TRIBUTOS_DA_ECF = ("IRPJ", "CSLL")
 
 
 class GestaoCancelada(RuntimeError):
@@ -112,6 +120,58 @@ def selecionar_por_competencia(
     return [melhores[p] for p in sorted(melhores)], avisos
 
 
+def ler_ecfs(caminhos: Iterable[str],
+             deve_parar: Callable[[], bool] | None = None,
+             ) -> tuple[list[ApuracaoECF], list[str]]:
+    """Lê cada ECF. Devolve as apurações e o que ficou de fora.
+
+    A ECF é pequena — poucos MB por ano — e vai inteira em memória: não há
+    índice nem cache, e não faz falta.
+    """
+    caminhos = list(caminhos)
+    apuracoes: list[ApuracaoECF] = []
+    avisos: list[str] = []
+    for caminho in caminhos:
+        if deve_parar is not None and deve_parar():
+            raise GestaoCancelada("leitura da ecf cancelada a pedido")
+        nome = os.path.basename(caminho)
+        try:
+            apuracoes.append(ler_ecf(caminho))
+        except (ArquivoECFInvalido, OSError, ValueError) as erro:
+            log.warning("não deu para ler a ecf na gestão",
+                        extra={"arquivo": nome, "erro": str(erro)})
+            avisos.append(f"{nome}: não deu para ler — {erro}.")
+    log.info("gestão leu as ecf", extra={
+        "arquivos": len(caminhos), "apuracoes": len(apuracoes), "recusados": len(avisos),
+    })
+    return sorted(apuracoes, key=lambda a: a.dt_ini), avisos
+
+
+def montar_irpj_csll(apuracoes: list[ApuracaoECF],
+                     avisos_da_leitura: Iterable[str] = ()) -> list[Relatorio]:
+    """Os relatórios de IRPJ e de CSLL, da mesma leitura da ECF.
+
+    **Ainda sem gabarito.** A validação das 59 competências cobriu PIS e COFINS;
+    o IRPJ/CSLL de referência é de outra empresa e a comparação ficou pendente
+    também no projeto de origem. Até rodar `tools/validar_gestao.py` contra um
+    export real, estes números valem menos que os de PIS/COFINS — e quem os usar
+    precisa saber disso.
+    """
+    if not apuracoes:
+        return []
+    antes = list(avisos_da_leitura)
+    relatorios = []
+    for tributo in TRIBUTOS_DA_ECF:
+        relatorio = montar_relatorio_irpj_csll(apuracoes, tributo)
+        relatorio.avisos = antes + relatorio.avisos
+        relatorios.append(relatorio)
+    log.info("gestão de irpj/csll montada", extra={
+        "apuracoes": len(apuracoes), "relatorios": len(relatorios),
+        "quadros": sum(len(r.quadros) for r in relatorios),
+    })
+    return relatorios
+
+
 def montar(apuracoes: list[ApuracaoEFD],
            avisos_da_leitura: Iterable[str] = ()) -> list[Relatorio]:
     """Os relatórios de PIS e de COFINS, com os avisos na frente.
@@ -124,7 +184,7 @@ def montar(apuracoes: list[ApuracaoEFD],
     selecionadas, avisos_da_selecao = selecionar_por_competencia(apuracoes)
     antes = list(avisos_da_leitura) + avisos_da_selecao
     relatorios = []
-    for tributo in TRIBUTOS:
+    for tributo in TRIBUTOS_DA_EFD:
         relatorio = montar_relatorio_piscofins(selecionadas, tributo)
         relatorio.avisos = antes + relatorio.avisos
         relatorios.append(relatorio)

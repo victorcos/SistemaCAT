@@ -327,6 +327,13 @@ A 037 tem **52 colunas** (v0.76.0: entrou `Município`, ao lado de
 `Natureza do Crédito` é deduzida **do CFOP** nos ramos em que o registro não
 traz `NAT_BC_CRED` (C100/C170 e C190/C191/C195); nos demais é lida do arquivo.
 
+### Tipos de arquivo (v0.79.0)
+
+`sped_ecf` entrou no catálogo — a Escrituração Contábil Fiscal, de onde saem
+IRPJ e CSLL. Como os outros tipos, é reconhecido pelo motor lendo o 0000 e
+descrito no espelho em C# (`TiposDeArquivo.cs`); as duas tabelas têm de ser
+iguais, e há teste de compatibilidade que cobra isso. Não alimenta a CAT 42.
+
 ### O razão contábil na tela (v0.77.0)
 
 Três rotas de leitura sobre o `razao.parquet` da mesma execução. Todas exigem

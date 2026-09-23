@@ -114,6 +114,8 @@ class TipoDeArquivo(str, Enum):
     SPED_ICMS_IPI = "sped_icms_ipi"
     SPED_CONTRIBUICOES = "sped_contribuicoes"
     SPED_ECD = "sped_ecd"
+    # ECF: a escrituração contábil fiscal, de onde saem IRPJ e CSLL
+    SPED_ECF = "sped_ecf"
     SPED_OUTRO = "sped_outro"
     XML_NFE = "xml_nfe"
     XML_OUTRO = "xml_outro"
@@ -139,6 +141,7 @@ class TipoDeArquivo(str, Enum):
             TipoDeArquivo.SPED_ICMS_IPI: "EFD ICMS/IPI",
             TipoDeArquivo.SPED_CONTRIBUICOES: "EFD Contribuições",
             TipoDeArquivo.SPED_ECD: "ECD",
+            TipoDeArquivo.SPED_ECF: "ECF",
             TipoDeArquivo.SPED_OUTRO: "SPED de outro tipo",
             TipoDeArquivo.XML_NFE: "XML de NF-e ou CF-e",
             TipoDeArquivo.XML_OUTRO: "XML de outro documento",

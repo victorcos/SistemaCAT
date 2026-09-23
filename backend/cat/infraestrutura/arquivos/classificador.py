@@ -61,6 +61,7 @@ _POR_TIPO_SPED = {
     TipoSped.EFD_ICMS_IPI: TipoDeArquivo.SPED_ICMS_IPI,
     TipoSped.EFD_CONTRIBUICOES: TipoDeArquivo.SPED_CONTRIBUICOES,
     TipoSped.ECD: TipoDeArquivo.SPED_ECD,
+    TipoSped.ECF: TipoDeArquivo.SPED_ECF,
 }
 
 _POR_ESPECIE = {

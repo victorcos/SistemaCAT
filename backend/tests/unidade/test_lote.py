@@ -80,6 +80,25 @@ class TestClassificar:
         assert a.tipo is TipoDeArquivo.SPED_CONTRIBUICOES
         assert not a.alimenta_a_cat
 
+    def test_ecf_e_reconhecida_e_tambem_nao_alimenta_a_cat(self, tmp_path):
+        """A ECF é o quarto leiaute do 0000, e o único com o CNPJ antes das datas.
+
+        Sem entrada no catálogo ela entraria como "SPED de outro tipo" e o
+        importador diria que a base está completa sem a contabilidade fiscal.
+        """
+        ecf = "\n".join([
+            "|0000|LECF|0009|50948371000178|EMPRESA DO TESTE LTDA|0||||01012024|31122024|0|||||",
+            "|0010|||1|A||",
+        ]) + "\n"
+        a = classificar(escrever(tmp_path, "ecf2024.txt", ecf))
+
+        assert a.tipo is TipoDeArquivo.SPED_ECF
+        assert a.tipo.grupo is Grupo.SPED
+        assert a.tipo.rotulo == "ECF"
+        assert not a.alimenta_a_cat
+        assert a.cnpj == "50948371000178"
+        assert a.competencia == date(2024, 1, 1)
+
     def test_xml_de_nfe(self, tmp_path):
         a = classificar(escrever(tmp_path, "nota.xml", NFE, "utf-8"))
         assert a.tipo is TipoDeArquivo.XML_NFE

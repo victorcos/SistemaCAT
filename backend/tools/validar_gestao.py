@@ -1,11 +1,23 @@
 """Confere a Gestão gerada aqui contra o export CSV da Gestão do Sistema MA.
 
-É o teste contra dado real: lê os SPED do cliente, monta os 36 quadros e
-compara **linha a linha, mês a mês** com o CSV que o MA exporta. Serve para
-revalidar as regras depois de mexer no código, e para checar um cliente novo.
+É o teste contra dado real: lê os SPED do cliente, monta os quadros e compara
+**linha a linha, mês a mês** com o CSV que o MA exporta. Serve para revalidar as
+regras depois de mexer no código, e para checar um cliente novo.
 
     python tools/validar_gestao.py PIS    "D:\\...\\PIS.csv"    "D:\\...\\EFD-Contrib"
     python tools/validar_gestao.py COFINS "D:\\...\\COFINS.csv" "D:\\...\\EFD-Contrib"
+    python tools/validar_gestao.py IRPJ   "D:\\...\\IRPJ.csv"   "D:\\...\\ECF"
+    python tools/validar_gestao.py CSLL   "D:\\...\\CSLL.csv"   "D:\\...\\ECF"
+
+PIS e COFINS leem a EFD-Contribuições; IRPJ e CSLL leem a ECF. A pasta muda
+junto com o tributo, e é só isso que muda na chamada.
+
+**IRPJ e CSLL nunca passaram por aqui.** A validação de 59 competências cobriu
+PIS e COFINS; o IRPJ/CSLL de referência é de outra empresa, e a comparação ficou
+pendente também no projeto de origem. Rodar isto contra um export real é o que
+falta para eles valerem tanto quanto os outros dois — e há uma suspeita já
+anotada esperando por essa confirmação, em
+`quadros_irpj_csll.py::_compensacoes`.
 
 **Nenhum dado de cliente entra no repositório**: os caminhos vêm por argumento
 e o resultado sai na tela. É por isso que isto é uma ferramenta e não um teste
@@ -27,8 +39,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cat.infraestrutura.gestao.montagem import ler, montar  # noqa: E402
 from cat.infraestrutura.gestao.modelos import Relatorio  # noqa: E402
+from cat.infraestrutura.gestao.montagem import (  # noqa: E402
+    ler,
+    ler_ecfs,
+    montar,
+    montar_irpj_csll,
+)
+
+DA_ECF = ("IRPJ", "CSLL")
 
 MESES = {"JAN": "01", "FEV": "02", "MAR": "03", "ABR": "04", "MAI": "05", "JUN": "06",
          "JUL": "07", "AGO": "08", "SET": "09", "OUT": "10", "NOV": "11", "DEZ": "12"}
@@ -131,26 +150,36 @@ def comparar(relatorio: Relatorio, ma: dict[str, dict[str, dict[str, int]]],
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("tributo", choices=["PIS", "COFINS"])
+    p.add_argument("tributo", choices=["PIS", "COFINS", "IRPJ", "CSLL"])
     p.add_argument("export_ma", help="CSV exportado da Gestão do MA")
-    p.add_argument("pasta_efd", help="pasta com os arquivos da EFD-Contribuições")
+    p.add_argument("pasta", help="pasta com a EFD-Contribuições (PIS/COFINS) ou com a ECF")
     p.add_argument("--limite", type=int, default=50, help="máximo de divergências exibidas")
     args = p.parse_args()
 
-    caminhos = arquivos_em(args.pasta_efd)
-    print(f"{len(caminhos)} arquivo(s) de EFD-Contribuições — lendo…", flush=True)
+    da_ecf = args.tributo in DA_ECF
+    caminhos = arquivos_em(args.pasta)
+    fonte = "ECF" if da_ecf else "EFD-Contribuições"
+    print(f"{len(caminhos)} arquivo(s) de {fonte} — lendo…", flush=True)
 
     def andou(apuracao, i, total):
         print(f"  {i}/{total} {os.path.basename(apuracao.arquivo)} "
               f"· {apuracao.periodo} · {apuracao.segundos}s", flush=True)
 
-    apuracoes, avisos = ler(caminhos, avisar=andou)
+    if da_ecf:
+        apuracoes, avisos = ler_ecfs(caminhos)
+        for apuracao in apuracoes:
+            print(f"  {os.path.basename(apuracao.arquivo)} · {apuracao.dt_fin[-4:]} "
+                  f"· {len(apuracao.periodos)} período(s)", flush=True)
+    else:
+        apuracoes, avisos = ler(caminhos, avisar=andou)
     for aviso in avisos:
         print(f"  ! {aviso}")
-    relatorios = montar(apuracoes, avisos)
+    relatorios = montar_irpj_csll(apuracoes, avisos) if da_ecf else montar(apuracoes, avisos)
     if not relatorios:
-        print("nenhuma apuração: nada a comparar")
+        print(f"nenhuma apuração legível em {args.pasta}: nada a comparar")
         return 1
+    if da_ecf:
+        print("(IRPJ/CSLL ainda não têm gabarito conferido — esta rodada é a primeira)")
     relatorio = next(r for r in relatorios if r.tributo == args.tributo)
 
     conferidos, problemas, ausentes = comparar(relatorio, ler_export_ma(args.export_ma))

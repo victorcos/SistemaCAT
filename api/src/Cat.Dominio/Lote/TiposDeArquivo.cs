@@ -18,6 +18,7 @@ public static class TiposDeArquivo
         Novo("sped_icms_ipi", "EFD ICMS/IPI", alimenta: true),
         Novo("sped_contribuicoes", "EFD Contribuições"),
         Novo("sped_ecd", "ECD"),
+        Novo("sped_ecf", "ECF"),
         Novo("sped_outro", "SPED de outro tipo"),
         Novo("xml_nfe", "XML de NF-e ou CF-e", alimenta: true),
         Novo("xml_outro", "XML de outro documento"),

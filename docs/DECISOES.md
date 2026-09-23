@@ -5,6 +5,61 @@
 
 ---
 
+## 2026-09-22 — A ECF entra, e o 0000 ganha um quarto leiaute
+
+**O que entrou.** A Escrituração Contábil Fiscal e o bloco de IRPJ/CSLL do
+Lucro Real que sai dela: Parte A do e-Lalur e do e-Lacs (lucro líquido, adições,
+exclusões, compensações), o cálculo do imposto e da contribuição, e o saldo das
+contas da Parte B.
+
+**A ECF quebrou a âncora do leitor do 0000, e isso era a coisa a acertar.** Os
+três leiautes que o domínio já conhecia compartilham uma sequência: data de
+início, data de fim, razão social e CNPJ, coladas nessa ordem. O par de datas
+servia de âncora e o resto se lia a partir dele. **A ECF não segue essa
+sequência** — nela o CNPJ e o nome vêm *antes* das datas. Pior: pode haver uma
+terceira data (`DT_SIT_ESP`, situação especial) colada ao par do período, e aí
+o *primeiro* par de datas seria (DT_SIT_ESP, DT_INI) — um período que começa na
+data da cisão.
+
+Então a ECF tem âncora própria, também por forma: o CNPJ é o campo de catorze
+dígitos, o nome é o que vem depois dele, e o período é o **último** par de datas
+consecutivas do registro. Nada depois de DT_FIN tem forma de data, então "o
+último par" é sempre o certo — com ou sem situação especial. Há teste para os
+dois casos.
+
+A alternativa era ler a ECF por posição fixa dentro do leitor da gestão, como o
+projeto de origem fazia. Seria a terceira vez que este projeto lê um 0000 por
+posição, e as duas primeiras deram errado em silêncio.
+
+**UF e município saem vazios, de propósito.** O 0000 da ECF não os traz — eles
+estão no 0030, que é outro registro e não é problema deste leitor. Inventar um
+valor seria pior que a ausência.
+
+**`sped_ecf` entrou no catálogo de tipos**, no classificador e no espelho em C#
+que a tela usa. Sem a entrada no espelho, o arquivo apareceria como "Não
+reconhecido" — e há teste de compatibilidade que cobra as duas tabelas iguais.
+
+**IRPJ e CSLL valem menos que PIS e COFINS, e isso está escrito.** A validação
+das 59 competências cobriu PIS e COFINS. O IRPJ/CSLL de referência é de outra
+empresa, e a comparação ficou pendente também no projeto de origem. O oráculo
+`tools/validar_gestao.py` passou a aceitar os dois tributos e a pasta da ECF —
+rodá-lo contra um export real é o que falta.
+
+**Uma suspeita registrada, não corrigida.** Quando o e-Lalur não traz linha de
+"compensação do próprio período", a regra portada deduz esse valor da diferença
+entre o lucro real antes e depois da compensação. Só que essa diferença é a
+compensação **inteira**, inclusive a de períodos anteriores: havendo prejuízo
+anterior compensado, o mesmo valor sai nas duas linhas. Provavelmente a dedução
+só deveria valer quando não há compensação anterior nenhuma.
+
+Não mudei. Estes quadros nunca passaram por gabarito, e mudar regra fiscal por
+raciocínio — sem arquivo que confirme — foi exatamente como o erro da natureza
+do crédito nasceu. O comportamento atual está **fixado em teste** e comentado no
+código, para que a correção, quando vier, seja deliberada e a suspeita não se
+perca no caminho.
+
+---
+
 ## 2026-09-22 — A Gestão (36 quadros) entra: o núcleo, e o gabarito que não se versiona
 
 **O que é.** Os mesmos 36 quadros que o Sistema MA exporta na "Gestão" de

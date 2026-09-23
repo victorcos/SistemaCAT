@@ -18,18 +18,29 @@ EFD Contribuições
 ECD
     |0000|LECD|DT_INI|DT_FIN|NOME|CNPJ|UF|IE|COD_MUN|IM|IND_SIT_ESP|...
 
-O discriminador do TIPO é o campo 2: na ECD vem `LECD`. Entre as duas EFD, o
-campo 4 é data no ICMS/IPI e indicador de situação especial nas Contribuições.
+ECF
+    |0000|LECF|COD_VER|CNPJ|NOME|IND_SIT_INI_PER|SIT_ESPECIAL|PAT_REMAN_CIS|
+          DT_SIT_ESP|DT_INI|DT_FIN|RETIFICADORA|NUM_REC|TIP_ECF|COD_SCP|
+
+O discriminador do TIPO é o campo 2: `LECD` na ECD, `LECF` na ECF. Entre as
+duas EFD, o campo 4 é data no ICMS/IPI e indicador de situação especial nas
+Contribuições.
 
 Mas os CAMPOS não são lidos por posição fixa, e isso é deliberado. Um arquivo
 de ECD real desta casa não seguia o leiaute publicado — trazia dois campos a
 mais antes das datas. Leiaute de SPED muda entre versões, e cada cliente gera
 com a ferramenta que tem.
 
-O que nunca muda nos três leiautes é a **sequência**: data de início, data de
-fim, razão social e CNPJ vêm coladas, nessa ordem. Então o par de datas serve
-de âncora e o resto se lê a partir dele. Posição fixa quebraria em silêncio;
-âncora falha alto, dizendo que não achou o par de datas.
+Nos três primeiros, o que nunca muda é a **sequência**: data de início, data de
+fim, razão social e CNPJ vêm coladas, nessa ordem. O par de datas serve de
+âncora e o resto se lê a partir dele.
+
+**A ECF não segue essa sequência** — nela o CNPJ e o nome vêm *antes* das
+datas, e ainda pode haver uma terceira data (DT_SIT_ESP) logo antes do par.
+Então ela tem âncora própria, também por forma: o CNPJ é o campo de catorze
+dígitos, o nome é o que vem depois dele, e o período é o **último** par de
+datas consecutivas do registro. Posição fixa quebraria em silêncio; âncora
+falha alto, dizendo o que não achou.
 """
 
 from __future__ import annotations
@@ -48,6 +59,7 @@ class TipoSped(str, Enum):
     EFD_ICMS_IPI = "efd_icms_ipi"
     EFD_CONTRIBUICOES = "efd_contribuicoes"
     ECD = "ecd"
+    ECF = "ecf"
 
     @property
     def rotulo(self) -> str:
@@ -55,6 +67,7 @@ class TipoSped(str, Enum):
             TipoSped.EFD_ICMS_IPI: "EFD ICMS/IPI",
             TipoSped.EFD_CONTRIBUICOES: "EFD Contribuições",
             TipoSped.ECD: "ECD — Escrituração Contábil Digital",
+            TipoSped.ECF: "ECF — Escrituração Contábil Fiscal",
         }[self]
 
     @property
@@ -136,6 +149,8 @@ def detectar_tipo(campos: list[str]) -> TipoSped:
         )
     if campos[1].strip().upper().startswith("LECD"):
         return TipoSped.ECD
+    if campos[1].strip().upper().startswith("LECF"):
+        return TipoSped.ECF
     if _parece_data(campos[3]):
         return TipoSped.EFD_ICMS_IPI
     if len(campos) >= 7 and _parece_data(campos[5]):
@@ -155,6 +170,64 @@ def _achar_par_de_datas(campos: list[str]) -> int:
             return i
     raise ArquivoNaoReconhecido(
         "não achei o par de datas do período no registro 0000"
+    )
+
+
+def _ultimo_par_de_datas(campos: list[str]) -> int:
+    """Índice do **último** par de datas consecutivas. É a âncora da ECF.
+
+    A ECF pode trazer DT_SIT_ESP logo antes de DT_INI: numa empresa em situação
+    especial, três datas ficam coladas e o primeiro par seria (DT_SIT_ESP,
+    DT_INI) — um período começando na data da cisão. O último par é sempre
+    (DT_INI, DT_FIN), porque nada depois deles no 0000 tem forma de data.
+    """
+    achado = -1
+    for i in range(1, len(campos) - 1):
+        if _parece_data(campos[i]) and _parece_data(campos[i + 1]):
+            achado = i
+    if achado < 0:
+        raise ArquivoNaoReconhecido(
+            "não achei o par de datas do período no registro 0000"
+        )
+    return achado
+
+
+def _achar_cnpj(campos: list[str]) -> int:
+    """Índice do primeiro campo com catorze dígitos. É o CNPJ da ECF.
+
+    Não se confere o dígito aqui: CNPJ torto não pode derrubar a leitura do
+    resto do cabeçalho — quem confere na tela vê o campo vazio e corrige.
+    """
+    for i, c in enumerate(campos):
+        v = c.strip()
+        if len(v) == 14 and v.isdigit():
+            return i
+    raise ArquivoNaoReconhecido("não achei o CNPJ no registro 0000 da ECF")
+
+
+def _ler_ecf(campos: list[str], em) -> CabecalhoSped:
+    """A ECF tem o CNPJ e o nome antes das datas, ao contrário dos outros três.
+
+    UF e município **não estão** no 0000 da ECF — vêm no 0030, que é outro
+    registro e não é problema deste leitor. Saem vazios, e quem precisar deles
+    lê o 0030.
+    """
+    i_cnpj = _achar_cnpj(campos)
+    nome = em(i_cnpj + 1)
+    if not nome:
+        raise ArquivoNaoReconhecido("o registro 0000 da ECF não traz a razão social")
+    d = _ultimo_par_de_datas(campos)
+    return CabecalhoSped(
+        tipo=TipoSped.ECF,
+        cnpj=tentar(em(i_cnpj)),
+        nome=" ".join(nome.split()),
+        uf="",
+        inscricao_estadual="",
+        codigo_municipio="",
+        inicio=_data(em(d)),
+        fim=_data(em(d + 1)),
+        versao_leiaute=em(2),
+        retificadora=em(d + 2) == "1",
     )
 
 
@@ -198,6 +271,9 @@ def ler_cabecalho(linha: str) -> CabecalhoSped:
 
     def em(i: int) -> str:
         return campos[i].strip() if 0 <= i < len(campos) else ""
+
+    if tipo is TipoSped.ECF:
+        return _ler_ecf(campos, em)
 
     d = _achar_par_de_datas(campos)
     nome = em(d + 2)

@@ -1,15 +1,23 @@
-"""Gestão Fiscal no padrão do Sistema MA, para PIS/Pasep e COFINS.
+"""Gestão Fiscal no padrão do Sistema MA: PIS/COFINS da EFD, IRPJ/CSLL da ECF.
 
-Monta, a partir da EFD-Contribuições, os **36 quadros** que o MA exporta na
-"Gestão": receita por CST, contribuição apurada, natureza dos créditos,
-ajustes, controle de saldos — cada quadro uma lista de linhas, cada linha um
-valor por competência.
+Monta os mesmos relatórios que o MA exporta na "Gestão" — cada um uma lista de
+quadros, cada quadro uma lista de linhas, cada linha um valor por competência.
+
+Duas fontes, quatro relatórios:
+
+* **EFD-Contribuições** → PIS/Pasep e COFINS, nos **36 quadros**: receita por
+  CST, contribuição apurada, natureza dos créditos, ajustes, controle de saldos;
+* **ECF** → IRPJ e CSLL do Lucro Real: Parte A do e-Lalur e do e-Lacs, cálculo
+  do imposto e saldo das contas da Parte B.
 
 ## O caminho
 
 ```
 EFD-Contribuições ──► agregador ──► ApuracaoEFD ──► quadros ──► Relatorio
      (1 GB)          uma passada     (poucos MB)      regras     36 quadros
+
+ECF  ──► ecf.py ──► ApuracaoECF ──► quadros_irpj_csll ──► Relatorio
+ (MB)   uma passada   por período        regras          IRPJ e CSLL
 ```
 
 O `ApuracaoEFD` é o resumo de **um** arquivo: registros de apuração inteiros,
@@ -32,6 +40,11 @@ MA em 59 competências, e o que bateu centavo a centavo está marcado
 `# VALIDADO` ou `# CONFIRMADO` linha a linha. Onde eu discordaria, escrevi
 comentário em vez de mudar a regra: sem o arquivo de referência eu não teria
 como revalidar.
+
+**Isso vale para PIS e COFINS.** IRPJ e CSLL não passaram por gabarito nenhum —
+o arquivo de referência é de outra empresa e a comparação ficou pendente também
+no projeto de origem. `tools/validar_gestao.py` já aceita os dois, e há uma
+suspeita anotada esperando essa rodada (`quadros_irpj_csll.py::_compensacoes`).
 
 As notas de procedência falam em **empresa A, B e C**. O nome delas não é
 versionado; o que dá peso à nota é quantas competências foram conferidas.

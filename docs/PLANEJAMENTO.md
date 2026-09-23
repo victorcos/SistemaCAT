@@ -147,7 +147,10 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [ ] Etapa `apuracao_contribuicoes`: ligar a Gestão à fila, com planilha e tela
 - [ ] Rodar `tools/validar_gestao.py` contra o export do MA e as EFD reais: é o que
       confirma o porte, e o gabarito não pode ser versionado
-- [ ] Gestão de IRPJ/CSLL: vem da ECF, outro leitor e outros quadros
+- [x] Gestão de IRPJ/CSLL: leitor da ECF, os quadros do Lucro Real e a ECF no
+      leitor do 0000 do domínio, como quarto leiaute (v0.79.0)
+- [ ] Conferir a suspeita da compensação do próprio período (`_compensacoes`):
+      o valor derivado repete a compensação de períodos anteriores
 - [ ] Telas do handoff de design (hub de módulos, escolha de frente, coluna de módulos
       em Usuários) — desenho pronto em `Reconstrução tela listagem usuários/design_handoff`
 - [ ] Resolver a colisão de vocabulário: o handoff chama de "módulo" o nível 1 e de
