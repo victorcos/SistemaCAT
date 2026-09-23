@@ -177,7 +177,10 @@ export const criarProjeto = (dados: {
     headers: { "Content-Type": "application/json" },
   });
 
-export const listarProjetos = () => chamar<Projeto[]>("/projetos");
+/** Os trabalhos que a pessoa enxerga. `modulo` recorta pela frente tributária;
+ *  sem ele a lista sai inteira, como sempre saiu. */
+export const listarProjetos = (modulo?: string) =>
+  chamar<Projeto[]>(modulo ? `/projetos?modulo=${encodeURIComponent(modulo)}` : "/projetos");
 
 export const detalharProjeto = (id: number) =>
   chamar<ProjetoDetalhe>(`/projetos/${id}`);

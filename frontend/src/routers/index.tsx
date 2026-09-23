@@ -14,7 +14,9 @@ import ArquivoDigital from "@/pages/ArquivoDigital";
 import PreValidacao from "@/pages/PreValidacao";
 import QuebraDeSped from "@/pages/QuebraDeSped";
 import Entrega from "@/pages/Entrega";
+import ModulosDoSegmento from "@/pages/ModulosDoSegmento";
 import Razao from "@/pages/Razao";
+import Segmentos from "@/pages/Segmentos";
 import RazaoContabil from "@/pages/RazaoContabil";
 import DePara from "@/pages/DePara";
 import Suportado from "@/pages/Suportado";
@@ -78,6 +80,13 @@ export const roteador = createBrowserRouter([
             element: <Leiaute />,
             children: [
               { path: ROTAS.inicio, element: <Inicio /> },
+              // o hub e a escolha de frente: a porta de entrada, antes de
+              // qualquer trabalho. Ficam na mesma moldura do resto porque o
+              // menu lateral é o caminho de volta — sem ele, quem entrasse
+              // direto num módulo não teria como trocar de assunto
+              { path: "/segmentos", element: <Segmentos /> },
+              { path: "/segmentos/:chave", element: <ModulosDoSegmento /> },
+              { path: "/modulos/:chave", element: <Inicio /> },
               { path: ROTAS.importar, element: <Importar /> },
               { path: "/projetos/:id", element: <Projeto /> },
               { path: "/projetos/:id/arquivos", element: <Lote /> },

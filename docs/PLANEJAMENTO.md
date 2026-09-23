@@ -153,10 +153,10 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       o valor derivado repete a compensação de períodos anteriores
 - [x] Caminho até as telas de PIS/COFINS: seletor de tributo ao criar o trabalho,
       destino da etapa `quebra_de_sped` e link do razão contábil (v0.80.0)
-- [ ] Telas do handoff de design (hub de módulos, escolha de frente, coluna de módulos
-      em Usuários) — desenho pronto em `Reconstrução tela listagem usuários/design_handoff`.
-      **As rotas `/segmentos` e `/modulos/:chave` estão em `routes.ts` e não no
-      roteador**: hoje não há hub, e a tela inicial lista todos os trabalhos
+- [x] Hub de cards: `/segmentos`, `/segmentos/:chave` e `/modulos/:chave`, com o
+      destino pós-login resolvido pelo servidor e o resumo por módulo (v0.81.0)
+- [ ] O resto do handoff em Usuários: coluna de módulos na lista e chips de
+      "módulos liberados" nos modais de criar e editar — a API já grava desde a v0.66.0
 - [ ] Resolver a colisão de vocabulário: o handoff chama de "módulo" o nível 1 e de
       "frente" o nível 2, e `frente` já existe no código como tipo de trabalho
 - [x] Tela do razão da ECD, com seletor de conta: busca por código, nome e conta

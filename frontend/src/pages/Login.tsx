@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Aviso } from "@/components/ui/Aviso";
 import { Botao } from "@/components/ui/Botao";
 import { Campo, CampoSenha, Entrada } from "@/components/ui/Campo";
-import { destinoDeVolta, ROTAS } from "@/constants/routes";
+import { destinoDaEntrada, ROTAS } from "@/constants/routes";
 import { useAuth } from "@/hooks/useAuth";
 import { LeiauteAcesso } from "@/layout/LeiauteAcesso";
 import { comoErro } from "@/lib/errors";
@@ -33,7 +33,7 @@ export default function Login() {
       // quem entra com senha provisória só faz uma coisa: trocar a senha
       const destino = u.senha_provisoria
         ? ROTAS.trocarSenha
-        : destinoDeVolta((local.state as { de?: string } | null)?.de);
+        : destinoDaEntrada(u, (local.state as { de?: string } | null)?.de);
       navegar(destino, { replace: true });
     } catch (e) {
       setErro(comoErro(e));

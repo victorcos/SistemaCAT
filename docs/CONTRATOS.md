@@ -327,6 +327,19 @@ A 037 tem **52 colunas** (v0.76.0: entrou `Município`, ao lado de
 `Natureza do Crédito` é deduzida **do CFOP** nos ramos em que o registro não
 traz `NAT_BC_CRED` (C100/C170 e C190/C191/C195); nos demais é lida do arquivo.
 
+### Resumo por módulo (v0.81.0)
+
+| Método | Rota | Quem |
+| --- | --- | --- |
+| `GET` | `/api/segmentos/resumo` | qualquer usuário |
+
+Devolve `resumo`: uma linha por módulo que a pessoa enxerga, com `abertos` (nem
+concluídos nem cancelados) e `total`. O recorte de empresa é o mesmo da
+listagem de trabalhos. Módulo sem trabalho sai zerado, não sai de fora.
+
+`GET /api/projetos?modulo=<chave>` recorta a listagem pela frente tributária;
+sem o parâmetro a lista sai inteira, como sempre saiu.
+
 ### Tipos de arquivo (v0.79.0)
 
 `sped_ecf` entrou no catálogo — a Escrituração Contábil Fiscal, de onde saem

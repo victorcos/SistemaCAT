@@ -1,4 +1,4 @@
-import { IconeInicio, IconeEnviar, IconeUsuarios, type Icone } from "./icons";
+import { IconeInicio, IconeEnviar, IconePasta, IconeUsuarios, type Icone } from "./icons";
 import { ROTAS } from "./routes";
 import type { Papel } from "@/types/auth";
 import { ADMINISTRA_USUARIOS } from "./roles";
@@ -13,7 +13,10 @@ export interface ItemDeMenu {
 }
 
 export const MENU: ItemDeMenu[] = [
-  { para: ROTAS.inicio, rotulo: "Início", icone: IconeInicio },
+  // o caminho de volta ao hub: sem ele, quem entrasse direto num módulo
+  // ficaria preso nele até sair e entrar de novo
+  { para: ROTAS.segmentos, rotulo: "Segmentos", icone: IconePasta },
+  { para: ROTAS.inicio, rotulo: "Todos os trabalhos", icone: IconeInicio },
   { para: ROTAS.importar, rotulo: "Cadastro", icone: IconeEnviar },
   {
     para: ROTAS.usuarios,

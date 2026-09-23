@@ -5,6 +5,65 @@
 
 ---
 
+## 2026-09-23 — O hub de cards: a porta de entrada que faltava
+
+**O que entrou.** Três telas e um endereço:
+
+```
+login ──► /segmentos ──► /segmentos/:chave ──► /modulos/:chave
+          (o hub)        (qual frente)          (os trabalhos)
+```
+
+* **`/segmentos`** — um card por segmento que a pessoa enxerga, mais o de
+  *Gestão de usuários* para quem administra;
+* **`/segmentos/:chave`** — dentro do segmento, qual frente: PIS/COFINS ou CBS;
+  ICMS ou IBS. O IRPJ/CSLL tem um módulo só e **pula este nível**;
+* **`/modulos/:chave`** — a lista de trabalhos recortada por frente. É a mesma
+  tela de `/`, com `?modulo=` no servidor: trocar o recorte não muda o que um
+  trabalho é.
+
+**Quem decide o caminho é o servidor, e isso já existia.** `Segmentos.Entrada`
+resolve o destino desde a v0.66.0 e o login já o devolvia em `usuario.entrada`
+— a tela é que ignorava e mandava todo mundo para `/`. Agora o login e a
+`RotaPublica` usam o mesmo destino, então quem tem um segmento só entra direto
+nele e nunca vê um hub de um card, que não é escolha nenhuma.
+
+A regra fica no servidor porque é a mesma que decide o que cada rota aceita.
+Duas cópias divergiriam, e a tela mandaria alguém para uma página que a API
+recusa.
+
+**Uma tela chegada por atalho não é erro.** Quem digitar `/segmentos` tendo um
+segmento só é redirecionado; quem digitar `/segmentos/icms` sem enxergar ICMS
+volta ao hub. Nenhum dos dois vira mensagem de erro — quem barra de verdade é a
+API, em toda rota de trabalho, e a tela só evita o beco.
+
+**Os números dos cards vêm de `/segmentos/resumo`**, não de uma contagem no
+navegador: o recorte é o mesmo da listagem (só as empresas que a pessoa
+enxerga), e contar aqui exigiria baixar a lista inteira de trabalhos para
+mostrar dois números. Módulo sem trabalho nenhum sai zerado, e não some: o card
+existe de qualquer forma, e "0 trabalhos" é informação — card ausente não é.
+
+**Onde me afastei do handoff, e por quê.**
+
+* **Vocabulário.** O handoff chama de *módulo* o primeiro nível e de *frente* o
+  segundo. Aqui o primeiro nível é **segmento** e o segundo é **módulo** —
+  porque `frente` já existe no sistema como o TIPO de trabalho (CAT 42, de-para,
+  quebra de SPED), com coluna e restrição de unicidade no banco, e `modulo` é a
+  coluna que decide o roteiro de etapas desde a v0.66.0. Renomear os dois para
+  caber no desenho custaria uma migração e uma reescrita de domínio para ganhar
+  nada;
+* **O menu lateral fica.** O handoff pede a porta de entrada sem menu. Mantive
+  o menu, com um item **Segmentos** no topo: sem ele, quem entrasse direto num
+  módulo — que é a maioria, pela regra de entrada — ficaria preso nele até sair
+  e entrar de novo. A alternativa do desenho é um atalho de troca na topbar,
+  que é a mesma coisa com mais código.
+
+**O que continua fora:** as pílulas de módulo na lista de usuários e os
+chips-checkbox de "módulos liberados" nos modais de criar e editar usuário. O
+acesso por segmento já é gravável pela API desde a v0.66.0; falta a tela.
+
+---
+
 ## 2026-09-23 — Rota registrada não é tela alcançável
 
 **O defeito.** As telas de PIS/COFINS estavam prontas, testadas e no roteador —

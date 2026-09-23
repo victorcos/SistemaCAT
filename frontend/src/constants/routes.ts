@@ -47,8 +47,24 @@ const ROTAS_DE_ACESSO: string[] = [ROTAS.login, ROTAS.trocarSenha];
  * devolve inclusive depois de um F5 — entao um `de` ruim gravado uma vez
  * sobrevive a sessao inteira. Filtrar aqui e o que impede isso.
  */
-export function destinoDeVolta(de: unknown): string {
+function paraOndeIa(de: unknown): string | null {
   return typeof de === "string" && de.startsWith("/") && !ROTAS_DE_ACESSO.includes(de)
     ? de
-    : ROTAS.inicio;
+    : null;
+}
+
+/**
+ * Para onde mandar quem acabou de entrar.
+ *
+ * Quem foi barrado a caminho de alguma tela volta para ela. Quem entrou pela
+ * porta da frente vai para onde o **servidor** disse: o hub, um segmento, ou
+ * direto o módulo, conforme o que a pessoa enxerga (`usuario.entrada`,
+ * resolvido em `Segmentos.Entrada`).
+ *
+ * A regra fica no servidor e não aqui porque é a mesma que decide o que cada
+ * rota aceita. Duas cópias divergiriam, e a tela mandaria alguém para uma
+ * página que a API recusa.
+ */
+export function destinoDaEntrada(usuario: { entrada: string | null }, de?: unknown): string {
+  return paraOndeIa(de) ?? usuario.entrada ?? ROTAS.inicio;
 }

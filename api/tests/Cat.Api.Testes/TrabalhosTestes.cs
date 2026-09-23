@@ -132,11 +132,75 @@ public sealed class TrabalhosTestes(BancoDeTeste banco, MotorInternoFalso _motor
         return (await Json(r)).GetProperty("id").GetInt32();
     }
 
-    private static async Task<int> Projeto(HttpClient c, int empresa, string? nome = null)
+    // ------------------------------------------------- resumo por módulo (hub)
+    [Fact]
+    public async Task Resumo_conta_trabalhos_abertos_por_modulo()
+    {
+        var (_, _, token) = await Pessoa("gestor");
+        var c = Cliente(token: token);
+        var empresa = await Empresa(c);
+
+        // o banco é compartilhado com os outros testes, que criam trabalhos em
+        // paralelo. Contar absoluto aqui dava um teste que passa sozinho e falha
+        // na suíte — o que se mede é a **diferença** que estas três linhas fazem
+        var antes = await Resumo(c);
+
+        await Projeto(c, empresa);                                  // módulo padrão: icms
+        await Projeto(c, empresa, modulo: "piscofins");
+        var concluido = await Projeto(c, empresa, modulo: "piscofins");
+        await c.PatchAsync($"/api/projetos/{concluido}/status",
+            JsonContent.Create(new { status = "concluido" }));
+
+        var depois = await Resumo(c);
+
+        // o concluído sai dos abertos e fica no total: o card conta o que anda
+        Assert.Equal(1, depois["piscofins"].Abertos - antes["piscofins"].Abertos);
+        Assert.Equal(2, depois["piscofins"].Total - antes["piscofins"].Total);
+        Assert.Equal(1, depois["icms"].Abertos - antes["icms"].Abertos);
+    }
+
+    private static async Task<Dictionary<string, (int Abertos, int Total)>> Resumo(HttpClient c)
+    {
+        var r = await c.GetAsync("/api/segmentos/resumo");
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        return (await Json(r)).GetProperty("resumo").EnumerateArray().ToDictionary(
+            x => x.GetProperty("modulo").GetString()!,
+            x => (x.GetProperty("abertos").GetInt32(), x.GetProperty("total").GetInt32()));
+    }
+
+    [Fact]
+    public async Task Resumo_traz_modulo_sem_trabalho_zerado_e_so_o_que_a_pessoa_ve()
+    {
+        var (_, _, token) = await Pessoa("gestor");
+        var c = Cliente(token: token);
+
+        var resumo = (await Json(await c.GetAsync("/api/segmentos/resumo")))
+            .GetProperty("resumo").EnumerateArray().ToList();
+        var chaves = resumo.Select(x => x.GetProperty("modulo").GetString()).ToList();
+
+        // o gestor enxerga todos os segmentos, então todos os módulos saem —
+        // zerados quando não há trabalho: o card existe de qualquer forma, e
+        // "0 trabalhos" é informação, ausência de card não é
+        Assert.Contains("icms", chaves);
+        Assert.Contains("piscofins", chaves);
+        Assert.Contains("irpj_csll", chaves);
+        Assert.All(resumo, x => Assert.True(x.GetProperty("abertos").GetInt32() >= 0));
+    }
+
+    [Fact]
+    public async Task Resumo_exige_usuario()
+    {
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await Cliente().GetAsync("/api/segmentos/resumo")).StatusCode);
+    }
+
+    private static async Task<int> Projeto(HttpClient c, int empresa, string? nome = null,
+        string? modulo = null)
     {
         var r = await c.PostAsJsonAsync("/api/projetos", new
         {
-            empresa_id = empresa, frente = "cat42", nome = nome ?? "Trabalho " + Guid.NewGuid().ToString("N")[..6],
+            empresa_id = empresa, frente = "cat42", modulo,
+            nome = nome ?? "Trabalho " + Guid.NewGuid().ToString("N")[..6],
             competencia_ini = "2021-05-01", competencia_fim = "2021-05-01", observacao = (string?)null,
         });
         Assert.Equal(HttpStatusCode.Created, r.StatusCode);

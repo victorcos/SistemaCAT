@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Aviso } from "@/components/ui/Aviso";
 import { Botao, BotaoLink } from "@/components/ui/Botao";
 import { Campo, Entrada } from "@/components/ui/Campo";
@@ -63,8 +63,22 @@ function passaNaBusca(p: Projeto, termo: string): boolean {
 
 /* ------------------------------------------------------------------ */
 
+/**
+ * A lista de trabalhos.
+ *
+ * Serve a dois caminhos: `/` mostra tudo, e `/modulos/:chave` mostra só a
+ * frente escolhida no hub. É a mesma tela porque é a mesma coisa — trocar o
+ * recorte não muda o que um trabalho é, nem o que se faz com ele.
+ */
 export default function Inicio() {
   const { usuario } = useAuth();
+  const { chave: modulo } = useParams<{ chave?: string }>();
+  // o rótulo bonito do módulo vem do catálogo do servidor, não de um de-para
+  // aqui: duas listas para o mesmo nome divergiriam no dia em que uma mudasse
+  const [catalogo, setCatalogo] = useState<Segmento[]>([]);
+  const rotuloDoModulo = modulo
+    ? (catalogo.flatMap((s) => s.modulos).find((m) => m.chave === modulo)?.rotulo ?? modulo)
+    : null;
   const [projetos, setProjetos] = useState<Projeto[] | null>(null);
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [busca, setBusca] = useState("");
@@ -73,7 +87,7 @@ export default function Inicio() {
   const [criando, setCriando] = useState(false);
 
   function carregar() {
-    listarProjetos()
+    listarProjetos(modulo)
       .then((lista) => {
         setProjetos(lista);
         setErro(null);
@@ -81,7 +95,20 @@ export default function Inicio() {
       .catch((e) => setErro(comoErro(e)));
   }
 
-  useEffect(carregar, []);
+  // recarrega ao trocar de módulo: /modulos/icms e /modulos/piscofins são a
+  // mesma tela, e sem a dependência a segunda mostraria a lista da primeira
+  useEffect(carregar, [modulo]);
+
+  useEffect(() => {
+    if (!modulo) return;
+    let vivo = true;
+    meusSegmentos()
+      .then((s) => vivo && setCatalogo(s))
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [modulo]);
 
   const metricas = useMemo(() => {
     const lista = projetos ?? [];
@@ -113,8 +140,8 @@ export default function Inicio() {
   return (
     <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
       <CabecalhoDePagina
-        eyebrow="Trabalhos"
-        titulo={`Olá, ${usuario?.nome_exibicao ?? ""}`}
+        eyebrow={rotuloDoModulo ?? "Trabalhos"}
+        titulo={rotuloDoModulo ? `Trabalhos de ${rotuloDoModulo}` : `Olá, ${usuario?.nome_exibicao ?? ""}`}
         sub="Cada cartão é um trabalho de uma empresa. Abra para ver as etapas do processamento e continuar de onde parou."
         acao={
           <Botao icone={IconeNovo} onClick={() => setCriando(true)} className="shadow-acao">

@@ -44,3 +44,19 @@ export const definirSegmentos = (usuarioId: number, segmentos: string[]) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ segmentos }),
   });
+
+/** Quantos trabalhos há em cada módulo — os números dos cards do hub. */
+export interface ResumoDoModulo {
+  modulo: string;
+  /** os que ainda andam: nem concluídos nem cancelados */
+  abertos: number;
+  total: number;
+}
+
+/**
+ * Vem do servidor, e não de uma contagem aqui, porque o recorte é o mesmo da
+ * listagem: só as empresas que a pessoa enxerga. Contar no navegador exigiria
+ * baixar a lista inteira de trabalhos para mostrar dois números por card.
+ */
+export const resumoDosModulos = () =>
+  chamar<{ resumo: ResumoDoModulo[] }>("/segmentos/resumo").then((r) => r.resumo);
