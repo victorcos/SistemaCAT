@@ -253,6 +253,43 @@ de trabalho pendente é perdê-lo no dia em que o trabalho acaba.
 
 ---
 
+## 2026-09-23 — A liberação de segmentos ganha tela
+
+**O que faltava.** A API grava o acesso por segmento desde a v0.66.0
+(`PUT /usuarios/:id/segmentos`), e **nenhuma tela chamava**: `definirSegmentos`
+existia no serviço e não era importado por lugar nenhum. O acesso existia e não
+havia como concedê-lo — quem não nascesse com segmento ficava sem, e ninguém
+tinha como arrumar pela interface.
+
+Foi assim que o Victor o procurou e não achou. Não estava escondido: não estava
+lá.
+
+**Três lugares, e cada um responde a uma pergunta diferente:**
+
+* **a coluna da lista** — quem enxerga o quê, de relance. Sem nenhum segmento,
+  a pílula sai em âmbar dizendo "nenhum", porque essa pessoa entra e não vê
+  trabalho algum, e isso tem de saltar antes de alguém reclamar;
+* **o formulário de criar** — a liberação junto com o cadastro. Criar e liberar
+  são dois recursos na API: o usuário nasce sem segmento e recebe os dele em
+  seguida;
+* **o formulário de editar** — mudar depois, que é o caso comum.
+
+**Gestor e dev aparecem marcados e travados.** Não é escolha: é o que o papel
+significa, e o servidor decide assim independentemente do que esteja gravado
+(`Papel.EnxergaTodosOsSegmentos`). Oferecer caixas que a API ignoraria seria
+mentir sobre quem manda.
+
+**A dica muda conforme a escolha**, porque o efeito não é óbvio: liberar um
+segmento decide **onde a pessoa cai ao entrar**, e não só o que ela vê. Com um
+só, ela pula o painel; com dois, escolhe; com nenhum, não vê nada. Descobrir
+isso depois, porque alguém entrou numa tela inesperada, é caro.
+
+**Validação: não-gestor precisa de ao menos um.** Salvar sem nenhum seria
+gravar uma conta que não serve para nada, e o erro só apareceria no primeiro
+acesso da pessoa.
+
+---
+
 ## 2026-09-23 — Mais duas abas: Exclusões e Histórico
 
 **Exclusões, declarada e sem código.** O que sai da base do PIS/COFINS antes de

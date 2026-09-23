@@ -11,6 +11,12 @@ import { Aviso } from "@/components/ui/Aviso";
 import { Botao } from "@/components/ui/Botao";
 import { BotaoIcone } from "@/components/ui/BotaoIcone";
 import { Campo, Entrada } from "@/components/ui/Campo";
+import type { Segmento } from "@/services/segmentos";
+import {
+  ChipsDeSegmento,
+  PilulasDeSegmento,
+  useCatalogoDeSegmentos,
+} from "@/components/shared/SegmentosDoUsuario";
 import { Carregando } from "@/components/ui/Carregando";
 import { Combobox, type OpcaoDeCombobox } from "@/components/ui/Combobox";
 import { Etiqueta, type TomDeEtiqueta } from "@/components/ui/Etiqueta";
@@ -42,11 +48,13 @@ import {
 } from "@/constants/icons";
 import {
   CARGOS,
+  ENXERGA_TODOS_OS_SEGMENTOS,
   enxergaTodasAsEmpresas,
   ORDEM_CARGOS,
   ORDEM_PAPEIS,
   PAPEIS,
 } from "@/constants/roles";
+import { definirSegmentos } from "@/services/segmentos";
 import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useToast } from "@/hooks/useToast";
@@ -137,6 +145,7 @@ export default function Usuarios() {
   const confirmar = useConfirm();
   const toast = useToast();
 
+  const catalogo = useCatalogoDeSegmentos();
   const [usuarios, setUsuarios] = useState<UsuarioResumo[] | null>(null);
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [busca, setBusca] = useState("");
@@ -304,16 +313,16 @@ export default function Usuarios() {
           </Vazio>
         ) : (
           <div className="overflow-x-auto">
-            <div role="table" aria-label="Usuários" className="min-w-[1080px]">
+            <div role="table" aria-label="Usuários" className="min-w-[1240px]">
               <div role="row" className={cn(GRADE, "border-b border-borda bg-tabela-cabecalho-fundo px-4 py-3")}>
-                {["Nome", "Usuário", "Papel", "Cargo", "Situação", "Último acesso", "Ações"].map(
+                {["Nome", "Usuário", "Papel", "Cargo", "Segmentos", "Situação", "Último acesso", "Ações"].map(
                   (c, i) => (
                     <div
                       key={c}
                       role="columnheader"
                       className={cn(
                         "text-[10px] font-extrabold uppercase tracking-[0.14em] text-tabela-cabecalho-texto",
-                        i === 6 && "text-right",
+                        i === 7 && "text-right",
                       )}
                     >
                       {c}
@@ -325,6 +334,7 @@ export default function Usuarios() {
                 <Linha
                   key={u.id}
                   u={u}
+                  catalogo={catalogo}
                   souEu={u.id === eu.id}
                   ocupado={ocupado === u.id}
                   aoEditar={() => setEditando(u)}
@@ -448,7 +458,8 @@ function FlashBanner({ flash, aoFechar }: { flash: Flash; aoFechar: () => void }
 /* linha                                                               */
 /* ------------------------------------------------------------------ */
 
-const GRADE = "grid grid-cols-[1.5fr_1fr_.8fr_.9fr_1fr_.9fr_1.4fr] items-center gap-3";
+// a coluna de segmentos entra entre Cargo e Situação, como o handoff pede
+const GRADE = "grid grid-cols-[1.4fr_.9fr_.7fr_.8fr_1.1fr_.9fr_.9fr_1.3fr] items-center gap-3";
 
 // matizes que se revezam nos avatares; o id decide, então a mesma pessoa
 // tem sempre a mesma cor
@@ -468,6 +479,7 @@ function iniciais(nome: string): string {
 
 function Linha({
   u,
+  catalogo,
   souEu,
   ocupado,
   aoEditar,
@@ -477,6 +489,7 @@ function Linha({
   aoDesbloquear,
 }: {
   u: UsuarioResumo;
+  catalogo: Segmento[];
   souEu: boolean;
   ocupado: boolean;
   aoEditar: () => void;
@@ -523,6 +536,9 @@ function Linha({
       </div>
       <div role="cell" className="text-[13px] text-texto-suave">
         {CARGOS[u.cargo]}
+      </div>
+      <div role="cell" className="min-w-0">
+        <PilulasDeSegmento segmentos={u.segmentos} catalogo={catalogo} papel={u.papel} />
       </div>
       <div role="cell">
         <Etiqueta tom={situacao.tom} pulso={u.ativo}>
@@ -606,11 +622,13 @@ function ModalNovo({
   aoFechar: () => void;
   aoCriado: (nome: string, senha: string) => void;
 }) {
+  const catalogo = useCatalogoDeSegmentos();
   const [usuario, setUsuario] = useState("");
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [papel, setPapel] = useState<Papel>("leitura");
   const [cargo, setCargo] = useState<Cargo>("analista");
+  const [segmentos, setSegmentos] = useState<string[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -622,6 +640,7 @@ function ModalNovo({
     setEmail("");
     setPapel("leitura");
     setCargo("analista");
+    setSegmentos([]);
     setErro(null);
   }, [aberto]);
 
@@ -640,6 +659,12 @@ function ModalNovo({
       setErro("Informe um e-mail válido.");
       return;
     }
+    // sem segmento a pessoa entra e não vê trabalho algum — e não saberia por
+    // quê. Quem enxerga tudo pelo papel não tem escolha a fazer
+    if (!ENXERGA_TODOS_OS_SEGMENTOS.includes(papel) && segmentos.length === 0) {
+      setErro("Libere ao menos um segmento.");
+      return;
+    }
     setErro(null);
     setEnviando(true);
     try {
@@ -650,6 +675,11 @@ function ModalNovo({
         papel,
         cargo,
       });
+      // criar e liberar são dois recursos na API: o usuário nasce sem segmento
+      // e recebe os dele em seguida
+      if (segmentos.length > 0 && !ENXERGA_TODOS_OS_SEGMENTOS.includes(papel)) {
+        await definirSegmentos(r.usuario.id, segmentos);
+      }
       aoCriado(r.usuario.nome_exibicao, r.senha_provisoria);
     } catch (err) {
       setErro(comoErro(err).message);
@@ -718,9 +748,26 @@ function ModalNovo({
         <Campo rotulo="Cargo" dica="Posição na empresa. Não define permissão.">
           {(props) => <Combobox {...props} valor={cargo} opcoes={OPCOES_DE_CARGO} aoMudar={setCargo} />}
         </Campo>
+        <div className="sm:col-span-2">
+          <Campo rotulo="Segmentos liberados">
+            {() => (
+              <ChipsDeSegmento
+                catalogo={catalogo}
+                escolhidos={segmentos}
+                aoMudar={setSegmentos}
+                papel={papel}
+              />
+            )}
+          </Campo>
+        </div>
       </form>
     </Modal>
   );
+}
+
+/** Dois conjuntos iguais, sem depender da ordem em que vieram. */
+function mesmoConjunto(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((x) => b.includes(x));
 }
 
 /* ------------------------------------------------------------------ */
@@ -738,10 +785,12 @@ function ModalEditar({
   aoFechar: () => void;
   aoSalvo: (u: UsuarioResumo) => void;
 }) {
+  const catalogo = useCatalogoDeSegmentos();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [papel, setPapel] = useState<Papel>("leitura");
   const [cargo, setCargo] = useState<Cargo>("analista");
+  const [segmentos, setSegmentos] = useState<string[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -751,6 +800,7 @@ function ModalEditar({
     setEmail(usuario.email);
     setPapel(usuario.papel);
     setCargo(usuario.cargo);
+    setSegmentos(usuario.segmentos);
     setErro(null);
   }, [usuario]);
 
@@ -765,16 +815,26 @@ function ModalEditar({
       setErro("Informe um e-mail válido.");
       return;
     }
+    // quem não enxerga tudo pelo papel precisa de ao menos um segmento: sem
+    // nenhum, a pessoa entra e não vê trabalho algum — e não saberia por quê
+    if (!ENXERGA_TODOS_OS_SEGMENTOS.includes(papel) && segmentos.length === 0) {
+      setErro("Libere ao menos um segmento.");
+      return;
+    }
     setErro(null);
     setEnviando(true);
     try {
-      // três recursos na API, um formulário na tela: só vai o que mudou
+      // quatro recursos na API, um formulário na tela: só vai o que mudou
       let atual = usuario;
       if (nome.trim() !== usuario.nome_exibicao || email.trim() !== usuario.email) {
         atual = await alterarDados(usuario.id, { nome_exibicao: nome.trim(), email: email.trim() });
       }
       if (papel !== usuario.papel) atual = await alterarPapel(usuario.id, papel);
       if (cargo !== usuario.cargo) atual = await alterarCargo(usuario.id, cargo);
+      if (!mesmoConjunto(segmentos, usuario.segmentos)) {
+        await definirSegmentos(usuario.id, segmentos);
+        atual = { ...atual, segmentos };
+      }
       aoSalvo(atual);
     } catch (err) {
       setErro(comoErro(err).message);
@@ -825,6 +885,18 @@ function ModalEditar({
         <Campo rotulo="Cargo" dica="Posição na empresa. Não define permissão.">
           {(props) => <Combobox {...props} valor={cargo} opcoes={OPCOES_DE_CARGO} aoMudar={setCargo} />}
         </Campo>
+        <div className="sm:col-span-2">
+          <Campo rotulo="Segmentos liberados">
+            {() => (
+              <ChipsDeSegmento
+                catalogo={catalogo}
+                escolhidos={segmentos}
+                aoMudar={setSegmentos}
+                papel={papel}
+              />
+            )}
+          </Campo>
+        </div>
       </form>
     </Modal>
   );

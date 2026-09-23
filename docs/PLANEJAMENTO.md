@@ -169,8 +169,8 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] Abas de Exclusões e Histórico na barra; o histórico não conta no progresso (v0.87.0)
 - [ ] `exclusoes`: declarada e sem código. O Tema 69 cruzando as duas EFD —
       é a fatia fiscal que falta no módulo de PIS/COFINS
-- [ ] Tela do gestor para liberar módulos a cada pessoa: a API grava desde a
-      v0.66.0 (`PUT /usuarios/:id/segmentos`), falta a tela
+- [x] Tela do gestor para liberar segmentos a cada pessoa: coluna na lista e
+      chips nos formulários de criar e editar (v0.90.0)
 - [ ] `quebra_xml`: declarada e sem código. Abrir os XML do lote item a item
 - [ ] Escolher entre a barra (`BarraDeFuncionalidades`) e os cards
       (`PainelDoTrabalho`): as duas foram construídas para o mesmo lugar

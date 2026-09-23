@@ -1,6 +1,6 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.87.0**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.90.0**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
@@ -38,7 +38,7 @@ O endereço, a tela que o atende e se exige papel específico.
 | `/usuarios` | Usuarios | sim |
 | `*` | NaoEncontrada | — |
 
-## 2. Telas (23)
+## 2. Telas (24)
 
 O resumo é o que o próprio arquivo diz de si no comentário do topo.
 
@@ -150,9 +150,15 @@ Quebrar os SPED — abrir os arquivos e dizer o que há dentro.
 
 Etapa 5 — montar o razão dos itens (Ficha 3). Uma ficha por estabelecimento e mercadoria com ST, pelo custo médio
 
+### RazaoContabil.teste
+
+`src/pages/RazaoContabil.teste.tsx` · 261 linhas
+
+O seletor do razão: o que a marcação tem de aguentar. Existe por uma pergunta feita em 23/09/2026, na revisão da tela: *"filtrar,
+
 ### RazaoContabil
 
-`src/pages/RazaoContabil.tsx` · 477 linhas
+`src/pages/RazaoContabil.tsx` · 780 linhas
 
 Razão contábil da ECD — escolher a conta, depois ver os lançamentos.
 
@@ -176,11 +182,11 @@ Troca obrigatória da senha provisória. Aparece no lugar da aplicação, sem me
 
 ### Usuarios
 
-`src/pages/Usuarios.tsx` · 1066 linhas
+`src/pages/Usuarios.tsx` · 1138 linhas
 
 O que se diz da pessoa numa linha: uma situação só, na ordem de
 
-## 3. Componentes (28 arquivos)
+## 3. Componentes (29 arquivos)
 
 O que já existe e pode ser reaproveitado. Desenhar um componente que já
 está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
@@ -217,6 +223,7 @@ está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
 | `OcorrenciasDoArquivo.tsx` | OcorrenciasDoArquivo | `chave, carregar, cabecalho` | O que a pré-validação achou num arquivo digital. Serve às duas telas que pré-validam — a do arquivo que o sistema gerou e a |
 | `PainelDoTrabalho.tsx` | PainelDoTrabalho | `projetoId, etapas, rota, bloqueio` | O painel do trabalho: o que há para ler, e o que dá para fazer. |
 | `Rodada.tsx` | quando, duracao, Faixa, Rotulo, Cartao, BarraFina, ListaDoLog | `titulo` | As peças das telas de etapa que rodam no servidor e mostram o resultado em |
+| `SegmentosDoUsuario.tsx` | useCatalogoDeSegmentos, PilulasDeSegmento, ChipsDeSegmento | `segmentos, catalogo, papel` | O catálogo inteiro, buscado uma vez por montagem de tela. |
 | `TrabalhoParado.tsx` | TrabalhoParado | `status, projetoId` | A faixa que explica por que a etapa não roda. Aparece nas três telas de etapa e no detalhe do trabalho, sempre com a |
 | `VendaAConsumidor.tsx` | EscolhaDaVendaAConsumidor | `projeto, usadaNoRazao, bloqueada, aoMudar` | Como o trabalho enquadra a venda a consumidor final. É escolha do trabalho (decisão de 16/09/2026): o manual põe o cupom no |
 
@@ -693,6 +700,7 @@ Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 | `ORDEM_PAPEIS` | gestor, analista, revisor, leitura, dev, |
 | `ADMINISTRA_USUARIOS` | dev, gestor |
 | `IGNORA_ESCOPO_DE_EMPRESA` | dev, gestor |
+| `ENXERGA_TODOS_OS_SEGMENTOS` | dev, gestor |
 | `PODE_EXCLUIR_TRABALHO` | dev, gestor |
 | `PODE_APROVAR_ENTREGA` | revisor, gestor |
 | `PODE_ESCREVER` | dev, gestor, analista, revisor |
@@ -718,7 +726,7 @@ _Nenhuma._
 
 #### Telas em `pages/` sem rota
 
-_Nenhuma._
+- `RazaoContabil.teste`
 
 #### Rotas que nenhum link aponta
 

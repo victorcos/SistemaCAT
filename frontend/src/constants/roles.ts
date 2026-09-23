@@ -74,6 +74,12 @@ export const ADMINISTRA_USUARIOS: Papel[] = ["dev", "gestor"];
  *  aviso de nada — é por isso que três telas consultam esta lista. */
 export const IGNORA_ESCOPO_DE_EMPRESA: Papel[] = ["dev", "gestor"];
 
+/** Quem enxerga todo segmento tributário, esteja o que estiver gravado.
+ *
+ *  Espelha `Papel.EnxergaTodosOsSegmentos` no servidor — que é quem decide.
+ *  A tela repete para não oferecer uma escolha que a API ignoraria. */
+export const ENXERGA_TODOS_OS_SEGMENTOS: Papel[] = ["dev", "gestor"];
+
 export const enxergaTodasAsEmpresas = (papel: Papel) =>
   IGNORA_ESCOPO_DE_EMPRESA.includes(papel);
 
