@@ -109,6 +109,14 @@ npm run dev
 A tela abre em http://localhost:5173. Quem está no ar, e com qual versão de
 cada lado: http://localhost:8010/api/saude.
 
+Para entregar o front a quem vai desenhar — rotas, telas, componentes, tokens,
+endpoints e os buracos de navegação, tudo levantado do código:
+
+```
+cd frontend
+npm run handoff        # escreve docs/HANDOFF-FRONT.md
+```
+
 Se um gestor perder o acesso e não houver outro disponível, a saída é pelo
 servidor:
 
