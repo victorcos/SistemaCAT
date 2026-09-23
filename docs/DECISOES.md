@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-09-23 — O front ganhou testes, por uma pergunta que o código não respondia
+
+**A pergunta.** "Filtrar, marcar uma conta, trocar de filtro, marcar outra — a
+primeira continua marcada?" O código dizia que sim: a seleção mora no seletor,
+acima da lista, e trocar filtro só refaz a lista. Mas isso era **leitura de
+código**, não resposta: bastaria alguém mover o estado para dentro da lista
+numa refatoração para a resposta virar não, sem nada quebrar visivelmente. Quem
+descobre é quem perde meia hora de marcação na frente do cliente.
+
+**O que faltava era instrumento.** O front tinha `tsc -b` e mais nada — nenhum
+teste de tela em nove meses de projeto. Agora tem vitest + Testing Library em
+jsdom, `npm test`, e os arquivos seguem o nome do resto da casa
+(`*.teste.tsx`, como `test_*.py` no motor).
+
+**O primeiro arquivo cobre o que foi perguntado**, e o vizinho de cada caso:
+busca, recorte por saldo, estabelecimento e navegação pela árvore não desmarcam;
+o que se extrai é o que está marcado, **inclusive o que o filtro tirou da tela**;
+Limpar desmarca; sem marcação não há o que extrair; e a mesma conta em dois
+estabelecimentos marca nos dois, porque é uma conta só do plano.
+
+**O que o teste encontrou.** O comportamento estava certo — nenhum defeito de
+seleção. Mas escrever o teste expôs outro: os botões da árvore não tinham nome
+acessível nenhum. O nome saía do conteúdo — código, contagem e três valores
+grudados —, impronunciável em leitor de tela e impossível de alcançar por
+papel. Ganharam `aria-label`.
+
+**Quando escrever teste de tela.** Onde o estado atravessa interações — seleção
+que sobrevive a filtro, rascunho que sobrevive a navegação, acumulado de
+páginas. Renderização de lista e formatação de número continuam não valendo o
+custo: o compilador e o olho pegam.
+
+---
+
 ## 2026-09-23 — O seletor de contas vira árvore, pela referencial da ECD
 
 **O problema.** 10.282 contas numa lista de 100 por página são 103 páginas.

@@ -166,7 +166,7 @@ export default function RazaoContabil() {
  * A seleção atravessa galhos, buscas e páginas de propósito: procura-se uma
  * conta, marca-se, procura-se outra.
  */
-function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
+export function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
   const [busca, setBusca] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [recorte, setRecorte] = useState<RecorteDeConta>("todas");
@@ -254,8 +254,11 @@ function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
       {/* a barra da extração: o que está marcado, e o que sai daqui */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 border-t border-borda-sutil bg-superficie-vidro px-5.5 py-3">
         <span className="flex items-baseline gap-2">
-          <span className="font-mono text-[17px] font-extrabold leading-none text-texto">
-            {numero(marcadas.size)}
+          <span
+            data-testid="quantas-marcadas"
+            className="font-mono text-[17px] font-extrabold leading-none text-texto"
+          >
+            {marcadas.size}
           </span>
           <span className="text-[12px] text-texto-suave">
             {marcadas.size === 1 ? "conta marcada" : "contas marcadas"}
@@ -472,6 +475,9 @@ function Galho({
         <button
           type="button"
           aria-expanded={aberto}
+          // sem rótulo, o nome do botão vira o amontoado de código, contagem e
+          // três valores — impronunciável em leitor de tela
+          aria-label={semMapa ? "Contas sem conta referencial" : `Conta referencial ${galho.codigo}`}
           onClick={() => setAberto((x) => !x)}
           className={cn(
             "grid w-full cursor-pointer items-center gap-3 border-0 bg-transparent py-3 text-left hover:bg-tabela-linha-hover",
@@ -545,6 +551,7 @@ function LinhaDeConta({
         <button
           type="button"
           aria-expanded={abertoAgora}
+          aria-label={`Partidas da conta ${c.conta}`}
           onClick={() => p.setAberta(abertoAgora ? null : chave)}
           className={cn(
             "grid w-full cursor-pointer items-center gap-3 border-0 bg-transparent py-3 text-left",

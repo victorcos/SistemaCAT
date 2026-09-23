@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
@@ -14,6 +14,16 @@ export default defineConfig({
   // Windows o .pathname devolve '/C:/projetos/...' e o resolve quebra.
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+  },
+
+  // Os testes de tela rodam em jsdom. O nome do arquivo segue o resto da casa
+  // (`.teste.tsx`, como `test_*.py` no motor) para que procurar por "teste"
+  // ache tudo, nas duas linguagens.
+  test: {
+    environment: "jsdom",
+    include: ["src/**/*.teste.{ts,tsx}"],
+    setupFiles: ["src/testes/ambiente.ts"],
+    restoreMocks: true,
   },
 
   server: {
