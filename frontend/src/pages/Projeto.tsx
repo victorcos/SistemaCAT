@@ -80,6 +80,14 @@ const DESTINOS: Record<
       padrao: "Apurar o ICMS suportado",
     },
   },
+  historico: {
+    rota: ROTAS.historico,
+    rotulos: {
+      concluida: "Ver tudo o que aconteceu",
+      em_andamento: "Ver tudo o que aconteceu",
+      padrao: "Ver tudo o que aconteceu",
+    },
+  },
   quebra_de_sped: {
     rota: ROTAS.quebraDeSped,
     rotulos: {

@@ -163,6 +163,34 @@ de trabalho pendente é perdê-lo no dia em que o trabalho acaba.
 
 ---
 
+## 2026-09-23 — Mais duas abas: Exclusões e Histórico
+
+**Exclusões, declarada e sem código.** O que sai da base do PIS/COFINS antes de
+apurar — e a principal é o ICMS destacado, o Tema 69. A aba aparece na barra
+como indisponível, dizendo o que vai fazer, porque o caminho inteiro visível é
+melhor que um buraco entre Apuração e Gestão.
+
+O motor não existe e a razão está escrita desde 22/09/2026: a exclusão **cruza a
+EFD-Contribuições com a EFD ICMS/IPI** do mesmo CNPJ e competência, porque o
+campo do ICMS no C170 das Contribuições é facultativo e metade dos clientes o
+manda em branco. É a decisão que torna o reaproveitamento de leitura entre
+trabalhos um requisito, e não uma conveniência.
+
+**Histórico, em todo módulo.** Já existia como tela e rota, alcançável só por um
+botão no canto. Virou funcionalidade da barra nos três módulos.
+
+**E precisou de um conceito novo: a funcionalidade que não conta.** O histórico
+nunca "conclui" — é consulta, não tarefa. Somá-lo ao denominador faria o cartão
+dizer "3 de 6" para sempre e a barra de progresso jamais chegar ao fim com tudo
+pronto. `DefinicaoEtapa` ganhou `Conta`, e `Progresso` passou a ignorar quem o
+tem falso.
+
+Foi o que os testes cobraram: três deles comparavam o roteiro de ICMS com o do
+Python e passaram a comparar só o que conta — com uma asserção a mais dizendo
+que o histórico está lá e não entra na conta.
+
+---
+
 ## 2026-09-23 — Quebrar e apurar são coisas distintas, e a barra diz isso
 
 **O erro.** Eu tinha empacotado duas funcionalidades na mesma etapa porque as

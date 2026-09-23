@@ -166,6 +166,11 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       funcionalidades — nada trava mais (v0.86.0)
 - [ ] Em Quebras: escolher um registro e baixá-lo. O índice já guarda a posição
       de cada um; falta a rota e a tela
+- [x] Abas de Exclusões e Histórico na barra; o histórico não conta no progresso (v0.87.0)
+- [ ] `exclusoes`: declarada e sem código. O Tema 69 cruzando as duas EFD —
+      é a fatia fiscal que falta no módulo de PIS/COFINS
+- [ ] Tela do gestor para liberar módulos a cada pessoa: a API grava desde a
+      v0.66.0 (`PUT /usuarios/:id/segmentos`), falta a tela
 - [ ] `quebra_xml`: declarada e sem código. Abrir os XML do lote item a item
 - [ ] Escolher entre a barra (`BarraDeFuncionalidades`) e os cards
       (`PainelDoTrabalho`): as duas foram construídas para o mesmo lugar

@@ -39,8 +39,13 @@ public static class SituacoesDeEtapa
 /// "Quebras", "Apuração". O <paramref name="Nome"/> continua sendo a frase
 /// inteira, que a tela usa no cabeçalho e no cartão. Vazio cai no Nome.
 /// </param>
+/// <param name="Conta">
+/// Se entra no progresso do trabalho. Falso para a funcionalidade que **nunca
+/// conclui** — o histórico é consulta, não tarefa. Sem isto o cartão diria
+/// "3 de 6" para sempre, e a barra jamais chegaria ao fim com tudo pronto.
+/// </param>
 public sealed record DefinicaoEtapa(string Chave, string Nome, string Descricao,
-    bool Implementada = false, string Aba = "")
+    bool Implementada = false, string Aba = "", bool Conta = true)
 {
     public string Rotulo => string.IsNullOrWhiteSpace(Aba) ? Nome : Aba;
 }
@@ -147,6 +152,20 @@ public static class Etapas
             "CST, natureza dos créditos, ajustes e controle de saldos, competência a " +
             "competência.",
             Implementada: true, Aba: "Gestão"),
+        new("exclusoes", "Exclusões da base",
+            "O que sai da base de cálculo do PIS/COFINS antes de apurar. A " +
+            "principal é o ICMS destacado (Tema 69, RE 574.706), que **cruza a " +
+            "EFD-Contribuições com a EFD ICMS/IPI** do mesmo CNPJ e da mesma " +
+            "competência — o campo do ICMS no C170 das Contribuições é " +
+            "facultativo, e metade dos clientes o manda em branco. Ainda não " +
+            "construída.",
+            Implementada: false, Aba: "Exclusões"),
+        new("historico", "Histórico do trabalho",
+            "Tudo o que aconteceu, em ordem: quem importou, quem rodou cada " +
+            "etapa, o que cada rodada produziu, quem mudou o status e por quê. " +
+            "É a resposta para \"por que este número é este\" três meses depois — " +
+            "e é consulta, não tarefa: não entra no progresso.",
+            Implementada: true, Aba: "Histórico", Conta: false),
         new("quebra_xml", "Quebrar os XML",
             "Abrir os XML das notas do lote item a item, como a quebra faz com o " +
             "SPED. Ainda não construída.",
@@ -166,11 +185,12 @@ public static class Etapas
         new Dictionary<string, IReadOnlyList<string>>
         {
             ["icms"] = ["importar", "conferencia", "movimentos", "st_suportado", "razao",
-                        "apuracao", "arquivo_digital", "entrega"],
+                        "apuracao", "arquivo_digital", "entrega", "historico"],
             // a barra do trabalho de PIS/COFINS, na ordem em que aparece
             ["piscofins"] = ["importar", "quebra_de_sped", "apuracao_piscofins",
-                             "apuracao_contribuicoes", "quebra_xml"],
-            ["irpj_csll"] = ["importar"],
+                             "exclusoes", "apuracao_contribuicoes", "quebra_xml",
+                             "historico"],
+            ["irpj_csll"] = ["importar", "historico"],
         };
 
     /// <summary>
@@ -235,7 +255,7 @@ public static class Etapas
     /// </summary>
     public static (int Feitas, int Totais) Progresso(IReadOnlyList<EtapaDoProjeto> etapas)
     {
-        var disponiveis = etapas.Where(e => e.Definicao.Implementada).ToList();
+        var disponiveis = etapas.Where(e => e.Definicao.Implementada && e.Definicao.Conta).ToList();
         return (disponiveis.Count(e => e.Situacao == SituacaoEtapa.Concluida), disponiveis.Count);
     }
 }

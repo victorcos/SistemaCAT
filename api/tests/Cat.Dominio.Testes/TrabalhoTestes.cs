@@ -107,10 +107,12 @@ public sealed class EtapasTestes
     public void Ordem_e_textos_iguais_aos_do_python()
     {
         // a paridade com o Python é do ROTEIRO de ICMS, não do catálogo: desde
-        // 22/09/2026 `Todas` guarda também as etapas dos outros módulos
+        // 22/09/2026 `Todas` guarda também as etapas dos outros módulos. O
+        // histórico entrou em 23/09/2026 e fica de fora desta conta: é consulta,
+        // não etapa do rito da CAT 42
         Assert.Equal(
             ["importar", "conferencia", "movimentos", "st_suportado", "razao", "apuracao", "arquivo_digital", "entrega"],
-            Etapas.Do("icms").Select(e => e.Chave));
+            Etapas.Do("icms").Where(e => e.Conta).Select(e => e.Chave));
         Assert.Equal("Ainda não disponível", SituacaoEtapa.NaoDisponivel.Rotulo());
         Assert.Equal("nao_disponivel", SituacaoEtapa.NaoDisponivel.Valor());
     }
@@ -172,7 +174,9 @@ public sealed class RoteiroPorModuloTestes
         Assert.Equal(
             ["importar", "conferencia", "movimentos", "st_suportado", "razao", "apuracao",
              "arquivo_digital", "entrega"],
-            Etapas.Do("icms").Select(d => d.Chave));
+            Etapas.Do("icms").Where(d => d.Conta).Select(d => d.Chave));
+        // o histórico está em todo módulo, e em nenhum conta como trabalho
+        Assert.Contains("historico", Etapas.Do("icms").Select(d => d.Chave));
     }
 
     [Fact]
@@ -207,12 +211,16 @@ public sealed class RoteiroPorModuloTestes
         var roteiro = Etapas.Montar("piscofins", new HashSet<string> { "importar" });
 
         Assert.Equal(
-            ["Arquivos", "Quebras", "Apuração", "Gestão", "Quebra XML"],
+            ["Arquivos", "Quebras", "Apuração", "Exclusões", "Gestão", "Quebra XML", "Histórico"],
             roteiro.Select(e => e.Definicao.Rotulo));
-        // a quebra XML ainda não existe, e só ela fica de fora
+        // o histórico é consulta: aparece na barra e não entra no denominador
+        Assert.False(roteiro.Single(e => e.Definicao.Chave == "historico").Definicao.Conta);
+        // as exclusões e a quebra de XML ainda não existem, e só elas ficam de fora
+        var porFazer = new[] { "exclusoes", "quebra_xml" };
         Assert.Equal((1, 4), Etapas.Progresso(roteiro));
-        Assert.False(roteiro.Single(e => e.Definicao.Chave == "quebra_xml").Acessivel);
-        Assert.All(roteiro.Where(e => e.Definicao.Chave != "quebra_xml"),
+        Assert.All(roteiro.Where(e => porFazer.Contains(e.Definicao.Chave)),
+            e => Assert.False(e.Acessivel));
+        Assert.All(roteiro.Where(e => !porFazer.Contains(e.Definicao.Chave)),
             e => Assert.True(e.Acessivel));
     }
 
