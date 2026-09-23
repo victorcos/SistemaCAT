@@ -28,6 +28,7 @@ escreveu, e a conversão acontece à vista, aqui.
 from __future__ import annotations
 
 import os
+import time
 from decimal import Decimal
 
 from cat.infraestrutura.analitico.confronto import _escapar
@@ -63,7 +64,7 @@ def _arquivo(destino: str) -> str:
     if not os.path.isfile(caminho):
         raise RazaoNaoGerado(
             f"O razão contábil não está em disco nesta execução ({ARQUIVO_DO_RAZAO}). "
-            "Rode a quebra de SPED de novo, com pelo menos uma ECD no lote.")
+            "Rode a apuração de PIS/COFINS de novo, com pelo menos uma ECD no lote.")
     return caminho
 
 
@@ -76,6 +77,65 @@ def _texto(v) -> str:
     return format(Decimal(v or 0).quantize(Decimal("0.01")), "f")
 
 
+ARQUIVO_DO_RESUMO = "razao_por_conta.parquet"
+
+
+def _resumo(destino: str) -> str:
+    """O resumo por conta, escrito na primeira leitura e reaproveitado depois.
+
+    O seletor agregava o razão inteiro a cada página — e "inteiro", numa base
+    de rede, é dezessete milhões de partidas. Eram 27 segundos por página numa
+    tela que é a **primeira** coisa que se vê: quem abria achava que não havia
+    conta nenhuma e ia embora.
+
+    O resumo tem uma linha por conta — dez mil, não milhões — e responde em
+    milissegundos. Não é cache de consulta: é a mesma agregação de sempre,
+    feita uma vez em vez de a cada clique. Some o arquivo, ele se refaz.
+
+    Escreve em nome provisório e renomeia no fim, porque duas telas abrindo ao
+    mesmo tempo leriam um parquet pela metade — que não é erro que apareça:
+    seria conta faltando na lista.
+    """
+    origem = _arquivo(destino)
+    caminho = os.path.join(destino, ARQUIVO_DO_RESUMO)
+    if os.path.isfile(caminho) and os.path.getmtime(caminho) >= os.path.getmtime(origem):
+        return caminho
+
+    parcial = f"{caminho}.{os.getpid()}.parcial"
+    comeco = time.monotonic()
+    con = _leitura(destino)
+    try:
+        con.execute(f"""
+            COPY (
+                SELECT cnpj, conta,
+                       any_value(descricao)             AS descricao,
+                       any_value(conta_referencial)     AS conta_referencial,
+                       count(*)                         AS lancamentos,
+                       sum({_DEBITO})                   AS debitos,
+                       sum({_CREDITO})                  AS creditos,
+                       sum({_DEBITO}) - sum({_CREDITO}) AS saldo,
+                       min(data)                        AS de,
+                       max(data)                        AS ate,
+                       count(DISTINCT arquivo)          AS arquivos
+                FROM read_parquet('{_escapar(origem)}')
+                GROUP BY cnpj, conta
+            ) TO '{_escapar(parcial)}' (FORMAT PARQUET)
+        """)
+    except BaseException:
+        if os.path.isfile(parcial):
+            os.remove(parcial)
+        raise
+    finally:
+        con.close()
+    os.replace(parcial, caminho)
+
+    log.info("resumo do razão por conta materializado", extra={
+        "execucao_pasta": os.path.basename(destino),
+        "segundos": round(time.monotonic() - comeco, 1),
+    })
+    return caminho
+
+
 def estabelecimentos(destino: str) -> list[dict]:
     """Os CNPJ que aparecem no razão, com quantas contas cada um tem.
 
@@ -83,15 +143,15 @@ def estabelecimentos(destino: str) -> list[dict]:
     filiais tem o mesmo plano de contas trinta vezes, e sem o filtro o seletor
     vira uma lista de repetições.
     """
-    caminho = _arquivo(destino)
+    caminho = _resumo(destino)
     con = _leitura(destino)
     try:
         cursor = con.execute(f"""
             SELECT cnpj,
-                   count(DISTINCT conta) AS contas,
-                   count(*)              AS lancamentos,
-                   min(data)             AS de,
-                   max(data)             AS ate
+                   count(*)          AS contas,
+                   sum(lancamentos)  AS lancamentos,
+                   min(de)           AS de,
+                   max(ate)          AS ate
             FROM read_parquet('{_escapar(caminho)}')
             GROUP BY cnpj ORDER BY cnpj
         """)
@@ -114,7 +174,7 @@ def contas(destino: str, busca: str | None = None, cnpj: str | None = None,
     if so and so not in RECORTES:
         raise ValueError(f"Recorte desconhecido: {so}. Há {', '.join(sorted(RECORTES))}.")
     pagina, por_pagina = _pagina(pagina, por_pagina)
-    caminho = _arquivo(destino)
+    caminho = _resumo(destino)
 
     filtros, parametros = [], []
     if cnpj and cnpj.strip():
@@ -123,23 +183,11 @@ def contas(destino: str, busca: str | None = None, cnpj: str | None = None,
     if busca and busca.strip():
         filtros.append("(conta ILIKE ? OR descricao ILIKE ? OR conta_referencial ILIKE ?)")
         parametros += [f"%{busca.strip()}%"] * 3
+    if so:
+        filtros.append(RECORTES[so])
     onde = f"WHERE {' AND '.join(filtros)}" if filtros else ""
 
-    agrupado = f"""
-        SELECT cnpj, conta,
-               any_value(descricao)          AS descricao,
-               any_value(conta_referencial)  AS conta_referencial,
-               count(*)                      AS lancamentos,
-               sum({_DEBITO})                AS debitos,
-               sum({_CREDITO})               AS creditos,
-               sum({_DEBITO}) - sum({_CREDITO}) AS saldo,
-               min(data)                     AS de,
-               max(data)                     AS ate,
-               count(DISTINCT arquivo)       AS arquivos
-        FROM read_parquet('{_escapar(caminho)}') {onde}
-        GROUP BY cnpj, conta
-    """
-    base = f"({agrupado})" if not so else f"(SELECT * FROM ({agrupado}) WHERE {RECORTES[so]})"
+    base = f"(SELECT * FROM read_parquet('{_escapar(caminho)}') {onde})"
 
     con = _leitura(destino)
     try:

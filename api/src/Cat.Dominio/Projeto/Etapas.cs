@@ -1,4 +1,4 @@
-namespace Cat.Dominio.Projeto;
+﻿namespace Cat.Dominio.Projeto;
 
 public enum SituacaoEtapa
 {
@@ -142,9 +142,11 @@ public static class Etapas
             "minutos.",
             Implementada: true, Aba: "Quebras"),
         new("apuracao_piscofins", "Apurar PIS/COFINS",
-            "O par que se confronta: a Consulta de Entradas (037), do lado fiscal, e " +
-            "o razão contábil da ECD, do lado da contabilidade. Onde os dois " +
-            "discordam é onde está o trabalho.",
+            "Monta a Consulta de Entradas (037), do lado fiscal, e o razão da ECD, do " +
+            "lado contábil. O cruzamento entre os dois é seu: casar partida contábil " +
+            "com item de nota exige critério que muda de cliente para cliente, e um " +
+            "casamento automático erraria calado. Marque as contas no razão, extraia, " +
+            "e compare com a 037.",
             Implementada: true, Aba: "Apuração"),
         new("apuracao_contribuicoes", "Gestão Fiscal",
             "Os quadros no padrão do MA: da EFD-Contribuições saem PIS e COFINS, nos " +

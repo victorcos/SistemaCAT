@@ -7,6 +7,7 @@ motivo de cada recusa ficaram aqui, num lugar só.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from dataclasses import dataclass
 
@@ -171,10 +172,40 @@ NAO_TERMINOU = {
 }
 
 
+# o caminho inteiro precisa caber em 260 caracteres no Windows, e a pasta da
+# execução já come boa parte
+LIMITE_DO_SUFIXO = 60
+
+
 class PlanilhaRecusada(Exception):
     def __init__(self, status: int, mensagem: str) -> None:
         self.status = status
         super().__init__(mensagem)
+
+
+def sufixo_do_recorte(escolhidos: frozenset[str] | None,
+                      classes: frozenset[str] | None) -> str:
+    """O pedaço do nome do arquivo que identifica o recorte pedido.
+
+    Cada recorte precisa de arquivo próprio: sem isso o primeiro download
+    ficaria em cache e o filtro seguinte devolveria a planilha errada — quem
+    confere a conta 4.1.1 receberia a 3.1.1 de volta, com o nome certo.
+
+    Recorte grande — dezenas de contas do razão — daria nome maior do que o
+    Windows aceita (260 caracteres com a pasta da execução), e a gravação
+    morreria no meio do download. Nesses casos entra o resumo: continua sendo
+    a mesma seleção que gera o mesmo nome, que é o que o cache precisa.
+
+    A ordem não conta: marcar 3.1.1 e depois 4.1.1 é a mesma seleção que o
+    contrário, e gerar duas vezes o mesmo arquivo seria desperdício.
+    """
+    partes = sorted(escolhidos or ()) + sorted(classes or ())
+    if not partes:
+        return ""
+    junto = "_".join(partes)
+    if len(junto) > LIMITE_DO_SUFIXO:
+        return "-" + hashlib.sha1(junto.encode("utf-8")).hexdigest()[:12]
+    return "-" + junto
 
 
 def _ja_montado() -> int:
@@ -231,8 +262,7 @@ def gerar(execucao: ExecucaoDB, etapa_da_rota: str, qual: str,
     # cada recorte vira arquivo próprio: sem isso, o primeiro download ficaria
     # em cache e o filtro seguinte devolveria a planilha errada. E o formato
     # entra no nome: sem isso o xlsx já gerado responderia ao pedido de csv.
-    partes = sorted(escolhidos or ()) + sorted(classes or ())
-    sufixo = "-" + "_".join(partes) if partes else ""
+    sufixo = sufixo_do_recorte(escolhidos, classes)
     raiz, _ = os.path.splitext(nome)
     destino = os.path.join(pasta, f"{raiz}{sufixo}.{formato}")
     if precisa_gerar(destino, origem):

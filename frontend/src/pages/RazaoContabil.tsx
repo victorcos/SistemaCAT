@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Rotulo } from "@/components/shared/Rodada";
 import { Aviso } from "@/components/ui/Aviso";
+import { BaixarPlanilha } from "@/components/shared/BaixarPlanilha";
 import { Botao } from "@/components/ui/Botao";
 import { Carregando } from "@/components/ui/Carregando";
 import { Busca, Segmentado, Toolbar } from "@/components/ui/Filtros";
@@ -13,7 +14,9 @@ import { cn } from "@/lib/cn";
 import { comoErro } from "@/lib/errors";
 import { dinheiro, numero } from "@/lib/format";
 import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
+import type { Formato } from "@/services/conferencia";
 import {
+  baixarPlanilhaDaApuracao,
   contasDoRazaoContabil,
   estabelecimentosDoRazaoContabil,
   lancamentosDaConta,
@@ -101,7 +104,7 @@ export default function RazaoContabil() {
       <CabecalhoDePagina
         eyebrow={projeto?.projeto.nome ? `PIS/COFINS · ${projeto.projeto.nome}` : "PIS/COFINS"}
         titulo="Razão contábil"
-        sub="As partidas das contas analíticas da ECD, em ordem de data e com o saldo correndo. Escolha a conta para ver os lançamentos dela."
+        sub="As partidas das contas analíticas da ECD, em ordem de data e com o saldo correndo. Marque as contas e extraia — é a planilha que se compara com a Consulta de Entradas (037)."
       />
 
       {erro && <Aviso titulo={erro.message} codigo={erro.requisicaoId} aoFechar={() => setErro(null)} />}
@@ -134,6 +137,24 @@ export default function RazaoContabil() {
   );
 }
 
+/**
+ * O seletor: marcar contas, extrair, e — se quiser — espiar os lançamentos.
+ *
+ * O gesto principal desta tela é **marcar e extrair**: quem confronta a
+ * contabilidade com a Consulta de Entradas (037) escolhe meia dúzia de contas
+ * e leva as partidas delas para comparar por fora. O sistema não cruza as duas
+ * pontas sozinho, e é de propósito: casar lançamento contábil com item de nota
+ * exige critério que muda de cliente para cliente.
+ *
+ * A marcação é **pelo código da conta**, não pelo par CNPJ+conta: a 3.1.1 é a
+ * mesma conta do plano em todo estabelecimento, e quem a escolhe quer as
+ * partidas de todos. Com mais de um CNPJ na base a tela diz isso, porque a
+ * planilha sai maior do que a linha marcada sugere.
+ *
+ * A seleção atravessa páginas e filtros de propósito: procura-se uma conta,
+ * marca-se, procura-se outra. Perder o marcado a cada busca obrigaria a
+ * escolher tudo de uma vez, ou a extrair em pedaços.
+ */
 function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
   const [busca, setBusca] = useState("");
   const [cnpj, setCnpj] = useState("");
@@ -142,7 +163,10 @@ function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
   const [dados, setDados] = useState<Pagina<ContaContabil> | null>(null);
   const [estabelecimentos, setEstabelecimentos] = useState<EstabelecimentoDoRazao[]>([]);
   const [aberta, setAberta] = useState<string | null>(null);
+  const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
+  const [baixando, setBaixando] = useState<Formato | null>(null);
   const leitura = useAcao();
+  const download = useAcao();
   const { executar } = leitura;
 
   useEffect(() => {
@@ -177,6 +201,35 @@ function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
   const paginas = dados ? Math.max(1, Math.ceil(dados.total / dados.por_pagina)) : 1;
   const colunas = "grid-cols-[28px_1.1fr_1.6fr_.7fr_1fr_1fr_1fr]";
 
+  const daPagina = dados?.linhas.map((c) => c.conta) ?? [];
+  const paginaInteira = daPagina.length > 0 && daPagina.every((c) => marcadas.has(c));
+
+  const alternar = (conta: string) =>
+    setMarcadas((antes) => {
+      const agora = new Set(antes);
+      if (agora.has(conta)) agora.delete(conta);
+      else agora.add(conta);
+      return agora;
+    });
+
+  const alternarPagina = (marcar: boolean) =>
+    setMarcadas((antes) => {
+      const agora = new Set(antes);
+      for (const c of daPagina) {
+        if (marcar) agora.add(c);
+        else agora.delete(c);
+      }
+      return agora;
+    });
+
+  async function extrair(formato: Formato) {
+    setBaixando(formato);
+    await download.executar((sinal) =>
+      baixarPlanilhaDaApuracao(execucaoId, "razao-contabil", formato, [...marcadas], sinal),
+    );
+    setBaixando(null);
+  }
+
   return (
     <section className="overflow-hidden rounded-raio-g border border-borda bg-superficie">
       <Toolbar>
@@ -202,6 +255,54 @@ function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
         </span>
       </Toolbar>
 
+      {/* a barra da extração: o que está marcado, e o que sai daqui */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 border-t border-borda-sutil bg-superficie-vidro px-5.5 py-3">
+        <span className="flex items-baseline gap-2">
+          <span className="font-mono text-[17px] font-extrabold leading-none text-texto">
+            {numero(marcadas.size)}
+          </span>
+          <span className="text-[12px] text-texto-suave">
+            {marcadas.size === 1 ? "conta marcada" : "contas marcadas"}
+          </span>
+        </span>
+
+        {marcadas.size > 0 && (
+          <Botao variante="fantasma" tamanho="sm" onClick={() => setMarcadas(new Set())}>
+            Limpar
+          </Botao>
+        )}
+
+        {marcadas.size === 0 && (
+          <span className="text-[12px] text-texto-fraco">
+            Marque as contas que vai conferir contra a 037 — a busca e a troca de página não
+            desmarcam.
+          </span>
+        )}
+
+        {marcadas.size > 0 && estabelecimentos.length > 1 && (
+          <span className="text-[12px] text-texto-fraco">
+            Sai a conta nos {numero(estabelecimentos.length)} estabelecimentos.
+          </span>
+        )}
+
+        <div className="ml-auto">
+          <BaixarPlanilha
+            aoBaixar={extrair}
+            desabilitado={marcadas.size === 0}
+            rotulo="Extrair as contas marcadas"
+            destaque
+            baixando={baixando}
+            aoCancelar={download.cancelar}
+          />
+        </div>
+      </div>
+
+      {download.erro && (
+        <div className="px-5.5 pt-4">
+          <Aviso titulo={download.erro.message} codigo={download.erro.requisicaoId} />
+        </div>
+      )}
+
       {leitura.erro && (
         <div className="px-5.5 pt-4">
           <Aviso titulo={leitura.erro.message} codigo={leitura.erro.requisicaoId} />
@@ -209,67 +310,92 @@ function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
       )}
 
       <div className={cn("overflow-x-auto transition-opacity", leitura.carregando && "opacity-60")}>
-        <div className="min-w-[940px]">
-          <div className={cn("grid gap-3 bg-tabela-cabecalho-fundo px-5.5 py-3", colunas)}>
-            {["", "Conta", "Descrição", "Partidas", "Débitos", "Créditos", "Saldo"].map((c, i) => (
-              <span
-                key={i}
-                className={cn(
-                  "text-[10px] font-extrabold uppercase tracking-[0.14em] text-tabela-cabecalho-texto",
-                  i >= 3 && "text-right",
-                )}
-              >
-                {c}
-              </span>
-            ))}
+        <div className="min-w-[980px]">
+          <div className="grid grid-cols-[30px_1fr] items-center gap-3 bg-tabela-cabecalho-fundo px-5.5 py-3">
+            <input
+              type="checkbox"
+              aria-label="Marcar as contas desta página"
+              checked={paginaInteira}
+              onChange={(e) => alternarPagina(e.target.checked)}
+            />
+            <div className={cn("grid gap-3", colunas)}>
+              {["", "Conta", "Descrição", "Partidas", "Débitos", "Créditos", "Saldo"].map((c, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    "text-[10px] font-extrabold uppercase tracking-[0.14em] text-tabela-cabecalho-texto",
+                    i >= 3 && "text-right",
+                  )}
+                >
+                  {c}
+                </span>
+              ))}
+            </div>
           </div>
 
           {dados?.linhas.map((c) => {
             const chave = `${c.cnpj}|${c.conta}`;
             const abertoAgora = aberta === chave;
+            const marcada = marcadas.has(c.conta);
             return (
               <Fragment key={chave}>
-                <button
-                  type="button"
-                  aria-expanded={abertoAgora}
-                  onClick={() => setAberta(abertoAgora ? null : chave)}
+                <div
                   className={cn(
-                    "grid w-full cursor-pointer items-center gap-3 border-0 border-t border-borda-sutil px-5.5 py-3 text-left transition-colors hover:bg-tabela-linha-hover",
-                    colunas,
-                    abertoAgora ? "bg-superficie-alt" : "bg-transparent",
+                    "grid grid-cols-[30px_1fr] items-center gap-3 border-t border-borda-sutil px-5.5 transition-colors",
+                    abertoAgora
+                      ? "bg-superficie-alt"
+                      : marcada
+                        ? "bg-laranja-500/8"
+                        : "bg-transparent hover:bg-tabela-linha-hover",
                   )}
                 >
-                  <IconeExpandir
-                    size={13}
-                    strokeWidth={2}
-                    aria-hidden
-                    className={cn("text-texto-fraco transition-transform", abertoAgora && "rotate-90")}
+                  <input
+                    type="checkbox"
+                    aria-label={`Marcar a conta ${c.conta}`}
+                    checked={marcada}
+                    onChange={() => alternar(c.conta)}
                   />
-                  <span className="min-w-0">
-                    <span className="block font-mono text-[13px] text-texto">{c.conta}</span>
-                    <span className="mt-0.5 block font-mono text-[11px] text-texto-fraco">
-                      {cnpjFormatado(c.cnpj)}
+                  <button
+                    type="button"
+                    aria-expanded={abertoAgora}
+                    onClick={() => setAberta(abertoAgora ? null : chave)}
+                    className={cn(
+                      "grid w-full cursor-pointer items-center gap-3 border-0 bg-transparent py-3 text-left",
+                      colunas,
+                    )}
+                  >
+                    <IconeExpandir
+                      size={13}
+                      strokeWidth={2}
+                      aria-hidden
+                      className={cn("text-texto-fraco transition-transform", abertoAgora && "rotate-90")}
+                    />
+                    <span className="min-w-0">
+                      <span className="block font-mono text-[13px] text-texto">{c.conta}</span>
+                      <span className="mt-0.5 block font-mono text-[11px] text-texto-fraco">
+                        {cnpjFormatado(c.cnpj)}
+                      </span>
                     </span>
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-[13px] text-texto" title={c.descricao}>
-                      {c.descricao || "Sem nome no plano de contas"}
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13px] text-texto" title={c.descricao}>
+                        {c.descricao || "Sem nome no plano de contas"}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-texto-fraco">
+                        {c.conta_referencial ? `referencial ${c.conta_referencial} · ` : ""}
+                        {data(c.de)} a {data(c.ate)}
+                        {c.arquivos > 1 ? ` · ${numero(c.arquivos)} ECD` : ""}
+                      </span>
                     </span>
-                    <span className="mt-0.5 block text-[11px] text-texto-fraco">
-                      {c.conta_referencial ? `referencial ${c.conta_referencial} · ` : ""}
-                      {data(c.de)} a {data(c.ate)}
-                      {c.arquivos > 1 ? ` · ${numero(c.arquivos)} ECD` : ""}
+                    <span className="text-right font-mono text-[13px] tabular-nums text-texto-suave">
+                      {numero(c.lancamentos)}
                     </span>
-                  </span>
-                  <span className="text-right font-mono text-[13px] tabular-nums text-texto-suave">
-                    {numero(c.lancamentos)}
-                  </span>
-                  <span className="text-right text-[13px]">{dinheiro(c.debitos)}</span>
-                  <span className="text-right text-[13px]">{dinheiro(c.creditos)}</span>
-                  <span className="text-right text-[13px]">
-                    <Saldo valor={c.saldo} forte />
-                  </span>
-                </button>
+                    <span className="text-right text-[13px]">{dinheiro(c.debitos)}</span>
+                    <span className="text-right text-[13px]">{dinheiro(c.creditos)}</span>
+                    <span className="text-right text-[13px]">
+                      <Saldo valor={c.saldo} forte />
+                    </span>
+                  </button>
+                </div>
                 {abertoAgora && <Lancamentos execucaoId={execucaoId} conta={c} />}
               </Fragment>
             );
@@ -286,7 +412,8 @@ function SeletorDeConta({ execucaoId }: { execucaoId: number }) {
       <div className="flex flex-wrap items-center gap-3 border-t border-borda bg-superficie-vidro px-5.5 py-3.5">
         <Paginacao pagina={pagina} paginas={paginas} ocupado={leitura.carregando} aoIr={setPagina} />
         <span className="min-w-[220px] flex-1 text-[11px] text-texto-fraco">
-          Uma página por vez, montada no servidor. O razão inteiro sai pelo download da quebra.
+          Uma página por vez, montada no servidor. Sem conta marcada, o razão inteiro continua
+          saindo pelo download da apuração.
         </span>
       </div>
     </section>

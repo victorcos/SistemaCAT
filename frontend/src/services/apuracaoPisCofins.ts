@@ -61,16 +61,32 @@ export const detalharApuracao = (execucaoId: number) =>
 export const cancelarApuracao = (execucaoId: number) =>
   chamar<ExecucaoDaApuracao>(`/apuracao-piscofins/${execucaoId}/cancelar`, { method: "POST" });
 
+/**
+ * Baixa a planilha da apuração.
+ *
+ * `contas` só vale para o razão, e é o recorte que a tela do razão monta: as
+ * contas marcadas. Vazio, vem o razão inteiro — que numa ECD de rede passa de
+ * milhão de partidas. O servidor as recebe como `classificacoes`, que é o
+ * canal genérico de recorte das planilhas (na conferência são as situações do
+ * documento; no suportado, as fontes da cascata).
+ */
 export function baixarPlanilhaDaApuracao(
   execucaoId: number,
   qual: PlanilhaDaApuracao,
   formato: Formato,
+  contas: string[] = [],
   sinal?: AbortSignal,
 ): Promise<void> {
-  const filtro = formato !== "xlsx" ? `?formato=${formato}` : "";
+  const p = new URLSearchParams();
+  if (formato !== "xlsx") p.set("formato", formato);
+  if (contas.length) p.set("classificacoes", contas.join(","));
+  const filtro = p.toString() ? `?${p}` : "";
+  // o nome diz que é recorte: dois arquivos na pasta de Downloads com o mesmo
+  // nome e conteúdos diferentes é como se confere a conta errada
+  const recorte = contas.length ? `_${contas.length}_contas` : "";
   return baixarArquivo(
     `/api/apuracao-piscofins/${execucaoId}/planilhas/${qual}${filtro}`,
-    `${NOME[qual]}.${formato}`,
+    `${NOME[qual]}${recorte}.${formato}`,
     sinal,
   );
 }

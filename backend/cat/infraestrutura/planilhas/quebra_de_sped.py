@@ -152,7 +152,20 @@ def gerar_entradas(parquet: str, destino: str, modelos=None, classificacoes=None
 
 def gerar_razao_contabil(parquet: str, destino: str, modelos=None, classificacoes=None,
                          formato: str = "xlsx") -> int:
-    return gerar(parquet, destino, COLUNAS_RAZAO, "Razão Contábil", formato=formato)
+    """O razão. `classificacoes`, nesta planilha, são as **contas escolhidas**.
+
+    Sem nenhuma, sai o razão inteiro, como sempre saiu. Com contas, sai só o
+    que se vai conferir: quem confronta a contabilidade com a 037 leva meia
+    dúzia de contas por vez, e baixar milhões de partidas para filtrar no Excel
+    não é conferência — é espera.
+
+    O recorte é pelo código da conta, não pelo par CNPJ+conta: a mesma conta em
+    dois estabelecimentos é a mesma conta do plano, e quem escolhe "3.1.1"
+    quer a 3.1.1 de todos eles. A tela avisa quando há mais de um.
+    """
+    return gerar(parquet, destino, COLUNAS_RAZAO, "Razão Contábil",
+                 classificacoes=classificacoes, formato=formato,
+                 campo_da_classificacao="conta")
 
 
 def gerar_arquivos_quebrados(parquet: str, destino: str, modelos=None, classificacoes=None,

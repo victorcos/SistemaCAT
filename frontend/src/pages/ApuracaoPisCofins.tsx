@@ -183,7 +183,7 @@ export default function ApuracaoPisCofins() {
       <CabecalhoDePagina
         eyebrow="PIS/COFINS · Apuração"
         titulo="Apurar PIS/COFINS"
-        sub="Lê a EFD-Contribuições e a ECD do lote e monta o par que se confronta: a Consulta de Entradas (037), do lado fiscal, e o razão contábil, do lado da contabilidade. Onde os dois discordam é onde está o trabalho."
+        sub="Lê a EFD-Contribuições e a ECD do lote e monta os dois lados: a Consulta de Entradas (037), do fiscal, e o razão contábil, da contabilidade. O cruzamento não é automático — no razão você marca as contas, extrai, e compara com a 037."
         acao={
           <div className="flex flex-col items-end gap-2.5">
             {acao}
@@ -263,7 +263,7 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaApuracao; resumo:
 
   async function baixar(qual: PlanilhaDaApuracao, formato: Formato) {
     setBaixando({ qual, formato });
-    await download.executar((sinal) => baixarPlanilhaDaApuracao(execucao.id, qual, formato, sinal));
+    await download.executar((sinal) => baixarPlanilhaDaApuracao(execucao.id, qual, formato, [], sinal));
     setBaixando(null);
   }
 

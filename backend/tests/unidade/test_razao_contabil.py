@@ -187,7 +187,9 @@ class TestEstabelecimentos:
 
 class TestSemArquivo:
     def test_execucao_sem_razao_diz_o_que_fazer(self, tmp_path):
-        with pytest.raises(RazaoNaoGerado, match="Rode a quebra de SPED"):
+        # a etapa que produz o razão é a apuração desde 23/09/2026; a mensagem
+        # que mandava rodar a quebra levava a pessoa a rodar a etapa errada
+        with pytest.raises(RazaoNaoGerado, match="Rode a apuração de PIS/COFINS"):
             contas(str(tmp_path))
         with pytest.raises(RazaoNaoGerado):
             lancamentos(str(tmp_path), MATRIZ, "1.1.1.01")

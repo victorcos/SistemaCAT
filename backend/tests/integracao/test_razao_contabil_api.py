@@ -27,6 +27,7 @@ from tests.integracao.cadastro import (
     criar_usuario,
     execucao,
     iniciar,
+    planilha,
     rodar_fila,
 )
 
@@ -195,3 +196,43 @@ class TestOQueAsRotasRecusam:
         r = cliente.post("/interno/razao-contabil/contas", headers=SEGREDO,
                          json={"execucao_id": 999_999})
         assert r.status_code == 404
+
+
+class TestExtrairAsContasMarcadas:
+    """A extração do que se marcou na tela — o que vai ser comparado com a 037.
+
+    O cruzamento não é automático por decisão de 23/09/2026: casar partida
+    contábil com item de nota exige critério que muda de cliente para cliente.
+    O que o sistema entrega é a planilha das contas escolhidas.
+    """
+
+    def test_sem_marcar_nada_sai_o_razao_inteiro(self, cliente, quebra):
+        saida = planilha(cliente, "apuracao_piscofins", quebra["id"], "razao-contabil",
+                         formato="csv")
+
+        linhas = saida.content.decode("utf-8-sig").splitlines()
+        contas = {linha.split(";")[1] for linha in linhas[1:] if linha}
+        assert contas == {"3.1.1", "4.1.1"}
+
+    def test_marcada_uma_conta_sai_so_ela(self, cliente, quebra):
+        saida = planilha(cliente, "apuracao_piscofins", quebra["id"], "razao-contabil",
+                         classificacoes="3.1.1", formato="csv")
+
+        linhas = [x for x in saida.content.decode("utf-8-sig").splitlines()[1:] if x]
+        assert {linha.split(";")[1] for linha in linhas} == {"3.1.1"}
+        # a 3.1.1 tem três partidas na ECD do teste; a 4.1.1 tem duas
+        assert len(linhas) == 3
+
+    def test_o_recorte_nao_reaproveita_o_arquivo_do_recorte_anterior(self, cliente, quebra):
+        """Dois recortes seguidos: o segundo não pode servir o primeiro.
+
+        O nome do arquivo em cache carrega a seleção justamente por isso — e,
+        quando a seleção é grande demais para caber no nome, um resumo dela.
+        """
+        uma = planilha(cliente, "apuracao_piscofins", quebra["id"], "razao-contabil",
+                       classificacoes="3.1.1", formato="csv")
+        outra = planilha(cliente, "apuracao_piscofins", quebra["id"], "razao-contabil",
+                         classificacoes="4.1.1", formato="csv")
+
+        assert uma.content != outra.content
+        assert {x.split(";")[1] for x in outra.content.decode("utf-8-sig").splitlines()[1:] if x} == {"4.1.1"}

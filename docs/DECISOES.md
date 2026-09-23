@@ -5,6 +5,59 @@
 
 ---
 
+## 2026-09-23 — O cruzamento com a 037 é do analista, não do sistema
+
+**A decisão.** A apuração de PIS/COFINS monta os dois lados — a Consulta de
+Entradas (037), do fiscal, e o razão da ECD, do contábil — e **para aí**. Não
+casa um com o outro.
+
+Casar partida contábil com item de nota exige critério que muda de cliente para
+cliente: um lança a nota inteira numa conta, outro rateia por centro de custo,
+outro agrupa o mês num lançamento só. Um casamento automático acertaria em
+alguns e **erraria calado** nos demais — e erro calado em conferência é pior
+que conferência nenhuma, porque ninguém volta a olhar o que o sistema disse que
+bate.
+
+**O que o sistema entrega, então.** Na tela do razão: marcar as contas e
+extrair. Marca-se por código de conta, a marcação atravessa busca e página, e
+saem as partidas só das marcadas — em xlsx ou CSV. É essa planilha que se
+compara com a 037, por fora, com o critério de quem conhece o cliente.
+
+**Como o recorte chega ao servidor.** Pelo canal genérico de recorte das
+planilhas (`classificacoes`), que já servia às situações do documento na
+conferência e às fontes da cascata no suportado. Aqui são as contas, e a
+planilha do razão passou a filtrar por `conta` em vez de ignorar o recorte.
+Nenhuma rota nova, nada de novo no C#.
+
+**O nome do arquivo em cache.** Cada recorte é um arquivo, senão o primeiro
+download ficaria em cache e o filtro seguinte devolveria a planilha errada —
+com o nome certo. Trinta contas no nome, porém, passam do que o Windows aceita
+em caminho, e a gravação morreria depois de o servidor ter feito a planilha
+inteira: acima de 60 caracteres o recorte vira resumo. Mesma seleção, mesmo
+nome; ordem de marcação não conta.
+
+**O seletor levava 27 segundos, e por isso parecia vazio.** Cada página
+reagregava o razão inteiro — dezessete milhões de partidas numa base de rede —
+e ainda fazia isso duas vezes, uma para contar e outra para paginar. A tela é a
+primeira coisa que se vê: quem abria via cabeçalho, "1 / 1" e nenhuma linha, e
+concluía que não havia conta nenhuma.
+
+Agora o resumo por conta é **materializado na primeira leitura**
+(`razao_por_conta.parquet`, uma linha por conta em vez de milhões) e reusado
+depois. Medido na base real: 25,7 s na primeira abertura, 80 ms nas seguintes,
+150 ms com busca. Não é cache de consulta — é a mesma agregação, feita uma vez;
+some o arquivo e ele se refaz, e o mtime do razão manda nele. Escreve em nome
+provisório e renomeia, porque duas telas abrindo juntas leriam um parquet pela
+metade, e isso não dá erro: dá conta faltando na lista.
+
+**De onde veio o formato.** Do Streamlit (`4_ECD_Razao_Contabil.py`), que é como
+a casa faz isso hoje: escolhe-se no plano de contas e o razão sai consolidado
+das escolhidas. As colunas já eram as mesmas — CNPJ, conta, competência, data,
+número, valor, D/C, saldo acumulado, histórico, participante. O que faltava era
+poder escolher.
+
+---
+
 ## 2026-09-23 — O SQLite aceitava a consulta que o Postgres recusa
 
 **O erro.** "Quebrar os SPED" respondia **"O motor do sistema não respondeu"**.
