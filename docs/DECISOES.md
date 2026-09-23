@@ -286,6 +286,39 @@ de trabalho pendente é perdê-lo no dia em que o trabalho acaba.
 
 ---
 
+## 2026-09-23 — A porta de entrada sem moldura, e o menu que recolhe
+
+**O hub perdeu o menu lateral.** É onde se escolhe o **contexto** — e o menu é
+justamente o que aquele contexto passa a mostrar. Oferecê-lo antes da escolha é
+pedir que a pessoa navegue para dentro de algo que ela ainda não escolheu.
+
+No lugar dele, uma faixa só: logotipo, quem está logado e Sair. Mais a grade de
+56px e o halo laranja que a tela de acesso já usava — é o que faz a porta de
+entrada parecer porta de entrada, e não mais uma tela interna.
+
+**Do segundo nível em diante o menu volta**, porque aí já há contexto: a pessoa
+está dentro de um segmento e precisa circular por ele.
+
+Isto corrige o que eu tinha decidido ao contrário em 23/09/2026, algumas horas
+antes: mantive o menu no hub "para haver caminho de volta". O caminho de volta
+existe — o item *Segmentos* no próprio menu, das telas internas. O que não
+existia era razão para o hub ter menu.
+
+**O menu recolhe, e lembra.** Quem trabalha numa tabela larga — a 037, o razão,
+os 36 quadros — quer os 232px de volta. Recolhido sobram os ícones, com o
+rótulo no `title`; o texto some por `sr-only`, e não por deixar de ser
+renderizado, para que o leitor de tela continue anunciando o item.
+
+A escolha vai para o `localStorage`: é preferência de quem usa, não estado de
+tela — quem recolheu quer a tela larga **sempre**, não até o próximo F5. E a
+leitura é protegida, porque navegador com armazenamento bloqueado existe: sem o
+valor, abre expandido.
+
+O botão não aparece em tela estreita, onde o menu já é uma barra horizontal no
+topo e não há largura a recuperar.
+
+---
+
 ## 2026-09-23 — A liberação de segmentos ganha tela
 
 **O que faltava.** A API grava o acesso por segmento desde a v0.66.0

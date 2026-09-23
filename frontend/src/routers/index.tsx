@@ -2,6 +2,7 @@ import { createBrowserRouter, Outlet } from "react-router-dom";
 import { ADMINISTRA_USUARIOS } from "@/constants/roles";
 import { ROTAS } from "@/constants/routes";
 import Leiaute from "@/layout/Leiaute";
+import LeiauteDeEntrada from "@/layout/LeiauteDeEntrada";
 import Conferencia from "@/pages/Conferencia";
 import Gestao from "@/pages/Gestao";
 import Historico from "@/pages/Historico";
@@ -79,14 +80,19 @@ export const roteador = createBrowserRouter([
         children: [
           { path: ROTAS.trocarSenha, element: <TrocarSenha /> },
           {
+            // a porta de entrada não tem menu lateral: é onde se escolhe o
+            // contexto, e o menu é o que aquele contexto passa a mostrar.
+            // Oferecê-lo antes da escolha é pedir que a pessoa navegue para
+            // dentro de algo que ela ainda não escolheu
+            element: <LeiauteDeEntrada />,
+            children: [{ path: "/segmentos", element: <Segmentos /> }],
+          },
+          {
             element: <Leiaute />,
             children: [
               { path: ROTAS.inicio, element: <Inicio /> },
-              // o hub e a escolha de frente: a porta de entrada, antes de
-              // qualquer trabalho. Ficam na mesma moldura do resto porque o
-              // menu lateral é o caminho de volta — sem ele, quem entrasse
-              // direto num módulo não teria como trocar de assunto
-              { path: "/segmentos", element: <Segmentos /> },
+              // do segundo nível em diante o menu volta: já há contexto, e a
+              // pessoa precisa circular dentro dele
               { path: "/segmentos/:chave", element: <ModulosDoSegmento /> },
               { path: "/modulos/:chave", element: <Inicio /> },
               { path: ROTAS.importar, element: <Importar /> },

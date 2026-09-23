@@ -1,6 +1,6 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.90.0**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-09-23, sobre a versão **0.91.0**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
@@ -14,8 +14,8 @@ O endereço, a tela que o atende e se exige papel específico.
 | --- | --- | --- |
 | `/login` | Login | — |
 | `/trocar-senha` | TrocarSenha | — |
-| `/` | Inicio | — |
 | `/segmentos` | Segmentos | — |
+| `/` | Inicio | — |
 | `/segmentos/:chave` | ModulosDoSegmento | — |
 | `/modulos/:chave` | Inicio | — |
 | `/importar` | Importar | — |
@@ -152,7 +152,7 @@ Etapa 5 — montar o razão dos itens (Ficha 3). Uma ficha por estabelecimento e
 
 ### RazaoContabil.teste
 
-`src/pages/RazaoContabil.teste.tsx` · 261 linhas
+`src/pages/RazaoContabil.teste.tsx` · 263 linhas
 
 O seletor do razão: o que a marcação tem de aguentar. Existe por uma pergunta feita em 23/09/2026, na revisão da tela: *"filtrar,
 
@@ -231,9 +231,9 @@ está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
 
 | Componente | Exporta | Propriedades | Para que serve |
 | --- | --- | --- | --- |
-| `BarraTopo.tsx` | BarraTopo | `usuario` | O tema sempre esteve pronto em tokens.css e nunca teve como ser trocado — |
+| `BarraTopo.tsx` | BarraTopo | `usuario, antes, solta` | @param antes o que vai à esquerda do nome. Na porta de entrada é o logotipo, |
 | `LeiauteAcesso.tsx` | LeiauteAcesso | `titulo, sub, rodape, children` | A moldura das telas de acesso (login e troca de senha). Metade marinho com o logotipo, metade formulário. Em tela estreita o lado |
-| `MenuLateral.tsx` | MenuLateral | `papel` | O menu lateral. Fica marinho porque é a moldura da identidade — ver docs/IDENTIDADE.md |
+| `MenuLateral.tsx` | MenuLateral | `papel` | O menu lateral. Preto, como o resto da moldura — ver docs/IDENTIDADE.md seção 3. Em tela |
 
 ## 4. Tokens de design (217)
 

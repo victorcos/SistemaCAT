@@ -4,13 +4,36 @@ import { enxergaTodasAsEmpresas } from "@/constants/roles";
 import { IconeClaro, IconeEscuro, IconeSair } from "@/constants/icons";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
+import type { ReactNode } from "react";
+import { cn } from "@/lib/cn";
 import type { Usuario } from "@/types/auth";
 
-export function BarraTopo({ usuario }: { usuario: Usuario }) {
+/**
+ * @param antes o que vai à esquerda do nome. Na porta de entrada é o logotipo,
+ *              porque lá não há menu lateral para carregá-lo.
+ * @param solta sem a borda e o fundo da faixa, para quando o fundo é da tela.
+ */
+export function BarraTopo({
+  usuario,
+  antes,
+  solta,
+}: {
+  usuario: Usuario;
+  antes?: ReactNode;
+  solta?: boolean;
+}) {
   const { sair } = useAuth();
 
   return (
-    <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-borda bg-superficie/85 px-6 py-3 backdrop-blur-[10px]">
+    <header
+      className={cn(
+        "flex flex-wrap items-center gap-3 px-6 py-3",
+        solta
+          ? "bg-transparent"
+          : "sticky top-0 z-20 border-b border-borda bg-superficie/85 backdrop-blur-[10px]",
+      )}
+    >
+      {antes}
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
         <strong className="truncate text-sm">{usuario.nome_exibicao}</strong>
         <EtiquetaDePapel papel={usuario.papel} />
