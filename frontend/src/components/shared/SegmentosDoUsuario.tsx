@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Chip } from "@/components/ui/Filtros";
+import { corDoAssunto } from "@/constants/assuntos";
 import { cn } from "@/lib/cn";
 import { catalogoDeSegmentos, type Segmento } from "@/services/segmentos";
 import { ENXERGA_TODOS_OS_SEGMENTOS } from "@/constants/roles";
@@ -24,15 +25,6 @@ import type { Papel } from "@/types/auth";
  * gravado. Os chips aparecem marcados e travados, com a razão no lugar em que
  * alguém procuraria: o próprio campo.
  */
-
-/** A cor de cada segmento, a mesma dos cards do hub. */
-const TOM: Record<string, string> = {
-  piscofins: "border-laranja-500/40 bg-laranja-500/12 text-laranja-800 escuro:text-laranja-300",
-  icms: "border-azul-400/40 bg-azul-400/12 text-azul-700 escuro:text-azul-300",
-  irpj_csll: "border-sucesso/40 bg-sucesso-fundo text-sucesso",
-};
-
-const TOM_PADRAO = "border-borda-forte bg-superficie-vidro text-texto-suave";
 
 /** O catálogo inteiro, buscado uma vez por montagem de tela. */
 export function useCatalogoDeSegmentos(): Segmento[] {
@@ -80,7 +72,7 @@ export function PilulasDeSegmento({
           key={chave}
           className={cn(
             "whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-extrabold",
-            TOM[chave] ?? TOM_PADRAO,
+            corDoAssunto(chave).pilula,
           )}
         >
           {catalogo.find((s) => s.chave === chave)?.rotulo ?? chave}

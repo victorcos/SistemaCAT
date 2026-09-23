@@ -15,6 +15,7 @@ import {
   Metricas,
   Vazio,
 } from "@/components/ui/Pagina";
+import { corDoAssunto } from "@/constants/assuntos";
 import { FRENTES, type Frente } from "@/constants/fronts";
 import { meusSegmentos, type Segmento } from "@/services/segmentos";
 import { IconeNovo } from "@/constants/icons";
@@ -57,8 +58,16 @@ function passaNoFiltro(p: Projeto, f: Filtro): boolean {
 function passaNaBusca(p: Projeto, termo: string): boolean {
   if (!termo) return true;
   const t = termo.toLocaleLowerCase("pt-BR");
-  return [p.empresa, p.nome, p.frente_rotulo, p.cnpj_matriz ?? "", p.cnpj_matriz_formatado ?? ""]
-    .some((c) => c.toLocaleLowerCase("pt-BR").includes(t));
+  // o assunto entra na busca porque agora está escrito no cartão: quem lê
+  // "PIS/COFINS" ali espera poder digitar isso e achar os trabalhos do tributo
+  return [
+    p.empresa,
+    p.nome,
+    p.frente_rotulo,
+    p.modulo_rotulo,
+    p.cnpj_matriz ?? "",
+    p.cnpj_matriz_formatado ?? "",
+  ].some((c) => c.toLocaleLowerCase("pt-BR").includes(t));
 }
 
 /* ------------------------------------------------------------------ */
@@ -210,7 +219,7 @@ export default function Inicio() {
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
               {visiveis.map((p) => (
-                <CartaoDeTrabalho key={p.id} p={p} />
+                <CartaoDeTrabalho key={p.id} p={p} mostrarAssunto={!modulo} />
               ))}
               <button
                 type="button"
@@ -255,7 +264,14 @@ const FAIXA: Record<Status, string> = {
   concluido: "border-l-sucesso",
 };
 
-function CartaoDeTrabalho({ p }: { p: Projeto }) {
+/**
+ * Um trabalho.
+ *
+ * `mostrarAssunto` é falso na lista já recortada por módulo (`/modulos/icms`):
+ * ali o título da tela já diz "Trabalhos de ICMS", e repetir a etiqueta em
+ * quarenta cartões idênticos não informa nada — vira ruído com cor.
+ */
+function CartaoDeTrabalho({ p, mostrarAssunto }: { p: Projeto; mostrarAssunto: boolean }) {
   const status = p.status as Status;
   const tom = TOM_DO_STATUS[status] ?? "neutro";
   const cancelado = status === "cancelado";
@@ -281,6 +297,20 @@ function CartaoDeTrabalho({ p }: { p: Projeto }) {
           <Etiqueta tom="destaque" title="Dados vieram do arquivo e ainda não foram conferidos">
             Pré-cadastro
           </Etiqueta>
+        )}
+        {/* O assunto, na cor dele — a mesma dos cards do hub. Fica à direita
+            porque não é estado do trabalho como as outras duas: é de que
+            tributo ele é, e é por esse critério que se varre a lista. */}
+        {mostrarAssunto && (
+          <span
+            title={`Trabalho de ${p.modulo_rotulo}`}
+            className={cn(
+              "ml-auto whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-extrabold",
+              corDoAssunto(p.modulo).pilula,
+            )}
+          >
+            {p.modulo_rotulo}
+          </span>
         )}
       </div>
 

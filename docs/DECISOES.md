@@ -5,6 +5,43 @@
 
 ---
 
+## 2026-09-23 — O cartão de trabalho diz de que tributo é, e a cor do assunto passa a ter uma fonte só
+
+**O que faltava.** Na lista de todos os trabalhos, o cartão dizia a empresa, o
+CNPJ, a frente ("CAT 42 — Ressarcimento de ICMS-ST", "Quebra de SPED") e o
+nome do projeto — e **não dizia de que tributo o trabalho é**. Dava para
+deduzir pela frente, mas deduzir uma vez por cartão é exatamente o trabalho
+que uma etiqueta poupa. Agora há uma, na cor do assunto.
+
+**A etiqueta é do módulo, não do segmento.** Ela mostra `modulo_rotulo` —
+"PIS/COFINS", "CBS", "ICMS", "IBS", "IRPJ/CSLL". O segmento diria "PIS/COFINS"
+tanto para um trabalho de PIS/COFINS quanto para um de CBS, e na transição de
+2027 a 2033 os dois convivem: é justamente aí que a distinção importa.
+
+**Ela some na lista já recortada.** Em `/modulos/icms` o título da tela já diz
+"Trabalhos de ICMS"; repetir a etiqueta em quarenta cartões idênticos não
+informa nada, só acrescenta cor. A etiqueta responde "qual é o assunto deste?",
+pergunta que só existe quando a lista mistura assuntos.
+
+**A cor do assunto vira uma fonte só** (`constants/assuntos.ts`). A mesma
+tabela já estava escrita em dois lugares — os cards do hub (`CardDeEscolha`) e
+as pílulas de segmento na lista de usuários —, e esta etiqueta seria a
+terceira. Três cópias da mesma verdade divergem no dia em que alguém mexer
+numa, e "o azul é o ICMS" só vira reconhecimento se for sempre o mesmo azul.
+O sucessor herda a cor de quem sucede: CBS laranja como PIS/COFINS, IBS azul
+como ICMS.
+
+**Uma mudança de comportamento no meio disso:** assunto que a tabela não
+conhece agora cai em **cinza**, e não mais no laranja da casa. Cinza diz "não
+sei o que é isto"; laranja diria que é PIS/COFINS, o que é pior do que não
+dizer nada.
+
+**A busca acompanha o que o cartão passou a mostrar.** Quem lê "PIS/COFINS"
+ali espera digitar isso e achar os trabalhos do tributo — `modulo_rotulo`
+entrou nos campos pesquisados.
+
+---
+
 ## 2026-09-23 — Um caminho por funcionalidade: o card perde o "Abrir", o histórico sai da barra
 
 **Duas repetições, a mesma regra.** Quem olha a tela do trabalho precisa

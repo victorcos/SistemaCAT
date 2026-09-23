@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { corDoAssunto } from "@/constants/assuntos";
 import { cn } from "@/lib/cn";
 import { numero } from "@/lib/format";
 
@@ -12,20 +13,9 @@ import { numero } from "@/lib/format";
  *
  * **A cor é do assunto, não do card.** Cada segmento tem a sua, e ela se repete
  * no ícone, na borda ao passar o mouse e no chamado do rodapé — é o que faz
- * alguém reconhecer "o azul é o ICMS" antes de ler o nome.
+ * alguém reconhecer "o azul é o ICMS" antes de ler o nome. A tabela mora em
+ * `constants/assuntos`, com as pílulas que usam a mesma cor em outras telas.
  */
-
-/** As cores de cada assunto. Chave desconhecida cai no laranja da casa. */
-const TEMAS: Record<string, { anel: string; fundo: string; texto: string }> = {
-  piscofins: { anel: "hover:border-laranja-500/55", fundo: "bg-laranja-500/12", texto: "text-marca-laranja" },
-  cbs: { anel: "hover:border-laranja-500/55", fundo: "bg-laranja-500/12", texto: "text-marca-laranja" },
-  icms: { anel: "hover:border-azul-400/55", fundo: "bg-azul-400/12", texto: "text-azul-400" },
-  ibs: { anel: "hover:border-azul-400/55", fundo: "bg-azul-400/12", texto: "text-azul-400" },
-  irpj_csll: { anel: "hover:border-sucesso/55", fundo: "bg-sucesso/12", texto: "text-sucesso" },
-  usuarios: { anel: "hover:border-borda-forte", fundo: "bg-texto-fraco/12", texto: "text-texto-suave" },
-};
-
-const PADRAO = TEMAS.piscofins;
 
 /** A sigla do ícone. Sem entrada, as três primeiras letras servem. */
 const SIGLAS: Record<string, string> = {
@@ -50,7 +40,7 @@ export interface Escolha {
 }
 
 export function CardDeEscolha({ escolha }: { escolha: Escolha }) {
-  const tema = TEMAS[escolha.chave] ?? PADRAO;
+  const tema = corDoAssunto(escolha.chave);
   const sigla = SIGLAS[escolha.chave] ?? escolha.rotulo.slice(0, 4).toUpperCase();
 
   return (
