@@ -263,6 +263,9 @@ class RemessaDto(BaseModel):
     recusados: int
     tipos: dict[str, int]
     arquivos_para_cat: int
+    # a que trabalho cada arquivo serve, e quais módulos a remessa atende
+    observacoes: list[str]
+    modulos_atendidos: list[str]
     primeira_competencia: date | None
     ultima_competencia: date | None
     avisos: list[str]
@@ -303,6 +306,8 @@ def _remessa_dto(r: RemessaAnalisada) -> RemessaDto:
         recusados=len(r.recusados),
         tipos=r.tipos,
         arquivos_para_cat=r.serve_para_cat,
+        observacoes=r.observacoes,
+        modulos_atendidos=r.modulos_atendidos,
         primeira_competencia=r.primeira_competencia,
         ultima_competencia=r.ultima_competencia,
         avisos=r.avisos,

@@ -5,6 +5,41 @@
 
 ---
 
+## 2026-09-23 — A remessa deixa de ser medida só pela CAT 42
+
+**O defeito.** Quem enviava uma EFD-Contribuições para abrir um trabalho de
+PIS/COFINS lia na conferência: *"Nenhum arquivo é EFD ICMS/IPI"*, em tom de
+atenção, e *"0 servem à CAT 42"* na contagem de arquivos. Nada estava
+bloqueado — o pré-cadastro seguia —, mas a tela dizia que o arquivo não servia
+justamente quando ele era o arquivo daquele trabalho. O cadastro nasceu quando
+só existia a CAT 42 e ficou medindo toda remessa por ela.
+
+**A escolha.** Cada tipo de SPED passa a declarar **a que módulo serve**
+(`TipoSped.modulos`), e a análise devolve duas listas separadas:
+
+- `avisos` — o que exige decisão de quem cadastra: empresas diferentes na
+  mesma remessa, matriz deduzida da raiz, arquivos não reconhecidos;
+- `observacoes` — o que a remessa alimenta, em tom de informação: *"1 EFD
+  Contribuições: serve ao trabalho de PIS/COFINS."* A falta de EFD ICMS/IPI
+  virou uma linha dessas, não mais um alerta.
+
+A EFD ICMS/IPI aparece em dois módulos, e é proposital: além de ser o arquivo
+da CAT 42, é dela que sai a exclusão do ICMS da base do PIS/COFINS. A ECD
+também serve a dois — razão contábil na quebra de SPED, base contábil do lucro
+real.
+
+**As chaves de módulo estão duplicadas** entre `Segmento.cs` (catálogo) e
+`cabecalho.py` (o mapa acima). Ficou assim porque a frase da tela é escrita no
+motor, e nome de módulo é vocabulário estável. Se um terceiro lugar precisar
+da lista, ela vira contrato e sobe para um só.
+
+**O passo seguinte veio junto.** O tributo do projeto vinha sempre ICMS, e o
+nome nascia "Ressarcimento ST" — de novo, o mundo da CAT 42. Agora o tributo
+começa no que os arquivos indicam, entre os que a pessoa enxerga, e o nome
+sugerido acompanha o tributo até alguém digitar o seu.
+
+---
+
 ## 2026-09-23 — A Gestão vira etapa, e o formato longo no meio do caminho
 
 **O que entrou.** `apuracao_contribuicoes`, a segunda etapa do módulo de

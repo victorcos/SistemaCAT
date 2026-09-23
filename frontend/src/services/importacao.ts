@@ -16,6 +16,10 @@ export interface Remessa {
   recusados: number;
   tipos: Record<string, number>;
   arquivos_para_cat: number;
+  /** a que trabalho cada tipo de arquivo serve — informação, não alerta */
+  observacoes: string[];
+  /** chaves dos módulos que têm o que ler nesta remessa */
+  modulos_atendidos: string[];
   primeira_competencia: string | null;
   ultima_competencia: string | null;
   avisos: string[];

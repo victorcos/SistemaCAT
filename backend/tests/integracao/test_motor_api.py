@@ -105,6 +105,29 @@ class TestRemessaPeloCanal:
         # se a empresa já existe, quem diz é a API: ela tem o banco da tela
         assert "ja_cadastrada" not in corpo
 
+    def test_remessa_de_contribuicoes_diz_que_serve_a_piscofins(self, cliente):
+        """Remessa sem EFD ICMS/IPI não é remessa inválida: é de outro trabalho.
+
+        O cadastro mostrava só a conta da CAT 42, e quem ia abrir um trabalho
+        de PIS/COFINS via a própria EFD-Contribuições como arquivo que "não
+        serve". A resposta agora traz a que módulo cada arquivo serve.
+        """
+        contribuicoes = (
+            "|0000|006|0|||01062021|30062021|EMPRESA DA REMESSA|11222333000181"
+            "|SP|3550308||00|2|\r\n"
+        ).encode("latin-1")
+        r = cliente.post("/interno/remessas/analisar", headers=self.SEGREDO,
+                         files={"arquivo": ("piscofins.txt", contribuicoes, "text/plain")})
+        assert r.status_code == 200, r.text
+        corpo = r.json()
+        assert corpo["modulos_atendidos"] == ["piscofins"]
+        assert corpo["observacoes"][0] == (
+            "1 EFD Contribuições: serve ao trabalho de PIS/COFINS."
+        )
+        # a falta da EFD ICMS/IPI vira observação, e não aviso de atenção
+        assert corpo["avisos"] == []
+        assert any("CAT 42" in o for o in corpo["observacoes"])
+
     def test_sem_sped_e_recusada_e_sem_segredo_nao_entra(self, cliente):
         r = cliente.post("/interno/remessas/analisar", headers=self.SEGREDO,
                          files={"arquivo": ("nada.txt", b"conteudo qualquer", "text/plain")})

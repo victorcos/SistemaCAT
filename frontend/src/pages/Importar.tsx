@@ -13,6 +13,7 @@ import { Campo, Entrada } from "@/components/ui/Campo";
 import { Combobox, type OpcaoDeCombobox } from "@/components/ui/Combobox";
 import { CabecalhoDePagina, Secao } from "@/components/ui/Pagina";
 import { FRENTES, type Frente } from "@/constants/fronts";
+import { rotuloDoSped } from "@/constants/sped";
 import { meusSegmentos, type Segmento } from "@/services/segmentos";
 import { IconeConfirma, IconeEnviar, IconeTentarDeNovo } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
@@ -336,13 +337,25 @@ function ConferirEmpresa({
       titulo="Confira a empresa"
       sub="Estes dados vieram do registro 0000 dos próprios arquivos. Nada foi digitado."
     >
-      {remessa.avisos.length > 0 && (
+      {(remessa.avisos.length > 0 || remessa.observacoes.length > 0) && (
         <div className="mt-4 flex flex-col gap-2">
           {remessa.avisos.map((a) => (
             <Aviso key={a} tom="atencao">
               {a}
             </Aviso>
           ))}
+          {/* a que trabalho a remessa serve: informação, e não atenção — era
+              o "0 servem à CAT 42" que fazia a EFD-Contribuições do trabalho
+              de PIS/COFINS parecer arquivo recusado */}
+          {remessa.observacoes.length > 0 && (
+            <Aviso tom="info" titulo="O que esta remessa alimenta">
+              <ul className="m-0 list-disc pl-5">
+                {remessa.observacoes.map((o) => (
+                  <li key={o}>{o}</li>
+                ))}
+              </ul>
+            </Aviso>
+          )}
         </div>
       )}
 
@@ -372,7 +385,7 @@ function ConferirEmpresa({
             `${numero(remessa.lidos)} lidos` +
             (remessa.recusados ? `, ${numero(remessa.recusados)} recusados` : "")
           }
-          nota={`${numero(remessa.arquivos_para_cat)} servem à CAT 42`}
+          nota={composicao(remessa.tipos)}
         />
       </dl>
 
@@ -388,6 +401,14 @@ function ConferirEmpresa({
       </div>
     </Secao>
   );
+}
+
+/** "1 EFD Contribuições" — do que a remessa é feita, por tipo de SPED. */
+function composicao(tipos: Record<string, number>): string | undefined {
+  const partes = Object.entries(tipos)
+    .sort(([, a], [, b]) => b - a)
+    .map(([tipo, qtd]) => `${numero(qtd)} ${rotuloDoSped(tipo)}`);
+  return partes.length ? partes.join(" · ") : undefined;
 }
 
 /** Um fato lido do arquivo: rótulo pequeno, valor grande, barra laranja. */
@@ -417,10 +438,33 @@ function Fato({
 
 /* ------------------------------------------------------------------ */
 
-/** ICMS quando a pessoa o enxerga; senão o primeiro módulo que ela vê. */
-function moduloPadrao(segmentos: Segmento[]): string {
-  const todos = segmentos.flatMap((s) => s.modulos);
-  return todos.some((m) => m.chave === "icms") ? "icms" : (todos[0]?.chave ?? "icms");
+/**
+ * O tributo que os próprios arquivos indicam, entre os que a pessoa enxerga.
+ *
+ * Antes vinha sempre ICMS, e quem enviava uma EFD-Contribuições para abrir um
+ * trabalho de PIS/COFINS precisava trocar na mão — logo depois de ler na tela
+ * que o arquivo "não serve". Sem indicação utilizável, mantém o ICMS, que é o
+ * trabalho de todo projeto anterior a esta divisão.
+ */
+function moduloPadrao(segmentos: Segmento[], atendidos: string[]): string {
+  const meus = segmentos.flatMap((s) => s.modulos).map((m) => m.chave);
+  return (
+    atendidos.find((m) => meus.includes(m)) ??
+    (meus.includes("icms") ? "icms" : (meus[0] ?? "icms"))
+  );
+}
+
+/** O nome que o trabalho ganha antes de alguém digitar: o do tributo dele. */
+function nomeSugerido(modulo: string, ano: string): string {
+  const base =
+    {
+      icms: "Ressarcimento ST",
+      ibs: "Apuração IBS",
+      piscofins: "Apuração PIS/COFINS",
+      cbs: "Apuração CBS",
+      irpj_csll: "Apuração IRPJ/CSLL",
+    }[modulo] ?? "Trabalho";
+  return `${base} ${ano}`.trim();
 }
 
 const OPCOES_DE_FRENTE: OpcaoDeCombobox<Frente>[] = (Object.keys(FRENTES) as Frente[]).map(
@@ -443,22 +487,34 @@ function FormularioDeProjeto({
   const [segmentos, setSegmentos] = useState<Segmento[]>([]);
   const [modulo, setModulo] = useState("icms");
 
+  const ano = remessa.primeira_competencia?.slice(0, 4) ?? "";
+  const [nome, setNome] = useState(() => nomeSugerido("icms", ano));
+  // enquanto ninguém digitou, o nome acompanha o tributo escolhido; depois do
+  // primeiro toque ele é de quem digitou, e trocar o tributo não o desfaz
+  const [nomeDigitado, setNomeDigitado] = useState(false);
+
   useEffect(() => {
     let vivo = true;
     meusSegmentos()
       .then((s) => {
         if (!vivo) return;
         setSegmentos(s);
-        setModulo(moduloPadrao(s));
+        const padrao = moduloPadrao(s, remessa.modulos_atendidos);
+        setModulo(padrao);
+        setNome((atual) => (nomeDigitado ? atual : nomeSugerido(padrao, ano)));
       })
       .catch(() => undefined);
     return () => {
       vivo = false;
     };
+    // só na montagem: depois disso quem manda no módulo é a escolha da pessoa
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [nome, setNome] = useState(
-    `Ressarcimento ST ${remessa.primeira_competencia?.slice(0, 4) ?? ""}`.trim(),
-  );
+
+  function escolherModulo(chave: string) {
+    setModulo(chave);
+    if (!nomeDigitado) setNome(nomeSugerido(chave, ano));
+  }
   // as competências já vêm dos arquivos: é o período que existe de fato
   const [ini, setIni] = useState(paraTextoOuVazio(remessa.primeira_competencia));
   const [fim, setFim] = useState(paraTextoOuVazio(remessa.ultima_competencia));
@@ -522,7 +578,7 @@ function FormularioDeProjeto({
               opcoes={segmentos.flatMap((s) =>
                 s.modulos.map((m) => ({ valor: m.chave, rotulo: m.rotulo })),
               )}
-              aoMudar={setModulo}
+              aoMudar={escolherModulo}
               disabled={segmentos.length === 0}
             />
           )}
@@ -534,7 +590,15 @@ function FormularioDeProjeto({
         </Campo>
         <Campo rotulo="Nome do trabalho">
           {(props) => (
-            <Entrada {...props} value={nome} onChange={(e) => setNome(e.target.value)} required />
+            <Entrada
+              {...props}
+              value={nome}
+              onChange={(e) => {
+                setNomeDigitado(true);
+                setNome(e.target.value);
+              }}
+              required
+            />
           )}
         </Campo>
         <Campo rotulo="Competência inicial">

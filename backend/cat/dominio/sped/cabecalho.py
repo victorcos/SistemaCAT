@@ -75,6 +75,43 @@ class TipoSped(str, Enum):
         """A CAT 42 é de ICMS-ST. Contribuições e ECD entram em outras frentes."""
         return self is TipoSped.EFD_ICMS_IPI
 
+    @property
+    def modulos(self) -> tuple[str, ...]:
+        """Os módulos de trabalho que leem este arquivo.
+
+        As chaves são as do catálogo de módulos, que vive em
+        `Cat.Dominio/Acesso/Segmento.cs`; aqui só se diz qual arquivo alimenta
+        qual trabalho. Sem isso a tela de cadastro media a remessa apenas pela
+        CAT 42, e uma EFD-Contribuições — que é justamente o arquivo do
+        trabalho de PIS/COFINS — aparecia como "0 servem".
+        """
+        return _MODULOS_POR_TIPO[self]
+
+
+# Qual arquivo alimenta qual módulo de trabalho.
+#
+# A EFD ICMS/IPI aparece em dois: além de ser o arquivo da CAT 42, é ela que o
+# PIS/COFINS lê para excluir o ICMS da base (Tema 69) — o mesmo que
+# `cat.dominio.lote` já registra. A ECD também: dela sai o razão contábil que a
+# quebra de SPED confronta com a EFD-Contribuições, e é a base contábil do
+# lucro real.
+_MODULOS_POR_TIPO: dict[TipoSped, tuple[str, ...]] = {
+    TipoSped.EFD_ICMS_IPI: ("icms", "piscofins"),
+    TipoSped.EFD_CONTRIBUICOES: ("piscofins",),
+    TipoSped.ECD: ("piscofins", "irpj_csll"),
+    TipoSped.ECF: ("irpj_csll",),
+}
+
+# Ordem do catálogo de módulos, e o nome de cada um na tela. A lista canônica
+# está em Cat.Dominio/Acesso/Segmento.cs; esta cópia existe porque a mensagem
+# do cadastro é escrita aqui, e um nome de módulo é vocabulário estável.
+MODULOS_EM_ORDEM: tuple[str, ...] = ("piscofins", "icms", "irpj_csll")
+ROTULO_DO_MODULO: dict[str, str] = {
+    "piscofins": "PIS/COFINS",
+    "icms": "ICMS",
+    "irpj_csll": "IRPJ/CSLL",
+}
+
 
 class ArquivoNaoReconhecido(ValueError):
     def __init__(self, motivo: str) -> None:

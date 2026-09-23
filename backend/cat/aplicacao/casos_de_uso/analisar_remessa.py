@@ -15,6 +15,8 @@ from datetime import date
 
 from cat.dominio.comum.cnpj import Cnpj
 from cat.dominio.sped.cabecalho import (
+    MODULOS_EM_ORDEM,
+    ROTULO_DO_MODULO,
     ArquivoNaoReconhecido,
     CabecalhoSped,
     TipoSped,
@@ -81,6 +83,37 @@ class RemessaAnalisada:
         return self.tipos.get(TipoSped.EFD_ICMS_IPI.value, 0)
 
     @property
+    def modulos_atendidos(self) -> list[str]:
+        """Os módulos de trabalho que têm o que ler nesta remessa."""
+        presentes = [TipoSped(t) for t in self.tipos]
+        return [
+            m for m in MODULOS_EM_ORDEM if any(m in t.modulos for t in presentes)
+        ]
+
+    @property
+    def observacoes(self) -> list[str]:
+        """A que trabalho cada arquivo serve. Informação, não alerta.
+
+        Antes a tela media a remessa só pela CAT 42 — "0 servem à CAT 42" e um
+        aviso dizendo que Contribuições e ECD "servem a outras frentes", sem
+        dizer quais. Quem ia cadastrar um trabalho de PIS/COFINS lia aquilo
+        como recusa do arquivo, que é exatamente o arquivo daquele trabalho.
+        """
+        if not self.lidos:
+            return []
+        saida: list[str] = []
+        for tipo, qtd in sorted(self.tipos.items()):
+            t = TipoSped(tipo)
+            verbo = "serve" if qtd == 1 else "servem"
+            modulos = " e ".join(ROTULO_DO_MODULO[m] for m in t.modulos)
+            saida.append(f"{qtd} {t.rotulo}: {verbo} ao trabalho de {modulos}.")
+        if not self.serve_para_cat:
+            saida.append(
+                "A CAT 42 é de ICMS-ST: para ela, a remessa precisa da EFD ICMS/IPI."
+            )
+        return saida
+
+    @property
     def avisos(self) -> list[str]:
         """O que o usuário precisa saber antes de confirmar o cadastro."""
         saida: list[str] = []
@@ -93,11 +126,6 @@ class RemessaAnalisada:
             saida.append(
                 "Nenhum arquivo é da matriz. O CNPJ da matriz foi deduzido da "
                 "raiz e precisa da sua conferência."
-            )
-        if self.lidos and not self.serve_para_cat:
-            saida.append(
-                "Nenhum arquivo é EFD ICMS/IPI. A CAT 42 é de ICMS-ST; "
-                "Contribuições e ECD servem a outras frentes."
             )
         if self.recusados:
             saida.append(
