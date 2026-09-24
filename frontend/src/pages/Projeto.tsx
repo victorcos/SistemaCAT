@@ -215,10 +215,14 @@ export default function Projeto() {
 
   return (
     <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
+      {/* De volta ao **módulo**, e não à lista de todos os trabalhos. Sair de um
+          trabalho de ICMS e cair numa lista com PIS/COFINS no meio é perder o
+          assunto em que se estava — e o assunto é o recorte do sistema inteiro
+          desde que o hub existe. */}
       {trilha ? (
         <Voltar para={ROTAS.projeto(p.id)}>Voltar ao trabalho</Voltar>
       ) : (
-        <Voltar para={ROTAS.inicio}>Trabalhos</Voltar>
+        <Voltar para={ROTAS.modulo(p.modulo)}>Trabalhos de {p.modulo_rotulo}</Voltar>
       )}
 
       <CabecalhoDePagina

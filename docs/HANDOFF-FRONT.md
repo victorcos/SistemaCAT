@@ -1,6 +1,6 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-09-24, sobre a versão **0.99.0**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-09-24, sobre a versão **0.99.1**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
@@ -149,7 +149,7 @@ Pré-validar os arquivos digitais que o cliente já transmitiu.
 
 ### Projeto
 
-`src/pages/Projeto.tsx` · 538 linhas
+`src/pages/Projeto.tsx` · 542 linhas
 
 Para onde cada funcionalidade leva, e com que palavras. A tela não decide o que está disponível — isso vem do domínio, em
 
@@ -747,7 +747,6 @@ Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 | Rótulo | Rota |
 | --- | --- |
 | Segmentos | `ROTAS.segmentos` |
-| Todos os trabalhos | `ROTAS.inicio` |
 | Cadastro | `ROTAS.importar` |
 | Usuários | `ROTAS.usuarios` |
 
