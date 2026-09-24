@@ -134,6 +134,48 @@ navegam para os mesmos lugares, na mesma tela.
 
 ---
 
+## 2026-09-24 — A tela das Exclusões, e o arquivo que entrou duas vezes
+
+**A tela.** Exclusões deixa de ser promessa na barra: roda, acompanha, mostra o
+que volta e baixa a planilha. O número grande vem com a base ao lado — e, com o
+mesmo destaque, **o que a conta recusou e por quê**. Número de tese que não diz
+o que ficou de fora é número que ninguém assina.
+
+A tabela por competência mostra o total de cada mês, que é a soma dos grupos
+daquele mês **já arredondados**. Recalcular sobre a soma daria outro número, e
+a primeira conferência que somasse a planilha à mão encontraria a diferença.
+
+**O que a primeira rodada real descobriu.** Rodando a base inteira, três
+execuções seguidas deram três números diferentes — R$ 38.711.369,34,
+R$ 38.507.768,78 e R$ 38.221.053,53. A causa não era o cálculo: o lote tem
+**dois arquivos com o mesmo nome** para 2021-03, os dois "Retificadora" com o
+mesmo carimbo de hora, e tamanhos de 138 MB e 365 MB. A primeira rodada somou
+os dois; as seguintes ficaram com um ou com o outro, conforme a ordem de
+leitura.
+
+**Três correções saíram daí:**
+
+* a exclusão passou a escolher **um arquivo por competência**, com a mesma
+  regra da Gestão (retificadora vence; depois, o mais novo). Sem isso, um lote
+  com a original e a retificadora do mesmo mês somava as duas;
+* a leitura do agregado **conta e avisa** quando a mesma chave aparece duas
+  vezes, em vez de deixar uma cobrir a outra em silêncio;
+* o aviso de competência repetida passou a **identificar o arquivo** — nome,
+  tamanho e pasta. "Usado X, ignorado X" não ajuda ninguém a decidir se o
+  certo foi escolhido, e é exatamente o que ele dizia quando os dois têm o
+  mesmo nome.
+
+**O agregado envenenado foi apagado.** O parquet da execução 119 guardava os
+dois arquivos sob a mesma chave; qualquer rodada que partisse dele herdaria a
+escolha arbitrária. Apagar e reler foi o certo: 14 minutos contra um número em
+que não se pode confiar.
+
+**O que fica para o cliente decidir:** qual dos dois arquivos de 2021-03 vale.
+O sistema escolhe o mais novo e diz qual ignorou, mas 227 MB de diferença entre
+dois arquivos que se dizem a mesma retificadora é pergunta para quem transmitiu.
+
+---
+
 ## 2026-09-24 — Os agregados ficam em disco, e a segunda conta sai em segundos
 
 **O gargalo.** Ler os 65 SPED da CEMA custa 1h18. Até aqui esse trabalho era

@@ -18,6 +18,7 @@ import PreValidacao from "@/pages/PreValidacao";
 import CreditoOutorgado from "@/pages/CreditoOutorgado";
 import QuebraDeSped from "@/pages/QuebraDeSped";
 import Entrega from "@/pages/Entrega";
+import Exclusoes from "@/pages/Exclusoes";
 import ModulosDoSegmento from "@/pages/ModulosDoSegmento";
 import Razao from "@/pages/Razao";
 import Segmentos from "@/pages/Segmentos";
@@ -112,6 +113,7 @@ export const roteador = createBrowserRouter([
               { path: "/projetos/:id/apuracao-piscofins", element: <ApuracaoPisCofins /> },
               { path: "/projetos/:id/razao-contabil", element: <RazaoContabil /> },
               { path: "/projetos/:id/apuracao-contribuicoes", element: <Gestao /> },
+              { path: "/projetos/:id/exclusoes", element: <Exclusoes /> },
               { path: "/projetos/:id/entrega", element: <Entrega /> },
               { path: "/projetos/:id/historico", element: <Historico /> },
               {

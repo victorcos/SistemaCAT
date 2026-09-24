@@ -75,3 +75,20 @@ def test_varios_arquivos_nao_se_misturam(tmp_path):
 def test_pasta_sem_agregado_volta_vazio(tmp_path):
     """Quem chama decide o que fazer; o que não pode é parecer base zerada."""
     assert ler(str(tmp_path)) == []
+
+
+def test_o_mesmo_arquivo_gravado_duas_vezes_conta_uma_e_nao_em_silencio(tmp_path, caplog):
+    """Aconteceu na base da CEMA: o mesmo SPED entrou duas vezes no lote.
+
+    Contar as duas somaria a competência inteira de novo — foram R$ 203.600,56
+    a mais na tese. Ficar com uma é o certo; fazê-lo calado, não.
+    """
+    documentos = {("PIS", "C170", "S", "01", "5102", "", "1,65"): [100, 100, 2, 0, 1]}
+    dobrado = _apuracao(documentos=documentos, contagens={"C170": 1})
+
+    gravar([dobrado, dobrado], str(tmp_path))
+    with caplog.at_level("WARNING"):
+        (voltou,) = ler(str(tmp_path))
+
+    assert voltou.documentos == documentos
+    assert "entrou duas vezes" in caplog.text

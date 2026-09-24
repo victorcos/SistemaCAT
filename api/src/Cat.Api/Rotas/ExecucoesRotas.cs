@@ -43,6 +43,8 @@ public static class ExecucoesRotas
             "apurar PIS/COFINS");
         Etapa(api, Execucoes.CreditoOutorgado, "credito-outorgado", detalheExigeEtapa: true,
             "apurar o crédito outorgado");
+        Etapa(api, Execucoes.Exclusoes, "exclusoes", detalheExigeEtapa: true,
+            "apurar as exclusões da base");
 
         api.MapGet("/entrega/{execucaoId:int}/estabelecimentos", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>

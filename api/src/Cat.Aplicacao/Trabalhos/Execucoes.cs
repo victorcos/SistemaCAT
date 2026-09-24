@@ -102,6 +102,7 @@ public sealed class Execucoes(
     public const string ApuracaoPisCofins = "apuracao_piscofins";
     /// <summary>Triagem dos itens beneficiados, no módulo de ICMS. Lê os XML, não o SPED.</summary>
     public const string CreditoOutorgado = "credito_outorgado";
+    public const string Exclusoes = "exclusoes";
 
     /// <summary>
     /// A entrega montada e ainda não aprovada. Não é situação gravada: é como o

@@ -186,21 +186,56 @@ class Resumo:
 
 
 @dataclass
+class Total:
+    """Uma soma de grupos — uma competência, ou o trabalho inteiro.
+
+    Soma o que cada grupo já resolveu, e **não recalcula sobre a soma**. O
+    grupo é a unidade de arredondamento: recalcular aqui daria um total que
+    não bate com a soma das linhas do relatório, e a primeira conferência que
+    somasse a planilha à mão encontraria a diferença.
+    """
+
+    base: int = 0
+    excluido: int = 0
+    pis: int = 0
+    cofins: int = 0
+    pis_novo: int = 0
+    cofins_novo: int = 0
+    grupos: int = 0
+
+    def somar(self, a: "Apurado") -> None:
+        self.base += a.base
+        self.excluido += a.excluido
+        self.pis += a.pis
+        self.cofins += a.cofins
+        self.pis_novo += a.pis_novo
+        self.cofins_novo += a.cofins_novo
+        self.grupos += 1
+
+    @property
+    def diferenca_pis(self) -> int:
+        return self.pis - self.pis_novo
+
+    @property
+    def diferenca_cofins(self) -> int:
+        return self.cofins - self.cofins_novo
+
+    @property
+    def diferenca(self) -> int:
+        return self.diferenca_pis + self.diferenca_cofins
+
+
+@dataclass
 class Exclusao:
     grupos: dict[Grupo, Apurado] = field(default_factory=dict)
     resumo: Resumo = field(default_factory=Resumo)
 
-    def por_periodo(self) -> dict[str, Apurado]:
-        """O total de cada competência — é a coluna do relatório."""
-        total: dict[str, Apurado] = defaultdict(Apurado)
+    def por_periodo(self) -> dict[str, Total]:
+        """O total de cada competência — é a linha do relatório."""
+        total: dict[str, Total] = defaultdict(Total)
         for grupo, a in self.grupos.items():
-            if not a.consistente:
-                continue
-            alvo = total[grupo.periodo]
-            alvo.base_pis += a.base_pis
-            alvo.base_cofins += a.base_cofins
-            alvo.pis += a.pis
-            alvo.cofins += a.cofins
+            if a.consistente:
+                total[grupo.periodo].somar(a)
         return dict(sorted(total.items()))
 
 

@@ -116,6 +116,7 @@ def ler(destino: str) -> list[AgregadoDeArquivo]:
         return []
 
     por_arquivo: dict[tuple[str, str, str], AgregadoDeArquivo] = {}
+    repetidas = 0
     for lote in pq.ParquetFile(arquivo).iter_batches():
         for r in lote.to_pylist():
             chave_arquivo = (r["cnpj"], r["periodo"], r["arquivo"])
@@ -125,6 +126,13 @@ def ler(destino: str) -> list[AgregadoDeArquivo]:
                     cnpj=r["cnpj"], periodo=r["periodo"], arquivo=r["arquivo"])
             chave = (r["tributo"], r["registro"], r["operacao"], r["cst"],
                      r["cfop"], r["natureza"], r["aliquota"])
+            if chave in alvo.documentos:
+                # dois arquivos com o mesmo nome, CNPJ e competência: o parquet
+                # os guardou separados e aqui um cobriria o outro. Ficar com um
+                # é o certo — o mesmo arquivo entregue duas vezes conta uma —,
+                # mas fazê-lo em silêncio esconderia uma base montada errada
+                repetidas += 1
+                continue
             alvo.documentos[chave] = [
                 int(r["vl_item"]), int(r["vl_bc"]), int(r["vl_trib"]),
                 int(r["quant"]), int(r["linhas"]),
@@ -132,8 +140,13 @@ def ler(destino: str) -> list[AgregadoDeArquivo]:
 
     _ler_contagens(destino, por_arquivo)
     agregados = list(por_arquivo.values())
+    if repetidas:
+        log.warning("agregado com chave repetida: o mesmo arquivo entrou duas vezes", extra={
+            "linhas_repetidas": repetidas, "destino": os.path.basename(destino),
+        })
     log.info("agregados da efd lidos do disco", extra={
-        "arquivos": len(agregados), "destino": os.path.basename(destino),
+        "arquivos": len(agregados), "repetidas": repetidas,
+        "destino": os.path.basename(destino),
     })
     return agregados
 

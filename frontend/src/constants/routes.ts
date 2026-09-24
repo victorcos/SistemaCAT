@@ -34,6 +34,8 @@ export const ROTAS = {
   /** a apuração de PIS/COFINS: a 037 e o razão da ECD, o par que se confronta */
   apuracaoPisCofins: (id: number | string) => `/projetos/${id}/apuracao-piscofins`,
   gestao: (id: number | string) => `/projetos/${id}/apuracao-contribuicoes`,
+  /** o que sai da base do PIS/COFINS antes de apurar — hoje, as próprias contribuições */
+  exclusoes: (id: number | string) => `/projetos/${id}/exclusoes`,
   /** o razão da ECD, com seletor de conta — sai da quebra de SPED */
   razaoContabil: (id: number | string) => `/projetos/${id}/razao-contabil`,
   entrega: (id: number | string) => `/projetos/${id}/entrega`,

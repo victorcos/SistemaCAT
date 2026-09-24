@@ -84,6 +84,20 @@ def ler(caminhos: Iterable[str],
     return sorted(apuracoes, key=lambda a: (a.cnpj, a.periodo)), avisos
 
 
+def _identificar(ap: ApuracaoEFD) -> str:
+    """O arquivo de um jeito que dê para conferir na pasta.
+
+    Só o nome não basta: numa base real desta casa dois arquivos vieram com o
+    **mesmo nome** e tamanhos muito diferentes (138 MB e 365 MB), os dois
+    retificadora da mesma competência. "Usado X, ignorado X" não ajuda ninguém
+    a decidir se o certo foi escolhido.
+    """
+    nome = os.path.basename(ap.arquivo)
+    pasta = os.path.basename(os.path.dirname(ap.arquivo))
+    mb = ap.tamanho / (1 << 20)
+    return f"{nome} ({mb:,.0f} MB, em {pasta})".replace(",", ".")
+
+
 def selecionar_por_competencia(
     apuracoes: list[ApuracaoEFD],
 ) -> tuple[list[ApuracaoEFD], list[str]]:
@@ -108,14 +122,14 @@ def selecionar_por_competencia(
         melhores[apuracao.periodo] = vencedor
         avisos.append(
             f"{apuracao.periodo}: dois arquivos para a mesma competência; usado "
-            f"{os.path.basename(vencedor.arquivo)}, ignorado "
-            f"{os.path.basename(perdedor.arquivo)}."
+            f"{_identificar(vencedor)}, ignorado {_identificar(perdedor)}."
         )
         log.info("competência com mais de um arquivo na gestão", extra={
             "periodo": apuracao.periodo,
-            "usado": os.path.basename(vencedor.arquivo),
-            "ignorado": os.path.basename(perdedor.arquivo),
+            "usado": vencedor.arquivo, "usado_bytes": vencedor.tamanho,
+            "ignorado": perdedor.arquivo, "ignorado_bytes": perdedor.tamanho,
             "por_retificadora": vencedor.tipo_escrit == "1",
+            "mesmo_nome": os.path.basename(vencedor.arquivo) == os.path.basename(perdedor.arquivo),
         })
     return [melhores[p] for p in sorted(melhores)], avisos
 

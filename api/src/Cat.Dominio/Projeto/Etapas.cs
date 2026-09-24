@@ -164,12 +164,14 @@ public static class Etapas
             Implementada: true, Aba: "Gestão"),
         new("exclusoes", "Exclusões da base",
             "O que sai da base de cálculo do PIS/COFINS antes de apurar. A " +
-            "principal é o ICMS destacado (Tema 69, RE 574.706), que **cruza a " +
-            "EFD-Contribuições com a EFD ICMS/IPI** do mesmo CNPJ e da mesma " +
-            "competência — o campo do ICMS no C170 das Contribuições é " +
-            "facultativo, e metade dos clientes o manda em branco. Ainda não " +
-            "construída.",
-            Implementada: false, Aba: "Exclusões"),
+            "primeira tese são as próprias contribuições: a receita embute PIS e " +
+            "COFINS, e a base de cada uma perde as duas. Sai grupo a grupo — " +
+            "registro, CST e CFOP na competência —, e o cruzamento com a 037 " +
+            "continua sendo do analista. Falta a do ICMS destacado (Tema 69, RE " +
+            "574.706), que precisa da EFD ICMS/IPI do mesmo CNPJ e competência: o " +
+            "campo do ICMS no C170 das Contribuições é facultativo, e metade dos " +
+            "clientes o manda em branco.",
+            Implementada: true, Aba: "Exclusões"),
         new("historico", "Histórico do trabalho",
             "Tudo o que aconteceu, em ordem: quem importou, quem rodou cada " +
             "etapa, o que cada rodada produziu, quem mudou o status e por quê. " +

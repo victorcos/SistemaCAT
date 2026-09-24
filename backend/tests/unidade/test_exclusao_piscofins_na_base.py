@@ -9,8 +9,8 @@ altere esse número está mudando a tese, não o código.
 from __future__ import annotations
 
 from cat.infraestrutura.exclusoes.piscofins_na_propria_base import (
-    Apurado,
     Grupo,
+    Total,
     calcular,
 )
 from cat.infraestrutura.gestao.modelos import ApuracaoEFD
@@ -190,6 +190,22 @@ class TestOTotalPorCompetencia:
 
         total = r.por_periodo()
         assert list(total) == ["2025-09", "2025-10"]
-        assert all(isinstance(a, Apurado) for a in total.values())
+        assert all(isinstance(a, Total) for a in total.values())
         assert total["2025-09"].diferenca == 856
+        assert total["2025-09"].grupos == 1
         assert r.resumo.periodos == ["2025-09", "2025-10"]
+
+    def test_o_total_e_a_soma_dos_grupos_ja_arredondados(self):
+        """Recalcular sobre a soma daria outro número — e a planilha somada à
+        mão não bateria com o total da tela."""
+        documentos = {}
+        for n, cfop in enumerate(("5102", "5405", "5949"), start=1):
+            documentos.update({
+                ("PIS", "C170", "S", "01", cfop, "", "1,65"): [1_000, 1_000, 10, 0, 1],
+                ("COFINS", "C170", "S", "01", cfop, "", "7,60"): [1_000, 1_000, 30, 0, 1],
+            })
+        r = calcular([_apuracao(documentos)])
+
+        soma_das_linhas = sum(a.diferenca for a in r.grupos.values())
+        assert r.por_periodo()[PERIODO].diferenca == soma_das_linhas
+        assert r.resumo.diferenca == soma_das_linhas

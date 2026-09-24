@@ -52,18 +52,26 @@ def fontes_do_projeto(projeto_id: int, sessao: Session) -> list[str]:
     return caminhos_do_lote(projeto_id, TipoDeArquivo.SPED_CONTRIBUICOES, sessao)
 
 
-def agregados_do_projeto(projeto_id: int, sessao: Session) -> str | None:
-    """A pasta da Gestão mais recente que deixou agregado em disco.
+# quem deixa agregado em disco: a Gestão, ao montar os quadros, e a própria
+# exclusão, quando precisou ler os SPED por não haver agregado nenhum
+ETAPAS_QUE_AGREGAM = (apurar_contribuicoes.ETAPA, ETAPA)
 
-    A mais recente, e não a primeira que serve: se o trabalho rodou a Gestão de
-    novo — porque chegou arquivo, porque a leitura foi corrigida —, é daquela
-    que a exclusão tem de partir. Execução antiga tem agregado velho, e um
-    número velho que bate com nada é pior que número nenhum.
+
+def agregados_do_projeto(projeto_id: int, sessao: Session) -> str | None:
+    """A pasta da rodada mais recente que deixou agregado em disco.
+
+    A mais recente, e não a primeira que serve: se o trabalho rodou de novo —
+    porque chegou arquivo, porque a leitura foi corrigida —, é daquela que a
+    exclusão tem de partir. Agregado velho que bate com nada é pior que
+    agregado nenhum.
+
+    Vale o da Gestão e o de uma exclusão anterior: a primeira rodada que leu os
+    SPED pagou a hora, e não há razão para a segunda pagar de novo.
     """
     execucoes = sessao.scalars(
         select(ExecucaoDB)
         .where(ExecucaoDB.projeto_id == projeto_id,
-               ExecucaoDB.etapa == apurar_contribuicoes.ETAPA,
+               ExecucaoDB.etapa.in_(ETAPAS_QUE_AGREGAM),
                ExecucaoDB.situacao == "concluida")
         .order_by(ExecucaoDB.id.desc()))
     for execucao in execucoes:
@@ -89,7 +97,8 @@ def preparar(projeto_id: int, usuario_id: int, sessao: Session) -> ExecucaoDB:
     sessao.add(execucao)
     sessao.commit()
     sessao.refresh(execucao)
-    de_onde = "do agregado da Gestão" if agregados else f"de {len(contribuicoes)} EFD-Contribuições"
+    de_onde = ("de agregado já lido" if agregados
+               else f"de {len(contribuicoes)} EFD-Contribuições")
     registrar_de_etapa(
         sessao, projeto_id, TipoDeEvento.ETAPA_INICIADA, ETAPA,
         f"Exclusões da base · {de_onde}",
@@ -152,9 +161,9 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     execucao.arquivos_totais = total
 
     if agregados:
-        diario.anotar("info", "Partindo do agregado que a Gestão deixou: sem reler os SPED.")
+        diario.anotar("info", "Partindo do agregado que uma rodada anterior deixou: sem reler os SPED.")
     else:
-        diario.anotar("aviso", f"Nenhuma Gestão concluída neste trabalho — os "
+        diario.anotar("aviso", f"Nenhum agregado neste trabalho — os "
                                f"{milhar(total)} SPED serão lidos agora, e o agregado fica "
                                "gravado para as próximas teses.")
 

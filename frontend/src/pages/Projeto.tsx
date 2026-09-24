@@ -107,6 +107,14 @@ const DESTINOS: Record<
       padrao: "Apurar as contribuições",
     },
   },
+  exclusoes: {
+    rota: ROTAS.exclusoes,
+    rotulos: {
+      concluida: "Ver o que volta e baixar a planilha",
+      em_andamento: "Acompanhar a apuração",
+      padrao: "Apurar as exclusões",
+    },
+  },
   razao: {
     rota: ROTAS.razao,
     rotulos: {
