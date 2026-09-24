@@ -52,12 +52,24 @@ import type { ErroApi } from "@/types/erro";
 
 const ESPERA_PARA_CANCELAR_MS = 400;
 
-const ATALHOS: { chave: string; rotulo: string }[] = [
-  { chave: "icms", rotulo: "ICMS" },
-  { chave: "piscofins", rotulo: "PIS/COFINS" },
-  { chave: "descontos", rotulo: "Descontos" },
-  { chave: "tudo", rotulo: "Tudo" },
-];
+const ROTULO_DO_ATALHO: Record<string, string> = {
+  icms: "ICMS",
+  piscofins: "PIS/COFINS",
+  descontos: "Descontos",
+  tudo: "Tudo",
+};
+
+/**
+ * Os atalhos que a barra mostra, na ordem, para o módulo do trabalho.
+ *
+ * O do outro tributo fica de fora: num trabalho de PIS/COFINS, um botão "ICMS"
+ * ao lado do "PIS/COFINS" convida ao clique errado — e quem realmente quiser a
+ * coluna de ICMS ali tem o bloco, um clique adiante.
+ */
+function atalhosDoModulo(modulo: string | undefined): string[] {
+  const proprio = modulo === "piscofins" ? "piscofins" : "icms";
+  return [proprio, "descontos", "tudo"];
+}
 
 export default function QuebraXml() {
   const { id } = useParams<{ id: string }>();
@@ -229,7 +241,9 @@ export default function QuebraXml() {
         </Faixa>
       )}
 
-      {resultado && resumo && <Concluido execucao={resultado} resumo={resumo} />}
+      {resultado && resumo && (
+        <Concluido execucao={resultado} resumo={resumo} modulo={p?.modulo} />
+      )}
     </div>
   );
 }
@@ -257,9 +271,12 @@ function EmCurso({ e }: { e: ExecucaoDaQuebraDeXml }) {
 function Concluido({
   execucao,
   resumo,
+  modulo,
 }: {
   execucao: ExecucaoDaQuebraDeXml;
   resumo: ResumoDaQuebraDeXml;
+  /** o tributo do trabalho: decide o que vem marcado e o que fica guardado */
+  modulo: string | undefined;
 }) {
   const [catalogo, setCatalogo] = useState<CatalogoDoXml | null>(null);
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
@@ -272,9 +289,12 @@ function Concluido({
       .then((c) => {
         if (!vivo) return;
         setCatalogo(c);
-        // começa com o atalho do tributo mais provável: tudo marcado assusta,
-        // nada marcado obriga a escolher 57 vezes antes do primeiro download
-        setMarcados(new Set(c.atalhos.icms ?? c.campos.map((x) => x.campo)));
+        // começa marcado no atalho **do tributo do trabalho**. Tudo marcado
+        // assusta, nada marcado obriga a escolher 57 vezes antes do primeiro
+        // download — e o atalho do outro tributo seria a escolha errada por
+        // padrão, que é pior que as duas
+        const doModulo = atalhosDoModulo(modulo)[0];
+        setMarcados(new Set(c.atalhos[doModulo] ?? c.campos.map((x) => x.campo)));
       })
       .catch(() => undefined);
     return () => {
@@ -330,6 +350,7 @@ function Concluido({
       {download.erro && <Aviso titulo={download.erro.message} codigo={download.erro.requisicaoId} />}
 
       <SeletorDeCampos
+        modulo={modulo}
         catalogo={catalogo}
         marcados={marcados}
         aoMudar={setMarcados}
@@ -369,8 +390,17 @@ function Numero({
 
 /* ------------------------------------------------------------------ */
 
-/** O seletor: blocos com atalho, e liberdade campo a campo dentro deles. */
+/**
+ * O seletor: os blocos do tributo do trabalho, e o resto guardado.
+ *
+ * Num trabalho de PIS/COFINS, ICMS-ST e ISSQN não são escolha — são ruído: seis
+ * blocos abertos com o mesmo peso fazem a pessoa procurar os dois que interessam.
+ * Então os blocos do próprio tributo ficam à vista, e os outros atrás de um
+ * clique, **sem sumir**: cruzar a nota com o ICMS destacado é trabalho legítimo,
+ * e quem precisa dele não deveria ter de mudar de tela.
+ */
 function SeletorDeCampos({
+  modulo,
   catalogo,
   marcados,
   aoMudar,
@@ -378,6 +408,7 @@ function SeletorDeCampos({
   baixando,
   aoCancelar,
 }: {
+  modulo: string | undefined;
   catalogo: CatalogoDoXml | null;
   marcados: Set<string>;
   aoMudar: (c: Set<string>) => void;
@@ -385,6 +416,8 @@ function SeletorDeCampos({
   baixando: Formato | null;
   aoCancelar: () => void;
 }) {
+  const [mostrarOutros, setMostrarOutros] = useState(false);
+
   if (!catalogo) {
     return (
       <section className="rounded-cartao border border-borda bg-superficie p-6 text-[13px] text-texto-fraco">
@@ -392,6 +425,18 @@ function SeletorDeCampos({
       </section>
     );
   }
+
+  const atalhos = atalhosDoModulo(modulo);
+  const doTributo = new Set(
+    (catalogo.atalhos[atalhos[0]] ?? []).map(
+      (campo) => catalogo.campos.find((c) => c.campo === campo)?.bloco ?? "",
+    ),
+  );
+  const principais = catalogo.blocos.filter((b) => doTributo.has(b));
+  const outros = catalogo.blocos.filter((b) => !doTributo.has(b));
+  const marcadosNosOutros = catalogo.campos.filter(
+    (c) => !doTributo.has(c.bloco) && marcados.has(c.campo),
+  ).length;
 
   const alternar = (campo: string) => {
     const agora = new Set(marcados);
@@ -409,6 +454,50 @@ function SeletorDeCampos({
     aoMudar(agora);
   };
 
+  const Bloco = ({ bloco }: { bloco: string }) => {
+    const doBloco = catalogo.campos.filter((c) => c.bloco === bloco);
+    const todos = doBloco.every((c) => marcados.has(c.campo));
+    const algum = doBloco.some((c) => marcados.has(c.campo));
+    return (
+      <div>
+        <label className="flex cursor-pointer items-center gap-2.5 border-b border-borda-sutil pb-2">
+          <input
+            type="checkbox"
+            aria-label={`Marcar o bloco ${bloco}`}
+            checked={todos}
+            ref={(el) => {
+              // meio marcado: o bloco tem campo escolhido, mas não todos
+              if (el) el.indeterminate = algum && !todos;
+            }}
+            onChange={(e) => alternarBloco(bloco, e.target.checked)}
+          />
+          <span className="text-[12px] font-extrabold uppercase tracking-[0.12em] text-texto">
+            {bloco}
+          </span>
+          <span className="ml-auto font-mono text-[11px] text-texto-fraco">
+            {doBloco.filter((c) => marcados.has(c.campo)).length}/{doBloco.length}
+          </span>
+        </label>
+
+        <ul className="m-0 mt-2 flex list-none flex-col gap-1 p-0">
+          {doBloco.map((c) => (
+            <li key={c.campo}>
+              <label className="flex cursor-pointer items-center gap-2.5 py-0.5 text-[13px] text-texto-suave">
+                <input
+                  type="checkbox"
+                  aria-label={`Marcar ${c.titulo}`}
+                  checked={marcados.has(c.campo)}
+                  onChange={() => alternar(c.campo)}
+                />
+                {c.titulo}
+              </label>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
+
   return (
     <section className="overflow-hidden rounded-cartao border border-borda bg-superficie">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-borda px-6 py-4">
@@ -421,16 +510,18 @@ function SeletorDeCampos({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {ATALHOS.filter((a) => catalogo.atalhos[a.chave]).map((a) => (
-            <Botao
-              key={a.chave}
-              variante="secundario"
-              tamanho="sm"
-              onClick={() => aoMudar(new Set(catalogo.atalhos[a.chave]))}
-            >
-              {a.rotulo}
-            </Botao>
-          ))}
+          {atalhos
+            .filter((chave) => catalogo.atalhos[chave])
+            .map((chave) => (
+              <Botao
+                key={chave}
+                variante="secundario"
+                tamanho="sm"
+                onClick={() => aoMudar(new Set(catalogo.atalhos[chave]))}
+              >
+                {ROTULO_DO_ATALHO[chave] ?? chave}
+              </Botao>
+            ))}
           <Botao variante="fantasma" tamanho="sm" onClick={() => aoMudar(new Set())}>
             Limpar
           </Botao>
@@ -449,50 +540,39 @@ function SeletorDeCampos({
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-x-8 gap-y-5 p-6">
-        {catalogo.blocos.map((bloco) => {
-          const doBloco = catalogo.campos.filter((c) => c.bloco === bloco);
-          const todos = doBloco.every((c) => marcados.has(c.campo));
-          const algum = doBloco.some((c) => marcados.has(c.campo));
-          return (
-            <div key={bloco}>
-              <label className="flex cursor-pointer items-center gap-2.5 border-b border-borda-sutil pb-2">
-                <input
-                  type="checkbox"
-                  aria-label={`Marcar o bloco ${bloco}`}
-                  checked={todos}
-                  ref={(el) => {
-                    // meio marcado: o bloco tem campo escolhido, mas não todos
-                    if (el) el.indeterminate = algum && !todos;
-                  }}
-                  onChange={(e) => alternarBloco(bloco, e.target.checked)}
-                />
-                <span className="text-[12px] font-extrabold uppercase tracking-[0.12em] text-texto">
-                  {bloco}
-                </span>
-                <span className="ml-auto font-mono text-[11px] text-texto-fraco">
-                  {doBloco.filter((c) => marcados.has(c.campo)).length}/{doBloco.length}
-                </span>
-              </label>
-
-              <ul className="m-0 mt-2 flex list-none flex-col gap-1 p-0">
-                {doBloco.map((c) => (
-                  <li key={c.campo}>
-                    <label className="flex cursor-pointer items-center gap-2.5 py-0.5 text-[13px] text-texto-suave">
-                      <input
-                        type="checkbox"
-                        aria-label={`Marcar ${c.titulo}`}
-                        checked={marcados.has(c.campo)}
-                        onChange={() => alternar(c.campo)}
-                      />
-                      {c.titulo}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
+        {principais.map((bloco) => (
+          <Bloco key={bloco} bloco={bloco} />
+        ))}
       </div>
+
+      {outros.length > 0 && (
+        <div className="border-t border-borda-sutil">
+          <button
+            type="button"
+            aria-expanded={mostrarOutros}
+            onClick={() => setMostrarOutros((x) => !x)}
+            className="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent px-6 py-3.5 text-left hover:bg-tabela-linha-hover"
+          >
+            <span className="text-[13px] font-bold text-texto-suave">
+              {mostrarOutros ? "Esconder" : "Mostrar"} os outros tributos
+            </span>
+            <span className="text-[12px] text-texto-fraco">{outros.join(" · ")}</span>
+            {marcadosNosOutros > 0 && (
+              <span className="rounded-full bg-laranja-500/14 px-2 py-0.5 font-mono text-[11px] font-bold text-marca-laranja">
+                {numero(marcadosNosOutros)} marcados
+              </span>
+            )}
+          </button>
+
+          {mostrarOutros && (
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-x-8 gap-y-5 border-t border-borda-sutil bg-superficie-vidro p-6">
+              {outros.map((bloco) => (
+                <Bloco key={bloco} bloco={bloco} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <p className="m-0 border-t border-borda bg-superficie-vidro px-6 py-3 text-[11px] leading-relaxed text-texto-fraco">
         A ordem das colunas é sempre a mesma, independente da ordem em que você marcar — duas

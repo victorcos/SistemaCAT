@@ -216,6 +216,17 @@ Três decisões dentro dessa:
 planilhas, aqui recortando **coluna** em vez de linha. `modelos` continua
 recortando linha (55, 65, 59). Nenhuma rota nova para isso.
 
+**Corrigido no mesmo dia: o seletor segue o tributo do trabalho.** A primeira
+versão abria marcada no atalho de **ICMS** em qualquer módulo, e mostrava
+ICMS-ST, IPI e ISSQN com o mesmo peso numa tela de PIS/COFINS. Quem fosse
+baixar levaria as colunas erradas sem perceber — o download não avisa.
+
+Agora o padrão é o atalho do módulo, os blocos do outro tributo ficam atrás de
+"mostrar os outros tributos" — **sem sumir**, porque cruzar a nota com o ICMS
+destacado é trabalho legítimo — e o atalho do outro tributo sai da barra, onde
+convidava ao clique errado. Cinco testes de tela guardam isso, incluindo o que
+prova que a coluna do outro tributo, quando marcada à mão, vai no download.
+
 **A aba "Resumo" do extrator não veio** — uma linha por nota com a conferência
 entre o desconto declarado e a soma dos itens. Foi decisão de quem pediu: uma
 aba só, de itens. Fica anotada, porque a conferência de desconto é útil e o
