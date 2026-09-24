@@ -44,6 +44,11 @@ log = obter_log(__name__)
 
 ARQUIVO_ITENS_DO_XML = "itens_do_xml.parquet"
 
+# quantos CNPJ de fora o resumo guarda. A lista existe para a pessoa
+# reconhecer de quem é o que veio junto na pasta — uma pasta de rede
+# compartilhada devolve o grupo inteiro, e vinte já dizem o que houve.
+CNPJS_DE_FORA_GUARDADOS = 20
+
 _Q2 = Decimal("0.01")
 _Q4 = Decimal("0.0001")
 _Q5 = Decimal("0.00001")
@@ -137,6 +142,12 @@ class ProgressoDoXml(Progresso):
     nao_autorizados: int = 0
     # cópia autorizada que chegou depois de uma sem protocolo e ficou no lugar dela
     copias_trocadas: int = 0
+    # nota que não é da empresa do trabalho, nem emitente nem destinatário. O
+    # zip é o único lugar onde isto se decide aqui: o XML solto a importação já
+    # separa, mas o zip entra fechado, com o que o portal tiver posto dentro
+    de_outra_empresa: int = 0
+    # raiz do CNPJ de fora -> quantas notas. Nada sai em silêncio
+    cnpjs_de_fora: dict[str, int] = field(default_factory=dict)
     exemplos_ilegiveis: list[str] = field(default_factory=list)
     # (chave, arquivo) dos eventos de cancelamento achados no meio dos XML — o
     # zip do portal traz os eventos junto com as notas
@@ -148,16 +159,23 @@ def _q(valor: Decimal, casas: Decimal) -> Decimal:
 
 
 def extrair_itens_do_xml(xmls: list[str], destino: str, avisar: Aviso | None = None,
-                         progresso: ProgressoDoXml | None = None) -> ProgressoDoXml:
-    """Grava `itens_do_xml.parquet` em `destino` com o item de cada XML, solto ou em zip."""
+                         progresso: ProgressoDoXml | None = None,
+                         cnpj_raiz: str | None = None) -> ProgressoDoXml:
+    """Grava `itens_do_xml.parquet` em `destino` com o item de cada XML, solto ou em zip.
+
+    `cnpj_raiz` é a raiz do CNPJ da empresa do trabalho. Com ela, a nota de
+    outra empresa fica de fora e é contada; sem ela, tudo entra — é o que os
+    testes e as leituras avulsas fazem.
+    """
     progresso = progresso or ProgressoDoXml(arquivos_totais=contar_xml(xmls))
     return extrair_itens_de_conteudos(conteudos_de_xml(xmls, recusados=progresso.recusados),
-                                      destino, avisar, progresso)
+                                      destino, avisar, progresso, cnpj_raiz)
 
 
 def extrair_itens_de_conteudos(fontes: Iterable[tuple[str, bytes | None]], destino: str,
                                avisar: Aviso | None = None,
-                               progresso: ProgressoDoXml | None = None) -> ProgressoDoXml:
+                               progresso: ProgressoDoXml | None = None,
+                               cnpj_raiz: str | None = None) -> ProgressoDoXml:
     """O mesmo, a partir de (nome, conteúdo). Conteúdo None: lê do disco pelo nome.
 
     É por aqui que um XML de dentro de zip entra sem ser extraído para o disco.
@@ -171,7 +189,7 @@ def extrair_itens_de_conteudos(fontes: Iterable[tuple[str, bytes | None]], desti
     negadas: set[str] = set()
     try:
         for nome, conteudo in fontes:
-            _ler_um(nome, conteudo, escritor, vistas, negadas, progresso)
+            _ler_um(nome, conteudo, escritor, vistas, negadas, progresso, cnpj_raiz)
             progresso.arquivos_lidos += 1
             if avisar is not None:
                 avisar(progresso)
@@ -184,7 +202,8 @@ def extrair_itens_de_conteudos(fontes: Iterable[tuple[str, bytes | None]], desti
         "itens": progresso.itens, "repetidos": progresso.repetidos,
         "copias_trocadas": progresso.copias_trocadas, "nao_autorizados": progresso.nao_autorizados,
         "nao_sao_documento": progresso.nao_sao_documento, "ilegiveis": progresso.ilegiveis,
-        "sem_item": progresso.sem_item})
+        "sem_item": progresso.sem_item, "de_outra_empresa": progresso.de_outra_empresa,
+        "cnpjs_de_fora": progresso.cnpjs_de_fora})
     return progresso
 
 
@@ -210,8 +229,33 @@ def _uma_copia_por_chave(caminho: str, negadas: set[str], progresso: ProgressoDo
     os.remove(provisorio)
 
 
+def e_de_outra_empresa(doc: DocumentoXml, cnpj_raiz: str) -> bool:
+    """A nota não tem a empresa do trabalho em ponta nenhuma.
+
+    É a regra da importação (`inspecionar_lote._e_de_outra_empresa`), aplicada
+    agora nota a nota: a empresa pode ser o emitente (nota que ela emitiu) ou o
+    destinatário (nota que ela recebeu do fornecedor). Comparar só o emitente
+    jogaria fora toda a compra.
+
+    **Nota sem ponta legível fica.** Recusar o que não se sabe de quem é
+    perderia nota boa — e o que não tem CNPJ nenhum não contamina apuração de
+    outro cliente, que é o risco que esta regra existe para evitar.
+    """
+    pontas = [c for c in (doc.emitente, doc.destinatario) if c]
+    return bool(pontas) and all(c[:8] != cnpj_raiz for c in pontas)
+
+
+def _anotar_de_fora(doc: DocumentoXml, progresso: ProgressoDoXml) -> None:
+    """Conta a nota de fora e guarda de quem ela é, sem guardar a nota."""
+    progresso.de_outra_empresa += 1
+    quem = (doc.emitente or doc.destinatario or "")[:8]
+    if quem in progresso.cnpjs_de_fora or len(progresso.cnpjs_de_fora) < CNPJS_DE_FORA_GUARDADOS:
+        progresso.cnpjs_de_fora[quem] = progresso.cnpjs_de_fora.get(quem, 0) + 1
+
+
 def _ler_um(caminho: str, conteudo: bytes | None, escritor: _Escritor, vistas: dict[str, int],
-            negadas: set[str], progresso: ProgressoDoXml) -> None:
+            negadas: set[str], progresso: ProgressoDoXml,
+            cnpj_raiz: str | None = None) -> None:
     nome = os.path.basename(caminho)
     try:
         if conteudo is None:
@@ -228,6 +272,11 @@ def _ler_um(caminho: str, conteudo: bytes | None, escritor: _Escritor, vistas: d
         return
     if len(doc.chave) != 44 or not doc.chave.isdigit():
         _ilegivel(nome, ValueError(f"chave de acesso inválida: {doc.chave!r}"), progresso)
+        return
+    # antes de qualquer outra coisa: nota de outra empresa não é cópia, não é
+    # denegada, não é nada deste trabalho — é dado de outro cliente
+    if cnpj_raiz and e_de_outra_empresa(doc, cnpj_raiz):
+        _anotar_de_fora(doc, progresso)
         return
     if doc.autorizado is False:
         progresso.nao_autorizados += 1

@@ -66,6 +66,8 @@ class ResumoDaMovimentacao:
     xml_nao_autorizados: int = 0
     # repetidos em que a cópia autorizada ficou no lugar da sem protocolo
     xml_copias_trocadas: int = 0
+    # nota de outro CNPJ vinda dentro do zip do portal: fica de fora
+    xml_de_outra_empresa: int = 0
     saidas_completadas_pelo_xml: int = 0
     entradas_completadas_pelo_xml: int = 0
     movimentos_do_xml: int = 0
@@ -188,6 +190,12 @@ class ResumoDaMovimentacao:
             avisos.append(
                 f"{_numero(self.xml_ilegiveis)} XML não abriram (arquivo quebrado ou "
                 "chave inválida). O nome dos arquivos está no log da etapa."
+            )
+        if self.xml_de_outra_empresa:
+            avisos.append(
+                f"{_numero(self.xml_de_outra_empresa)} XML são de outra empresa — nem emitente "
+                "nem destinatário é o CNPJ do trabalho — e ficaram de fora. Vieram dentro do "
+                "zip, que a importação não abre. De quem são está no log da etapa."
             )
         if self.entradas_sem_item:
             avisos.append(

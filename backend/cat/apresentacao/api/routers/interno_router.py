@@ -166,6 +166,13 @@ class PedidoInspecionarLote(BaseModel):
     pasta: str = Field(min_length=1, max_length=1000)
 
 
+# quantos arquivos de outra empresa a tela recebe por nome, e quantos CNPJ
+# aparecem na conta. Uma pasta de rede do grupo inteiro devolve milhares: a
+# lista existe para reconhecer o que saiu, não para reler a pasta
+AMOSTRA_DE_FORA = 40
+EMPRESAS_DE_FORA = 20
+
+
 class ArquivoInspecionado(BaseModel):
     nome: str
     caminho: str
@@ -187,6 +194,14 @@ class ArquivoInspecionado(BaseModel):
     alimenta: bool = False
 
 
+class EmpresaDeFora(BaseModel):
+    """Um CNPJ que apareceu na pasta e não é o do trabalho."""
+
+    cnpj: str
+    arquivos: int
+    bytes_totais: int = 0
+
+
 class LoteInspecionado(BaseModel):
     """Tudo que a API precisa para mostrar a conferência e para registrar.
 
@@ -200,6 +215,12 @@ class LoteInspecionado(BaseModel):
     modulo: str
     arquivos: list[ArquivoInspecionado]
     de_outra_empresa: int
+    # de quem é o que ficou de fora, e uma amostra dos arquivos. O descarte por
+    # empresa não pede confirmação — misturar cliente é o acidente mais caro
+    # deste sistema —, mas tem de ser conferível: pasta de rede guarda o grupo
+    # inteiro, e quem importa precisa ver que o que saiu não era seu
+    empresas_de_fora: list[EmpresaDeFora] = []
+    fora_por_empresa: list[ArquivoInspecionado] = []
     copias: int
     # arquivos que OUTRO trabalho da mesma empresa já leu: entram, mas a
     # leitura não se repete. É o que permite o PIS/COFINS usar a EFD
@@ -209,6 +230,22 @@ class LoteInspecionado(BaseModel):
     competencias: list[date]
     cnpjs: list[str]
     avisos: list[str]
+
+
+def _empresas_de_fora(itens) -> list["EmpresaDeFora"]:
+    """Quantos arquivos e quantos bytes por CNPJ que não é o do trabalho.
+
+    Vai por CNPJ inteiro, e não pela raiz: quem confere quer reconhecer a
+    empresa que veio junto na pasta, e a filial diz mais do que a matriz.
+    """
+    por_cnpj: dict[str, list[int]] = {}
+    for item in itens:
+        conta = por_cnpj.setdefault(item.cnpj or "", [0, 0])
+        conta[0] += 1
+        conta[1] += item.tamanho
+    maiores = sorted(por_cnpj.items(), key=lambda par: (-par[1][0], par[0]))
+    return [EmpresaDeFora(cnpj=cnpj, arquivos=q, bytes_totais=b)
+            for cnpj, (q, b) in maiores[:EMPRESAS_DE_FORA]]
 
 
 @router.post("/lotes/inspecionar", response_model=LoteInspecionado,
@@ -241,6 +278,15 @@ def inspecionar_lote(
             for a in resumo.arquivos
         ],
         de_outra_empresa=len(resumo.de_outra_empresa),
+        empresas_de_fora=_empresas_de_fora(resumo.de_outra_empresa),
+        fora_por_empresa=[
+            ArquivoInspecionado(
+                nome=a.nome, caminho=a.caminho, tamanho=a.tamanho, tipo=a.tipo.value,
+                cnpj=a.cnpj, competencia=a.competencia, uf=a.uf, detalhe=a.detalhe,
+                motivo="de outra empresa", alimenta=False,
+            )
+            for a in resumo.de_outra_empresa[:AMOSTRA_DE_FORA]
+        ],
         copias=len(resumo.copias),
         reaproveitados=len(resumo.reaproveitados),
         serve=resumo.serve,

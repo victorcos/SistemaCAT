@@ -196,15 +196,18 @@ class TipoDeArquivo(str, Enum):
 # As chaves são as do catálogo de módulos (Cat.Dominio/Acesso/Segmento.cs). A
 # EFD ICMS/IPI serve a dois: é a base da CAT 42 e é dela que sai a exclusão do
 # ICMS da base do PIS/COFINS. A ECD também: razão contábil na quebra de SPED e
-# base contábil do lucro real.
+# base contábil do lucro real. O XML entrou no PIS/COFINS em 24/09/2026, com a
+# trilha de quebra de XML: é lá que estão o CST e a alíquota que o C170
+# consolidado esconde. O evento de cancelamento e a lista de canceladas, não —
+# quem os usa é a conferência da CAT 42.
 _MODULOS_POR_TIPO: dict[TipoDeArquivo, tuple[str, ...]] = {
     TipoDeArquivo.SPED_ICMS_IPI: ("icms", "piscofins"),
     TipoDeArquivo.SPED_CONTRIBUICOES: ("piscofins",),
     TipoDeArquivo.SPED_ECD: ("piscofins", "irpj_csll"),
     TipoDeArquivo.SPED_ECF: ("irpj_csll",),
-    TipoDeArquivo.XML_NFE: ("icms",),
+    TipoDeArquivo.XML_NFE: ("icms", "piscofins"),
     TipoDeArquivo.XML_CANCELAMENTO: ("icms",),
-    TipoDeArquivo.XML_COMPACTADO: ("icms",),
+    TipoDeArquivo.XML_COMPACTADO: ("icms", "piscofins"),
     TipoDeArquivo.GERENCIAL_MOVIMENTO: ("icms",),
     TipoDeArquivo.GERENCIAL_INVENTARIO: ("icms",),
     TipoDeArquivo.LISTA_DE_CANCELADAS: ("icms",),
@@ -213,7 +216,7 @@ _MODULOS_POR_TIPO: dict[TipoDeArquivo, tuple[str, ...]] = {
 # O que cada trabalho espera receber, para a mensagem de pasta que não serve.
 FALTA_POR_MODULO: dict[str, str] = {
     "icms": "Falta a EFD ICMS/IPI, o XML das notas ou o relatório gerencial.",
-    "piscofins": "Falta a EFD-Contribuições, a ECD ou a EFD ICMS/IPI.",
+    "piscofins": "Falta a EFD-Contribuições, a ECD, a EFD ICMS/IPI ou o XML das notas.",
     "irpj_csll": "Falta a ECF ou a ECD.",
 }
 

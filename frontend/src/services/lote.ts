@@ -28,6 +28,13 @@ export interface ArquivoDoLote {
   motivo: string;
 }
 
+/** Um CNPJ que apareceu na pasta e não é o do trabalho. */
+export interface EmpresaDeFora {
+  cnpj: string;
+  arquivos: number;
+  bytes_totais: number;
+}
+
 export interface Contagem {
   tipo: string;
   rotulo: string;
@@ -52,6 +59,9 @@ export interface ResumoDoLote {
   ja_no_trabalho: number;
   /** Já no trabalho, mas reconhecidos hoje como outro tipo: são atualizados ao importar. */
   reclassificados: number;
+  /** de quem é o que ficou de fora por ser de outra empresa, e o que foi */
+  empresas_de_fora: EmpresaDeFora[];
+  fora_por_empresa: ArquivoDoLote[];
 }
 
 export interface Lote {

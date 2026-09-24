@@ -38,6 +38,7 @@ from cat.aplicacao.casos_de_uso.historico_do_projeto import (
     exigir_que_ande,
     registrar_de_etapa,
 )
+from cat.aplicacao.casos_de_uso.rodada import raiz_do_trabalho
 from cat.dominio.icms.cat42.movimentacao import ResumoDaMovimentacao
 from cat.dominio.lote import TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
@@ -166,7 +167,8 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     relogio.congelar_totais(documentos=progresso.documentos, bytes_lidos=progresso.bytes_lidos)
     execucao.passo = "Lendo os itens dos XML"
     sessao.commit()
-    do_xml = extrair_itens_do_xml(xmls, destino, avisar=relogio.marcar)
+    do_xml = extrair_itens_do_xml(xmls, destino, avisar=relogio.marcar,
+                                  cnpj_raiz=raiz_do_trabalho(execucao.projeto_id, sessao))
 
     # sempre grava, mesmo vazio: a pasta não herda lista de uma rodada anterior
     execucao.passo = "Lendo as notas canceladas"
@@ -233,6 +235,7 @@ def _somar_xml(resumo: ResumoDaMovimentacao, do_xml: ProgressoDoXml) -> None:
     resumo.xml_ilegiveis = do_xml.ilegiveis
     resumo.xml_nao_autorizados = do_xml.nao_autorizados
     resumo.xml_copias_trocadas = do_xml.copias_trocadas
+    resumo.xml_de_outra_empresa = do_xml.de_outra_empresa
 
 
 def _serializar(resumo: ResumoDaMovimentacao, progresso: ProgressoDeItens,

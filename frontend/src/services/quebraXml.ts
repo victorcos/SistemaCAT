@@ -27,6 +27,10 @@ export interface ResumoDaQuebraDeXml {
   nao_autorizados?: number;
   copias_trocadas?: number;
   cancelamentos?: number;
+  /** notas de outro CNPJ, vindas dentro do zip: ficam de fora da planilha */
+  de_outra_empresa?: number;
+  /** raiz do CNPJ de fora -> quantas notas, as maiores primeiro */
+  cnpjs_de_fora?: Record<string, number>;
   iniciada_por?: string;
   segundos?: number;
   andamento?: { arquivos: number; notas: number; itens: number };

@@ -92,6 +92,16 @@ public sealed class MotorDeLotesFalso : IAsyncLifetime
                 pasta, modulo, arquivos, de_outra_empresa = pasta == "Z:/base" ? 1 : 0, copias = pasta == "Z:/so-copias" ? 3 : 0,
                 serve, competencias = serve ? new[] { "2025-01-01", "2025-03-01" } : [], cnpjs = new[] { "77665544000105" },
                 avisos = new[] { "1 arquivo(s) são de outra empresa (11222333000181) e ficaram de fora." },
+                empresas_de_fora = new[] { new { cnpj = "11222333000181", arquivos = 1, bytes_totais = 120L } },
+                fora_por_empresa = new[]
+                {
+                    new
+                    {
+                        nome = "intruso.txt", caminho = "Z:/base/intruso.txt", tamanho = 120L, tipo = "sped_icms_ipi",
+                        cnpj = "11222333000181", competencia = "2025-02-01", uf = "MG", detalhe = "",
+                        motivo = "de outra empresa", alimenta = false,
+                    },
+                },
             });
         });
 
@@ -246,7 +256,8 @@ public sealed class LotesTestes(BancoDeTeste banco, MotorDeLotesFalso motor) : I
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         var corpo = await Json(r);
         Assert.Equal(["pasta", "total_arquivos", "arquivos_uteis", "bytes_totais", "de_outra_empresa", "serve", "competencia_ini",
-                      "competencia_fim", "cnpjs", "contagens", "avisos", "amostra", "ja_no_trabalho", "copias", "reclassificados"],
+                      "competencia_fim", "cnpjs", "contagens", "avisos", "amostra", "ja_no_trabalho", "copias", "reclassificados",
+                      "empresas_de_fora", "fora_por_empresa"],
             corpo.EnumerateObject().Select(p => p.Name));
         Assert.Equal(4, corpo.GetProperty("total_arquivos").GetInt32());
         Assert.Equal(2, corpo.GetProperty("arquivos_uteis").GetInt32());
@@ -255,6 +266,16 @@ public sealed class LotesTestes(BancoDeTeste banco, MotorDeLotesFalso motor) : I
         Assert.Equal("2025-01-01", corpo.GetProperty("competencia_ini").GetString());
         Assert.Equal("2025-03-01", corpo.GetProperty("competencia_fim").GetString());
         Assert.Contains("outra empresa", corpo.GetProperty("avisos")[0].GetString());
+
+        // o que foi descartado por ser de outra empresa chega aberto na tela: o CNPJ,
+        // quantos arquivos e o nome de cada um. Descarte sem conferência é boato
+        var deFora = corpo.GetProperty("empresas_de_fora")[0];
+        Assert.Equal("11222333000181", deFora.GetProperty("cnpj").GetString());
+        Assert.Equal(1, deFora.GetProperty("arquivos").GetInt32());
+        var arquivoDeFora = corpo.GetProperty("fora_por_empresa")[0];
+        Assert.Equal("intruso.txt", arquivoDeFora.GetProperty("nome").GetString());
+        Assert.False(arquivoDeFora.GetProperty("alimenta").GetBoolean());
+        Assert.Equal("EFD ICMS/IPI", arquivoDeFora.GetProperty("tipo_rotulo").GetString());
 
         // o que serve primeiro, e dentro disso o mais numeroso
         var contagens = corpo.GetProperty("contagens").EnumerateArray().ToList();

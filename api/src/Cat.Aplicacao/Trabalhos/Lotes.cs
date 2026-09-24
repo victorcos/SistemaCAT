@@ -23,12 +23,19 @@ public sealed record ArquivoInspecionado(
     public bool Reclassificado => JaNoTrabalho && TipoNoTrabalho is not null && TipoNoTrabalho != Tipo;
 }
 
+/// <summary>Um CNPJ que apareceu na pasta e não é o do trabalho.</summary>
+public sealed record EmpresaDeFora(string Cnpj, int Arquivos, long BytesTotais);
+
 /// <summary>O que o motor leu da pasta. Os avisos vêm prontos: dependem do que só a leitura sabe.</summary>
 public sealed record LoteInspecionado(
     string Pasta, IReadOnlyList<ArquivoInspecionado> Arquivos, int DeOutraEmpresa, int Copias, bool Serve,
     IReadOnlyList<DateOnly> Competencias, IReadOnlyList<string> Cnpjs, IReadOnlyList<string> Avisos,
     // o módulo do trabalho: é contra ele que "serve" e "alimenta" foram medidos
-    string Modulo = Segmentos.Icms);
+    string Modulo = Segmentos.Icms,
+    // de quem é o que o motor deixou de fora, e uma amostra dos arquivos: o
+    // descarte por empresa não pede confirmação, mas tem de ser conferível
+    IReadOnlyList<EmpresaDeFora>? EmpresasDeFora = null,
+    IReadOnlyList<ArquivoInspecionado>? ForaPorEmpresa = null);
 
 public sealed record LoteLido(
     int Id, int ProjetoId, string Pasta, int TotalArquivos, int ArquivosUteis, long BytesTotais,

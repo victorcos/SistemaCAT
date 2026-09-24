@@ -110,6 +110,19 @@ class TestConferirAntesDeGravar:
         avisos = " ".join(inspecionar(cliente, projeto_id, pasta_com_base).json()["avisos"])
         assert "outra empresa" in avisos
 
+    def test_diz_de_quem_e_o_que_ficou_de_fora(self, cliente, projeto_id, pasta_com_base):
+        """O descarte por empresa não pede confirmação, mas tem de ser conferível:
+        quem importa precisa ver o CNPJ e o nome do arquivo que saiu."""
+        corpo = inspecionar(cliente, projeto_id, pasta_com_base).json()
+        assert [(e["cnpj"], e["arquivos"]) for e in corpo["empresas_de_fora"]] == [
+            ("11222333000181", 1)]
+        assert corpo["empresas_de_fora"][0]["bytes_totais"] > 0
+        fora = corpo["fora_por_empresa"]
+        assert len(fora) == 1 and fora[0]["cnpj"] == "11222333000181"
+        assert fora[0]["motivo"] == "de outra empresa" and fora[0]["alimenta"] is False
+        # e não entra na lista que vai virar lote
+        assert fora[0]["caminho"] not in [a["caminho"] for a in corpo["arquivos"]]
+
     def test_pasta_inexistente_explica(self, cliente, projeto_id):
         r = inspecionar(cliente, projeto_id, "Z:/pasta/que/nao/existe")
         assert r.status_code == 422

@@ -719,6 +719,33 @@ XML de dentro, e `arquivo` vira `lote.zip > nota.xml`. Evento de cancelamento
 dentro do zip vai para `chaves_canceladas.parquet`. O zip `xml_compactado`
 também é fonte da pré-validação dos arquivos do cliente.
 
+### XML de outra empresa, e o descarte aberto (v0.104.0)
+
+`xml_nfe` e `xml_compactado` passam a alimentar **`piscofins`**, além do ICMS —
+é a trilha de quebra de XML nos dois módulos. O evento de cancelamento
+(`xml_cancelamento`) continua só no ICMS. O espelho em `TiposDeArquivo.cs`
+acompanha, e o teste de compatibilidade cobra a igualdade das duas tabelas.
+
+`POST /interno/lotes/inspecionar` ganha, **à parte de `arquivos`** (o que vira
+lote):
+
+* `empresas_de_fora`: `cnpj`, `arquivos`, `bytes_totais`, os de mais arquivos
+  primeiro, até 20 CNPJ;
+* `fora_por_empresa`: até 40 arquivos descartados, com `motivo: "de outra
+  empresa"` e `alimenta: false`.
+
+`POST /api/projetos/{id}/lotes/inspecionar` repassa os dois, com `tipo_rotulo`
+e `grupo` como na amostra. O descarte continua automático e sem confirmação —
+misturar empresa contamina a apuração das duas —, mas passa a ser conferível na
+tela antes de gravar.
+
+Na leitura dos XML, `extrair_itens_do_xml(..., cnpj_raiz=)` deixa de fora a
+nota em que **nem emitente nem destinatário** tem a raiz do trabalho; sem
+`cnpj_raiz`, nada é descartado. `ProgressoDoXml` ganha `de_outra_empresa` e
+`cnpjs_de_fora` (raiz -> notas, até 20 raízes). O resumo da quebra de XML leva
+os dois; o dos movimentos ganha `xml_de_outra_empresa` e um aviso. É o que
+fecha o buraco do zip: o solto a importação já separava, o zip entrava fechado.
+
 ### Certificado digital (v0.55.1)
 
 A inspeção do lote não abre pasta com "certificado(s)" no nome nem lê .pfx,

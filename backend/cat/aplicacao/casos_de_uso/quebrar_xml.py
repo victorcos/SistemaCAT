@@ -29,7 +29,9 @@ from cat.aplicacao.casos_de_uso.conferir_documentos import (
     pasta_da_execucao,
 )
 from cat.aplicacao.casos_de_uso.historico_do_projeto import exigir_que_ande, registrar_de_etapa
-from cat.aplicacao.casos_de_uso.rodada import Diario, duracao, milhar, nome_de
+from cat.aplicacao.casos_de_uso.rodada import (
+    Diario, duracao, milhar, nome_de, raiz_do_trabalho,
+)
 from cat.dominio.lote import TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.itens_do_xml import (
@@ -132,7 +134,8 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
                                     "itens": p.itens}
         diario.salvar_de_vez_em_quando()
 
-    progresso = extrair_itens_do_xml(xmls, destino, avisar=andou)
+    raiz = raiz_do_trabalho(execucao.projeto_id, sessao)
+    progresso = extrair_itens_do_xml(xmls, destino, avisar=andou, cnpj_raiz=raiz)
 
     segundos = round(time.time() - inicio, 1)
     execucao.situacao = "concluida"
@@ -153,8 +156,22 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
         "nao_autorizados": progresso.nao_autorizados,
         "copias_trocadas": progresso.copias_trocadas,
         "cancelamentos": len(progresso.cancelamentos),
+        "de_outra_empresa": progresso.de_outra_empresa,
+        "cnpjs_de_fora": dict(sorted(progresso.cnpjs_de_fora.items(),
+                                     key=lambda par: -par[1])),
         "segundos": segundos,
     })
+
+    # o descarte por empresa tem linha própria: é o único que fala de outro
+    # cliente, e quem confere precisa ver de quem era o que saiu
+    if progresso.de_outra_empresa:
+        quem = sorted(progresso.cnpjs_de_fora, key=lambda c: -progresso.cnpjs_de_fora[c])[:3]
+        reticencia = "…" if len(progresso.cnpjs_de_fora) > len(quem) else ""
+        diario.anotar(
+            "aviso",
+            f"{milhar(progresso.de_outra_empresa)} nota(s) de outra empresa ficaram de fora "
+            f"(CNPJ {', '.join(quem)}{reticencia}). O trabalho é da empresa do cadastro: "
+            "nota de outro CNPJ não entra na planilha.")
 
     # nada some em silêncio: cada descarte tem contador e, aqui, uma linha
     for quantos, o_que in (

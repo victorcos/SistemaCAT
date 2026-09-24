@@ -226,6 +226,17 @@ class TestInspecionarPasta:
         for modulo in ("icms", "piscofins"):
             assert inspecionar_pasta(str(tmp_path), "50948371", modulo=modulo).serve
 
+    def test_xml_serve_aos_dois_trabalhos(self, tmp_path):
+        """O XML entrou no PIS/COFINS com a trilha de quebra de XML: é nele que
+        estão o CST e a alíquota que o C170 consolidado esconde. Sem isto, a
+        pasta de notas era recusada com "nada aqui alimenta o trabalho"."""
+        escrever(tmp_path, "nota.xml", NFE, "utf-8")
+        for modulo in ("icms", "piscofins"):
+            r = inspecionar_pasta(str(tmp_path), "50948371", modulo=modulo)
+            assert r.serve and len(r.uteis) == 1
+        # o evento de cancelamento é da conferência da CAT 42, e só dela
+        assert TipoDeArquivo.XML_CANCELAMENTO.modulos == ("icms",)
+
     def test_pasta_de_ecf_so_serve_ao_irpj_csll(self, tmp_path):
         escrever(tmp_path, "ecf.txt", ECF)
         assert not inspecionar_pasta(str(tmp_path), "50948371").serve

@@ -74,12 +74,12 @@ const CONCLUIDA = {
   resumo: { versao: 1, arquivos: 3, notas: 2, itens: 7 },
 };
 
-function montar(modulo: string) {
+function montar(modulo: string, resumo: object = CONCLUIDA.resumo) {
   detalhar.mockResolvedValue({
     projeto: { id: 6, modulo, modulo_rotulo: modulo, empresa: "CEMA", status: "em_andamento" },
     etapas: [],
   } as never);
-  listar.mockResolvedValue([CONCLUIDA] as never);
+  listar.mockResolvedValue([{ ...CONCLUIDA, resumo }] as never);
   pedirCampos.mockResolvedValue(CATALOGO as never);
 
   return render(
@@ -95,6 +95,31 @@ const marcados = () => screen.getByText(/de 6 campos/).textContent ?? "";
 
 beforeEach(() => {
   baixar.mockResolvedValue(undefined);
+});
+
+describe("o que ficou de fora", () => {
+  /**
+   * O zip do portal entra fechado na importação: é a quebra que abre a nota e
+   * vê de quem ela é. Descarte sem nome de CNPJ na tela é descarte que ninguém
+   * confere — e aqui o que sai é dado de outro cliente.
+   */
+  it("mostra as notas de outra empresa e de quem são", async () => {
+    montar("piscofins", {
+      versao: 1, arquivos: 3, notas: 2, itens: 7,
+      de_outra_empresa: 1243, cnpjs_de_fora: { "22333444": 1200, "77666555": 43 },
+    });
+
+    expect(await screen.findByText("notas de outra empresa")).toBeTruthy();
+    expect(screen.getByText("1.243")).toBeTruthy();
+    expect(screen.getByText("22333444")).toBeTruthy();
+    expect(screen.getByText("77666555")).toBeTruthy();
+  });
+
+  it("sem nota de fora, o assunto não aparece", async () => {
+    montar("piscofins");
+    await screen.findByText("PIS e COFINS");
+    expect(screen.queryByText("notas de outra empresa")).toBeNull();
+  });
 });
 
 describe("num trabalho de PIS/COFINS", () => {

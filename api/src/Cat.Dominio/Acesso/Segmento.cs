@@ -68,7 +68,7 @@ public static class Segmentos
     /// </summary>
     public static string FaltaNoLote(string? modulo) => modulo switch
     {
-        PisCofins => "Falta a EFD-Contribuições, a ECD ou a EFD ICMS/IPI.",
+        PisCofins => "Falta a EFD-Contribuições, a ECD, a EFD ICMS/IPI ou o XML das notas.",
         IrpjCsll => "Falta a ECF ou a ECD.",
         _ => "Falta a EFD ICMS/IPI, o XML das notas ou o relatório gerencial.",
     };

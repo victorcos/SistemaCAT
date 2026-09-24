@@ -5,6 +5,45 @@
 
 ---
 
+## 2026-09-24 — O XML entra no PIS/COFINS, e o que é de outra empresa sai à vista
+
+**O que estava quebrado.** A trilha de quebra de XML foi criada nos dois
+módulos, mas a tabela que diz quem lê o quê continuou mandando XML só para o
+ICMS. Resultado na tela: pasta com 7.186 XML, "PIS/COFINS LÊ 0", o aviso de que
+nada ali alimenta o trabalho e o botão de importar desligado. A trilha existia e
+não tinha como receber arquivo. Agora `xml_nfe` e `xml_compactado` alimentam
+`piscofins` também — e só eles: o evento de cancelamento é da conferência da CAT
+42, e não tem o que fazer numa apuração de contribuição.
+
+**O descarte por empresa passa a ser conferível.** A regra não mudou: arquivo em
+que nem o emitente nem o destinatário é o CNPJ do trabalho fica de fora, sem
+perguntar. Misturar cliente é o acidente mais caro que este sistema pode causar
+— contamina a apuração de dois de uma vez —, e confirmação nenhuma justifica
+correr esse risco. O que mudou é que o descarte deixou de ser um número perdido
+no meio dos avisos: a conferência da pasta mostra quantos saíram, de que CNPJ,
+quantos bytes, e abre a lista com o nome dos arquivos. **Descarte que ninguém vê
+é boato** — e quem importa precisa conferir, antes de gravar, que o que saiu não
+era seu.
+
+**O zip era o buraco.** A importação identifica o XML solto e o separa por CNPJ;
+o zip do portal entra fechado, e ninguém sabe o que há dentro dele até a etapa
+abrir. Numa pasta de rede — que guarda o grupo inteiro — isso significa a nota
+de outra empresa entrando na planilha por baixo. Agora quem lê XML recebe a raiz
+do CNPJ do trabalho e descarta nota a nota, com contador por CNPJ no resumo e no
+log. Vale para a quebra de XML e para a extração de movimentos do ICMS.
+
+**Nota sem ponta legível fica.** Recusar o que não se sabe de quem é perderia
+nota boa, e o que não tem CNPJ nenhum não contamina apuração de ninguém — que é
+o risco que a regra existe para evitar. Pelo mesmo motivo a comparação é por
+**raiz**: outra filial é a mesma empresa.
+
+**O que fica de fora de propósito.** A conferência da CAT 42 (etapa 2) não
+filtra por empresa: lá só se lê o começo e o fim do arquivo, e a única ponta
+legível sem abrir a nota é o emitente — filtrar por ele jogaria fora toda nota
+de compra, que é justamente o insumo da CAT 42.
+
+---
+
 ## 2026-09-24 — O trabalho ganha um nível: um card por frente, e as etapas dentro dele
 
 **O que mudou de fato.** O ICMS tinha oito etapas porque tinha uma obrigação só.

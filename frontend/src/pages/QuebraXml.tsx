@@ -308,8 +308,12 @@ function Concluido({
     ["arquivos que não deram para ler", resumo.ilegiveis ?? 0],
     ["notas sem item", resumo.sem_item ?? 0],
     ["notas com protocolo que não autoriza", resumo.nao_autorizados ?? 0],
+    ["notas de outra empresa", resumo.de_outra_empresa ?? 0],
   ];
   const descartes = foraDaConta.filter(([, q]) => q > 0);
+  // a pasta de rede guarda o grupo inteiro, e o zip do portal entra fechado na
+  // importação: é aqui que a nota do outro CNPJ aparece, e de quem ela é
+  const cnpjsDeFora = Object.entries(resumo.cnpjs_de_fora ?? {});
 
   async function baixar(formato: Formato) {
     setBaixando(formato);
@@ -344,6 +348,18 @@ function Concluido({
               </li>
             ))}
           </ul>
+          {cnpjsDeFora.length > 0 && (
+            <p className="m-0 mt-3 text-[13px] text-texto-fraco">
+              De outra empresa, por CNPJ:{" "}
+              {cnpjsDeFora.map(([cnpj, quantas], i) => (
+                <span key={cnpj}>
+                  {i > 0 && ", "}
+                  <span className="font-mono">{cnpj}</span> ({numero(quantas)})
+                </span>
+              ))}
+              . O trabalho é da empresa do cadastro: nota de outro CNPJ não entra na planilha.
+            </p>
+          )}
         </section>
       )}
 

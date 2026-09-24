@@ -314,9 +314,9 @@ public sealed class TrabalhosTestes(BancoDeTeste banco, MotorInternoFalso _motor
         Assert.Equal(nome.ToUpperInvariant(), p.GetProperty("criado_por").GetString());
         Assert.Equal(id, p.GetProperty("responsavel_id").GetInt32());
         Assert.Equal(0, p.GetProperty("etapas_feitas").GetInt32());
-        // as oito da cadeia da CAT 42 mais o crédito outorgado; o histórico não
-        // conta, porque nunca conclui
-        Assert.Equal(9, p.GetProperty("etapas_totais").GetInt32());
+        // as oito da cadeia da CAT 42, mais o crédito outorgado e a quebra de XML;
+        // o histórico não conta, porque nunca conclui
+        Assert.Equal(10, p.GetProperty("etapas_totais").GetInt32());
 
         // o evento "criado" no formato que o histórico em Python lê
         var projeto = p.GetProperty("id").GetInt32();

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from cat.dominio.lote import TipoDeArquivo
 from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import (
-    ArquivoDoLoteDB, ExecucaoDB, LoteDB, UsuarioDB,
+    ArquivoDoLoteDB, ExecucaoDB, LoteDB, ProjetoDB, UsuarioDB,
 )
 from cat.log import contexto, obter_log
 
@@ -161,6 +161,24 @@ def caminhos_do_lote(projeto_id: int, tipo: TipoDeArquivo, sessao: Session) -> l
                  extra={"projeto_id": projeto_id, "tipo": tipo.value,
                         "descartados": repetidos, "mantidos": len(caminhos)})
     return caminhos
+
+
+def raiz_do_trabalho(projeto_id: int, sessao: Session) -> str | None:
+    """A raiz do CNPJ da empresa do trabalho — o que separa a nota dela da de fora.
+
+    A importação já barra o XML solto de outra empresa, mas o zip entra
+    fechado: o portal entrega a pasta do grupo inteiro, e é dentro dele que a
+    nota do outro CNPJ aparece. Quem lê XML passa esta raiz adiante.
+
+    Sem raiz cadastrada nada é separado, e o log diz isso: é melhor uma
+    planilha larga e avisada do que um descarte que ninguém pediu.
+    """
+    projeto = sessao.get(ProjetoDB, projeto_id)
+    raiz = projeto.empresa.cnpj_raiz if projeto is not None and projeto.empresa is not None else None
+    if not raiz:
+        log.warning("trabalho sem raiz de CNPJ: a leitura não separa por empresa",
+                    extra={"projeto_id": projeto_id})
+    return raiz
 
 
 # ---------------------------------------------------------------------------

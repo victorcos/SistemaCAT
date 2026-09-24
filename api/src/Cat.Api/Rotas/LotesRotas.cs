@@ -29,7 +29,9 @@ public static class LotesRotas
         string Pasta, int TotalArquivos, int ArquivosUteis, long BytesTotais, int DeOutraEmpresa, bool Serve,
         DateOnly? CompetenciaIni, DateOnly? CompetenciaFim, IReadOnlyList<string> Cnpjs, IReadOnlyList<ContagemDto> Contagens,
         IReadOnlyList<string> Avisos, IReadOnlyList<ArquivoDto> Amostra, int JaNoTrabalho, int Copias,
-        int Reclassificados);
+        int Reclassificados,
+        // o descarte por empresa, aberto: o CNPJ de cada um e a amostra por nome
+        IReadOnlyList<EmpresaDeFora> EmpresasDeFora, IReadOnlyList<ArquivoDto> ForaPorEmpresa);
 
     public sealed record LoteDto(
         int Id, int ProjetoId, string Pasta, int TotalArquivos, int ArquivosUteis, long BytesTotais,
@@ -140,24 +142,27 @@ public static class LotesRotas
         porTipo.Select(c => Contagem(c.Tipo, c.Quantidade, modulo))
             .OrderBy(c => !c.Alimenta).ThenByDescending(c => c.Quantidade).ToList();
 
+    private static ArquivoDto Arquivo(ArquivoInspecionado a)
+    {
+        var t = TiposDeArquivo.Buscar(a.Tipo);
+        return new ArquivoDto(a.Nome, a.Caminho, a.Tamanho, a.Tipo, t.Rotulo, t.Grupo, a.Alimenta, a.Cnpj,
+            a.Competencia, a.Uf, a.Detalhe, a.Motivo);
+    }
+
     public static ResumoDto Resumo(LoteInspecionado r)
     {
         // a amostra mostra primeiro o que NÃO entrou: é o que o usuário precisa ver
         var amostra = r.Arquivos.OrderBy(a => a.Alimenta).ThenBy(a => a.Nome, StringComparer.Ordinal)
             .Take(AmostraNaTela)
-            .Select(a =>
-            {
-                var t = TiposDeArquivo.Buscar(a.Tipo);
-                return new ArquivoDto(a.Nome, a.Caminho, a.Tamanho, a.Tipo, t.Rotulo, t.Grupo, a.Alimenta, a.Cnpj,
-                    a.Competencia, a.Uf, a.Detalhe, a.Motivo);
-            }).ToList();
+            .Select(Arquivo).ToList();
         return new ResumoDto(
             r.Pasta, r.Arquivos.Count, r.Arquivos.Count(a => a.Alimenta), r.Arquivos.Sum(a => a.Tamanho),
             r.DeOutraEmpresa, r.Serve,
             r.Competencias.Count > 0 ? r.Competencias[0] : null, r.Competencias.Count > 0 ? r.Competencias[^1] : null,
             r.Cnpjs.Take(20).ToList(),
             Contagens(r.Arquivos.GroupBy(a => a.Tipo).Select(g => (g.Key, g.Count())), r.Modulo),
-            r.Avisos, amostra, r.Arquivos.Count(a => a.JaNoTrabalho), r.Copias, r.Arquivos.Count(a => a.Reclassificado));
+            r.Avisos, amostra, r.Arquivos.Count(a => a.JaNoTrabalho), r.Copias, r.Arquivos.Count(a => a.Reclassificado),
+            r.EmpresasDeFora ?? [], (r.ForaPorEmpresa ?? []).Select(Arquivo).ToList());
     }
 
     public static LoteDto Lote(LoteLido l) => new(

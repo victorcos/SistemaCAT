@@ -27,7 +27,9 @@ import {
   listarLotes,
   registrarLote,
   removerLote,
+  type ArquivoDoLote,
   type Contagem,
+  type EmpresaDeFora,
   type Lote,
   type LoteRegistrado,
   type ResumoDoLote,
@@ -47,7 +49,7 @@ import type { ErroApi } from "@/types/erro";
  *  procurar "a EFD ICMS/IPI e os XML" é mandar procurar a pasta errada. */
 const ARQUIVOS_DO_MODULO: Record<string, string> = {
   icms: "a EFD ICMS/IPI, os XML e os relatórios do ERP",
-  piscofins: "a EFD-Contribuições, a ECD e a EFD ICMS/IPI",
+  piscofins: "a EFD-Contribuições, a ECD, a EFD ICMS/IPI e os XML das notas",
   irpj_csll: "a ECF e a ECD",
 };
 
@@ -336,6 +338,85 @@ function EtiquetasDeTipo({
   );
 }
 
+/**
+ * O que a pasta trazia de outra empresa, aberto.
+ *
+ * O descarte é automático e não pede confirmação — arquivo de outra empresa
+ * entrar no trabalho contamina a apuração de dois clientes de uma vez. Mas
+ * descarte que ninguém vê é boato: pasta de rede guarda o grupo inteiro, e
+ * quem importa precisa conferir que o que saiu não era seu antes de gravar.
+ */
+function DeOutraEmpresa({
+  quantos,
+  empresas,
+  arquivos,
+}: {
+  quantos: number;
+  empresas: EmpresaDeFora[];
+  arquivos: ArquivoDoLote[];
+}) {
+  const [aberto, setAberto] = useState(false);
+  if (quantos === 0) return null;
+  return (
+    <section className="mt-4 rounded-cartao border border-borda bg-superficie-alt p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="m-0 text-[13px] font-bold text-texto-suave">
+          {numero(quantos)} arquivo(s) de outra empresa ficaram de fora
+        </h3>
+        <button
+          type="button"
+          onClick={() => setAberto((v) => !v)}
+          className="text-[13px] font-semibold text-laranja-700 underline-offset-2 hover:underline escuro:text-laranja-300"
+          aria-expanded={aberto}
+        >
+          {aberto ? "Ocultar" : "Ver o que saiu"}
+        </button>
+      </div>
+      <p className="m-0 mt-1 text-[13px] text-texto-fraco">
+        Nem emitente nem destinatário é o CNPJ deste trabalho. Eles não entram na importação —
+        misturar empresa contamina a apuração das duas.
+      </p>
+      {aberto && (
+        <>
+          <ul className="m-0 mt-3 flex list-none flex-wrap gap-2 p-0">
+            {empresas.map((e) => (
+              <li
+                key={e.cnpj}
+                className="inline-flex items-center gap-1.5 rounded-full border border-borda bg-superficie px-3 py-1 text-xs"
+              >
+                <span className="font-mono">{e.cnpj || "sem CNPJ"}</span>
+                <span className="font-mono font-semibold">{numero(e.arquivos)}</span>
+                <span className="text-texto-fraco">{tamanho(e.bytes_totais)}</span>
+              </li>
+            ))}
+          </ul>
+          {arquivos.length > 0 && (
+            <div className="mt-3">
+              <Tabela colunas={["Arquivo", "Reconhecido como", "CNPJ", "Competência", "Tamanho"]}>
+                {arquivos.map((a) => (
+                  <Linha key={a.caminho} apagada>
+                    <Celula title={a.caminho}>{a.nome}</Celula>
+                    <Celula>{a.tipo_rotulo}</Celula>
+                    <Celula mono>{a.cnpj ?? "—"}</Celula>
+                    <Celula mono>{competencia(a.competencia)}</Celula>
+                    <Celula mono>{tamanho(a.tamanho)}</Celula>
+                  </Linha>
+                ))}
+              </Tabela>
+              {quantos > arquivos.length && (
+                <p className="m-0 mt-2 text-[13px] text-texto-fraco">
+                  Mostrando {numero(arquivos.length)} de {numero(quantos)}. O log da importação tem a
+                  conta completa por CNPJ.
+                </p>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 function ConferenciaDaPasta({
   resumo,
   modulo,
@@ -404,6 +485,12 @@ function ConferenciaDaPasta({
           </Aviso>
         )}
       </div>
+
+      <DeOutraEmpresa
+        quantos={resumo.de_outra_empresa}
+        empresas={resumo.empresas_de_fora ?? []}
+        arquivos={resumo.fora_por_empresa ?? []}
+      />
 
       <h3 className="mb-2 mt-6 text-[13px] font-bold text-texto-suave">
         Amostra — o que não entra aparece primeiro
