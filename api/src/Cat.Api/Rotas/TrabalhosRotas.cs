@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Cat.Api.Infra;
 using Cat.Aplicacao.Trabalhos;
 using Cat.Dominio.Acesso;
@@ -31,7 +31,23 @@ public static class TrabalhosRotas
         string Chave, string Nome, string NomeCurto, string Descricao, string Situacao,
         string SituacaoRotulo, bool Implementada, bool Acessivel);
 
-    public sealed record ProjetoDetalheDto(ProjetoDto Projeto, IReadOnlyList<EtapaDto> Etapas, BaseDto Base);
+    /// <summary>
+    /// Uma frente de trabalho do módulo — a CAT 42, o crédito outorgado, a
+    /// quebra de XML —, com as etapas que cabem dentro dela e quanto já foi
+    /// feito. É o card que a tela do trabalho abre.
+    /// </summary>
+    /// <param name="Etapas">chaves de <c>EtapaDto</c>, na ordem da frente</param>
+    /// <param name="Construida">
+    /// Se a frente já existe no sistema. Falso quando nenhuma etapa própria dela
+    /// foi construída — `importar`, que toda frente tem, não conta aqui: sem
+    /// isso a quebra de XML apareceria como "1 de 1 concluída" só porque a base
+    /// foi importada.
+    /// </param>
+    public sealed record TrilhaDto(string Chave, string Rotulo, string Sigla, string Descricao,
+        IReadOnlyList<string> Etapas, int Feitas, int Totais, bool Construida);
+
+    public sealed record ProjetoDetalheDto(ProjetoDto Projeto, IReadOnlyList<EtapaDto> Etapas,
+        BaseDto Base, IReadOnlyList<TrilhaDto> Trilhas);
 
     /// <summary>De quando é a base importada; `fora_do_periodo` são as EFD fora do período do cadastro.</summary>
     public sealed record BaseDto(int Efds, DateOnly? Primeira, DateOnly? Ultima, int ForaDoPeriodo);
@@ -84,7 +100,8 @@ public static class TrabalhosRotas
                     var p = await caso.Detalhar(projetoId, http.UsuarioAtual(), http.RequestAborted);
                     var b = await caso.BaseDoTrabalho(p.Projeto, http.RequestAborted);
                     return Results.Json(new ProjetoDetalheDto(Projeto(p), p.Etapas.Select(Etapa).ToList(),
-                        new BaseDto(b.Efds, b.Primeira, b.Ultima, b.ForaDoPeriodo)));
+                        new BaseDto(b.Efds, b.Primeira, b.Ultima, b.ForaDoPeriodo),
+                        Trilhas(p)));
                 }))
             .ExigirUsuario();
 
@@ -230,6 +247,24 @@ public static class TrabalhosRotas
             p.Status, StatusDoProjeto.Rotulo(p.Status), p.PreCadastro, feitas, totais,
             p.CriadoPor, p.CriadoPorId, p.Responsavel, p.ResponsavelId, p.Comentarios,
             VendaAConsumidor.DoBanco(p.VendaAConsumidor).Valor, VendaAConsumidor.DoBanco(p.VendaAConsumidor).Rotulo);
+    }
+
+    /// <summary>
+    /// As frentes do módulo, com o progresso de cada uma medido sobre as
+    /// etapas dela — e não sobre o trabalho inteiro. O denominador segue a
+    /// mesma regra do progresso geral: só conta o que existe e o que conclui.
+    /// </summary>
+    private static IReadOnlyList<TrilhaDto> Trilhas(ProjetoComEtapas pe)
+    {
+        var porChave = pe.Etapas.ToDictionary(e => e.Definicao.Chave);
+        return Etapas.TrilhasDo(pe.Projeto.Modulo).Select(t =>
+        {
+            var minhas = t.Etapas.Where(porChave.ContainsKey).Select(c => porChave[c]).ToList();
+            var (feitas, totais) = Cat.Dominio.Projeto.Etapas.Progresso(minhas);
+            var construida = minhas.Any(e => e.Definicao.Chave != "importar" && e.Definicao.Implementada);
+            return new TrilhaDto(t.Chave, t.Rotulo, t.Sigla, t.Descricao,
+                minhas.Select(e => e.Definicao.Chave).ToList(), feitas, totais, construida);
+        }).ToList();
     }
 
     private static EtapaDto Etapa(EtapaDoProjeto e) => new(

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { BarraDeFuncionalidades } from "@/components/shared/BarraDeFuncionalidades";
+import { FrentesDoTrabalho } from "@/components/shared/FrentesDoTrabalho";
 import { PainelDoTrabalho } from "@/components/shared/PainelDoTrabalho";
 import { Aviso } from "@/components/ui/Aviso";
 import { Botao, BotaoLink } from "@/components/ui/Botao";
@@ -155,7 +156,7 @@ const DESTINOS: Record<
 export default function Projeto() {
   const { podeExcluirTrabalho, administraUsuarios, podeEscrever } = useAuth();
   const [editando, setEditando] = useState(false);
-  const { id } = useParams<{ id: string }>();
+  const { id, trilha: chaveDaTrilha } = useParams<{ id: string; trilha?: string }>();
   const [d, setD] = useState<ProjetoDetalhe | null>(null);
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [aExcluir, setAExcluir] = useState<OQueSeraApagado | null>(null);
@@ -185,18 +186,44 @@ export default function Projeto() {
      histórico não é etapa: ele nunca conclui, que é por isso que o servidor já
      o deixa fora do progresso (`DefinicaoEtapa.Conta`). 23/09/2026. */
   const funcionalidades = d.etapas.filter((e) => e.chave !== "historico");
+  /* As frentes do trabalho — a CAT 42, o crédito outorgado, a quebra de XML.
+     Quem diz quais são é o servidor; a tela só abre o card. Sem `trilha` na
+     rota estamos no trabalho, e os cards são as frentes; com ela estamos
+     dentro de uma, e os cards são as etapas dela. */
+  const trilhas = d.trilhas ?? [];
+  const trilha = chaveDaTrilha ? trilhas.find((t) => t.chave === chaveDaTrilha) : undefined;
+  const dentroDeUmaFrente = chaveDaTrilha !== undefined;
+  const daFrente = trilha
+    ? funcionalidades.filter((e) => trilha.etapas.includes(e.chave))
+    : funcionalidades;
   const status = p.status as Status;
   // trabalho parado não roda etapa — a API recusa, e a tela diz antes
   const anda = aceitaProcessamento(status);
   const parado = avisoDeTrabalhoParado(status);
 
+  if (dentroDeUmaFrente && !trilha) {
+    return (
+      <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
+        <Voltar para={ROTAS.projeto(p.id)}>Voltar ao trabalho</Voltar>
+        <Aviso titulo="Esta frente de trabalho não existe neste módulo">
+          O trabalho é de {p.modulo_rotulo}, e {p.modulo_rotulo} não tem a frente{" "}
+          <code className="font-mono">{chaveDaTrilha}</code>. Volte ao trabalho para ver as que tem.
+        </Aviso>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
-      <Voltar para={ROTAS.inicio}>Trabalhos</Voltar>
+      {trilha ? (
+        <Voltar para={ROTAS.projeto(p.id)}>Voltar ao trabalho</Voltar>
+      ) : (
+        <Voltar para={ROTAS.inicio}>Trabalhos</Voltar>
+      )}
 
       <CabecalhoDePagina
-        eyebrow={p.frente_rotulo}
-        titulo={p.empresa}
+        eyebrow={trilha ? `${p.empresa} · ${p.modulo_rotulo}` : p.frente_rotulo}
+        titulo={trilha ? trilha.rotulo : p.empresa}
         sub={
           <span className="flex flex-wrap items-center gap-2 font-mono">
             {p.cnpj_matriz_formatado ?? "CNPJ não informado"}
@@ -260,9 +287,15 @@ export default function Projeto() {
             não foi construído e o que não conclui. Recontar aqui dava uma
             segunda verdade — e ela discordava, somando o histórico. */}
         <div className="flex flex-wrap items-center gap-3">
-          <Barra de={p.etapas_feitas} para={p.etapas_totais} className="min-w-[200px] flex-1" />
+          <Barra
+            de={trilha ? trilha.feitas : p.etapas_feitas}
+            para={trilha ? trilha.totais : p.etapas_totais}
+            className="min-w-[200px] flex-1"
+          />
           <span className="text-[13px] font-semibold text-texto-suave">
-            {p.etapas_feitas} de {p.etapas_totais} etapas concluídas
+            {trilha ? trilha.feitas : p.etapas_feitas} de{" "}
+            {trilha ? trilha.totais : p.etapas_totais} etapas concluídas
+            {trilha ? " nesta frente" : ""}
           </span>
         </div>
       </CabecalhoDePagina>
@@ -308,38 +341,44 @@ export default function Projeto() {
         </Aviso>
       )}
 
-      <BarraDeFuncionalidades
-        etapas={funcionalidades}
-        rota={(chave: string) => {
-          const destino = DESTINOS[chave];
-          return destino ? destino.rota(Number(id)) : null;
-        }}
-      />
+      {trilha && (
+        <BarraDeFuncionalidades
+          etapas={daFrente}
+          rota={(chave: string) => {
+            const destino = DESTINOS[chave];
+            return destino ? destino.rota(Number(id)) : null;
+          }}
+        />
+      )}
 
-      {/* Um painel só, para todo módulo. Até 24/09/2026 o ICMS tinha uma lista
-          numerada e o PIS/COFINS tinha os cards: a numeração dizia que a CAT 42
-          é uma fila, e isso **era** verdade quando o módulo tinha só ela. Com o
-          crédito outorgado — que lê os XML direto e não espera etapa nenhuma —
-          deixou de ser: o módulo passou a ter funcionalidade independente, como
-          o PIS/COFINS sempre teve.
+      {/* Dois níveis, e o mesmo card nos dois. No trabalho, um card por frente
+          — CAT 42, crédito outorgado, e as que vierem (CAT 207, quebra de XML);
+          dentro da frente, um card por etapa, que é o painel que o PIS/COFINS
+          já tinha.
 
-          A ordem da CAT 42 não se perdeu: ela é a ordem dos cards, que é a do
-          servidor, e a dependência real continua dita em cada descrição e
-          cobrada pelo servidor, com a frase que explica o que falta. */}
-      <PainelDoTrabalho
-        projetoId={Number(id)}
-        etapas={funcionalidades}
-        rota={(chave: string) => {
-          const destino = DESTINOS[chave];
-          return destino ? destino.rota(Number(id)) : null;
-        }}
-        bloqueio={anda ? undefined : parado?.titulo}
-      />
+          A ordem da CAT 42 não se perdeu quando a lista numerada saiu: ela é a
+          ordem dos cards, que é a do servidor, e a dependência real continua
+          dita em cada descrição e cobrada por quem pode cobrá-la — o servidor,
+          com a frase que explica o que falta. */}
+      {trilha ? (
+        <PainelDoTrabalho
+          projetoId={Number(id)}
+          etapas={daFrente}
+          rota={(chave: string) => {
+            const destino = DESTINOS[chave];
+            return destino ? destino.rota(Number(id)) : null;
+          }}
+          bloqueio={anda ? undefined : parado?.titulo}
+        />
+      ) : (
+        <FrentesDoTrabalho projetoId={p.id} modulo={p.modulo} trilhas={trilhas} />
+      )}
 
-      {/* A pré-validação é da CAT 42, e só aparece onde ela existe. Aparecia em
-          todo trabalho, inclusive nos de PIS/COFINS, que não têm arquivo digital
-          nenhum para auditar. */}
-      {p.modulo === "icms" && (
+      {/* A pré-validação é da CAT 42, e só aparece onde ela existe — e no
+          trabalho, não dentro de uma frente. Aparecia em todo trabalho,
+          inclusive nos de PIS/COFINS, que não têm arquivo digital para
+          auditar. */}
+      {p.modulo === "icms" && !trilha && (
         <section className="flex flex-wrap items-center gap-4 rounded-cartao border border-borda bg-superficie-vidro p-6">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border border-laranja-500/30 bg-laranja-500/14 text-laranja-700 escuro:text-laranja-300">
             <IconeArquivoDigital size={18} strokeWidth={1.8} aria-hidden />
@@ -357,7 +396,7 @@ export default function Projeto() {
         </section>
       )}
 
-      {podeExcluirTrabalho && (
+      {podeExcluirTrabalho && !trilha && (
         <section className="flex flex-wrap items-center justify-between gap-4 rounded-cartao border border-erro/30 border-l-[3px] border-l-erro bg-erro-fundo p-6">
           <div className="min-w-0">
             <h2 className="m-0 text-base font-extrabold text-erro">Excluir este trabalho</h2>

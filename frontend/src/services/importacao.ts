@@ -90,10 +90,35 @@ export interface BaseDoTrabalho {
   fora_do_periodo: number;
 }
 
+/**
+ * Uma frente de trabalho do módulo — a CAT 42, o crédito outorgado, a quebra
+ * de XML —, com as chaves das etapas que cabem dentro dela.
+ *
+ * É o card que a tela do trabalho abre. Quem diz quais são, e em que ordem, é
+ * o servidor (`Etapas.TrilhasPorModulo`): repetir a lista aqui daria duas
+ * fontes para a mesma verdade, e um dia a tela ofereceria uma frente que o
+ * servidor não conhece.
+ */
+export interface Trilha {
+  chave: string;
+  rotulo: string;
+  /** o quadrado do card, como no hub: "C42", "OUT" */
+  sigla: string;
+  descricao: string;
+  /** chaves de `Etapa`, na ordem da frente */
+  etapas: string[];
+  feitas: number;
+  totais: number;
+  /** falso quando nenhuma etapa própria da frente foi construída ainda */
+  construida: boolean;
+}
+
 export interface ProjetoDetalhe {
   projeto: Projeto;
   etapas: Etapa[];
   base?: BaseDoTrabalho;
+  /** vazio no módulo que ainda não tem frente construída */
+  trilhas?: Trilha[];
 }
 
 /**

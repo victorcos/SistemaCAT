@@ -188,6 +188,63 @@ public sealed class RoteiroPorModuloTestes
     }
 
     [Fact]
+    public void Toda_trilha_comeca_por_importar()
+    {
+        // a base é a mesma para todas: quem importou para a CAT 42 já importou
+        // para o crédito outorgado, e o card de cada frente conta essa etapa
+        Assert.All(Etapas.TrilhasPorModulo.Values.SelectMany(t => t),
+            t => Assert.Equal("importar", t.Etapas[0]));
+    }
+
+    [Fact]
+    public void Toda_etapa_do_roteiro_cabe_numa_trilha()
+    {
+        // é o que garante que nenhuma etapa fique sem card na tela do trabalho.
+        // `importar` e `historico` são de qualquer trabalho, e não de uma frente
+        foreach (var (modulo, chaves) in Etapas.Roteiros)
+        {
+            var nasTrilhas = Etapas.TrilhasDo(modulo).SelectMany(t => t.Etapas).ToHashSet();
+            Assert.All(chaves.Where(c => c is not "importar" and not "historico"),
+                c => Assert.True(nasTrilhas.Contains(c),
+                    $"a etapa '{c}' está no roteiro de {modulo} e em trilha nenhuma"));
+        }
+    }
+
+    [Fact]
+    public void O_roteiro_sai_das_trilhas_e_nao_repete_o_importar()
+    {
+        var icms = Etapas.Roteiros["icms"];
+
+        Assert.Equal("importar", icms[0]);
+        Assert.Equal("historico", icms[^1]);
+        Assert.Single(icms.Where(c => c == "importar"));
+        // as duas frentes do ICMS, uma depois da outra
+        Assert.Equal(
+            ["importar", "conferencia", "movimentos", "st_suportado", "razao", "apuracao",
+             "arquivo_digital", "entrega", "credito_outorgado", "historico"],
+            icms);
+    }
+
+    [Fact]
+    public void As_frentes_do_icms_sao_a_cat42_e_o_credito_outorgado()
+    {
+        var trilhas = Etapas.TrilhasDo("icms");
+
+        Assert.Equal(["cat42", "credito_outorgado"], trilhas.Select(t => t.Chave));
+        // a cadeia da CAT 42 inteira mora numa trilha só, e é ela que tem ordem
+        Assert.Equal(8, trilhas[0].Etapas.Count);
+        // o outorgado não espera nada dela: a base, e ele
+        Assert.Equal(["importar", "credito_outorgado"], trilhas[1].Etapas);
+    }
+
+    [Fact]
+    public void Modulo_sem_frente_construida_nao_inventa_nenhuma()
+    {
+        Assert.Empty(Etapas.TrilhasDo("irpj_csll"));
+        Assert.Equal(["importar", "historico"], Etapas.Roteiros["irpj_csll"]);
+    }
+
+    [Fact]
     public void O_piscofins_nao_herda_etapa_de_icms()
     {
         var chaves = Etapas.Do("piscofins").Select(d => d.Chave).ToList();
@@ -223,9 +280,10 @@ public sealed class RoteiroPorModuloTestes
             roteiro.Select(e => e.Definicao.Rotulo));
         // o histórico é consulta: aparece na barra e não entra no denominador
         Assert.False(roteiro.Single(e => e.Definicao.Chave == "historico").Definicao.Conta);
-        // as exclusões e a quebra de XML ainda não existem, e só elas ficam de fora
-        var porFazer = new[] { "exclusoes", "quebra_xml" };
-        Assert.Equal((1, 4), Etapas.Progresso(roteiro));
+        // a quebra de XML ainda não existe, e só ela fica de fora — as exclusões
+        // entraram em 24/09/2026 e passaram a contar
+        var porFazer = new[] { "quebra_xml" };
+        Assert.Equal((1, 5), Etapas.Progresso(roteiro));
         Assert.All(roteiro.Where(e => porFazer.Contains(e.Definicao.Chave)),
             e => Assert.False(e.Acessivel));
         Assert.All(roteiro.Where(e => !porFazer.Contains(e.Definicao.Chave)),

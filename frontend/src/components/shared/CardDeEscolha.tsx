@@ -37,11 +37,18 @@ export interface Escolha {
   /** o que o rodapé conta. Ausente some — melhor que mostrar zero inventado */
   contagem?: { quantos: number; rotulo: string };
   chamada: string;
+  /** a sigla do quadrado, quando a chave não é um assunto do catálogo */
+  sigla?: string;
+  /** de que assunto o card herda a cor. Por padrão, a própria chave — as
+   *  frentes de um trabalho herdam a do módulo, para o ICMS inteiro ser azul */
+  cor?: string;
+  /** entra apagado: a frente existe no caminho, e ainda não no sistema */
+  apagado?: boolean;
 }
 
 export function CardDeEscolha({ escolha }: { escolha: Escolha }) {
-  const tema = corDoAssunto(escolha.chave);
-  const sigla = SIGLAS[escolha.chave] ?? escolha.rotulo.slice(0, 4).toUpperCase();
+  const tema = corDoAssunto(escolha.cor ?? escolha.chave);
+  const sigla = escolha.sigla ?? SIGLAS[escolha.chave] ?? escolha.rotulo.slice(0, 4).toUpperCase();
 
   return (
     <Link
@@ -51,6 +58,9 @@ export function CardDeEscolha({ escolha }: { escolha: Escolha }) {
         "border border-borda bg-superficie p-6 no-underline shadow-cat transition-all",
         "hover:-translate-y-1 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-borda-foco",
         tema.anel,
+        // apagado, e não escondido: quem procura a frente que sabe que existe
+        // precisa achá-la, e lá dentro a tela diz que ela ainda não foi feita
+        escolha.apagado && "opacity-60",
       )}
     >
       {/* o brilho do canto, na cor do assunto */}

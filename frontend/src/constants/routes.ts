@@ -19,6 +19,8 @@ export const ROTAS = {
   usuarios: "/usuarios",
 
   projeto: (id: number | string) => `/projetos/${id}`,
+  /** uma frente de trabalho dentro do trabalho: a CAT 42, o crédito outorgado */
+  frente: (id: number | string, frente: string) => `/projetos/${id}/frente/${frente}`,
   arquivos: (id: number | string) => `/projetos/${id}/arquivos`,
   conferencia: (id: number | string) => `/projetos/${id}/conferencia`,
   movimentos: (id: number | string) => `/projetos/${id}/movimentos`,

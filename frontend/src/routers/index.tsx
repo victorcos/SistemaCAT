@@ -110,6 +110,9 @@ export const roteador = createBrowserRouter([
               { path: "/projetos/:id/pre-validacao", element: <PreValidacao /> },
               { path: "/projetos/:id/quebra-de-sped", element: <QuebraDeSped /> },
               { path: "/projetos/:id/credito-outorgado", element: <CreditoOutorgado /> },
+              // a mesma tela do trabalho, um nível dentro: os cards passam a
+              // ser as etapas da frente em vez das frentes do trabalho
+              { path: "/projetos/:id/frente/:trilha", element: <Projeto /> },
               { path: "/projetos/:id/apuracao-piscofins", element: <ApuracaoPisCofins /> },
               { path: "/projetos/:id/razao-contabil", element: <RazaoContabil /> },
               { path: "/projetos/:id/apuracao-contribuicoes", element: <Gestao /> },

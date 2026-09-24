@@ -80,7 +80,7 @@ function motivoDe(e: Etapa, bloqueio?: string): string | undefined {
  * painel continua inteiro. O que não pode falhar é conseguir abrir a
  * funcionalidade — e isso não depende daqui.
  */
-function FaixaDeLeiautes({ projetoId }: { projetoId: number }) {
+export function FaixaDeLeiautes({ projetoId }: { projetoId: number }) {
   const [leiautes, setLeiautes] = useState<Contagem[] | null>(null);
 
   useEffect(() => {

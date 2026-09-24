@@ -1,12 +1,12 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-09-24, sobre a versão **0.97.1**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-09-24, sobre a versão **0.99.0**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
 errado é o código — não este documento.
 
-## 1. Rotas (26)
+## 1. Rotas (28)
 
 O endereço, a tela que o atende e se exige papel específico.
 
@@ -31,15 +31,17 @@ O endereço, a tela que o atende e se exige papel específico.
 | `/projetos/:id/pre-validacao` | PreValidacao | — |
 | `/projetos/:id/quebra-de-sped` | QuebraDeSped | — |
 | `/projetos/:id/credito-outorgado` | CreditoOutorgado | — |
+| `/projetos/:id/frente/:trilha` | Projeto | — |
 | `/projetos/:id/apuracao-piscofins` | ApuracaoPisCofins | — |
 | `/projetos/:id/razao-contabil` | RazaoContabil | — |
 | `/projetos/:id/apuracao-contribuicoes` | Gestao | — |
+| `/projetos/:id/exclusoes` | Exclusoes | — |
 | `/projetos/:id/entrega` | Entrega | — |
 | `/projetos/:id/historico` | Historico | — |
 | `/usuarios` | Usuarios | sim |
 | `*` | NaoEncontrada | — |
 
-## 2. Telas (25)
+## 2. Telas (26)
 
 O resumo é o que o próprio arquivo diz de si no comentário do topo.
 
@@ -84,6 +86,12 @@ De-para de códigos do trabalho. O sistema propõe os pares a partir da moviment
 `src/pages/Entrega.tsx` · 733 linhas
 
 Etapa 8 — relatórios e entrega. Três regras mandam na tela: **o relatório mostra tudo e o dossiê só o que vai
+
+### Exclusoes
+
+`src/pages/Exclusoes.tsx` · 439 linhas
+
+Exclusões da base do PIS/COFINS. Uma tese hoje: as próprias contribuições fora da base. A receita embute PIS e
 
 ### Gestao
 
@@ -141,7 +149,7 @@ Pré-validar os arquivos digitais que o cliente já transmitiu.
 
 ### Projeto
 
-`src/pages/Projeto.tsx` · 491 linhas
+`src/pages/Projeto.tsx` · 538 linhas
 
 Para onde cada funcionalidade leva, e com que palavras. A tela não decide o que está disponível — isso vem do domínio, em
 
@@ -193,7 +201,7 @@ Troca obrigatória da senha provisória. Aparece no lugar da aplicação, sem me
 
 O que se diz da pessoa numa linha: uma situação só, na ordem de
 
-## 3. Componentes (29 arquivos)
+## 3. Componentes (30 arquivos)
 
 O que já existe e pode ser reaproveitado. Desenhar um componente que já
 está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
@@ -227,8 +235,9 @@ está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
 | `CardDeFuncionalidade.tsx` | CardDeFuncionalidade | `etapa` | Uma funcionalidade do trabalho, como card. É o card do hub (`CardDeEscolha`) um nível abaixo: lá se escolhe o tributo, |
 | `CorrecoesAMao.tsx` | CorrecoesAMao | `projetoId` | Correção à mão do trabalho: a porta da planilha e a lista do que já foi |
 | `EditarCadastro.tsx` | EditarCadastro | `projeto, aberto, aoFechar, aoSalvar` | Nome e período do trabalho. Existe porque o período muda de verdade: o trabalho do Amigão nasceu como |
+| `FrentesDoTrabalho.tsx` | FrentesDoTrabalho | `projetoId, modulo, trilhas` | As frentes de trabalho de um trabalho: a CAT 42, o crédito outorgado, e as |
 | `OcorrenciasDoArquivo.tsx` | OcorrenciasDoArquivo | `chave, carregar, cabecalho` | O que a pré-validação achou num arquivo digital. Serve às duas telas que pré-validam — a do arquivo que o sistema gerou e a |
-| `PainelDoTrabalho.tsx` | PainelDoTrabalho | `projetoId, etapas, rota, bloqueio` | O painel do trabalho: o que há para ler, e o que dá para fazer. |
+| `PainelDoTrabalho.tsx` | PainelDoTrabalho, FaixaDeLeiautes | `projetoId, etapas, rota, bloqueio` | O painel do trabalho: o que há para ler, e o que dá para fazer. |
 | `Rodada.tsx` | quando, duracao, Faixa, Rotulo, Cartao, BarraFina, ListaDoLog | `titulo` | As peças das telas de etapa que rodam no servidor e mostram o resultado em |
 | `SegmentosDoUsuario.tsx` | useCatalogoDeSegmentos, PilulasDeSegmento, ChipsDeSegmento | `segmentos, catalogo, papel` | O catálogo inteiro, buscado uma vez por montagem de tela. |
 | `TrabalhoParado.tsx` | TrabalhoParado | `status, projetoId` | A faixa que explica por que a etapa não roda. Aparece nas três telas de etapa e no detalhe do trabalho, sempre com a |
@@ -510,7 +519,7 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 | `--borda-sutil` | `rgb(255 255 255 / 8%)` | — |
 | `--brilho-acao` | `0 12px 28px rgb(255 127 0 / 30%)` | — |
 
-## 5. O que a tela pede ao servidor (95 chamadas)
+## 5. O que a tela pede ao servidor (99 chamadas)
 
 Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 `:id`, qualquer que seja o nome no código.
@@ -601,6 +610,15 @@ Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 | GET | `/api/entrega/:id/planilhas/pacote` |
 | GET | `/api/entrega/:id/planilhas/relatorio` |
 | POST | `/api/projetos/:id/entrega` |
+
+### `exclusoes`
+
+| Método | Rota |
+| --- | --- |
+| GET | `/api/exclusoes/:id` |
+| POST | `/api/exclusoes/:id/cancelar` |
+| GET | `/api/exclusoes/:id/planilhas/exclusoes:id` |
+| POST | `/api/projetos/:id/exclusoes` |
 
 ### `gestao`
 

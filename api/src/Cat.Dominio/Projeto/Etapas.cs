@@ -185,29 +185,88 @@ public static class Etapas
     ];
 
     /// <summary>
+    /// Uma frente de trabalho dentro do módulo: a CAT 42, a CAT 207, o crédito
+    /// outorgado, a quebra de XML. É o que se contrata e o que se entrega — e,
+    /// na tela, é o card que se abre para ver as etapas dele.
+    ///
+    /// **Chama-se trilha, e não frente**, porque `frente` já é a coluna do
+    /// projeto (<see cref="Frentes"/>), que classifica o trabalho inteiro: um
+    /// trabalho de frente "cat42" percorre hoje a CAT 42 **e** o crédito
+    /// outorgado. Dois nomes para conceitos diferentes valem mais que um nome
+    /// para dois.
+    ///
+    /// **Toda trilha começa por importar.** A base é a mesma para todas — quem
+    /// importou para a CAT 42 já importou para o crédito outorgado —, e é por
+    /// isso que `importar` aparece em cada trilha e no roteiro uma vez só.
+    /// </summary>
+    /// <param name="Sigla">o quadrado do card, como no hub: "C42", "OUT".</param>
+    public sealed record Trilha(string Chave, string Rotulo, string Sigla, string Descricao,
+        IReadOnlyList<string> Etapas);
+
+    /// <summary>
+    /// As frentes de trabalho de cada módulo, na ordem em que aparecem.
+    ///
+    /// **É daqui que sai o roteiro**, e não o contrário: assim nenhuma etapa
+    /// fica sem card na tela, e acrescentar uma frente nova (CAT 207, quebra de
+    /// XML) é acrescentar uma linha aqui com as chaves dela.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, IReadOnlyList<Trilha>> TrilhasPorModulo =
+        new Dictionary<string, IReadOnlyList<Trilha>>
+        {
+            ["icms"] =
+            [
+                new("cat42", "CAT 42", "C42",
+                    "Ressarcimento e complemento de ICMS-ST: da conferência dos documentos " +
+                    "ao arquivo digital no leiaute da CAT 42 e à entrega. A ordem aqui é de " +
+                    "dependência real — sem movimentos não há razão.",
+                    ["importar", "conferencia", "movimentos", "st_suportado", "razao",
+                     "apuracao", "arquivo_digital", "entrega"]),
+                new("credito_outorgado", "Crédito outorgado", "OUT",
+                    "Quais itens vendidos são produto beneficiado, pela descrição e pela NCM. " +
+                    "Lê os XML do lote direto: não depende da CAT 42 nem de etapa nenhuma dela.",
+                    ["importar", "credito_outorgado"]),
+            ],
+            ["piscofins"] =
+            [
+                new("piscofins", "Apuração de PIS/COFINS", "P/C",
+                    "Da quebra dos SPED à Gestão Fiscal: a Consulta de Entradas e o razão da " +
+                    "ECD, as exclusões da base e os quadros no padrão do MA.",
+                    ["importar", "quebra_de_sped", "apuracao_piscofins", "exclusoes",
+                     "apuracao_contribuicoes"]),
+                new("quebra_xml", "Quebra de XML", "XML",
+                    "Abrir os XML das notas do lote item a item, como a quebra faz com o SPED.",
+                    ["importar", "quebra_xml"]),
+            ],
+            // nenhuma frente construída ainda: o trabalho importa a base e para aí
+            ["irpj_csll"] = [],
+        };
+
+    /// <summary>As frentes do módulo. Módulo desconhecido cai no de ICMS.</summary>
+    public static IReadOnlyList<Trilha> TrilhasDo(string? modulo) =>
+        TrilhasPorModulo.TryGetValue(modulo ?? "", out var t) ? t : TrilhasPorModulo["icms"];
+
+    /// <summary>
     /// Qual módulo percorre quais etapas, na ordem. A chave é a do módulo em
     /// <see cref="Acesso.Segmentos"/>; o valor, chaves de <see cref="Todas"/>.
     ///
-    /// Acrescentar funcionalidade é acrescentar a etapa ao catálogo e a chave
-    /// dela aqui — nada mais. Etapa declarada e ainda não construída aparece
-    /// como "ainda não disponível", que é deliberado: o usuário vê o caminho
-    /// inteiro e sabe onde o trabalho está.
+    /// **Derivado das trilhas**, e não escrito à mão: duas listas para a mesma
+    /// verdade divergiriam no dia em que alguém mexesse numa, e o preço seria
+    /// uma etapa que existe no roteiro e não aparece em card nenhum.
+    ///
+    /// `importar` abre todo roteiro e `historico` fecha todos: os dois são de
+    /// qualquer trabalho, e não de uma frente. Etapa declarada e ainda não
+    /// construída aparece como "ainda não disponível", que é deliberado: o
+    /// usuário vê o caminho inteiro e sabe onde o trabalho está.
     /// </summary>
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> Roteiros =
-        new Dictionary<string, IReadOnlyList<string>>
-        {
-            // o crédito outorgado fica no fim porque não pertence à cadeia da
-            // CAT 42: ele lê os XML do lote direto, e não depende de nenhuma das
-            // outras. A ordem das oito primeiras é de dependência real
-            ["icms"] = ["importar", "conferencia", "movimentos", "st_suportado", "razao",
-                        "apuracao", "arquivo_digital", "entrega", "credito_outorgado",
-                        "historico"],
-            // a barra do trabalho de PIS/COFINS, na ordem em que aparece
-            ["piscofins"] = ["importar", "quebra_de_sped", "apuracao_piscofins",
-                             "exclusoes", "apuracao_contribuicoes", "quebra_xml",
-                             "historico"],
-            ["irpj_csll"] = ["importar", "historico"],
-        };
+        TrilhasPorModulo.ToDictionary(
+            p => p.Key,
+            p => (IReadOnlyList<string>)
+            [
+                "importar",
+                .. p.Value.SelectMany(t => t.Etapas).Where(c => c != "importar").Distinct(),
+                "historico",
+            ]);
 
     /// <summary>
     /// O roteiro do módulo. Módulo desconhecido cai no de ICMS, que é o de todo

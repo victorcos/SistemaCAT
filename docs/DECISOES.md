@@ -5,6 +5,48 @@
 
 ---
 
+## 2026-09-24 — O trabalho ganha um nível: um card por frente, e as etapas dentro dele
+
+**O que mudou de fato.** O ICMS tinha oito etapas porque tinha uma obrigação só.
+Com o crédito outorgado entrando, e com CAT 207 e quebra de XML no caminho
+(decisão do Victor, 24/09/2026), a tela do trabalho passaria a empilhar doze,
+quinze cards soltos, misturando obrigações que não têm nada a ver uma com a
+outra. Agora o trabalho mostra **uma frente por card** — CAT 42, crédito
+outorgado — e clicar no card abre as etapas daquela frente.
+
+**Chama-se trilha no código, e frente na tela.** `frente` já é a coluna do
+projeto (`Frentes`: cat42, depara, sped, notafiscal), que classifica o trabalho
+inteiro — e um trabalho de frente "cat42" percorre hoje a CAT 42 **e** o crédito
+outorgado. Dois nomes para conceitos diferentes valem mais que um nome para
+dois; quem lê a tela nunca vê a palavra trilha, só o nome da frente.
+
+**O roteiro passou a ser derivado das trilhas**, e não escrito à mão ao lado
+delas. Duas listas para a mesma verdade divergiriam no primeiro dia em que
+alguém mexesse numa, e o preço seria uma etapa existindo no roteiro e não
+aparecendo em card nenhum. Um teste cobra exatamente isso.
+
+**Toda trilha começa por `importar`, e o roteiro só o tem uma vez.** A base é a
+mesma para todas — quem importou para a CAT 42 já importou para o crédito
+outorgado. `importar` abre todo roteiro e `historico` fecha todos: os dois são
+de qualquer trabalho, e não de uma frente.
+
+**Frente sem nada construído não some: entra apagada.** E o card não diz "1 de
+1 concluída" só porque a base foi importada — `Construida` olha as etapas
+próprias da frente, ignorando o `importar` que todas têm. Card que desaparece
+faz a pessoa procurar a frente que ela sabe que foi contratada.
+
+**O card é o mesmo do hub de tributos**, com a cor do módulo em vez de uma cor
+por frente: dentro do trabalho o assunto já é um só, e pintar cada frente de uma
+cor inventaria uma distinção que não existe. Quem escolheu ICMS numa tela de
+cards não deveria aprender uma segunda gramática para escolher a CAT 42 dentro
+dele.
+
+**O que fica em aberto:** de dentro de uma etapa (o razão, por exemplo), o
+"Voltar ao trabalho" cai no nível das frentes, e não na frente de onde se veio.
+É um clique a mais, e o conserto exige a etapa saber de que frente foi aberta.
+
+---
+
 ## 2026-09-23 — O crédito outorgado entra no ICMS, vindo do Quebra de SPED
 
 **De onde veio.** A funcionalidade existe e roda no projeto `Quebra de SPED`
