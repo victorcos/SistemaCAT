@@ -134,6 +134,46 @@ navegam para os mesmos lugares, na mesma tela.
 
 ---
 
+## 2026-09-24 — A fila sai de dentro do motor
+
+**O estrago.** A Gestão Fiscal de 65 arquivos morreu no quarto, com
+"Interrompida: o motor reiniciou durante a rodada". A mensagem estava certa: o
+motor de desenvolvimento roda com `--reload`, a fila de execuções era uma
+thread dentro dele, e salvar um `.py` derruba o processo — que, ao sair, ainda
+encerra de propósito o processo filho da rodada. Com duas pessoas mexendo no
+código ao mesmo tempo, isso acontece dezenas de vezes por dia: uma apuração de
+uma hora **nunca** chegava ao fim. A de 23/09 morreu duas vezes assim (a
+conferência de 95 mil documentos, em 220; a Gestão, em 4 de 65).
+
+**O diagnóstico que faltava.** O projeto já tinha tratado metade do problema em
+16/09: cada rodada passou a ter processo próprio, para que falta de memória não
+derrubasse o motor. Mas quem **vigia** o filho continuava dentro do processo que
+recarrega — e o vigia, ao ser encerrado, mata o filho junto.
+
+**A mudança.** `workers/rodar.py`: a fila roda em processo próprio, fora do
+motor. `python -m workers.rodar`, uma janela dedicada em `scripts/subir.ps1`, e
+o motor sobe com `CAT_FILA_AUTOMATICA=false`. O motor recarrega à vontade — é o
+que torna o desenvolvimento suportável — e não leva rodada nenhuma junto.
+
+**Por que não é só configuração.** Dois trabalhadores no mesmo banco não
+disputam execução (o `SKIP LOCKED` cuida disso), mas o que reinicia marca como
+interrompida a rodada que o outro está tocando: `recuperar_interrompidas` não
+tem como saber que a linha "rodando" é de outro processo vivo. Daí o motor
+subir **sem** fila, e o trabalhador avisar no log quando percebe que o motor
+também está configurado para rodá-la.
+
+**Provado na base real.** Com a apuração em curso, salvei um `.py` de propósito:
+o motor reiniciou (`/interno/saude` respondeu `ok` logo depois) e a rodada
+seguiu de 2/65 para 4/65 sem piscar. Antes, esse mesmo gesto a matava.
+
+**O que fica de dívida.** `recuperar_interrompidas` continua sendo heurística:
+"linha rodando quando eu subo é rodada morta". Com a fila num processo só, a
+heurística volta a valer. Para valer sempre, a execução precisaria registrar
+quem a está tocando (máquina e processo), e aí a recuperação checaria se aquele
+trabalhador ainda vive. Fica anotado para quando houver mais de um.
+
+---
+
 ## 2026-09-23 — O front ganhou testes, por uma pergunta que o código não respondia
 
 **A pergunta.** "Filtrar, marcar uma conta, trocar de filtro, marcar outra — a

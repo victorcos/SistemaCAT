@@ -247,6 +247,18 @@ def _laco() -> None:
     log.info("trabalhador da fila parado")
 
 
+def rodar_ate_parar() -> None:
+    """O laço da fila **neste** processo, até alguém chamar `parar()`.
+
+    É o que `workers/rodar.py` usa. Fora do motor, a fila não é derrubada pelo
+    `--reload` do desenvolvimento — e uma apuração de uma hora deixa de morrer
+    porque alguém salvou um arquivo.
+    """
+    recuperar_interrompidas()
+    _parar.clear()
+    _laco()
+
+
 def iniciar_em_segundo_plano() -> None:
     global _linha
     if _linha is not None and _linha.is_alive():

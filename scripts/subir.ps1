@@ -3,10 +3,13 @@
   Sobe o motor, a API e a tela do Sistema CAT, cada um na sua janela, e abre o navegador.
 
 .DESCRIPTION
-  Três processos, nesta ordem:
+  Quatro processos, nesta ordem:
 
     1. motor Python em http://127.0.0.1:8020 — só aceita conexão da própria
        máquina; faz o trabalho pesado e atende o que ainda não foi portado;
+    1b. a fila de execuções, em processo próprio: é ela que roda as etapas
+       longas. Fica fora do motor porque o motor recarrega a cada arquivo
+       salvo, e recarregar no meio de uma apuração de uma hora a matava;
     2. API em C# em http://localhost:8010 — a única porta que a tela conhece;
        repassa ao motor o que ainda não foi migrado (docs/MIGRACAO_CSHARP.md);
     3. tela em http://localhost:5173 (Vite).
@@ -65,7 +68,13 @@ function Janela([string]$titulo, [string]$pasta, [string]$comando) {
 }
 
 Write-Host "==> Motor em http://127.0.0.1:8020 (só local)" -ForegroundColor Cyan
-Janela "Sistema CAT — motor" $backend "& '$venvPython' -m uvicorn cat.apresentacao.api.app:app --reload --host 127.0.0.1 --port 8020"
+# CAT_FILA_AUTOMATICA=false: quem roda a fila é a janela ao lado. O motor
+# recarrega a cada `.py` salvo, e com a fila dentro dele uma apuração de uma
+# hora morria toda vez que alguém mexia no código (23/09/2026).
+Janela "Sistema CAT — motor" $backend "`$env:CAT_FILA_AUTOMATICA = 'false'; & '$venvPython' -m uvicorn cat.apresentacao.api.app:app --reload --host 127.0.0.1 --port 8020"
+
+Write-Host "==> Fila de execuções (fora do motor, não recarrega)" -ForegroundColor Cyan
+Janela "Sistema CAT — fila" $backend "& '$venvPython' -m workers.rodar"
 
 Write-Host "==> API em http://localhost:8010" -ForegroundColor Cyan
 Janela "Sistema CAT — API" $api "dotnet watch run --non-interactive --no-launch-profile"
@@ -77,4 +86,4 @@ if (-not $SemNavegador) {
     Start-Sleep -Seconds 8
     Start-Process "http://localhost:5173"
 }
-Write-Host "Feche as três janelas para parar. Quem está no ar, e com qual versão: http://localhost:8010/api/saude."
+Write-Host "Feche as quatro janelas para parar. Quem está no ar, e com qual versão: http://localhost:8010/api/saude."
