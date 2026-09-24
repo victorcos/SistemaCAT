@@ -80,13 +80,30 @@ export function Combobox<T extends string>({
   const lista = useRef<HTMLUListElement>(null);
   const idLista = useId();
 
-  /** Onde o painel cabe: colado ao botão, para baixo ou para cima. */
+  /**
+   * Onde o painel cabe: colado ao botão, para baixo ou para cima.
+   *
+   * **O limite é o modal quando há um.** Medindo pela janela, a lista de um
+   * campo no meio de um diálogo abre para baixo e transborda o card, ficando
+   * sobre o fundo escurecido da página — parece defeito, e parecia mesmo. O
+   * diálogo é o mundo de quem está dentro dele: é a borda dele que decide se
+   * cabe embaixo, se cabe em cima, e onde a lista tem de parar.
+   */
   const medir = useCallback(() => {
     const caixa = raiz.current?.getBoundingClientRect();
     if (!caixa) return;
-    const altura = painel.current?.offsetHeight ?? 280;
-    const abaixo = window.innerHeight - caixa.bottom;
-    const cabeAbaixo = abaixo >= altura + 8 || abaixo >= caixa.top;
+    const dialogo = raiz.current?.closest("dialog")?.getBoundingClientRect();
+    // a margem interna existe para a lista não encostar na borda do modal
+    const limite = dialogo
+      ? { topo: dialogo.top + 8, base: dialogo.bottom - 8 }
+      : { topo: 0, base: window.innerHeight };
+
+    // `||` e não `??`: altura zero é painel ainda sem layout, não painel de
+    // zero pixel — e zero faria qualquer frestinha parecer espaço bastante
+    const altura = painel.current?.offsetHeight || 280;
+    const abaixo = limite.base - caixa.bottom;
+    const acima = caixa.top - limite.topo;
+    const cabeAbaixo = abaixo >= altura + 8 || abaixo >= acima;
     setPosicao({
       position: "fixed",
       left: caixa.left,
@@ -94,8 +111,8 @@ export function Combobox<T extends string>({
       ...(cabeAbaixo
         ? { top: caixa.bottom + 6 }
         : { bottom: window.innerHeight - caixa.top + 6 }),
-      // teto para a lista nunca estourar a janela
-      maxHeight: Math.max(180, (cabeAbaixo ? abaixo : caixa.top) - 14),
+      // teto para a lista nunca estourar o modal — ou a janela, fora dele
+      maxHeight: Math.max(140, (cabeAbaixo ? abaixo : acima) - 14),
     });
   }, []);
 

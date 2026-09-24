@@ -176,6 +176,30 @@ navegam para os mesmos lugares, na mesma tela.
 
 ---
 
+## 2026-09-24 — O painel do combobox para na borda do modal
+
+**O segundo defeito da mesma lista.** Em 23/09 o painel abria **atrás** do
+diálogo, e foi resolvido montando-o dentro do `<dialog>` (top layer). Agora
+abria **para fora**: num campo perto do rodapé, a lista descia além da borda do
+card e ficava sobre o fundo escurecido da página. Visto no "Novo trabalho", no
+seletor de tributo.
+
+**A causa era a medida.** O espaço disponível vinha da janela, e a janela é
+maior que o modal: havia 278 px até o rodapé da tela e só 30 px até o rodapé do
+card. Quem está dentro de um diálogo tem o diálogo por mundo — é a borda dele
+que decide se cabe embaixo, se cabe em cima e onde a lista para.
+
+**O que o teste achou de brinde.** `offsetHeight ?? 280` só cai no padrão
+quando o valor é nulo, e painel ainda sem layout devolve **zero** — com zero,
+qualquer frestinha de 8 px parecia espaço bastante. Virou `|| 280`: altura zero
+é painel não medido, não painel de zero pixel.
+
+**E o ambiente de teste ganhou o que faltava:** `scrollIntoView`, que o jsdom
+não implementa. Sem isso o efeito do teclado estoura e o teste falha por um
+motivo que nada tem a ver com o que ele mede.
+
+---
+
 ## 2026-09-24 — A quebra de XML, com a planilha que cada um escolhe
 
 **O que entrou.** A etapa `quebra_xml` deixa de ser promessa: abre as notas do
