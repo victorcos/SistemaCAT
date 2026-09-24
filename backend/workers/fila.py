@@ -53,6 +53,7 @@ from cat.aplicacao.casos_de_uso import (
     montar_razao,
     pre_validar_arquivos,
     quebrar_sped,
+    quebrar_xml,
 )
 from cat.aplicacao.casos_de_uso.historico_do_projeto import registrar_de_etapa
 from cat.config import obter_config
@@ -76,6 +77,7 @@ EXECUTORES = {
     pre_validar_arquivos.ETAPA: pre_validar_arquivos.executar,
     montar_entrega.ETAPA: montar_entrega.executar,
     quebrar_sped.ETAPA: quebrar_sped.executar,
+    quebrar_xml.ETAPA: quebrar_xml.executar,
     apurar_contribuicoes.ETAPA: apurar_contribuicoes.executar,
     apurar_piscofins.ETAPA: apurar_piscofins.executar,
     apurar_credito_outorgado.ETAPA: apurar_credito_outorgado.executar,

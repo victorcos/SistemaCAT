@@ -25,6 +25,7 @@ from cat.aplicacao.casos_de_uso import (
     montar_razao,
     pre_validar_arquivos,
     quebrar_sped,
+    quebrar_xml,
 )
 from cat.infraestrutura.analitico.confronto import (
     ARQUIVO_CONFERIDOS,
@@ -47,6 +48,7 @@ from cat.infraestrutura.analitico.credito_outorgado import (
     ARQUIVO_ELEGIVEIS,
 )
 from cat.infraestrutura.analitico.exclusoes import ARQUIVO_DAS_EXCLUSOES
+from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML
 from cat.infraestrutura.analitico.gestao import ARQUIVO_DOS_QUADROS
 from cat.infraestrutura.analitico.piscofins import (
     ARQUIVO_DAS_ENTRADAS,
@@ -95,6 +97,7 @@ from cat.infraestrutura.planilhas.quebra_de_sped import (
     gerar_razao_contabil,
 )
 from cat.infraestrutura.planilhas.exclusoes import gerar_exclusoes
+from cat.infraestrutura.planilhas.itens_do_xml import gerar_itens_do_xml
 from cat.infraestrutura.planilhas.razao import gerar_conferencia, gerar_ficha3, gerar_fichas
 from cat.infraestrutura.planilhas.suportado import gerar_suportado
 from cat.infraestrutura.repositorios.modelos import ExecucaoDB
@@ -136,6 +139,10 @@ PLANILHAS = {
         # o par que se confronta: o fiscal de um lado, o contábil do outro
         "entradas": ("consulta_de_entradas.xlsx", ARQUIVO_DAS_ENTRADAS, gerar_entradas),
         "razao-contabil": ("razao_contabil.xlsx", ARQUIVO_DO_RAZAO, gerar_razao_contabil),
+    },
+    quebrar_xml.ETAPA: {
+        # uma linha por item, com as colunas que a tela escolher
+        "itens": ("itens_do_xml.xlsx", ARQUIVO_ITENS_DO_XML, gerar_itens_do_xml),
     },
     apurar_exclusoes.ETAPA: {
         # uma linha por grupo: somar a coluna da diferença dá o total da tela
@@ -193,6 +200,7 @@ NAO_TERMINOU = {
     pre_validar_arquivos.ETAPA: "A pré-validação ainda não terminou.",
     montar_entrega.ETAPA: "A montagem da entrega ainda não terminou.",
     apurar_exclusoes.ETAPA: "A apuração das exclusões ainda não terminou.",
+    quebrar_xml.ETAPA: "A quebra dos XML ainda não terminou.",
 }
 
 

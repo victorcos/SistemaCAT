@@ -49,6 +49,7 @@ from cat.aplicacao.casos_de_uso import (
     planilhas,
     pre_validar_arquivos,
     quebrar_sped,
+    quebrar_xml,
     rodada,
 )
 from cat.aplicacao.casos_de_uso.analisar_remessa import RemessaAnalisada, analisar
@@ -68,6 +69,7 @@ from cat.infraestrutura.analitico import entrega as analitico_entrega
 from cat.infraestrutura.analitico import pre_validacao_do_cliente as analitico_pre_validacao
 from cat.infraestrutura.analitico import razao as analitico_razao
 from cat.infraestrutura.analitico import razao_contabil as analitico_razao_contabil
+from cat.infraestrutura.planilhas import itens_do_xml as planilha_do_xml
 from cat.infraestrutura.analitico import suportado as analitico_suportado
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
 from cat.infraestrutura.planilhas import correcoes_da_planilha
@@ -368,6 +370,8 @@ PREPARADORES = {
                          "Já existe uma quebra de SPED em andamento neste trabalho."),
     apurar_exclusoes.ETAPA: (apurar_exclusoes.preparar, apurar_exclusoes.NadaParaExcluir,
                              "Já existe uma apuração de exclusões em andamento neste trabalho."),
+    quebrar_xml.ETAPA: (quebrar_xml.preparar, quebrar_xml.NadaParaQuebrar,
+                        "Já existe uma quebra de XML em andamento neste trabalho."),
     apurar_credito_outorgado.ETAPA: (
         apurar_credito_outorgado.preparar, apurar_credito_outorgado.NadaParaVarrer,
         "Já existe uma apuração do crédito outorgado em andamento neste trabalho."),
@@ -609,6 +613,23 @@ def _quebra_concluida(execucao_id: int, sessao: Session) -> ExecucaoDB:
         raise HTTPException(status.HTTP_409_CONFLICT,
                             "A apuração de PIS/COFINS ainda não terminou.")
     return execucao
+
+
+@router.post("/xml/campos", dependencies=[Depends(exigir_segredo)])
+def campos_do_xml() -> dict:
+    """O catálogo de colunas da planilha dos XML, para a tela montar o seletor.
+
+    Vem do servidor de propósito: a tela não pode oferecer coluna que a planilha
+    não sabe produzir, e uma segunda lista escrita no front divergiria na
+    primeira vez que alguém acrescentasse um campo aqui.
+    """
+    return {
+        "blocos": list(planilha_do_xml.BLOCOS),
+        "campos": [{"campo": c.campo, "titulo": c.titulo, "bloco": c.bloco}
+                   for c in planilha_do_xml.CAMPOS],
+        "atalhos": {nome: list(planilha_do_xml.campos_do_atalho(nome))
+                    for nome in planilha_do_xml.ATALHOS},
+    }
 
 
 @router.post("/razao-contabil/contas", dependencies=[Depends(exigir_segredo)])

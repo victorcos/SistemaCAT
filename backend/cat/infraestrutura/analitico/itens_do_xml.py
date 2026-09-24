@@ -53,7 +53,9 @@ ESQUEMA_ITENS_DO_XML = pa.schema([
     ("modelo", pa.string()),
     ("tipo", pa.string()),                  # tpNF: 0 entrada, 1 saída, de quem emitiu
     ("emitente", pa.string()),
+    ("emitente_nome", pa.string()),
     ("destinatario", pa.string()),
+    ("destinatario_nome", pa.string()),
     ("numero_documento", pa.string()),
     ("serie", pa.string()),
     ("emissao", pa.date32()),
@@ -95,6 +97,24 @@ ESQUEMA_ITENS_DO_XML = pa.schema([
     ("icms_efetivo", pa.decimal128(18, 2)),
     # o ICMS suportado antes, como a NF-e informa no CST 60: substituto + retido + FCP
     ("retido_informado", pa.decimal128(18, 2)),
+    # PIS, COFINS, IPI e ISSQN do item. Não entram em apuração nenhuma do
+    # sistema — entram na extração dos XML, onde quem confere escolhe as
+    # colunas. O leitor já os lia; só não chegavam ao disco
+    ("cst_pis", pa.string()),
+    ("bc_pis", pa.decimal128(18, 2)),
+    ("aliq_pis", pa.decimal128(9, 4)),
+    ("valor_pis", pa.decimal128(18, 2)),
+    ("cst_cofins", pa.string()),
+    ("bc_cofins", pa.decimal128(18, 2)),
+    ("aliq_cofins", pa.decimal128(9, 4)),
+    ("valor_cofins", pa.decimal128(18, 2)),
+    ("cst_ipi", pa.string()),
+    ("bc_ipi", pa.decimal128(18, 2)),
+    ("aliq_ipi", pa.decimal128(9, 4)),
+    ("valor_ipi", pa.decimal128(18, 2)),
+    ("issqn_deducao", pa.decimal128(18, 2)),
+    ("issqn_desconto_incondicional", pa.decimal128(18, 2)),
+    ("issqn_desconto_condicional", pa.decimal128(18, 2)),
     # a ordem do arquivo na leitura: entre cópias da mesma chave, fica a de número maior
     ("leitura", pa.int64()),
 ])
@@ -243,6 +263,7 @@ def _ler_um(caminho: str, conteudo: bytes | None, escritor: _Escritor, vistas: d
 def _linha(doc: DocumentoXml, arquivo: str, item, leitura: int) -> dict:
     return {
         "chave": doc.chave, "modelo": doc.modelo, "tipo": doc.tipo, "emitente": doc.emitente,
+        "emitente_nome": doc.emitente_nome, "destinatario_nome": doc.destinatario_nome,
         "destinatario": doc.destinatario, "numero_documento": doc.numero, "serie": doc.serie,
         "emissao": doc.emissao, "consumidor_final": doc.consumidor_final, "protocolo": doc.cstat,
         "arquivo": arquivo, "leitura": leitura,
@@ -263,6 +284,15 @@ def _linha(doc: DocumentoXml, arquivo: str, item, leitura: int) -> dict:
         "valor_st": _q(item.valor_st, _Q2), "fcp_st": _q(item.fcp_st, _Q2),
         "bc_st_retido": _q(item.bc_st_retido, _Q2),
         "retido_informado": _q(item.retido_informado, _Q2) if item.retido_informado is not None else None,
+        "cst_pis": item.cst_pis, "bc_pis": _q(item.bc_pis, _Q2),
+        "aliq_pis": _q(item.aliq_pis, _Q4), "valor_pis": _q(item.valor_pis, _Q2),
+        "cst_cofins": item.cst_cofins, "bc_cofins": _q(item.bc_cofins, _Q2),
+        "aliq_cofins": _q(item.aliq_cofins, _Q4), "valor_cofins": _q(item.valor_cofins, _Q2),
+        "cst_ipi": item.cst_ipi, "bc_ipi": _q(item.bc_ipi, _Q2),
+        "aliq_ipi": _q(item.aliq_ipi, _Q4), "valor_ipi": _q(item.valor_ipi, _Q2),
+        "issqn_deducao": _q(item.issqn_deducao, _Q2),
+        "issqn_desconto_incondicional": _q(item.issqn_desconto_incondicional, _Q2),
+        "issqn_desconto_condicional": _q(item.issqn_desconto_condicional, _Q2),
     }
 
 

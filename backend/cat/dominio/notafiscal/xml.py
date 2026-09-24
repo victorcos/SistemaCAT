@@ -131,6 +131,16 @@ class ItemDoXml:
     bc_cofins: Decimal = ZERO
     aliq_cofins: Decimal = ZERO
     valor_cofins: Decimal = ZERO
+    # IPI e ISSQN. Não entram em apuração nenhuma do sistema; entram na planilha
+    # de extração dos XML, onde quem confere escolhe as colunas que quer ver —
+    # e quem trabalha com indústria ou com serviço precisa destas
+    cst_ipi: str = ""
+    bc_ipi: Decimal = ZERO
+    aliq_ipi: Decimal = ZERO
+    valor_ipi: Decimal = ZERO
+    issqn_deducao: Decimal = ZERO
+    issqn_desconto_incondicional: Decimal = ZERO
+    issqn_desconto_condicional: Decimal = ZERO
 
     @property
     def base_da_operacao(self) -> Decimal:
@@ -305,6 +315,8 @@ def _item(det: ET.Element) -> ItemDoXml:
     icms = _grupo_do_icms(det)
     pis = _grupo_do_tributo(det, "PIS")
     cofins = _grupo_do_tributo(det, "COFINS")
+    ipi = _grupo_do_tributo(det, "IPI")
+    issqn = _filho(_filho(det, "imposto"), "ISSQN") if _filho(det, "imposto") is not None else None
     gtin = _texto(prod, "cEAN").strip()
     cest = _texto(prod, "CEST")
     if not cest:
@@ -352,6 +364,13 @@ def _item(det: ET.Element) -> ItemDoXml:
         bc_cofins=_decimal(_texto(cofins, "vBC")),
         aliq_cofins=_decimal(_texto(cofins, "pCOFINS")),
         valor_cofins=_decimal(_texto(cofins, "vCOFINS")),
+        cst_ipi=_texto(ipi, "CST"),
+        bc_ipi=_decimal(_texto(ipi, "vBC")),
+        aliq_ipi=_decimal(_texto(ipi, "pIPI")),
+        valor_ipi=_decimal(_texto(ipi, "vIPI")),
+        issqn_deducao=_decimal(_texto(issqn, "vDeducao")),
+        issqn_desconto_incondicional=_decimal(_texto(issqn, "vDescIncond")),
+        issqn_desconto_condicional=_decimal(_texto(issqn, "vDescCond")),
     )
 
 
@@ -360,7 +379,8 @@ def _grupo_do_tributo(det: ET.Element, nome: str) -> ET.Element | None:
 
     Mesma forma do ICMS: o nome do grupo muda com o regime — `PISAliq`,
     `PISQtde`, `PISOutr`, `PISNT`, e os quatro equivalentes do COFINS —, e o que
-    interessa é o que está dentro dele.
+    interessa é o que está dentro dele. Serve também ao IPI (`IPITrib`,
+    `IPINT`), que tem a mesma estrutura.
     """
     imposto = _filho(det, "imposto")
     tributo = _filho(imposto, nome) if imposto is not None else None

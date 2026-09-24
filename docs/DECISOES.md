@@ -176,6 +176,53 @@ navegam para os mesmos lugares, na mesma tela.
 
 ---
 
+## 2026-09-24 — A quebra de XML, com a planilha que cada um escolhe
+
+**O que entrou.** A etapa `quebra_xml` deixa de ser promessa: abre as notas do
+lote item a item e entrega a planilha. Existe nos **dois módulos** — no ICMS,
+porque a EFD não traz o item da saída própria (NF-e e NFC-e vão à escrituração
+só com o analítico); no PIS/COFINS, porque o CST e a alíquota que o C170
+consolidado esconde estão no XML.
+
+**Não é leitor novo.** É o mesmo `itens_do_xml.py` que a extração de movimentos
+usa desde a etapa 3: trata NF-e, NFC-e e CF-e SAT, recusa CT-e e evento de
+cancelamento, escolhe a cópia autorizada entre as repetidas e lê zip sem
+descompactar em disco. Aproveitar o que já tinha calo foi a escolha óbvia
+diante de portar o extrator avulso — que, aliás, lia **só** `PISAliq` e perderia
+todo CST que não fosse alíquota básica.
+
+**O que faltava no parquet, e agora está lá:** PIS, COFINS, IPI e ISSQN por
+item, e o nome de quem emitiu e de quem recebeu. O leitor já lia PIS e COFINS —
+só não chegavam ao disco, porque a CAT 42 não usa. IPI e ISSQN o domínio passou
+a ler.
+
+**A particularidade pedida: escolher as colunas.** São 57 possíveis e quase
+ninguém quer as 57 — quem confere ICMS não olha ISSQN; quem confere contribuição
+não olha ST. A tela mostra os campos em oito blocos, com atalhos (`ICMS`,
+`PIS/COFINS`, `Descontos`, `Tudo`) e liberdade campo a campo dentro deles.
+
+Três decisões dentro dessa:
+
+* **o catálogo vem do servidor.** A tela pede a lista do que a planilha sabe
+  produzir, em vez de carregar uma cópia. Duas listas divergiriam na primeira
+  coluna nova, e a tela ofereceria coluna que a planilha não entrega;
+* **a ordem é a do catálogo**, nunca a da escolha: duas planilhas do mesmo
+  trabalho se comparam lado a lado;
+* **escolha estragada não derruba nada.** Campo que não existe mais — guardado
+  no navegador de alguém — é ignorado; e se a escolha inteira for de campos
+  inexistentes, sai o catálogo completo em vez de uma planilha vazia.
+
+**Como a escolha viaja:** em `classificacoes`, o canal genérico de recorte das
+planilhas, aqui recortando **coluna** em vez de linha. `modelos` continua
+recortando linha (55, 65, 59). Nenhuma rota nova para isso.
+
+**A aba "Resumo" do extrator não veio** — uma linha por nota com a conferência
+entre o desconto declarado e a soma dos itens. Foi decisão de quem pediu: uma
+aba só, de itens. Fica anotada, porque a conferência de desconto é útil e o
+dado para montá-la já está no parquet.
+
+---
+
 ## 2026-09-24 — A tela das Exclusões, e o arquivo que entrou duas vezes
 
 **A tela.** Exclusões deixa de ser promessa na barra: roda, acompanha, mostra o

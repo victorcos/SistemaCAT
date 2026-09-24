@@ -179,9 +179,12 @@ public static class Etapas
             "e é consulta, não tarefa: não entra no progresso.",
             Implementada: true, Aba: "Histórico", Conta: false),
         new("quebra_xml", "Quebrar os XML",
-            "Abrir os XML das notas do lote item a item, como a quebra faz com o " +
-            "SPED. Ainda não construída.",
-            Implementada: false, Aba: "Quebra XML"),
+            "Abrir os XML das notas do lote item a item — NF-e, NFC-e e CF-e SAT, " +
+            "soltos ou em zip. A planilha sai com as colunas que você escolher: " +
+            "identificação, produto, descontos, ICMS, ST, PIS/COFINS, IPI e ISSQN. " +
+            "É o item que a EFD não traz na saída própria, e o CST que o C170 " +
+            "consolidado esconde.",
+            Implementada: true, Aba: "Quebra XML"),
     ];
 
     /// <summary>
@@ -225,6 +228,11 @@ public static class Etapas
                     "Quais itens vendidos são produto beneficiado, pela descrição e pela NCM. " +
                     "Lê os XML do lote direto: não depende da CAT 42 nem de etapa nenhuma dela.",
                     ["importar", "credito_outorgado"]),
+                new("quebra_xml", "Quebra de XML", "XML",
+                    "Abrir os XML do lote item a item e levar para planilha as colunas que " +
+                    "interessam. No ICMS é o item que a EFD não traz: NF-e de emissão própria " +
+                    "e NFC-e vão à escrituração só com o analítico.",
+                    ["importar", "quebra_xml"]),
             ],
             ["piscofins"] =
             [

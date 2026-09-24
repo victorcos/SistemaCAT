@@ -108,6 +108,14 @@ const DESTINOS: Record<
       padrao: "Apurar as contribuições",
     },
   },
+  quebra_xml: {
+    rota: ROTAS.quebraXml,
+    rotulos: {
+      concluida: "Escolher as colunas e baixar",
+      em_andamento: "Acompanhar a leitura",
+      padrao: "Quebrar os XML",
+    },
+  },
   exclusoes: {
     rota: ROTAS.exclusoes,
     rotulos: {

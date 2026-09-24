@@ -38,6 +38,8 @@ export const ROTAS = {
   gestao: (id: number | string) => `/projetos/${id}/apuracao-contribuicoes`,
   /** o que sai da base do PIS/COFINS antes de apurar — hoje, as próprias contribuições */
   exclusoes: (id: number | string) => `/projetos/${id}/exclusoes`,
+  /** os XML do lote item a item, com as colunas que a pessoa escolher */
+  quebraXml: (id: number | string) => `/projetos/${id}/quebra-xml`,
   /** o razão da ECD, com seletor de conta — sai da quebra de SPED */
   razaoContabil: (id: number | string) => `/projetos/${id}/razao-contabil`,
   entrega: (id: number | string) => `/projetos/${id}/entrega`,

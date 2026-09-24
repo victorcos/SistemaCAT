@@ -126,6 +126,11 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
             ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
         }), PrazoLinhas, cancelar);
 
+    /// <summary>O catálogo de colunas da planilha dos XML: a tela monta o seletor com ele.</summary>
+    public async Task<JsonElement> CamposDoXml(CancellationToken cancelar) =>
+        await Chamar("interno/xml/campos", JsonContent.Create(new Dictionary<string, object?>()),
+            PrazoLinhas, cancelar);
+
     public async Task<JsonElement> EstabelecimentosDoRazaoContabil(int execucaoId, CancellationToken cancelar) =>
         await Chamar("interno/razao-contabil/estabelecimentos", JsonContent.Create(new Dictionary<string, object?>
         {

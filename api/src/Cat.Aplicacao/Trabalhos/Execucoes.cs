@@ -103,6 +103,7 @@ public sealed class Execucoes(
     /// <summary>Triagem dos itens beneficiados, no módulo de ICMS. Lê os XML, não o SPED.</summary>
     public const string CreditoOutorgado = "credito_outorgado";
     public const string Exclusoes = "exclusoes";
+    public const string QuebraXml = "quebra_xml";
 
     /// <summary>
     /// A entrega montada e ainda não aprovada. Não é situação gravada: é como o
@@ -307,6 +308,18 @@ public sealed class Execucoes(
     {
         var e = await Detalhar(execucaoId, PreValidacao, usuario, cancelar);
         return await motor.ArquivosDoCliente(e.Id, pedido, cancelar);
+    }
+
+    /// <summary>
+    /// O catálogo de colunas da planilha dos XML.
+    ///
+    /// Não passa por execução nenhuma: a tela precisa dele para montar o seletor
+    /// antes de existir rodada. Exige usuário, como toda leitura.
+    /// </summary>
+    public async Task<JsonElement> CamposDoXml(Usuario usuario, CancellationToken cancelar)
+    {
+        _ = usuario;
+        return await motor.CamposDoXml(cancelar);
     }
 
     /// <summary>Os estabelecimentos da entrega: os do dossiê primeiro.</summary>

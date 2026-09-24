@@ -45,6 +45,15 @@ public static class ExecucoesRotas
             "apurar o crédito outorgado");
         Etapa(api, Execucoes.Exclusoes, "exclusoes", detalheExigeEtapa: true,
             "apurar as exclusões da base");
+        Etapa(api, Execucoes.QuebraXml, "quebra-xml", detalheExigeEtapa: true,
+            "quebrar os XML");
+
+        // o catálogo de colunas do XML não depende de execução: é o que a
+        // planilha sabe produzir, e a tela precisa dele antes de existir rodada
+        api.MapGet("/quebra-xml/campos", async (HttpContext http, Execucoes caso) =>
+                await Traduzir(async () => Results.Json(
+                    await caso.CamposDoXml(http.UsuarioAtual(), http.RequestAborted))))
+            .ExigirUsuario();
 
         api.MapGet("/entrega/{execucaoId:int}/estabelecimentos", async (int execucaoId, HttpContext http, Execucoes caso) =>
                 await Traduzir(async () =>

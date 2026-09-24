@@ -120,6 +120,9 @@ public interface IMotor
     Task<System.Text.Json.JsonElement> LancamentosDoRazaoContabil(int execucaoId, PedidoDeLancamentos pedido, CancellationToken cancelar);
 
     /// <summary>Os estabelecimentos que aparecem no razão contábil, para o filtro da tela.</summary>
+    /// <summary>O catálogo de colunas da planilha dos XML; não depende de execução.</summary>
+    Task<System.Text.Json.JsonElement> CamposDoXml(CancellationToken cancelar);
+
     Task<System.Text.Json.JsonElement> EstabelecimentosDoRazaoContabil(int execucaoId, CancellationToken cancelar);
 
     /// <summary>O filtro do crédito outorgado do trabalho. Trabalho sem filtro responde vazio.</summary>
