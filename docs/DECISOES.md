@@ -134,6 +134,60 @@ navegam para os mesmos lugares, na mesma tela.
 
 ---
 
+## 2026-09-24 — A primeira exclusão: PIS e COFINS da própria base
+
+**A tese.** O preço de venda embute as duas contribuições, e receita não é
+imposto. Excluindo-as, a base encolhe e o que foi pago a mais volta.
+
+**A regra, escolhida por quem apura, não pelo código.** A base de cada uma
+perde **as duas**. Numa venda de R$ 1.000,00 com PIS de R$ 16,50 e COFINS de
+R$ 76,00, a base nova é R$ 907,50 para os dois — não R$ 983,50 para o PIS e
+R$ 924,00 para a COFINS. Volta R$ 8,56. A leitura conservadora (cada um só da
+própria base) daria R$ 6,05, e o gross-up pela alíquota daria o mesmo R$ 8,56
+enquanto o arquivo estiver coerente. Ficou a primeira, e o teste guarda o
+número: mudar aquilo é mudar a tese, não o código.
+
+**Só no débito.** O crédito das aquisições fica como está. É o que o
+escritório pede, e é o que dá o maior saldo — a visão líquida (com o efeito no
+crédito) fica anotada para quando alguém quiser o piso do benefício.
+
+**O agrupamento é o do MA, e isso não é detalhe.** Registro, CST e CFOP dentro
+da competência; o arredondamento acontece uma vez por grupo, com a alíquota
+**efetiva** (valor ÷ base) do próprio grupo. Duas razões: a alíquota efetiva é
+imune a alíquota fora do padrão, a ajuste na linha e ao arredondamento do ERP
+— e arredondar linha a linha, numa base de milhões de itens, move o total. O
+teste mostra o efeito em três vendas de R$ 10,00: linha a linha não volta
+nada; somadas, volta um centavo.
+
+**O que a conta recusa, contando:**
+
+* **alíquota em reais** (CST 03): a contribuição vem da quantidade, não da
+  receita — excluir dinheiro de uma base em litros não quer dizer nada;
+* **receita sem contribuição** e grupos zerados: não há o que excluir;
+* **base menor que a contribuição do próprio grupo**: arquivo inconsistente.
+  Recalcular ali devolveria base zero e "recuperaria" 100% do grupo — número
+  que passa na soma e não sobrevive à fiscalização.
+
+**O que ainda não é lido, e o resumo diz quando aparece:** C601/C605, D300,
+D350, F200, F510, F560 e I100. A leitura da Gestão cobre o resto da receita —
+A170, C170, C175, C181/C185, C381/C385, C481/C485, C491/C495, C870/C880,
+D201/D205, D601/D605, F100, F500, F550 —, e é ela que alimenta a exclusão: uma
+passada no arquivo serve às duas contas.
+
+**Medido na base real** (CEMA, dois meses de um estabelecimento): base de
+R$ 123.602.140,38, excluídos R$ 10.446.337,02, e voltam R$ 932.622,22 —
+R$ 160.268,51 de PIS e R$ 772.353,71 de COFINS. Nenhuma chave com contribuição
+apurada ficou de fora; o que sobrou no contador foram aquisições (fora por
+regra) e grupos zerados de CST 04 e 49.
+
+**O próximo passo, e a razão dele.** Hoje a Gestão monta os agregados e os
+descarta ao terminar, então a exclusão precisaria reler os arquivos — uma hora
+nesta base. Gravar os agregados na pasta da execução (são poucos MB para um
+SPED de 1 GB) faz a exclusão sair em segundos, e serve a toda tese que vier
+depois: a do ICMS destacado já está declarada na barra esperando.
+
+---
+
 ## 2026-09-24 — A fila sai de dentro do motor
 
 **O estrago.** A Gestão Fiscal de 65 arquivos morreu no quarto, com

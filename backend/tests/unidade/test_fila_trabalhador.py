@@ -15,9 +15,15 @@ from workers import fila
 
 @pytest.fixture(autouse=True)
 def fila_limpa():
-    fila.parar()
+    """Não deixar o freio puxado para os outros testes.
+
+    `_parar` é global do módulo. Sair daqui com ele acionado faria a rodada do
+    teste seguinte ser encerrada no primeiro ponto seguro — falha que apareceria
+    longe daqui e não se explicaria sozinha.
+    """
+    fila._parar.clear()
     yield
-    fila.parar()
+    fila._parar.clear()
 
 
 def test_recupera_o_que_ficou_rodando_antes_de_pegar_a_fila(monkeypatch):
