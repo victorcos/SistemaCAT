@@ -11,11 +11,16 @@ import { listarLotes, type Contagem } from "@/services/lote";
  * cada um com quantos arquivos o trabalho tem. Embaixo, **as funcionalidades**,
  * em cards, na mesma linguagem do hub de tributos.
  *
- * Substituiu a lista numerada de etapas em PIS/COFINS. A lista dizia que o
- * trabalho é uma fila — "1. Importar, 2. Quebrar, 3. Apurar" — e ali não é:
- * quebrar um SPED para olhar um C170 não depende de apurar nada, e a numeração
- * fazia parecer que sim. A ordem da CAT 42, onde a dependência é real (sem
- * movimentos não há razão), continua sendo lista.
+ * Substituiu a lista numerada de etapas em PIS/COFINS (23/09/2026) e **em todo
+ * módulo** desde 24/09/2026. A lista dizia que o trabalho é uma fila — "1.
+ * Importar, 2. Quebrar, 3. Apurar" — e isso deixou de valer também no ICMS: o
+ * crédito outorgado lê os XML do lote direto e não espera etapa nenhuma, como
+ * o resto do módulo um dia também não esperará.
+ *
+ * **A ordem não se perdeu com a numeração.** Ela é a ordem dos cards, que é a
+ * do servidor (`Etapas.Roteiros`), e a dependência real — sem movimentos não há
+ * razão — continua dita em cada descrição e cobrada por quem pode cobrá-la: o
+ * servidor, com a frase que explica o que falta.
  *
  * **Os leiautes vêm do servidor.** Rótulo, tipo e se aquilo alimenta este
  * trabalho são decisão do motor (`TipoDeArquivo.modulos`), que a API espelha.

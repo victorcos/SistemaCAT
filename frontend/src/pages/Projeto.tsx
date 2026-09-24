@@ -6,16 +6,11 @@ import { Aviso } from "@/components/ui/Aviso";
 import { Botao, BotaoLink } from "@/components/ui/Botao";
 import { Campo, CampoSenha } from "@/components/ui/Campo";
 import { Carregando } from "@/components/ui/Carregando";
-import { Etiqueta, type TomDeEtiqueta } from "@/components/ui/Etiqueta";
+import { Etiqueta } from "@/components/ui/Etiqueta";
 import { Modal } from "@/components/ui/Modal";
 import { EditarCadastro } from "@/components/shared/EditarCadastro";
-import {
-  Barra,
-  CabecalhoDePagina,
-  Secao,
-  Voltar,
-} from "@/components/ui/Pagina";
-import { IconeApagar, IconeArquivoDigital, IconeConfirma, IconeEditar, IconeHistorico } from "@/constants/icons";
+import { Barra, CabecalhoDePagina, Voltar } from "@/components/ui/Pagina";
+import { IconeApagar, IconeArquivoDigital, IconeEditar, IconeHistorico } from "@/constants/icons";
 import { ROTAS } from "@/constants/routes";
 import {
   TOM_DO_STATUS,
@@ -24,7 +19,6 @@ import {
   type Status,
 } from "@/constants/status";
 import { useAuth } from "@/hooks/useAuth";
-import { cn } from "@/lib/cn";
 import { periodo } from "@/lib/competencia";
 import { comoErro } from "@/lib/errors";
 import { numero } from "@/lib/format";
@@ -32,7 +26,6 @@ import {
   detalharProjeto,
   excluirProjeto,
   previaDaExclusao,
-  type Etapa,
   type OQueSeraApagado,
   type ProjetoDetalhe,
 } from "@/services/importacao";
@@ -147,14 +140,6 @@ const DESTINOS: Record<
       padrao: "Montar a entrega",
     },
   },
-};
-
-const TOM_DA_SITUACAO: Record<string, TomDeEtiqueta> = {
-  concluida: "sucesso",
-  em_andamento: "info",
-  pendente: "atencao",
-  bloqueada: "neutro",
-  nao_disponivel: "neutro",
 };
 
 /* ------------------------------------------------------------------ */
@@ -323,55 +308,46 @@ export default function Projeto() {
         }}
       />
 
-      {/* Em PIS/COFINS as funcionalidades são independentes, e a grade diz isso:
-          cada uma é um card, com os leiautes da base em cima. Na CAT 42 a ordem
-          é dependência real — sem movimentos não há razão —, e ali a lista
-          numerada continua sendo a leitura certa. */}
-      {p.modulo === "piscofins" ? (
-        <PainelDoTrabalho
-          projetoId={Number(id)}
-          etapas={funcionalidades}
-          rota={(chave: string) => {
-            const destino = DESTINOS[chave];
-            return destino ? destino.rota(Number(id)) : null;
-          }}
-          bloqueio={anda ? undefined : parado?.titulo}
-        />
-      ) : (
-        <Secao
-          titulo="As funcionalidades, em detalhe"
-          sub="A barra acima leva direto a cada uma. Aqui vai o que cada uma faz, em que pé está e o que ela produz."
-        >
-          <ol className="m-0 mt-4 flex list-none flex-col gap-2.5 p-0">
-            {funcionalidades.map((e, i) => (
-              <LinhaDeEtapa
-                key={e.chave}
-                e={e}
-                numero={i + 1}
-                projetoId={Number(id)}
-                bloqueada={!anda}
-                motivo={parado?.titulo ?? ""}
-              />
-            ))}
-          </ol>
-        </Secao>
-      )}
+      {/* Um painel só, para todo módulo. Até 24/09/2026 o ICMS tinha uma lista
+          numerada e o PIS/COFINS tinha os cards: a numeração dizia que a CAT 42
+          é uma fila, e isso **era** verdade quando o módulo tinha só ela. Com o
+          crédito outorgado — que lê os XML direto e não espera etapa nenhuma —
+          deixou de ser: o módulo passou a ter funcionalidade independente, como
+          o PIS/COFINS sempre teve.
 
-      <section className="flex flex-wrap items-center gap-4 rounded-cartao border border-borda bg-superficie-vidro p-6">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border border-laranja-500/30 bg-laranja-500/14 text-laranja-700 escuro:text-laranja-300">
-          <IconeArquivoDigital size={18} strokeWidth={1.8} aria-hidden />
-        </div>
-        <div className="min-w-[240px] flex-1">
-          <h2 className="m-0 text-base font-extrabold text-texto">Auditoria do que o cliente já transmitiu</h2>
-          <p className="m-0 mt-1.5 max-w-[680px] text-[13px] leading-relaxed text-texto-suave">
-            Pré-validar os arquivos da CAT 42 que o cliente gerou com outra ferramenta, soltos no lote ou em
-            zip. Não depende das etapas acima.
-          </p>
-        </div>
-        <BotaoLink para={ROTAS.preValidacao(p.id)} variante="secundario">
-          Pré-validar os arquivos do cliente
-        </BotaoLink>
-      </section>
+          A ordem da CAT 42 não se perdeu: ela é a ordem dos cards, que é a do
+          servidor, e a dependência real continua dita em cada descrição e
+          cobrada pelo servidor, com a frase que explica o que falta. */}
+      <PainelDoTrabalho
+        projetoId={Number(id)}
+        etapas={funcionalidades}
+        rota={(chave: string) => {
+          const destino = DESTINOS[chave];
+          return destino ? destino.rota(Number(id)) : null;
+        }}
+        bloqueio={anda ? undefined : parado?.titulo}
+      />
+
+      {/* A pré-validação é da CAT 42, e só aparece onde ela existe. Aparecia em
+          todo trabalho, inclusive nos de PIS/COFINS, que não têm arquivo digital
+          nenhum para auditar. */}
+      {p.modulo === "icms" && (
+        <section className="flex flex-wrap items-center gap-4 rounded-cartao border border-borda bg-superficie-vidro p-6">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border border-laranja-500/30 bg-laranja-500/14 text-laranja-700 escuro:text-laranja-300">
+            <IconeArquivoDigital size={18} strokeWidth={1.8} aria-hidden />
+          </div>
+          <div className="min-w-[240px] flex-1">
+            <h2 className="m-0 text-base font-extrabold text-texto">Auditoria do que o cliente já transmitiu</h2>
+            <p className="m-0 mt-1.5 max-w-[680px] text-[13px] leading-relaxed text-texto-suave">
+              Pré-validar os arquivos da CAT 42 que o cliente gerou com outra ferramenta, soltos no lote ou em
+              zip. Não depende de nenhuma funcionalidade acima.
+            </p>
+          </div>
+          <BotaoLink para={ROTAS.preValidacao(p.id)} variante="secundario">
+            Pré-validar os arquivos do cliente
+          </BotaoLink>
+        </section>
+      )}
 
       {podeExcluirTrabalho && (
         <section className="flex flex-wrap items-center justify-between gap-4 rounded-cartao border border-erro/30 border-l-[3px] border-l-erro bg-erro-fundo p-6">
@@ -402,84 +378,6 @@ export default function Projeto() {
         aoFechar={() => setAExcluir(null)}
       />
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-
-function LinhaDeEtapa({
-  e,
-  numero: n,
-  projetoId,
-  bloqueada,
-  motivo,
-}: {
-  e: Etapa;
-  numero: number;
-  projetoId: number;
-  /** o trabalho está pausado ou cancelado: a etapa não roda */
-  bloqueada: boolean;
-  motivo: string;
-}) {
-  const concluida = e.situacao === "concluida";
-  const atual = e.acessivel && !concluida;
-  const destino = DESTINOS[e.chave];
-  const rotulo = destino
-    ? destino.rotulos[e.situacao] ?? destino.rotulos.padrao
-    : null;
-
-  return (
-    <li
-      className={cn(
-        "flex gap-3.5 rounded-[14px] border border-l-[3px] p-4 transition-colors",
-        concluida && "border-sucesso/25 border-l-sucesso bg-sucesso-fundo",
-        atual && "border-laranja-500/35 border-l-marca-laranja bg-laranja-500/8",
-        !concluida && !atual && "border-borda border-l-borda-forte bg-superficie-vidro opacity-70",
-      )}
-    >
-      <div
-        aria-hidden
-        className={cn(
-          "flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold",
-          concluida && "bg-sucesso text-marca-branco",
-          atual && "bg-marca-laranja text-acao-texto",
-          !concluida && !atual && "border border-borda-forte text-texto-fraco",
-        )}
-      >
-        {concluida ? <IconeConfirma size={15} strokeWidth={3} /> : n}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="m-0 text-[15px] font-bold text-texto">{e.nome}</h3>
-          <Etiqueta tom={TOM_DA_SITUACAO[e.situacao] ?? "neutro"} pulso={e.situacao === "em_andamento"}>
-            {e.situacao_rotulo}
-          </Etiqueta>
-        </div>
-        <p className="m-0 mt-1.5 max-w-[720px] text-[13px] leading-[1.6] text-texto-suave [text-wrap:pretty]">
-          {e.descricao}
-        </p>
-        {rotulo && e.acessivel && (
-          <div className="mt-3">
-            {bloqueada ? (
-              // botão morto, e não link escondido: some o caminho, fica o
-              // motivo — quem chega aqui precisa saber por que não dá
-              <Botao tamanho="sm" variante="secundario" disabled title={motivo}>
-                {rotulo}
-              </Botao>
-            ) : (
-              <BotaoLink
-                para={destino.rota(projetoId)}
-                tamanho="sm"
-                variante={atual ? "principal" : "secundario"}
-              >
-                {rotulo}
-              </BotaoLink>
-            )}
-          </div>
-        )}
-      </div>
-    </li>
   );
 }
 
