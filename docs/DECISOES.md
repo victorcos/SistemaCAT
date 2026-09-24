@@ -176,6 +176,30 @@ navegam para os mesmos lugares, na mesma tela.
 
 ---
 
+## 2026-09-24 — Barra de rolagem que não rolava nada
+
+A tabela de usuários tinha `min-w-[1240px]` dentro de um `overflow-x-auto`:
+sempre que o card ficava um pixel abaixo disso, o navegador mostrava a barra
+horizontal — e ela aparecia **sem ter o que rolar**, que é o pior tipo de
+barra: ocupa espaço, chama atenção e não leva a lugar nenhum.
+
+O mínimo passou a ser **de cada coluna** (`minmax(190px,1.4fr)` e companhia), e
+não da tabela inteira. A largura mínima da tabela vira a soma dos mínimos, a
+proporção continua dividindo a sobra, e a barra aparece só quando não cabe de
+verdade — em janela estreita.
+
+**Uma armadilha do Tailwind no caminho:** a classe estava montada por
+concatenação de três literais, e o Tailwind lê o **texto** do arquivo. Classe
+que não existe inteira em lugar nenhum não vira CSS, e a grade sairia sem
+colunas. Ficou em uma linha só, com o porquê ao lado — e conferido no CSS
+gerado antes de publicar.
+
+Outras telas usam o mesmo par `overflow-x-auto` + `min-w` com valores menores
+(900 a 1120 px), onde a barra só aparece em janela realmente estreita. Ficam
+como estão; se alguma aparecer à toa, a correção é esta.
+
+---
+
 ## 2026-09-24 — O painel do combobox para na borda do modal
 
 **O segundo defeito da mesma lista.** Em 23/09 o painel abria **atrás** do

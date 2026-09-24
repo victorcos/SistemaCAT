@@ -313,7 +313,7 @@ export default function Usuarios() {
           </Vazio>
         ) : (
           <div className="overflow-x-auto">
-            <div role="table" aria-label="Usuários" className="min-w-[1240px]">
+            <div role="table" aria-label="Usuários">
               <div role="row" className={cn(GRADE, "border-b border-borda bg-tabela-cabecalho-fundo px-4 py-3")}>
                 {["Nome", "Usuário", "Papel", "Cargo", "Segmentos", "Situação", "Último acesso", "Ações"].map(
                   (c, i) => (
@@ -458,8 +458,23 @@ function FlashBanner({ flash, aoFechar }: { flash: Flash; aoFechar: () => void }
 /* linha                                                               */
 /* ------------------------------------------------------------------ */
 
-// a coluna de segmentos entra entre Cargo e Situação, como o handoff pede
-const GRADE = "grid grid-cols-[1.4fr_.9fr_.7fr_.8fr_1.1fr_.9fr_.9fr_1.3fr] items-center gap-3";
+/**
+ * A grade da tabela: proporção para dividir a sobra, mínimo para não espremer.
+ *
+ * O mínimo está em cada coluna, e não numa largura fixa da tabela inteira.
+ * Com `min-w-[1240px]` a barra de rolagem aparecia sempre que o card ficava um
+ * pixel abaixo disso — e ela aparecia sem ter o que rolar, que é o pior tipo
+ * de barra: ocupa espaço, chama atenção e não leva a lugar nenhum.
+ *
+ * Agora a largura mínima da tabela é a soma dos mínimos das colunas. Ela rola
+ * quando não cabe de verdade — em janela estreita — e fica quieta quando cabe.
+ *
+ * A coluna de segmentos entra entre Cargo e Situação, como o handoff pede.
+ */
+// em uma linha só de propósito: o Tailwind lê o texto do arquivo, e classe
+// montada por concatenação não chega a existir no CSS
+// prettier-ignore
+const GRADE = "grid items-center gap-3 grid-cols-[minmax(190px,1.4fr)_minmax(120px,.9fr)_minmax(80px,.7fr)_minmax(100px,.8fr)_minmax(110px,1.1fr)_minmax(95px,.9fr)_minmax(130px,.9fr)_minmax(160px,1.3fr)]";
 
 // matizes que se revezam nos avatares; o id decide, então a mesma pessoa
 // tem sempre a mesma cor
