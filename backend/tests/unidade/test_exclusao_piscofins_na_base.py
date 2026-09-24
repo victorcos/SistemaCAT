@@ -209,3 +209,41 @@ class TestOTotalPorCompetencia:
         soma_das_linhas = sum(a.diferenca for a in r.grupos.values())
         assert r.por_periodo()[PERIODO].diferenca == soma_das_linhas
         assert r.resumo.diferenca == soma_das_linhas
+
+
+class TestOParDeRegistrosDaMesmaReceita:
+    """C181 traz o PIS e C185 a COFINS da mesma consolidação.
+
+    Separados, a base entrava duas vezes e cada grupo excluía só a própria
+    contribuição — a tese conservadora, não a escolhida. Na CEMA isso custou
+    29% nos meses em que o cliente escritura por C180.
+    """
+
+    def test_pis_e_cofins_do_mesmo_c180_caem_no_mesmo_grupo(self):
+        documentos = {
+            ("PIS", "C181", "S", "01", "5102", "", "1,65"): _somas(100_000, 1_650),
+            ("COFINS", "C185", "S", "01", "5102", "", "7,60"): _somas(100_000, 7_600),
+        }
+        r = calcular([_apuracao(documentos)])
+
+        (grupo, a), = r.grupos.items()
+        assert grupo.registro == "C180/C181/C185"
+        assert a.base == 100_000              # a receita, uma vez só
+        assert a.excluido == 9_250            # as duas contribuições
+        assert a.diferenca == 856             # o mesmo gabarito da venda única
+
+    def test_registro_que_ja_traz_os_dois_nao_muda_de_nome(self):
+        r = calcular([_apuracao(_venda(registro="C170"))])
+
+        (grupo, _), = r.grupos.items()
+        assert grupo.registro == "C170"
+
+    def test_o_par_nao_junta_cfop_nem_cst_diferentes(self):
+        """Juntar a família não pode misturar o que era distinto."""
+        documentos = {
+            ("PIS", "C181", "S", "01", "5102", "", "1,65"): _somas(100_000, 1_650),
+            ("COFINS", "C185", "S", "01", "5405", "", "7,60"): _somas(200_000, 15_200),
+        }
+        r = calcular([_apuracao(documentos)])
+
+        assert len(r.grupos) == 2

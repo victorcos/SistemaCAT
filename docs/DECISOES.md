@@ -176,6 +176,49 @@ navegam para os mesmos lugares, na mesma tela.
 
 ---
 
+## 2026-09-24 — O gabarito do MA achou o defeito: C181 e C185 eram dois grupos
+
+**O número era 22% menor que o do MA, e a culpa era da chave do grupo.** O
+registro entra na chave, e a consolidação de NF-e escreve **dois** registros
+sobre a mesma receita: o C181 traz o PIS, o C185 traz a COFINS. Separados:
+
+    C181 CST 01   base 68.066.165   PIS 1.123.487   COFINS         0
+    C185 CST 01   base 68.066.165   PIS         0   COFINS 5.172.665
+
+A base entrava duas vezes e — pior — cada grupo excluía só a própria
+contribuição, que é exatamente a **tese conservadora** que não foi escolhida.
+Por isso os meses de C175 (que traz os dois na mesma linha) batiam a 2% e os de
+C180 erravam 29%: o defeito só aparecia onde a escrituração separa os tributos.
+
+Agora os pares vão para a mesma família — `C180/C181/C185`, `C190/C191/C195`,
+`C380/C381/C385`, `C400/C481/C485`, `C490/C491/C495`, `C600/C601/C605`,
+`D100/D101/D105`, `D200/D201/D205`, `D500/D501/D505`, `D600/D601/D605` —, com o
+nome que o MA usa, para os dois relatórios se compararem linha a linha.
+
+**O efeito:** de R$ 38.211.172,71 para **R$ 48.861.132,72**, contra
+R$ 49.229.265,54 do MA — de 22% de diferença para **0,75%**. Os grupos caíram
+de 1.535 para 869, e a base de R$ 10,06 bi para R$ 5,82 bi (a duplicação).
+
+**Do que sobrou, R$ 287 mil estão em três meses do próprio gabarito.** Em
+2023-07, 2023-08 e 2023-09 a razão entre o que volta e a base passa do teto
+teórico do método (0,8556% para 9,25%): com base de R$ 93,16 mi e contribuições
+de R$ 8,70 mi, o máximo seria R$ 811,9 mil e o MA traz R$ 932,9 mil. As colunas
+dele são coerentes entre si (zero linhas com `base STF ≠ base − PIS − COFINS`),
+então é conta de dentro do MA que precisa de explicação — anotado para
+perguntar a quem o gerou.
+
+**O resto — cerca de R$ 81 mil em 60 competências, 0,17%** — é o recorte: o MA
+inclui CST 49 e classifica por CFOP, e o sistema ainda recorta por CST.
+
+**E o CSV ganhou cabeçalho sem ambiguidade.** Comparar os dois arquivos só foi
+possível depois de descobrir que o meu tinha duas colunas "PIS" e duas
+"COFINS" — no xlsx as faixas separam, no CSV não. O gerador agora põe o bloco
+na frente quando o título se repete ("PIS - Valor"), e um teste percorre os
+catálogos cobrando isso. **A Consulta de Entradas tinha sete pares assim** e
+ninguém havia notado.
+
+---
+
 ## 2026-09-24 — A tela que já sabe o tributo para de perguntar
 
 O "Novo trabalho" abria com um seletor de **Tributo** listando os cinco — e

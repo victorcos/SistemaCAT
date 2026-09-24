@@ -73,6 +73,32 @@ REGISTROS_DE_FORA = (
 )
 
 
+# Registros que trazem PIS e COFINS em **linhas separadas**: a consolidação
+# escreve um registro para cada tributo, sobre a mesma receita. Sem juntá-los,
+# a base entra duas vezes e cada grupo exclui só a própria contribuição — que é
+# a tese conservadora, não a que se escolheu. Foi o que fez a apuração da CEMA
+# errar 29% nos meses de C180 e acertar nos de C175, que traz os dois na mesma
+# linha. O nome da família é o do MA, para os dois relatórios se compararem.
+FAMILIA_DO_REGISTRO = {
+    "C181": "C180/C181/C185", "C185": "C180/C181/C185",
+    "C191": "C190/C191/C195", "C195": "C190/C191/C195",
+    "C381": "C380/C381/C385", "C385": "C380/C381/C385",
+    "C481": "C400/C481/C485", "C485": "C400/C481/C485",
+    "C491": "C490/C491/C495", "C495": "C490/C491/C495",
+    "C501": "C500/C501/C505", "C505": "C500/C501/C505",
+    "C601": "C600/C601/C605", "C605": "C600/C601/C605",
+    "D101": "D100/D101/D105", "D105": "D100/D101/D105",
+    "D201": "D200/D201/D205", "D205": "D200/D201/D205",
+    "D501": "D500/D501/D505", "D505": "D500/D501/D505",
+    "D601": "D600/D601/D605", "D605": "D600/D601/D605",
+}
+
+
+def familia(registro: str) -> str:
+    """O par que fala da mesma receita. Registro que traz os dois volta igual."""
+    return FAMILIA_DO_REGISTRO.get(registro, registro)
+
+
 @dataclass(frozen=True)
 class Grupo:
     """Onde a exclusão acontece: um CST dentro de um CFOP, num registro."""
@@ -277,7 +303,7 @@ def calcular(apuracoes: list[ApuracaoEFD]) -> Exclusao:
                 fora[f"CST fora da tese, com contribuição apurada: {cst or 'em branco'}"] += 1
                 continue
 
-            grupo = Grupo(ap.cnpj, ap.periodo, registro, cst, cfop)
+            grupo = Grupo(ap.cnpj, ap.periodo, familia(registro), cst, cfop)
             alvo = resultado.grupos.setdefault(grupo, Apurado())
             if tributo == "PIS":
                 alvo.base_pis += somas[VL_BC]

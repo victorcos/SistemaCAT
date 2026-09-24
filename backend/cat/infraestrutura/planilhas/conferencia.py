@@ -263,6 +263,25 @@ def _texto_para_csv(valor, coluna: Coluna) -> str:
     return str(valor)
 
 
+def titulos_do_csv(colunas) -> list[str]:
+    """Os títulos das colunas do CSV, sem dois iguais.
+
+    No xlsx a faixa do bloco separa o "Valor" do PIS do "Valor" da COFINS. No
+    CSV não há faixa: as duas colunas saem com o mesmo nome, e quem abre no
+    Excel — ou aponta uma dinâmica para o arquivo — não tem como saber qual é
+    qual. A Consulta de Entradas saía com sete pares assim.
+
+    Quando o título se repete, o bloco entra na frente: "PIS - Valor". Quando
+    não se repete, nada muda — os arquivos que já circulam continuam iguais.
+    """
+    titulos = [c.titulo_no_csv for c in colunas]
+    repetidos = {t for t in titulos if titulos.count(t) > 1}
+    return [
+        f"{c.bloco} - {t}" if t in repetidos and c.bloco else t
+        for c, t in zip(colunas, titulos)
+    ]
+
+
 def _literal(texto: str) -> str:
     return "'" + str(texto).replace("'", "''") + "'"
 
@@ -322,7 +341,7 @@ def _gerar_csv(parquet: str, destino: str, colunas: tuple[Coluna, ...],
 
     with open(destino, "w", encoding="utf-8-sig", newline="") as f:
         csv.writer(f, delimiter=SEPARADOR_CSV,
-                   quoting=csv.QUOTE_MINIMAL).writerow([c.titulo_no_csv for c in colunas])
+                   quoting=csv.QUOTE_MINIMAL).writerow(titulos_do_csv(colunas))
     con = duckdb.connect()
     try:
         con.execute("SET threads TO 4")

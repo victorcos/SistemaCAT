@@ -23,8 +23,8 @@ COLUNAS_DAS_EXCLUSOES = (
     Coluna("cfop", "CFOP", "texto", 8, ONDE),
 
     Coluna("base", "Base de Cálculo", "numero", 18, ANTES),
-    Coluna("pis", "PIS", "numero", 15, ANTES),
-    Coluna("cofins", "COFINS", "numero", 15, ANTES),
+    Coluna("pis", "PIS Apurado", "numero", 15, ANTES),
+    Coluna("cofins", "COFINS Apurada", "numero", 15, ANTES),
 
     Coluna("excluido", "PIS + COFINS Excluídos", "numero", 18, TESE),
     Coluna("base_nova_pis", "Base Nova do PIS", "numero", 18, TESE),
@@ -32,8 +32,10 @@ COLUNAS_DAS_EXCLUSOES = (
     Coluna("pis_novo", "PIS Recalculado", "numero", 16, TESE),
     Coluna("cofins_novo", "COFINS Recalculada", "numero", 16, TESE),
 
-    Coluna("diferenca_pis", "PIS", "numero", 15, VOLTA),
-    Coluna("diferenca_cofins", "COFINS", "numero", 15, VOLTA),
+    # o nome diz o que é mesmo sem a faixa em cima: no CSV não há faixa, e
+    # "PIS" aparecendo duas vezes deixa quem abre sem saber qual é qual
+    Coluna("diferenca_pis", "PIS que Volta", "numero", 15, VOLTA),
+    Coluna("diferenca_cofins", "COFINS que Volta", "numero", 16, VOLTA),
 
     Coluna("tese", "Tese", "texto", 26, ONDE),
 )
