@@ -176,6 +176,37 @@ navegam para os mesmos lugares, na mesma tela.
 
 ---
 
+## 2026-09-24 — A tela que já sabe o tributo para de perguntar
+
+O "Novo trabalho" abria com um seletor de **Tributo** listando os cinco — e
+marcado em ICMS — numa tela chamada "Trabalhos de PIS/COFINS". Pior que
+redundante: convidava ao erro. A frente vinha "CAT 42" junto, e o trabalho
+nasceria de ICMS dentro da lista de PIS/COFINS, onde ninguém o encontraria
+depois.
+
+**Quando a tela define o tributo, ele deixa de ser pergunta**: vira um campo de
+leitura, com o rótulo que vem do catálogo do servidor. O seletor continua
+existindo para quando não há tela que o defina.
+
+**A frente passa a nascer coerente.** `frente` é a coluna do banco — o TIPO de
+trabalho — e não se deduz do tributo sozinha; é escolha de quem cadastra. O que
+se pode fazer é nascer certa em vez de nascer "CAT 42" em toda tela: ICMS nasce
+CAT 42, PIS/COFINS e IRPJ/CSLL nascem Quebra de SPED. Trocar continua a um
+clique. O exemplo do nome também mudou junto — "Ressarcimento ST 2025" não é
+exemplo de trabalho de PIS/COFINS.
+
+**O teste é da ligação, não do modal.** O defeito não estava no modal, que
+fazia o que lhe mandavam: estava na tela, que não lhe dizia onde ele tinha sido
+aberto. Por isso os quatro casos montam a página inteira em `/modulos/piscofins`
+e conferem o que chega ao `criarProjeto`.
+
+**E o ambiente de teste ganhou o `<dialog>`**: o jsdom não implementa
+`showModal()` nem `close()`. Sem eles, nenhuma tela com modal pode ser testada
+— e o `open` que o remendo põe e tira é o que faz o conteúdo existir para as
+queries por papel.
+
+---
+
 ## 2026-09-24 — Barra de rolagem que não rolava nada
 
 A tabela de usuários tinha `min-w-[1240px]` dentro de um `overflow-x-auto`:

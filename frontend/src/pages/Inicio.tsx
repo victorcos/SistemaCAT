@@ -249,6 +249,8 @@ export default function Inicio() {
 
       <ModalNovoTrabalho
         aberto={criando}
+        moduloDaTela={modulo}
+        rotuloDaTela={rotuloDoModulo}
         aoFechar={() => setCriando(false)}
         aoCriado={() => {
           setCriando(false);
@@ -397,6 +399,29 @@ function moduloPadrao(segmentos: Segmento[]): string {
 }
 
 /**
+ * Com que frente um trabalho nasce, por tributo.
+ *
+ * `frente` é a coluna do banco — o TIPO de trabalho —, e ela não se deduz do
+ * tributo sozinha: é escolha de quem cadastra. O que se pode fazer é nascer
+ * coerente, em vez de nascer "CAT 42" numa tela de PIS/COFINS, que é como
+ * estava. Quem quiser outra troca ao lado.
+ */
+const FRENTE_PADRAO: Record<string, Frente> = {
+  icms: "cat42",
+  piscofins: "sped",
+  irpj_csll: "sped",
+};
+
+const frentePadrao = (modulo: string): Frente => FRENTE_PADRAO[modulo] ?? "cat42";
+
+/** O exemplo do nome muda com o tributo: "Ressarcimento ST" não é de PIS/COFINS. */
+const EXEMPLO_DE_NOME: Record<string, string> = {
+  icms: "Ressarcimento ST 2025",
+  piscofins: "Apuração PIS/COFINS 2025",
+  irpj_csll: "IRPJ/CSLL 2025",
+};
+
+/**
  * Novo trabalho para empresa **já cadastrada**.
  *
  * Empresa nova continua vindo pelo cadastro por SPED: é o arquivo que diz
@@ -406,17 +431,23 @@ function ModalNovoTrabalho({
   aberto,
   aoFechar,
   aoCriado,
+  moduloDaTela,
+  rotuloDaTela,
 }: {
   aberto: boolean;
   aoFechar: () => void;
   aoCriado: () => void;
+  /** o tributo da tela de onde o modal foi aberto; definido, não se pergunta */
+  moduloDaTela?: string;
+  /** o nome bonito dele, que vem do catálogo do servidor */
+  rotuloDaTela?: string | null;
 }) {
   const [empresas, setEmpresas] = useState<Empresa[] | null>(null);
   const [empresa, setEmpresa] = useState("");
-  const [frente, setFrente] = useState<Frente>("cat42");
+  const [frente, setFrente] = useState<Frente>(FRENTE_PADRAO.icms);
   // o módulo decide o roteiro de etapas do trabalho; sem ele tudo nascia ICMS
   const [segmentos, setSegmentos] = useState<Segmento[]>([]);
-  const [modulo, setModulo] = useState("icms");
+  const [modulo, setModulo] = useState(moduloDaTela ?? "icms");
   const [nome, setNome] = useState("");
   const [ini, setIni] = useState("");
   const [fim, setFim] = useState("");
@@ -426,7 +457,8 @@ function ModalNovoTrabalho({
   useEffect(() => {
     if (!aberto) return;
     setEmpresa("");
-    setFrente("cat42");
+    setModulo(moduloDaTela ?? "icms");
+    setFrente(frentePadrao(moduloDaTela ?? "icms"));
     setNome("");
     setIni("");
     setFim("");
@@ -436,13 +468,17 @@ function ModalNovoTrabalho({
       .catch((e) => setErro(comoErro(e).message));
     // só os módulos que a pessoa enxerga: criar trabalho num assunto que ela
     // não vê é criar algo que ela não encontraria depois
+    // a lista de tributos só faz falta quando a tela não define um
+    if (moduloDaTela) return;
     meusSegmentos()
       .then((s) => {
         setSegmentos(s);
-        setModulo(moduloPadrao(s));
+        const escolhido = moduloPadrao(s);
+        setModulo(escolhido);
+        setFrente(frentePadrao(escolhido));
       })
       .catch(() => undefined);
-  }, [aberto]);
+  }, [aberto, moduloDaTela]);
 
   const opcoesDeEmpresa = useMemo<OpcaoDeCombobox<string>[]>(
     () =>
@@ -549,22 +585,37 @@ function ModalNovoTrabalho({
               )}
             </Campo>
           </div>
-          <Campo
-            rotulo="Tributo"
-            dica="Decide as etapas do trabalho: ICMS percorre a CAT 42; PIS/COFINS, a quebra de SPED."
-          >
-            {(props) => (
-              <Combobox
-                {...props}
-                valor={modulo}
-                opcoes={segmentos.flatMap((s) =>
-                  s.modulos.map((m) => ({ valor: m.chave, rotulo: m.rotulo })),
-                )}
-                aoMudar={setModulo}
-                disabled={segmentos.length === 0}
-              />
-            )}
-          </Campo>
+          {moduloDaTela ? (
+            // a tela já é de um tributo: perguntar de novo é convidar ao erro,
+            // e foi assim que o modal do PIS/COFINS abria marcado em ICMS
+            <Campo rotulo="Tributo" dica="Definido pela tela em que você está.">
+              {() => (
+                <p className="m-0 flex h-[42px] items-center rounded-raio border border-borda bg-superficie-alt px-3 text-[15px] font-semibold text-texto-suave">
+                  {rotuloDaTela ?? moduloDaTela}
+                </p>
+              )}
+            </Campo>
+          ) : (
+            <Campo
+              rotulo="Tributo"
+              dica="Decide as etapas do trabalho: ICMS percorre a CAT 42; PIS/COFINS, a quebra de SPED."
+            >
+              {(props) => (
+                <Combobox
+                  {...props}
+                  valor={modulo}
+                  opcoes={segmentos.flatMap((s) =>
+                    s.modulos.map((m) => ({ valor: m.chave, rotulo: m.rotulo })),
+                  )}
+                  aoMudar={(m) => {
+                    setModulo(m);
+                    setFrente(frentePadrao(m));
+                  }}
+                  disabled={segmentos.length === 0}
+                />
+              )}
+            </Campo>
+          )}
           <Campo rotulo="Frente de trabalho">
             {(props) => (
               <Combobox {...props} valor={frente} opcoes={OPCOES_DE_FRENTE} aoMudar={setFrente} />
@@ -576,7 +627,7 @@ function ModalNovoTrabalho({
                 {...props}
                 value={nome}
                 onChange={(ev) => setNome(ev.target.value)}
-                placeholder="Ressarcimento ST 2025"
+                placeholder={EXEMPLO_DE_NOME[modulo] ?? "Ressarcimento ST 2025"}
               />
             )}
           </Campo>
