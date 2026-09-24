@@ -176,6 +176,36 @@ navegam para os mesmos lugares, na mesma tela.
 
 ---
 
+## 2026-09-24 — Cinco anos: o que prescreveu aparece, e não entra no crédito
+
+**A regra.** O prazo para repetir o indébito é de cinco anos contados do
+pagamento (LC 118/2005, art. 3º), e PIS/COFINS vence no dia 25 do mês seguinte
+ao fato gerador (Lei 11.933/2009). A competência está fora quando o vencimento
+dela é anterior a `data do pedido − 5 anos`.
+
+**O corte é por dia, não por mês.** A competência de 08/2021 venceu em
+25/09/2021: um pedido de 24/09/2026 ainda a alcança — por um dia. Arredondar
+para o mês jogaria fora R$ 567 mil na base da CEMA, e é o tipo de decisão que
+ninguém quer descobrir depois.
+
+**Mostrar em vermelho, não somar** — foi o pedido, e é o certo. Competência
+prescrita aparece na tabela com a linha em vermelho e o valor riscado, some do
+número grande, e o rodapé do destaque diz quanto e quantas: "R$ 3.309.472,34 em
+7 competências fora dos cinco anos, contados de 24/09/2026 — não entram no
+crédito". A planilha ganhou a coluna `Prescrita`, para quem confere fora da
+tela.
+
+**A data de referência entra por fora.** O padrão é hoje, que é o certo para
+quem está montando o cálculo; mas ação já ajuizada, pedido administrativo
+anterior ou exigibilidade suspensa deslocam a contagem, e nada disso está no
+SPED. O sistema separa pela regra geral, diz qual data usou, e quem assina
+ajusta.
+
+**Na CEMA:** o crédito passou de R$ 48.861.132,72 para **R$ 45.551.660,38**,
+com R$ 3.309.472,34 em 2021-01 a 2021-07 marcados como prescritos.
+
+---
+
 ## 2026-09-24 — O gabarito do MA achou o defeito: C181 e C185 eram dois grupos
 
 **O número era 22% menor que o do MA, e a culpa era da chave do grupo.** O

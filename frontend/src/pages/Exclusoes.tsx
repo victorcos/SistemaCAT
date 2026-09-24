@@ -52,6 +52,10 @@ import type { ErroApi } from "@/types/erro";
 
 const ESPERA_PARA_CANCELAR_MS = 400;
 
+/** "2026-09-24" -> "24/09/2026". Vazio quando não há data. */
+const data = (iso: string | undefined) =>
+  iso?.length === 10 ? iso.split("-").reverse().join("/") : "";
+
 export default function Exclusoes() {
   const { id } = useParams<{ id: string }>();
   const projetoId = Number(id);
@@ -279,7 +283,7 @@ function Concluido({
       {/* o número da tese, e o que ele custou de base */}
       <section className="flex flex-wrap items-stretch gap-4 rounded-cartao border border-borda bg-superficie p-6 shadow-cat">
         <div className="min-w-[280px] flex-1">
-          <Rotulo>O que volta, excluindo as contribuições da base</Rotulo>
+          <Rotulo>Crédito no prazo, excluindo as contribuições da base</Rotulo>
           <p className="m-0 mt-1 font-mono text-[34px] font-extrabold leading-none text-sucesso">
             {dinheiro(resumo.diferenca ?? "0")}
           </p>
@@ -287,6 +291,15 @@ function Concluido({
             {dinheiro(resumo.diferenca_pis ?? "0")} de PIS ·{" "}
             {dinheiro(resumo.diferenca_cofins ?? "0")} de COFINS
           </p>
+          {(resumo.competencias_prescritas ?? 0) > 0 && (
+            <p className="m-0 mt-2 text-[12px] leading-relaxed text-erro">
+              <strong className="font-mono">{dinheiro(resumo.prescrito ?? "0")}</strong> em{" "}
+              {numero(resumo.competencias_prescritas ?? 0)}{" "}
+              {(resumo.competencias_prescritas ?? 0) === 1 ? "competência" : "competências"} fora
+              dos cinco anos{data(resumo.data_de_referencia) ? `, contados de ${data(resumo.data_de_referencia)}` : ""} —
+              não entram no crédito.
+            </p>
+          )}
         </div>
 
         <dl className="m-0 grid min-w-[300px] flex-1 grid-cols-2 gap-x-6 gap-y-3 self-center">
@@ -409,24 +422,38 @@ function PorCompetencia({ linhas }: { linhas: LinhaDaCompetencia[] }) {
           {linhas.map((l) => (
             <div
               key={l.competencia}
+              title={l.prescrita ? "Fora dos cinco anos: não entra no crédito." : undefined}
               className={cn(
                 "grid items-center gap-3 border-t border-borda-sutil px-5.5 py-2.5",
                 COLUNAS,
+                l.prescrita && "bg-erro/5 text-erro",
               )}
             >
-              <span className="font-mono text-[13px] text-texto">{mesAno(l.competencia)}</span>
+              <span
+                className={cn(
+                  "font-mono text-[13px]",
+                  l.prescrita ? "font-bold text-erro" : "text-texto",
+                )}
+              >
+                {mesAno(l.competencia)}
+              </span>
               <span className="text-right font-mono text-[12px] tabular-nums text-texto-fraco">
                 {numero(l.grupos)}
               </span>
-              <span className="text-right text-[13px] text-texto-suave">{dinheiro(l.base)}</span>
-              <span className="text-right text-[13px] text-texto-suave">{dinheiro(l.excluido)}</span>
+              <span className={cn("text-right text-[13px]", l.prescrita ? "text-erro" : "text-texto-suave")}>{dinheiro(l.base)}</span>
+              <span className={cn("text-right text-[13px]", l.prescrita ? "text-erro" : "text-texto-suave")}>{dinheiro(l.excluido)}</span>
               <span className="text-right text-[13px] text-texto-suave">
                 {dinheiro(l.diferenca_pis)}
               </span>
               <span className="text-right text-[13px] text-texto-suave">
                 {dinheiro(l.diferenca_cofins)}
               </span>
-              <span className="text-right font-mono text-[13px] font-bold text-sucesso">
+              <span
+                className={cn(
+                  "text-right font-mono text-[13px] font-bold",
+                  l.prescrita ? "text-erro line-through decoration-erro/50" : "text-sucesso",
+                )}
+              >
                 {dinheiro(l.diferenca)}
               </span>
             </div>

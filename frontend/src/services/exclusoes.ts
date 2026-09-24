@@ -17,6 +17,8 @@ import { baixarArquivo, type Execucao, type Formato } from "./conferencia";
 /** O total de uma competência — soma dos grupos, já arredondados. */
 export interface LinhaDaCompetencia {
   competencia: string;
+  /** fora dos cinco anos: aparece em vermelho e não entra no crédito */
+  prescrita: boolean;
   grupos: number;
   /** em reais, como texto: Decimal não atravessa JSON sem perder casa */
   base: string;
@@ -44,6 +46,11 @@ export interface ResumoDasExclusoes {
   diferenca_cofins?: string;
   diferenca?: string;
   competencias?: string[];
+  /** o que os cinco anos levaram — mostrado, nunca somado ao crédito */
+  prescrito?: string;
+  competencias_prescritas?: number;
+  /** a data do pedido que decidiu o corte, em aaaa-mm-dd */
+  data_de_referencia?: string;
   por_competencia?: LinhaDaCompetencia[];
   /** motivo -> quantas chaves não entraram na tese. Nada sai em silêncio */
   fora?: Record<string, number>;

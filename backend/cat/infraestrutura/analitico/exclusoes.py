@@ -20,11 +20,13 @@ import os
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from cat.dominio.piscofins import prescricao
 from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido
 from cat.infraestrutura.exclusoes.piscofins_na_propria_base import calcular
 from cat.infraestrutura.gestao.agregador import agregar_efd
@@ -48,6 +50,8 @@ ESQUEMA = pa.schema([
     ("registro", pa.string()),
     ("cst", pa.string()),
     ("cfop", pa.string()),
+    # fora do prazo de cinco anos: aparece no relatório, some do total
+    ("prescrita", pa.bool_()),
     # em reais, como as demais tabelas analíticas desta casa — a conta anda em
     # centavos inteiros e converte só aqui, na saída, uma vez por grupo
     ("base", pa.decimal128(18, 2)),
@@ -93,6 +97,10 @@ class Resumo:
     excluido: int = 0
     diferenca_pis: int = 0
     diferenca_cofins: int = 0
+    # o que cinco anos já levaram: mostrado, nunca somado ao crédito
+    prescrito: int = 0
+    competencias_prescritas: int = 0
+    data_de_referencia: str = ""
     competencias: list[str] = field(default_factory=list)
     # uma linha por competência, que é o que a tela mostra sem baixar nada
     por_competencia: list[dict] = field(default_factory=list)
@@ -103,6 +111,7 @@ class Resumo:
 
     @property
     def diferenca(self) -> int:
+        """O crédito: só o que ainda está no prazo."""
         return self.diferenca_pis + self.diferenca_cofins
 
 
@@ -114,6 +123,9 @@ def serializar(r: Resumo) -> dict:
         "diferenca_pis": str(reais(r.diferenca_pis)),
         "diferenca_cofins": str(reais(r.diferenca_cofins)),
         "diferenca": str(reais(r.diferenca)), "competencias": r.competencias,
+        "prescrito": str(reais(r.prescrito)),
+        "competencias_prescritas": r.competencias_prescritas,
+        "data_de_referencia": r.data_de_referencia,
         "por_competencia": r.por_competencia,
         "fora": r.fora, "avisos": r.avisos, "segundos": r.segundos,
     }
@@ -121,9 +133,15 @@ def serializar(r: Resumo) -> dict:
 
 def apurar(contribuicoes: list[str], destino: str, agregados_de: str | None = None,
            avisar: Callable[[Andamento], None] | None = None,
-           deve_parar: Callable[[], bool] | None = None) -> Resumo:
-    """Calcula as exclusões e grava o parquet. Devolve o resumo."""
+           deve_parar: Callable[[], bool] | None = None,
+           referencia: date | None = None) -> Resumo:
+    """Calcula as exclusões e grava o parquet. Devolve o resumo.
+
+    `referencia` é a data do pedido, que decide o que os cinco anos já levaram.
+    Sem ela, hoje — que é o certo para quem está montando o cálculo agora.
+    """
     inicio = time.time()
+    referencia = referencia or date.today()
     os.makedirs(destino, exist_ok=True)
     resumo = Resumo()
 
@@ -140,14 +158,25 @@ def apurar(contribuicoes: list[str], destino: str, agregados_de: str | None = No
         agregados = _ler_os_sped(contribuicoes, destino, resumo, avisar, deve_parar)
 
     exclusao = calcular(agregados)
+    resumo.data_de_referencia = referencia.isoformat()
+    prescritas = {c for c in exclusao.resumo.periodos if prescricao.prescrita(c, referencia)}
     resumo.grupos = exclusao.resumo.grupos
     resumo.base = exclusao.resumo.base
     resumo.excluido = exclusao.resumo.excluido
-    resumo.diferenca_pis = exclusao.resumo.diferenca_pis
-    resumo.diferenca_cofins = exclusao.resumo.diferenca_cofins
     resumo.competencias = exclusao.resumo.periodos
+    resumo.competencias_prescritas = len(prescritas)
+    # o crédito soma só o que está no prazo; o resto vai à parte, e a tela o
+    # mostra em vermelho. Somar os dois daria um número que ninguém pode pedir
+    for competencia, total in exclusao.por_periodo().items():
+        if competencia in prescritas:
+            resumo.prescrito += total.diferenca
+        else:
+            resumo.diferenca_pis += total.diferenca_pis
+            resumo.diferenca_cofins += total.diferenca_cofins
+
     resumo.por_competencia = [
         {"competencia": competencia, "grupos": total.grupos,
+         "prescrita": competencia in prescritas,
          "base": str(reais(total.base)), "excluido": str(reais(total.excluido)),
          "pis": str(reais(total.pis)), "cofins": str(reais(total.cofins)),
          "pis_novo": str(reais(total.pis_novo)),
@@ -160,7 +189,7 @@ def apurar(contribuicoes: list[str], destino: str, agregados_de: str | None = No
     resumo.fora = exclusao.resumo.fora
     resumo.avisos.extend(exclusao.resumo.avisos)
 
-    _gravar(exclusao, os.path.join(destino, ARQUIVO_DAS_EXCLUSOES))
+    _gravar(exclusao, os.path.join(destino, ARQUIVO_DAS_EXCLUSOES), prescritas)
     if avisar is not None:
         avisar(Andamento(arquivos=resumo.arquivos, grupos=resumo.grupos))
 
@@ -202,7 +231,7 @@ def _ler_os_sped(contribuicoes: list[str], destino: str, resumo: Resumo,
     return lidos
 
 
-def _gravar(exclusao, caminho: str) -> None:
+def _gravar(exclusao, caminho: str, prescritas: set[str]) -> None:
     """Uma linha por grupo. O parquet nasce mesmo sem nenhuma.
 
     Etapa que termina sem arquivo é etapa que a seguinte não distingue de etapa
@@ -218,6 +247,7 @@ def _gravar(exclusao, caminho: str) -> None:
         colunas["registro"].append(grupo.registro)
         colunas["cst"].append(grupo.cst)
         colunas["cfop"].append(grupo.cfop)
+        colunas["prescrita"].append(grupo.periodo in prescritas)
         colunas["base"].append(reais(a.base))
         colunas["excluido"].append(reais(a.excluido))
         colunas["pis"].append(reais(a.pis))

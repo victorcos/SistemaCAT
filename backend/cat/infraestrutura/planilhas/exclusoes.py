@@ -21,6 +21,9 @@ COLUNAS_DAS_EXCLUSOES = (
     Coluna("registro", "Registro", "texto", 10, ONDE),
     Coluna("cst", "CST", "texto", 7, ONDE),
     Coluna("cfop", "CFOP", "texto", 8, ONDE),
+    # "Sim" aqui é competência que os cinco anos levaram: fica no relatório
+    # para conferência, e fora da soma do crédito
+    Coluna("prescrita", "Prescrita", "texto", 10, ONDE),
 
     Coluna("base", "Base de Cálculo", "numero", 18, ANTES),
     Coluna("pis", "PIS Apurado", "numero", 15, ANTES),
