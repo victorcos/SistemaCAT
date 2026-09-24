@@ -105,3 +105,27 @@ describe("fora de modal", () => {
     expect(painel.style.maxHeight).toBe("624px");
   });
 });
+
+describe("quando o espaço é parecido dos dois lados", () => {
+  it("desce e rola por dentro, em vez de virar e tapar o cabeçalho", () => {
+    // 235 px abaixo, 269 acima: virar ganharia 34 px e cobriria o título
+    const modal = montarNoModal({ top: 265, bottom: 285 });
+
+    fireEvent.click(screen.getByRole("combobox"));
+    const estilo = painelDe(modal).style;
+
+    expect(estilo.top).toBe("291px");
+    expect(estilo.bottom).toBe("");
+    // 520 (rodapé útil) - 285 - 14
+    expect(estilo.maxHeight).toBe("221px");
+  });
+
+  it("vira quando ganha bem mais espaço", () => {
+    // 30 px abaixo contra 444 acima: aí compensa
+    const modal = montarNoModal({ top: 460, bottom: 490 });
+
+    fireEvent.click(screen.getByRole("combobox"));
+
+    expect(painelDe(modal).style.bottom).not.toBe("");
+  });
+})

@@ -18,6 +18,15 @@ export interface OpcaoDeCombobox<T extends string> {
   rotulo: string;
 }
 
+/**
+ * O quanto de espaço a mais, para cima, justifica virar a lista.
+ *
+ * Abaixo disso a lista desce e rola por dentro: virar por pouco só troca o
+ * problema de lugar — para cima ela cobre o que está acima do campo, que num
+ * modal é o título e o texto que explica o que preencher.
+ */
+const MARGEM_PARA_VIRAR = 60;
+
 interface Props<T extends string> {
   id?: string;
   "aria-describedby"?: string;
@@ -103,7 +112,15 @@ export function Combobox<T extends string>({
     const altura = painel.current?.offsetHeight || 280;
     const abaixo = limite.base - caixa.bottom;
     const acima = caixa.top - limite.topo;
-    const cabeAbaixo = abaixo >= altura + 8 || abaixo >= acima;
+
+    // Para baixo é o padrão, e vira só quando compensa de verdade.
+    //
+    // Virar por pouco é pior que descer com rolagem: para cima, a lista cobre
+    // o que está acima do campo — num modal, o título e o texto de ajuda. Com
+    // 235 px embaixo e 269 em cima, a lista subia e tapava o cabeçalho do
+    // "Novo trabalho" para ganhar 34 px que não mudavam nada.
+    const precisa = altura + 8;
+    const cabeAbaixo = abaixo >= precisa || acima <= abaixo + MARGEM_PARA_VIRAR;
     setPosicao({
       position: "fixed",
       left: caixa.left,

@@ -218,6 +218,12 @@ quando o valor é nulo, e painel ainda sem layout devolve **zero** — com zero,
 qualquer frestinha de 8 px parecia espaço bastante. Virou `|| 280`: altura zero
 é painel não medido, não painel de zero pixel.
 
+**Segunda volta, no mesmo dia: virar por pouco é pior que descer.** Com o
+limite certo, a lista passou a virar para cima cedo demais — num campo com
+235 px embaixo e 269 em cima, ela subia para ganhar 34 px e **cobria o título
+do modal**. Para baixo virou o padrão: só vira quando o espaço de cima passa o
+de baixo em mais de 60 px. Abaixo disso, desce e rola por dentro.
+
 **E o ambiente de teste ganhou o que faltava:** `scrollIntoView`, que o jsdom
 não implementa. Sem isso o efeito do teclado estoura e o teste falha por um
 motivo que nada tem a ver com o que ele mede.
