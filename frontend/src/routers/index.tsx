@@ -8,6 +8,7 @@ import Gestao from "@/pages/Gestao";
 import Historico from "@/pages/Historico";
 import Importar from "@/pages/Importar";
 import Inicio from "@/pages/Inicio";
+import Entrada from "@/routers/Entrada";
 import Login from "@/pages/Login";
 import Lote from "@/pages/Lote";
 import Movimentos from "@/pages/Movimentos";
@@ -92,7 +93,10 @@ export const roteador = createBrowserRouter([
           {
             element: <Leiaute />,
             children: [
-              { path: ROTAS.inicio, element: <Inicio /> },
+              // a raiz não mostra tela: leva a pessoa para onde ela pertence.
+              // Era a lista de todos os trabalhos, a única que misturava
+              // tributo — ver `routers/Entrada`
+              { path: ROTAS.inicio, element: <Entrada /> },
               // do segundo nível em diante o menu volta: já há contexto, e a
               // pessoa precisa circular dentro dele
               { path: "/segmentos/:chave", element: <ModulosDoSegmento /> },

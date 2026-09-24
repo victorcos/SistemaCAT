@@ -1,6 +1,6 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-09-24, sobre a versão **0.99.1**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-09-24, sobre a versão **0.99.2**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
@@ -15,7 +15,7 @@ O endereço, a tela que o atende e se exige papel específico.
 | `/login` | Login | — |
 | `/trocar-senha` | TrocarSenha | — |
 | `/segmentos` | Segmentos | — |
-| `/` | Inicio | — |
+| `/` | Entrada | — |
 | `/segmentos/:chave` | ModulosDoSegmento | — |
 | `/modulos/:chave` | Inicio | — |
 | `/importar` | Importar | — |
@@ -113,7 +113,7 @@ Cadastrar trabalho — o wizard de quatro passos. O cadastro começa por um arqu
 
 ### Inicio
 
-`src/pages/Inicio.tsx` · 607 linhas
+`src/pages/Inicio.tsx` · 612 linhas
 
 Os filtros da listagem. Os quatro status, mais o pré-cadastro, que não é
 

@@ -73,11 +73,17 @@ function passaNaBusca(p: Projeto, termo: string): boolean {
 /* ------------------------------------------------------------------ */
 
 /**
- * A lista de trabalhos.
+ * A lista de trabalhos de um módulo.
  *
- * Serve a dois caminhos: `/` mostra tudo, e `/modulos/:chave` mostra só a
- * frente escolhida no hub. É a mesma tela porque é a mesma coisa — trocar o
- * recorte não muda o que um trabalho é, nem o que se faz com ele.
+ * Servia a dois caminhos: `/`, que mostrava tudo, e `/modulos/:chave`, o
+ * recorte do hub. **A raiz deixou de mostrar tela em 24/09/2026** e passou a
+ * levar a pessoa para onde ela pertence (`routers/Entrada`): era a única tela
+ * que misturava tributo, e o tributo é o recorte de tudo desde que o hub
+ * existe. Quem entra em ICMS entra em ICMS.
+ *
+ * O código do caminho sem módulo continua aqui, e não é resto: é o que responde
+ * se alguém montar esta tela sem recorte — uma lista honesta, com a etiqueta do
+ * assunto em cada cartão.
  */
 export default function Inicio() {
   const { usuario } = useAuth();
@@ -219,7 +225,7 @@ export default function Inicio() {
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
               {visiveis.map((p) => (
-                <CartaoDeTrabalho key={p.id} p={p} mostrarAssunto={!modulo} />
+                <CartaoDeTrabalho key={p.id} p={p} />
               ))}
               <button
                 type="button"
@@ -267,11 +273,12 @@ const FAIXA: Record<Status, string> = {
 /**
  * Um trabalho.
  *
- * `mostrarAssunto` é falso na lista já recortada por módulo (`/modulos/icms`):
- * ali o título da tela já diz "Trabalhos de ICMS", e repetir a etiqueta em
- * quarenta cartões idênticos não informa nada — vira ruído com cor.
+ * A etiqueta do assunto aparece **sempre**, inclusive na lista já recortada por
+ * módulo. Escondê-la ali parecia certo — o título já diz "Trabalhos de ICMS" —,
+ * mas numa lista que deveria ser de um tributo só, o que se quer conferir de
+ * relance é justamente que nenhum cartão é de outro.
  */
-function CartaoDeTrabalho({ p, mostrarAssunto }: { p: Projeto; mostrarAssunto: boolean }) {
+function CartaoDeTrabalho({ p }: { p: Projeto }) {
   const status = p.status as Status;
   const tom = TOM_DO_STATUS[status] ?? "neutro";
   const cancelado = status === "cancelado";
@@ -301,8 +308,7 @@ function CartaoDeTrabalho({ p, mostrarAssunto }: { p: Projeto; mostrarAssunto: b
         {/* O assunto, na cor dele — a mesma dos cards do hub. Fica à direita
             porque não é estado do trabalho como as outras duas: é de que
             tributo ele é, e é por esse critério que se varre a lista. */}
-        {mostrarAssunto && (
-          <span
+        <span
             title={`Trabalho de ${p.modulo_rotulo}`}
             className={cn(
               "ml-auto whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-extrabold",
@@ -310,8 +316,7 @@ function CartaoDeTrabalho({ p, mostrarAssunto }: { p: Projeto; mostrarAssunto: b
             )}
           >
             {p.modulo_rotulo}
-          </span>
-        )}
+        </span>
       </div>
 
       <div className="min-w-0">
