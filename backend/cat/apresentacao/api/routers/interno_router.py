@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from cat.aplicacao.casos_de_uso import (
     apurar_contribuicoes,
+    apurar_exclusoes,
     apurar_credito_outorgado,
     apurar_periodo,
     apurar_piscofins,
@@ -365,6 +366,8 @@ PREPARADORES = {
         "Já existe uma apuração de PIS/COFINS em andamento neste trabalho."),
     quebrar_sped.ETAPA: (quebrar_sped.preparar, quebrar_sped.NadaParaQuebrar,
                          "Já existe uma quebra de SPED em andamento neste trabalho."),
+    apurar_exclusoes.ETAPA: (apurar_exclusoes.preparar, apurar_exclusoes.NadaParaExcluir,
+                             "Já existe uma apuração de exclusões em andamento neste trabalho."),
     apurar_credito_outorgado.ETAPA: (
         apurar_credito_outorgado.preparar, apurar_credito_outorgado.NadaParaVarrer,
         "Já existe uma apuração do crédito outorgado em andamento neste trabalho."),

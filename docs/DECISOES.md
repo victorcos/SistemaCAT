@@ -134,6 +134,40 @@ navegam para os mesmos lugares, na mesma tela.
 
 ---
 
+## 2026-09-24 — Os agregados ficam em disco, e a segunda conta sai em segundos
+
+**O gargalo.** Ler os 65 SPED da CEMA custa 1h18. Até aqui esse trabalho era
+jogado fora ao fim da rodada da Gestão: a Exclusão, que precisa exatamente dos
+mesmos números, começaria do zero — e a tese seguinte também, e a próxima.
+
+**A mudança.** A Gestão grava `agregados_efd.parquet` na pasta da execução: o
+resumo por chave (tributo, registro, operação, CST, CFOP, natureza, alíquota)
+com as somas da competência. Dezenas de milhares de linhas para um SPED de 1 GB.
+A Exclusão parte dele e sai em segundos.
+
+**Não é cache, é produto da etapa.** Fica na pasta da execução e envelhece com
+ela. Não há chave de invalidação para errar: o parquet de uma execução é, por
+definição, o que aquela execução leu. Quem quiser agregado de outra base roda a
+etapa naquela base — e a Exclusão sempre procura a Gestão **mais recente** que
+tenha agregado, porque número velho que bate com nada é pior que número nenhum.
+
+**As contagens moram num parquet próprio.** O registro que a leitura não cobre
+— C601, D350 e companhia — não vira linha de documento nenhuma, e é justamente
+ele que a tese precisa contar para avisar que ficou receita de fora. Guardá-lo
+junto do documento o perderia; o teste guarda essa lição.
+
+**Sem Gestão rodada, a Exclusão não recusa.** Lê os SPED ela mesma e grava o
+agregado na própria pasta — a tese seguinte não paga de novo. O resumo diz de
+onde veio ("agregados" ou "sped"), porque dez segundos e uma hora são a mesma
+etapa com fontes diferentes, e quem acompanha merece saber qual foi.
+
+**Consequência operacional da fila fora do motor:** o trabalhador não recarrega
+sozinho. Etapa nova ou executor alterado só valem depois de reiniciar a janela
+da fila. É o preço de a rodada de uma hora sobreviver a quem salva arquivo — e
+o preço certo.
+
+---
+
 ## 2026-09-24 — A primeira exclusão: PIS e COFINS da própria base
 
 **A tese.** O preço de venda embute as duas contribuições, e receita não é

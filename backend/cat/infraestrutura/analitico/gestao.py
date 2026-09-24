@@ -38,6 +38,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from cat.infraestrutura.gestao.modelos import Relatorio
+from cat.infraestrutura.gestao.agregados import gravar as gravar_agregados
 from cat.infraestrutura.gestao.montagem import (
     GestaoCancelada,
     ler,
@@ -88,6 +89,8 @@ class Resumo:
     ilegiveis: int = 0
     quadros: int = 0
     linhas: int = 0
+    # chaves do agregado gravadas em disco, para as teses da Exclusão
+    agregados: int = 0
     tributos: list[str] = field(default_factory=list)
     competencias: list[str] = field(default_factory=list)
     cnpj: str = ""
@@ -99,6 +102,7 @@ def serializar(r: Resumo) -> dict:
     return {
         "arquivos": r.arquivos, "contribuicoes": r.contribuicoes, "ecf": r.ecf,
         "ilegiveis": r.ilegiveis, "quadros": r.quadros, "linhas": r.linhas,
+        "agregados": r.agregados,
         "tributos": r.tributos, "competencias": r.competencias,
         "cnpj": r.cnpj, "razao_social": r.razao_social, "avisos": r.avisos,
     }
@@ -130,6 +134,10 @@ def apurar(contribuicoes: list[str], ecfs: list[str], destino: str,
         resumo.ilegiveis += len(avisos)
         resumo.avisos.extend(avisos)
         relatorios.extend(montar(apuracoes, avisos))
+        # o agregado de cada arquivo fica em disco: ler os SPED desta base
+        # custa uma hora, e as teses da Exclusão precisam dos mesmos números.
+        # Gravar aqui é o que faz a segunda conta sair em segundos
+        resumo.agregados = gravar_agregados(apuracoes, destino)
 
     if ecfs:
         if deve_parar is not None and deve_parar():
