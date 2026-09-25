@@ -310,6 +310,31 @@ def _cfe(inf: ET.Element) -> DocumentoXml:
 # ---------------------------------------------------------------------------
 # o item
 # ---------------------------------------------------------------------------
+def _numero_do_item(det: ET.Element) -> int:
+    """A posição do item no documento: atributo `nItem` ou filho `<nItem>`.
+
+    O leiaute põe `nItem` como **atributo** de `<det>`, e é assim que a SEFAZ
+    autoriza a nota. Mas XML que passou por ferramenta de terceiro — portal de
+    consulta, conversor do cliente — chega reserializado, com o número virado
+    elemento: as 121 notas que a Dom Atacarejo entregou em 25/09/2026 vinham
+    todas assim, e todas saíram com item 0.
+
+    **A posição é o que casa o item do XML com a linha do C170 da EFD.** Sem
+    ela o cruzamento por (chave, item) não existe, e nada na nota denuncia a
+    perda: o resto do item vem completo, e a planilha sai com uma coluna de
+    zeros que parece dado.
+
+    Não se inventa pela ordem do arquivo quando o número não vem de jeito
+    nenhum: zero é falta declarada, e a ordem do arquivo não é promessa de
+    nada.
+    """
+    bruto = (det.get("nItem") or "").strip() or _texto(det, "nItem")
+    try:
+        return int(bruto)
+    except ValueError:
+        return 0
+
+
 def _item(det: ET.Element) -> ItemDoXml:
     prod = _filho(det, "prod")
     icms = _grupo_do_icms(det)
@@ -325,7 +350,7 @@ def _item(det: ET.Element) -> ItemDoXml:
             if (obs.get("xCampoDet") or "").strip().upper() == "COD. CEST":
                 cest = _texto(obs, "xTextoDet")
     return ItemDoXml(
-        numero=int(det.get("nItem") or 0),
+        numero=_numero_do_item(det),
         codigo=_texto(prod, "cProd").strip(),
         gtin="" if gtin.upper() in _SEM_GTIN else gtin,
         descricao=_texto(prod, "xProd").strip(),

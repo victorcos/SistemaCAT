@@ -62,6 +62,25 @@ class TestNFe:
         assert (doc.numero, doc.serie, doc.emissao) == ("71458", "3", date(2024, 6, 26))
         assert [i.numero for i in doc.itens] == [1, 2]
 
+    def test_nitem_como_elemento_tambem_conta(self):
+        """XML reserializado por ferramenta de terceiro traz `<nItem>1</nItem>`
+        em vez do atributo. Foi o caso das 121 notas da Dom Atacarejo de
+        25/09/2026: todas saíam com item 0, e a posição é o que casa o item com
+        a linha do C170 da EFD."""
+        doc = ler_documento_xml(nfe(
+            (ITEM_CST00 + ITEM_CST60)
+            .replace('<det nItem="1">', "<det><nItem>1</nItem>")
+            .replace('<det nItem="2">', "<det><nItem>2</nItem>")))
+        assert [i.numero for i in doc.itens] == [1, 2]
+        # e o resto do item continua lido como sempre
+        assert doc.itens[0].codigo == "1111K3"
+
+    def test_sem_nitem_nenhum_a_posicao_fica_zero(self):
+        """Não se inventa o número pela ordem do arquivo: zero é falta
+        declarada, e a ordem do XML não promete a numeração da nota."""
+        doc = ler_documento_xml(nfe(ITEM_CST00.replace('<det nItem="1">', "<det>")))
+        assert doc.itens[0].numero == 0
+
     def test_venda_interestadual_com_icms_proprio(self):
         item = ler_documento_xml(nfe(ITEM_CST00)).itens[0]
         assert (item.codigo, item.gtin, item.ncm, item.cest, item.cfop) == (

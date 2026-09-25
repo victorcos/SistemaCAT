@@ -5,6 +5,29 @@
 
 ---
 
+## 2026-09-25 — `nItem` também vem como elemento, e sem ele o item do XML não casa com o C170
+
+**O defeito.** As 121 notas que a Dom Atacarejo entregou em 25/09/2026 vinham
+com `<det><nItem>1</nItem>` em vez de `<det nItem="1">` — o número do item como
+elemento, não como atributo. O leiaute da NF-e diz atributo, e é assim que a
+SEFAZ autoriza a nota; XML que passou por ferramenta de terceiro (portal de
+consulta, conversor do cliente) chega reserializado. O leitor só olhava o
+atributo, e as 916 linhas saíram com **item 0**.
+
+**Por que isso é grave e não aparece.** A posição do item é o que casa o item do
+XML com a linha do C170 da EFD: o par (chave, item) é o único identificador que
+as duas fontes têm em comum. Com zero em toda linha, o cruzamento simplesmente
+não existe — e nada denuncia a perda, porque o resto do item vem completo e a
+coluna de zeros parece dado. Na consolidação de movimentos do ICMS é o mesmo
+estrago, mais discreto: `itens_pareados_com_xml` cai sem explicação.
+
+**Não se inventa pela ordem do arquivo.** Quando o número não vem de jeito
+nenhum, fica zero: falta declarada. A ordem dos `<det>` no arquivo não é promessa
+da numeração da nota, e um número inventado casaria com a linha errada do C170 —
+pior que não casar.
+
+---
+
 ## 2026-09-24 — O XML entra no PIS/COFINS, e o que é de outra empresa sai à vista
 
 **O que estava quebrado.** A trilha de quebra de XML foi criada nos dois
