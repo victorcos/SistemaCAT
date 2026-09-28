@@ -242,14 +242,7 @@ export default function QuebraDeSped() {
         </Faixa>
       )}
 
-      {!rodando && resultado && resumo && (
-        <>
-          <Concluido execucao={resultado} resumo={resumo} />
-          {/* o conteúdo, depois do que foi lido: a quebra diz o que há dentro
-              dos arquivos, e aqui se pede o que está dentro deles */}
-          <ExtrairDoSped execucaoId={resultado.id} />
-        </>
-      )}
+      {!rodando && resultado && resumo && <Concluido execucao={resultado} resumo={resumo} />}
     </div>
   );
 }
@@ -351,6 +344,11 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaQuebra; resumo: R
           atencao={(resumo.ilegiveis ?? 0) > 0}
         />
       </section>
+
+      {/* A extração vem antes do que foi lido: ler os arquivos é o meio, e
+          extrair o registro é o fim. Enterrá-la depois da tabela de 58 linhas
+          obrigava a rolar a tela inteira para chegar ao que se veio fazer. */}
+      <ExtrairDoSped execucaoId={execucao.id} />
 
       {(resumo.avisos ?? []).length > 0 && (
         <section className="rounded-cartao border border-atencao/25 border-l-[3px] border-l-atencao bg-atencao-fundo px-5 py-4.5">

@@ -109,7 +109,16 @@ export function ExtrairDoSped({ execucaoId }: { execucaoId: number }) {
       <Aviso titulo={leitura.erro.message} codigo={leitura.erro.requisicaoId} aoFechar={() => leitura.setErro(null)} />
     );
   }
-  if (!dados) return null;
+  // enquanto a lista não chega, o cartão aparece dizendo que está vindo: some
+  // por um instante é o que faz alguém achar que a tela não mudou
+  if (!dados) {
+    return (
+      <Cartao className="flex items-center gap-3">
+        <h2 className="m-0 text-base font-extrabold text-texto">Extrair um registro</h2>
+        <span className="text-[13px] text-texto-fraco">Lendo o que há nos arquivos…</span>
+      </Cartao>
+    );
+  }
 
   return (
     <Cartao className="flex flex-col gap-3.5">

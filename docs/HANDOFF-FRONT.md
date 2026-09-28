@@ -1,6 +1,6 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-09-28, sobre a versão **0.108.0**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-09-28, sobre a versão **0.108.1**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
@@ -168,7 +168,7 @@ Para onde cada funcionalidade leva, e com que palavras. A tela não decide o que
 
 ### QuebraDeSped
 
-`src/pages/QuebraDeSped.tsx` · 418 linhas
+`src/pages/QuebraDeSped.tsx` · 416 linhas
 
 Quebrar os SPED — abrir os arquivos e dizer o que há dentro.
 
