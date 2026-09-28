@@ -1,12 +1,12 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-09-24, sobre a versão **0.99.2**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-09-28, sobre a versão **0.106.0**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
 errado é o código — não este documento.
 
-## 1. Rotas (28)
+## 1. Rotas (29)
 
 O endereço, a tela que o atende e se exige papel específico.
 
@@ -36,12 +36,13 @@ O endereço, a tela que o atende e se exige papel específico.
 | `/projetos/:id/razao-contabil` | RazaoContabil | — |
 | `/projetos/:id/apuracao-contribuicoes` | Gestao | — |
 | `/projetos/:id/exclusoes` | Exclusoes | — |
+| `/projetos/:id/quebra-xml` | QuebraXml | — |
 | `/projetos/:id/entrega` | Entrega | — |
 | `/projetos/:id/historico` | Historico | — |
 | `/usuarios` | Usuarios | sim |
 | `*` | NaoEncontrada | — |
 
-## 2. Telas (26)
+## 2. Telas (30)
 
 O resumo é o que o próprio arquivo diz de si no comentário do topo.
 
@@ -89,7 +90,7 @@ Etapa 8 — relatórios e entrega. Três regras mandam na tela: **o relatório m
 
 ### Exclusoes
 
-`src/pages/Exclusoes.tsx` · 439 linhas
+`src/pages/Exclusoes.tsx` · 466 linhas
 
 Exclusões da base do PIS/COFINS. Uma tese hoje: as próprias contribuições fora da base. A receita embute PIS e
 
@@ -111,9 +112,15 @@ Apuração das contribuições — a Gestão Fiscal no padrão do MA.
 
 Cadastrar trabalho — o wizard de quatro passos. O cadastro começa por um arquivo do SPED porque é ele que traz CNPJ, razão
 
+### Inicio.teste
+
+`src/pages/Inicio.teste.tsx` · 141 linhas
+
+"Novo trabalho" numa tela que já é de um tributo. O modal abria com um seletor de **Tributo** listando os cinco — e marcado em
+
 ### Inicio
 
-`src/pages/Inicio.tsx` · 612 linhas
+`src/pages/Inicio.tsx` · 663 linhas
 
 Os filtros da listagem. Os quatro status, mais o pré-cadastro, que não é
 
@@ -123,9 +130,15 @@ Os filtros da listagem. Os quatro status, mais o pré-cadastro, que não é
 
 _(sem comentário de topo)_
 
+### Lote.teste
+
+`src/pages/Lote.teste.tsx` · 112 linhas
+
+O descarte por empresa, na tela da importação. O sistema não pergunta se pode deixar de fora o arquivo de outra empresa —
+
 ### Lote
 
-`src/pages/Lote.tsx` · 460 linhas
+`src/pages/Lote.tsx` · 547 linhas
 
 Etapa 1 — importar a base de dados de um trabalho que já existe.
 
@@ -149,15 +162,27 @@ Pré-validar os arquivos digitais que o cliente já transmitiu.
 
 ### Projeto
 
-`src/pages/Projeto.tsx` · 542 linhas
+`src/pages/Projeto.tsx` · 550 linhas
 
 Para onde cada funcionalidade leva, e com que palavras. A tela não decide o que está disponível — isso vem do domínio, em
 
 ### QuebraDeSped
 
-`src/pages/QuebraDeSped.tsx` · 410 linhas
+`src/pages/QuebraDeSped.tsx` · 418 linhas
 
 Quebrar os SPED — abrir os arquivos e dizer o que há dentro.
+
+### QuebraXml.teste
+
+`src/pages/QuebraXml.teste.tsx` · 181 linhas
+
+O seletor de colunas da quebra de XML segue o tributo do trabalho.
+
+### QuebraXml
+
+`src/pages/QuebraXml.tsx` · 600 linhas
+
+Quebra de XML — as notas do lote, item a item. A tela entrega **uma planilha sob medida**: são 57 colunas possíveis e quase
 
 ### Razao
 
@@ -197,11 +222,11 @@ Troca obrigatória da senha provisória. Aparece no lugar da aplicação, sem me
 
 ### Usuarios
 
-`src/pages/Usuarios.tsx` · 1138 linhas
+`src/pages/Usuarios.tsx` · 1153 linhas
 
 O que se diz da pessoa numa linha: uma situação só, na ordem de
 
-## 3. Componentes (30 arquivos)
+## 3. Componentes (31 arquivos)
 
 O que já existe e pode ser reaproveitado. Desenhar um componente que já
 está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
@@ -235,6 +260,7 @@ está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
 | `CardDeFuncionalidade.tsx` | CardDeFuncionalidade | `etapa` | Uma funcionalidade do trabalho, como card. É o card do hub (`CardDeEscolha`) um nível abaixo: lá se escolhe o tributo, |
 | `CorrecoesAMao.tsx` | CorrecoesAMao | `projetoId` | Correção à mão do trabalho: a porta da planilha e a lista do que já foi |
 | `EditarCadastro.tsx` | EditarCadastro | `projeto, aberto, aoFechar, aoSalvar` | Nome e período do trabalho. Existe porque o período muda de verdade: o trabalho do Amigão nasceu como |
+| `ExtrairDoSped.tsx` | ExtrairDoSped | `execucaoId` | Extrair um registro do SPED, consolidado de todos os arquivos. |
 | `FrentesDoTrabalho.tsx` | FrentesDoTrabalho | `projetoId, modulo, trilhas` | As frentes de trabalho de um trabalho: a CAT 42, o crédito outorgado, e as |
 | `OcorrenciasDoArquivo.tsx` | OcorrenciasDoArquivo | `chave, carregar, cabecalho` | O que a pré-validação achou num arquivo digital. Serve às duas telas que pré-validam — a do arquivo que o sistema gerou e a |
 | `PainelDoTrabalho.tsx` | PainelDoTrabalho, FaixaDeLeiautes | `projetoId, etapas, rota, bloqueio` | O painel do trabalho: o que há para ler, e o que dá para fazer. |
@@ -519,7 +545,7 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 | `--borda-sutil` | `rgb(255 255 255 / 8%)` | — |
 | `--brilho-acao` | `0 12px 28px rgb(255 127 0 / 30%)` | — |
 
-## 5. O que a tela pede ao servidor (99 chamadas)
+## 5. O que a tela pede ao servidor (106 chamadas)
 
 Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 `:id`, qualquer que seja o nome no código.
@@ -684,8 +710,20 @@ Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 | --- | --- |
 | POST | `/api/projetos/:id/quebra-de-sped` |
 | GET | `/api/quebra-de-sped/:id` |
+| GET | `/api/quebra-de-sped/:id/alvos` |
 | POST | `/api/quebra-de-sped/:id/cancelar` |
+| GET | `/api/quebra-de-sped/:id/extracao` |
 | GET | `/api/quebra-de-sped/:id/planilhas/:id` |
+
+### `quebraXml`
+
+| Método | Rota |
+| --- | --- |
+| POST | `/api/projetos/:id/quebra-xml` |
+| GET | `/api/quebra-xml/:id` |
+| POST | `/api/quebra-xml/:id/cancelar` |
+| GET | `/api/quebra-xml/:id/planilhas/itens:id` |
+| GET | `/api/quebra-xml/campos` |
 
 ### `razao`
 
@@ -762,6 +800,9 @@ _Nenhuma._
 
 #### Telas em `pages/` sem rota
 
+- `Inicio.teste`
+- `Lote.teste`
+- `QuebraXml.teste`
 - `RazaoContabil.teste`
 
 #### Rotas que nenhum link aponta

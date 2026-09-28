@@ -50,6 +50,7 @@ from cat.infraestrutura.analitico.credito_outorgado import (
 from cat.infraestrutura.analitico.exclusoes import ARQUIVO_DAS_EXCLUSOES
 from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML
 from cat.infraestrutura.analitico.gestao import ARQUIVO_DOS_QUADROS
+from cat.infraestrutura.analitico import registros_do_sped as extracao_de_registro
 from cat.infraestrutura.analitico.piscofins import (
     ARQUIVO_DAS_ENTRADAS,
     ARQUIVO_DO_RAZAO,
@@ -90,6 +91,7 @@ from cat.infraestrutura.planilhas.credito_outorgado import (
     gerar_elegiveis,
 )
 from cat.infraestrutura.planilhas.gestao import gerar_quadros
+from cat.infraestrutura.planilhas.registros_do_sped import gerar_extracao
 from cat.infraestrutura.planilhas.quebra_de_sped import (
     gerar_arquivos_quebrados,
     gerar_contagens,
@@ -336,3 +338,41 @@ def precisa_gerar(planilha: str, parquet: str) -> bool:
         return os.path.getmtime(planilha) < os.path.getmtime(parquet)
     except OSError:
         return True
+
+
+# ---------------------------------------------------------------------------
+# a extração de registro: fora do catálogo, e por quê
+# ---------------------------------------------------------------------------
+def extrair_registro(execucao: ExecucaoDB, alvo: str, formato: str) -> PlanilhaPronta:
+    """Extrai um registro (ou uma hierarquia) da quebra e devolve a planilha.
+
+    Não entra em `PLANILHAS` porque a lista dali é fixa por etapa, e aqui o
+    parquet e as colunas mudam com o alvo: seriam cinquenta e duas entradas de
+    registro mais dezenove de hierarquia, todas iguais menos o nome.
+
+    **O parquet é reaproveitado**, como as outras planilhas: extrair de novo 59
+    arquivos a cada clique no botão de baixar seria minutos de espera para
+    entregar o mesmo arquivo. A idade é medida contra o que a quebra deixou —
+    quebra nova, extração nova.
+    """
+    pasta = execucao.pasta_de_trabalho or ""
+    if not os.path.isdir(pasta):
+        raise PlanilhaRecusada(
+            410, "Os arquivos desta quebra não estão mais em disco. Rode a quebra de novo.")
+
+    origem_da_quebra = os.path.join(pasta, ARQUIVO_DOS_ARQUIVOS)
+    limpo = alvo.strip().upper()
+    parquet = os.path.join(
+        pasta, extracao_de_registro.ARQUIVO_DA_EXTRACAO.format(alvo=limpo.replace("+", "_")))
+    if precisa_gerar(parquet, origem_da_quebra):
+        with contexto(etapa="quebra_de_sped", execucao_id=execucao.id, alvo=limpo):
+            extracao_de_registro.extrair(pasta, limpo)
+
+    nome = f"sped_{limpo.replace('+', '_')}.{formato}"
+    destino = os.path.join(pasta, nome)
+    if precisa_gerar(destino, parquet):
+        with contexto(etapa="quebra_de_sped", execucao_id=execucao.id, alvo=limpo):
+            linhas = gerar_extracao(parquet, destino, formato=formato, alvo=limpo)
+            log.info("planilha de registro gerada",
+                     extra={"alvo": limpo, "linhas": linhas, "formato": formato})
+    return PlanilhaPronta(caminho=destino, nome=nome, tipo=TIPOS[formato])

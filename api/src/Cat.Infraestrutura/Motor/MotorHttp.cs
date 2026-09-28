@@ -137,6 +137,25 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
             ["execucao_id"] = execucaoId,
         }), PrazoLinhas, cancelar);
 
+    public async Task<JsonElement> AlvosDaQuebra(int execucaoId, CancellationToken cancelar) =>
+        await Chamar("interno/quebra/alvos", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["execucao_id"] = execucaoId,
+        }), PrazoLinhas, cancelar);
+
+    public async Task<PlanilhaPronta> ExtrairDaQuebra(int execucaoId, PedidoDeExtracao pedido,
+        CancellationToken cancelar)
+    {
+        // o prazo é o da planilha, e não o das linhas: extrair o C170 de 59
+        // arquivos é leitura de disco, não uma consulta
+        var json = await Chamar("interno/quebra/extrair", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["execucao_id"] = execucaoId, ["alvo"] = pedido.Alvo, ["formato"] = pedido.Formato,
+        }), PrazoPlanilha, cancelar);
+        return new PlanilhaPronta(json.GetProperty("caminho").GetString()!,
+            json.GetProperty("nome").GetString()!, json.GetProperty("tipo").GetString()!);
+    }
+
     public async Task<JsonElement> FiltroDoCreditoOutorgado(int projetoId, CancellationToken cancelar) =>
         await Chamar("interno/credito-outorgado/filtro", JsonContent.Create(new Dictionary<string, object?>
         {

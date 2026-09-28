@@ -125,6 +125,14 @@ public interface IMotor
 
     Task<System.Text.Json.JsonElement> EstabelecimentosDoRazaoContabil(int execucaoId, CancellationToken cancelar);
 
+    /// <summary>O que dá para extrair de uma quebra: registros, hierarquias e blocos.</summary>
+    /// <exception cref="MotorRecusou">não é quebra (404), não terminou (409), material apagado (410)</exception>
+    Task<System.Text.Json.JsonElement> AlvosDaQuebra(int execucaoId, CancellationToken cancelar);
+
+    /// <summary>Extrai um registro ou hierarquia e devolve a planilha pronta.</summary>
+    /// <exception cref="MotorRecusou">alvo sem leiaute (422), formato desconhecido (404), material apagado (410)</exception>
+    Task<PlanilhaPronta> ExtrairDaQuebra(int execucaoId, PedidoDeExtracao pedido, CancellationToken cancelar);
+
     /// <summary>O filtro do crédito outorgado do trabalho. Trabalho sem filtro responde vazio.</summary>
     /// <exception cref="MotorRecusou">trabalho não existe (404)</exception>
     Task<System.Text.Json.JsonElement> FiltroDoCreditoOutorgado(int projetoId, CancellationToken cancelar);

@@ -69,6 +69,7 @@ from cat.infraestrutura.analitico import entrega as analitico_entrega
 from cat.infraestrutura.analitico import pre_validacao_do_cliente as analitico_pre_validacao
 from cat.infraestrutura.analitico import razao as analitico_razao
 from cat.infraestrutura.analitico import razao_contabil as analitico_razao_contabil
+from cat.infraestrutura.analitico import registros_do_sped as analitico_registros
 from cat.infraestrutura.planilhas import itens_do_xml as planilha_do_xml
 from cat.infraestrutura.analitico import suportado as analitico_suportado
 from cat.infraestrutura.arquivos.remessa import RemessaInvalida, percorrer
@@ -1052,4 +1053,68 @@ def gerar_planilha(
                                  pedido.classificacoes, pedido.formato)
     except planilhas.PlanilhaRecusada as erro:
         raise HTTPException(erro.status, str(erro)) from erro
+    return PlanilhaDto(caminho=pronta.caminho, nome=pronta.nome, tipo=pronta.tipo)
+
+
+# ---------------------------------------------------------------------------
+# Extrair registro do SPED: o que a quebra indexou, consolidado numa planilha
+#
+# Tem rota própria, e não entra no catálogo de `planilhas.py`, porque a lista
+# não é fixa: o parquet e as colunas dependem do registro pedido. Forçar isso
+# no catálogo exigiria uma entrada por registro — cinquenta e duas, e mais
+# dezenove hierarquias.
+# ---------------------------------------------------------------------------
+class PedidoDosAlvos(BaseModel):
+    execucao_id: int
+
+
+class PedidoDaExtracao(BaseModel):
+    execucao_id: int
+    # um registro ("C170") ou uma hierarquia ("C100+C170")
+    alvo: str = Field(min_length=1, max_length=40)
+    formato: str = "xlsx"
+
+
+def _quebra_concluida_para_extrair(execucao_id: int, sessao: Session) -> ExecucaoDB:
+    execucao = sessao.get(ExecucaoDB, execucao_id)
+    if execucao is None or execucao.etapa != quebrar_sped.ETAPA:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Quebra de SPED não encontrada.")
+    if execucao.situacao != "concluida":
+        raise HTTPException(status.HTTP_409_CONFLICT, "A quebra dos SPED ainda não terminou.")
+    return execucao
+
+
+def _traduzir_extracao(funcao):
+    try:
+        return funcao()
+    except analitico_registros.AlvoDesconhecido as erro:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)) from erro
+    except FileNotFoundError as erro:
+        raise HTTPException(status.HTTP_410_GONE, str(erro)) from None
+
+
+@router.post("/quebra/alvos", dependencies=[Depends(exigir_segredo)])
+def alvos_da_quebra(
+    pedido: PedidoDosAlvos, sessao: Annotated[Session, Depends(obter_sessao)]
+) -> dict:
+    """O que dá para extrair desta quebra: registros, hierarquias e os blocos."""
+    execucao = _quebra_concluida_para_extrair(pedido.execucao_id, sessao)
+    with contexto(etapa=quebrar_sped.ETAPA, execucao_id=execucao.id):
+        return _traduzir_extracao(
+            lambda: analitico_registros.disponiveis(execucao.pasta_de_trabalho or ""))
+
+
+@router.post("/quebra/extrair", response_model=PlanilhaDto,
+             dependencies=[Depends(exigir_segredo)])
+def extrair_da_quebra(
+    pedido: PedidoDaExtracao, sessao: Annotated[Session, Depends(obter_sessao)]
+) -> PlanilhaDto:
+    """Extrai o alvo e devolve a planilha pronta, em xlsx ou csv."""
+    execucao = _quebra_concluida_para_extrair(pedido.execucao_id, sessao)
+    if pedido.formato not in planilhas.FORMATOS:
+        raise HTTPException(status.HTTP_404_NOT_FOUND,
+                            f"Formato desconhecido: {pedido.formato}. Vale xlsx ou csv.")
+    with contexto(etapa=quebrar_sped.ETAPA, execucao_id=execucao.id, alvo=pedido.alvo):
+        pronta = _traduzir_extracao(
+            lambda: planilhas.extrair_registro(execucao, pedido.alvo, pedido.formato))
     return PlanilhaDto(caminho=pronta.caminho, nome=pronta.nome, tipo=pronta.tipo)

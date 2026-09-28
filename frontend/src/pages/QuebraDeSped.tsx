@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { BaixarPlanilha } from "@/components/shared/BaixarPlanilha";
+import { ExtrairDoSped } from "@/components/shared/ExtrairDoSped";
 import {
   BarraFina,
   Cartao,
@@ -241,7 +242,14 @@ export default function QuebraDeSped() {
         </Faixa>
       )}
 
-      {!rodando && resultado && resumo && <Concluido execucao={resultado} resumo={resumo} />}
+      {!rodando && resultado && resumo && (
+        <>
+          <Concluido execucao={resultado} resumo={resumo} />
+          {/* o conteúdo, depois do que foi lido: a quebra diz o que há dentro
+              dos arquivos, e aqui se pede o que está dentro deles */}
+          <ExtrairDoSped execucaoId={resultado.id} />
+        </>
+      )}
     </div>
   );
 }

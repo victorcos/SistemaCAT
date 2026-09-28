@@ -43,6 +43,9 @@ public sealed record PedidoDeOcorrencias(string Nome, int Pagina, int PorPagina)
 /// <param name="So">no_dossie, fora_do_dossie, com_previa, fora_de_sp</param>
 public sealed record PedidoDeEstabelecimentos(string? So, string? Busca, int Pagina, int PorPagina);
 
+/// <param name="Alvo">um registro ("C170") ou uma hierarquia ("C100+C170")</param>
+public sealed record PedidoDeExtracao(string Alvo, string Formato);
+
 /// <summary>Quais produtos têm o crédito outorgado, neste trabalho.</summary>
 /// <param name="SemFiltro">rodar sem julgar nada, para ver o universo antes do primeiro termo</param>
 /// <param name="GuardarDescartados">guardar também o que ficou de fora, para revisar o filtro</param>
@@ -212,6 +215,31 @@ public sealed class Execucoes(
     {
         var e = await Detalhar(execucaoId, ApuracaoPisCofins, usuario, cancelar);
         return await motor.LancamentosDoRazaoContabil(e.Id, pedido, cancelar);
+    }
+
+    // A extração de registro: o que a quebra indexou, consolidado numa planilha.
+    // A lista não é fixa — o registro e as colunas são escolha de quem pede —,
+    // e por isso não passa pelo catálogo de planilhas das outras etapas.
+
+    /// <summary>O que dá para extrair desta quebra: registros, hierarquias, blocos.</summary>
+    public async Task<JsonElement> AlvosDaQuebra(int execucaoId, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, QuebraDeSped, usuario, cancelar);
+        return await motor.AlvosDaQuebra(e.Id, cancelar);
+    }
+
+    /// <summary>Extrai o alvo e devolve a planilha pronta, em xlsx ou csv.</summary>
+    public async Task<PlanilhaPronta> ExtrairDaQuebra(int execucaoId, PedidoDeExtracao pedido,
+        Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, QuebraDeSped, usuario, cancelar);
+        var pronta = await motor.ExtrairDaQuebra(e.Id, pedido, cancelar);
+        log.Info("extração de registro pedida", new
+        {
+            execucao_id = e.Id, alvo = pedido.Alvo, formato = pedido.Formato,
+            por_usuario_id = usuario.Id,
+        });
+        return pronta;
     }
 
     // O crédito outorgado tem duas coisas que as outras etapas não têm: um

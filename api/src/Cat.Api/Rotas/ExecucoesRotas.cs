@@ -201,6 +201,30 @@ public static class ExecucoesRotas
                     Results.Json(await caso.EstabelecimentosDoRazaoContabil(execucaoId, http.UsuarioAtual(), http.RequestAborted))))
             .ExigirUsuario();
 
+        // A extração de registro da quebra: o que há para extrair, e a planilha
+        // de um alvo. Fica fora do `/planilhas/{qual}` das outras etapas porque
+        // o que sai depende do registro pedido, e não de uma lista fixa.
+        api.MapGet("/quebra-de-sped/{execucaoId:int}/alvos", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                    Results.Json(await caso.AlvosDaQuebra(execucaoId, http.UsuarioAtual(), http.RequestAborted))))
+            .ExigirUsuario();
+
+        api.MapGet("/quebra-de-sped/{execucaoId:int}/extracao",
+                async (int execucaoId, HttpContext http, Execucoes caso, ConfigCat config, ILogger<Execucoes> log) =>
+                await Traduzir(async () =>
+                {
+                    var q = http.Request.Query;
+                    var alvo = q["alvo"].FirstOrDefault() ?? "";
+                    if (alvo.Length is 0 or > 40)
+                        return CorpoJson.Recusar("Informe o registro ou a hierarquia a extrair.",
+                            StatusCodes.Status422UnprocessableEntity);
+                    var formato = q["formato"].FirstOrDefault() is { Length: > 0 } f ? f : "xlsx";
+                    var pronta = await caso.ExtrairDaQuebra(execucaoId, new PedidoDeExtracao(alvo, formato),
+                        http.UsuarioAtual(), http.RequestAborted);
+                    return Arquivo(pronta, config, log);
+                }))
+            .ExigirUsuario();
+
         // O crédito outorgado: o filtro do trabalho, e a leitura do que ele
         // capturou. O filtro é a única configuração de etapa que a tela grava —
         // ele existe antes da primeira rodada e sobrevive a todas, e por isso

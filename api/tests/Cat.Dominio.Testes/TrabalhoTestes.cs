@@ -61,6 +61,10 @@ public sealed class EtapasTestes
     private static SituacaoEtapa Situacao(IReadOnlyList<EtapaDoProjeto> e, string chave) =>
         e.Single(x => x.Definicao.Chave == chave).Situacao;
 
+    /// <summary>Quantas etapas do módulo entram no progresso: construídas e que concluem.</summary>
+    private static int QuantasContam(string modulo) =>
+        Etapas.Do(modulo).Count(d => d.Implementada && d.Conta);
+
     [Fact]
     public void Projeto_novo_tem_tudo_pendente_e_nada_barrado()
     {
@@ -71,9 +75,10 @@ public sealed class EtapasTestes
         var e = Montar([]);
         Assert.All(e, x => Assert.Equal(SituacaoEtapa.Pendente, x.Situacao));
         Assert.All(e, x => Assert.True(x.Acessivel));
-        // nove: as oito da cadeia da CAT 42 mais o crédito outorgado, que entrou
-        // em 23/09/2026 e conta como trabalho embora não pertença à cadeia
-        Assert.Equal((0, 9), Etapas.Progresso(e));
+        // o denominador sai das frentes do módulo, e não de um número escrito
+        // aqui: ele muda toda vez que uma frente nova entra, e congelá-lo faz
+        // este teste quebrar por acerto do sistema, não por defeito
+        Assert.Equal((0, QuantasContam("icms")), Etapas.Progresso(e));
     }
 
     [Fact]
@@ -83,7 +88,7 @@ public sealed class EtapasTestes
         Assert.Equal(SituacaoEtapa.Concluida, Situacao(e, "importar"));
         Assert.Equal(SituacaoEtapa.Pendente, Situacao(e, "conferencia"));
         Assert.Equal(SituacaoEtapa.Pendente, Situacao(e, "movimentos"));
-        Assert.Equal((1, 9), Etapas.Progresso(e));
+        Assert.Equal((1, QuantasContam("icms")), Etapas.Progresso(e));
     }
 
     [Fact]
@@ -98,11 +103,11 @@ public sealed class EtapasTestes
     public void Concluida_fora_de_ordem_conta_e_o_resto_segue_pendente()
     {
         // movimentos concluídos com a conferência pendente: acontece, e a
-        // conta é honesta — uma feita de nove
+        // conta é honesta — uma feita de quantas o módulo tem
         var e = Montar(["movimentos"]);
         Assert.Equal(SituacaoEtapa.Concluida, Situacao(e, "movimentos"));
         Assert.Equal(SituacaoEtapa.Pendente, Situacao(e, "conferencia"));
-        Assert.Equal((1, 9), Etapas.Progresso(e));
+        Assert.Equal((1, QuantasContam("icms")), Etapas.Progresso(e));
     }
 
     [Fact]
@@ -154,6 +159,11 @@ public sealed class EtapasTestes
 /// </summary>
 public sealed class RoteiroPorModuloTestes
 {
+    /// <summary>A cadeia da CAT 42: a única ordem que é dependência real.</summary>
+    private static readonly string[] CadeiaDaCat42 =
+        ["importar", "conferencia", "movimentos", "st_suportado", "razao", "apuracao",
+         "arquivo_digital", "entrega"];
+
     [Fact]
     public void Cada_roteiro_so_cita_etapa_que_existe_no_catalogo()
     {
@@ -182,9 +192,12 @@ public sealed class RoteiroPorModuloTestes
             chaves.Take(8));
         // o histórico está em todo módulo, e em nenhum conta como trabalho
         Assert.Contains("historico", chaves);
-        // o crédito outorgado é do módulo, e não da cadeia: fica depois dela,
-        // porque lê os XML do lote direto e não espera etapa nenhuma
-        Assert.Equal("credito_outorgado", chaves[^2]);
+        // o que não é da cadeia fica depois dela e antes do histórico: são as
+        // frentes que leem o lote direto e não esperam etapa nenhuma
+        Assert.Equal("historico", chaves[^1]);
+        var foraDaCadeia = chaves[8..^1];
+        Assert.Contains("credito_outorgado", foraDaCadeia);
+        Assert.All(foraDaCadeia, c => Assert.DoesNotContain(c, CadeiaDaCat42));
     }
 
     [Fact]
@@ -213,28 +226,36 @@ public sealed class RoteiroPorModuloTestes
     [Fact]
     public void O_roteiro_sai_das_trilhas_e_nao_repete_o_importar()
     {
-        var icms = Etapas.Roteiros["icms"];
-
-        Assert.Equal("importar", icms[0]);
-        Assert.Equal("historico", icms[^1]);
-        Assert.Single(icms.Where(c => c == "importar"));
-        // as duas frentes do ICMS, uma depois da outra
-        Assert.Equal(
-            ["importar", "conferencia", "movimentos", "st_suportado", "razao", "apuracao",
-             "arquivo_digital", "entrega", "credito_outorgado", "historico"],
-            icms);
+        foreach (var (modulo, chaves) in Etapas.Roteiros)
+        {
+            Assert.Equal("importar", chaves[0]);
+            Assert.Equal("historico", chaves[^1]);
+            // toda trilha começa por importar, e o roteiro o traz uma vez só
+            Assert.Single(chaves.Where(c => c == "importar"));
+            // e o roteiro é exatamente o que as trilhas dizem, na ordem delas
+            var dasTrilhas = Etapas.TrilhasDo(modulo)
+                .SelectMany(t => t.Etapas).Where(c => c != "importar").Distinct();
+            Assert.Equal(["importar", .. dasTrilhas, "historico"], chaves);
+        }
     }
 
     [Fact]
-    public void As_frentes_do_icms_sao_a_cat42_e_o_credito_outorgado()
+    public void A_cat42_e_a_primeira_frente_do_icms_e_as_outras_nao_dependem_dela()
     {
         var trilhas = Etapas.TrilhasDo("icms");
 
-        Assert.Equal(["cat42", "credito_outorgado"], trilhas.Select(t => t.Chave));
-        // a cadeia da CAT 42 inteira mora numa trilha só, e é ela que tem ordem
-        Assert.Equal(8, trilhas[0].Etapas.Count);
-        // o outorgado não espera nada dela: a base, e ele
-        Assert.Equal(["importar", "credito_outorgado"], trilhas[1].Etapas);
+        // a cadeia inteira mora numa trilha só, e é ela que tem ordem
+        Assert.Equal("cat42", trilhas[0].Chave);
+        Assert.Equal(CadeiaDaCat42, trilhas[0].Etapas);
+        // as demais leem o lote direto: a base, e a etapa delas. Nenhuma toma
+        // emprestada uma etapa da cadeia — se tomasse, dependeria dela
+        Assert.All(trilhas.Skip(1), t =>
+        {
+            Assert.Equal("importar", t.Etapas[0]);
+            Assert.All(t.Etapas.Skip(1),
+                c => Assert.DoesNotContain(c, CadeiaDaCat42));
+        });
+        Assert.Contains(trilhas, t => t.Chave == "credito_outorgado");
     }
 
     [Fact]
@@ -271,7 +292,7 @@ public sealed class RoteiroPorModuloTestes
     }
 
     [Fact]
-    public void A_barra_de_piscofins_tem_as_cinco_funcionalidades_na_ordem()
+    public void A_barra_de_piscofins_tem_as_funcionalidades_na_ordem()
     {
         var roteiro = Etapas.Montar("piscofins", new HashSet<string> { "importar" });
 
@@ -280,14 +301,13 @@ public sealed class RoteiroPorModuloTestes
             roteiro.Select(e => e.Definicao.Rotulo));
         // o histórico é consulta: aparece na barra e não entra no denominador
         Assert.False(roteiro.Single(e => e.Definicao.Chave == "historico").Definicao.Conta);
-        // a quebra de XML ainda não existe, e só ela fica de fora — as exclusões
-        // entraram em 24/09/2026 e passaram a contar
-        var porFazer = new[] { "quebra_xml" };
-        Assert.Equal((1, 5), Etapas.Progresso(roteiro));
-        Assert.All(roteiro.Where(e => porFazer.Contains(e.Definicao.Chave)),
-            e => Assert.False(e.Acessivel));
-        Assert.All(roteiro.Where(e => !porFazer.Contains(e.Definicao.Chave)),
-            e => Assert.True(e.Acessivel));
+        // o denominador sai do que está construído e conclui, e não de um número
+        // aqui: as exclusões entraram em 24/09/2026 e a quebra de XML em
+        // 28/09/2026, e cada uma mudou essa conta
+        var contam = Etapas.Do("piscofins").Count(d => d.Implementada && d.Conta);
+        Assert.Equal((1, contam), Etapas.Progresso(roteiro));
+        // nada fica inacessível: o que não existe é que não entra na conta
+        Assert.All(roteiro.Where(e => e.Definicao.Implementada), e => Assert.True(e.Acessivel));
     }
 
     [Fact]
