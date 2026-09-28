@@ -231,7 +231,7 @@ public sealed class RoteiroPorModuloTestes
             Assert.Equal("importar", chaves[0]);
             Assert.Equal("historico", chaves[^1]);
             // toda trilha começa por importar, e o roteiro o traz uma vez só
-            Assert.Single(chaves.Where(c => c == "importar"));
+            Assert.Single(chaves, c => c == "importar");
             // e o roteiro é exatamente o que as trilhas dizem, na ordem delas
             var dasTrilhas = Etapas.TrilhasDo(modulo)
                 .SelectMany(t => t.Etapas).Where(c => c != "importar").Distinct();
@@ -256,6 +256,23 @@ public sealed class RoteiroPorModuloTestes
                 c => Assert.DoesNotContain(c, CadeiaDaCat42));
         });
         Assert.Contains(trilhas, t => t.Chave == "credito_outorgado");
+    }
+
+    [Fact]
+    public void Cada_frente_de_piscofins_e_uma_funcionalidade_so()
+    {
+        // Quebrar um SPED para olhar um C170 não é apurar contribuição, e quem
+        // entra para quebrar não deve atravessar a apuração para chegar lá.
+        // Até 28/09/2026 as quatro moravam num card só, e isso desfazia a
+        // separação pedida em 23/09.
+        var trilhas = Etapas.TrilhasDo("piscofins");
+
+        Assert.Equal(
+            ["quebra_de_sped", "piscofins", "exclusoes", "apuracao_contribuicoes", "quebra_xml"],
+            trilhas.Select(t => t.Chave));
+        // a base, e a funcionalidade dela: nenhuma carrega a etapa de outra
+        Assert.All(trilhas, t => Assert.Equal(["importar", t.Chave == "piscofins"
+            ? "apuracao_piscofins" : t.Chave], t.Etapas));
     }
 
     [Fact]

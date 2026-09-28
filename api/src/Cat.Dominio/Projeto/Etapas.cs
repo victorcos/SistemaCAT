@@ -234,13 +234,31 @@ public static class Etapas
                     "e NFC-e vão à escrituração só com o analítico.",
                     ["importar", "quebra_xml"]),
             ],
+            // Cinco frentes, e não uma só com cinco etapas dentro. Até 28/09/2026
+            // a quebra, a 037, as exclusões e a Gestão moravam num card chamado
+            // "Apuração de PIS/COFINS" — e isso desfazia justamente a separação
+            // que o Victor tinha pedido em 23/09: quebrar um SPED para olhar um
+            // C170 não é apurar contribuição, e quem entra para quebrar não quer
+            // atravessar a apuração para chegar lá.
             ["piscofins"] =
             [
-                new("piscofins", "Apuração de PIS/COFINS", "P/C",
-                    "Da quebra dos SPED à Gestão Fiscal: a Consulta de Entradas e o razão da " +
-                    "ECD, as exclusões da base e os quadros no padrão do MA.",
-                    ["importar", "quebra_de_sped", "apuracao_piscofins", "exclusoes",
-                     "apuracao_contribuicoes"]),
+                new("quebra_de_sped", "Quebra de SPED", "SPED",
+                    "Abrir os SPED do lote: o que há dentro de cada arquivo, e a extração de " +
+                    "qualquer registro ou hierarquia — o C170 com a nota que o contém, o M210 " +
+                    "com o M200 — filtrando pelo bloco do leiaute.",
+                    ["importar", "quebra_de_sped"]),
+                new("piscofins", "Apuração de PIS/COFINS", "037",
+                    "O par que se confronta: a Consulta de Entradas (037), do lado fiscal, e o " +
+                    "razão da ECD, do lado contábil.",
+                    ["importar", "apuracao_piscofins"]),
+                new("exclusoes", "Exclusões da base", "EXC",
+                    "O que sai da base de cálculo antes de apurar — a principal é o ICMS " +
+                    "destacado, do Tema 69.",
+                    ["importar", "exclusoes"]),
+                new("apuracao_contribuicoes", "Gestão Fiscal", "GES",
+                    "Os 36 quadros no padrão do MA: receitas e bases por CST, natureza dos " +
+                    "créditos, ajustes e controle de saldos, competência a competência.",
+                    ["importar", "apuracao_contribuicoes"]),
                 new("quebra_xml", "Quebra de XML", "XML",
                     "Abrir os XML das notas do lote item a item, como a quebra faz com o SPED.",
                     ["importar", "quebra_xml"]),
