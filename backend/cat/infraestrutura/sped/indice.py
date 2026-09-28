@@ -62,7 +62,11 @@ log = obter_log(__name__)
 # e refeito, em vez de servir um recorte que já não é o que o código espera.
 # 2: entraram os registros do caminho consolidado (C180/C190 e filhos)
 # 3: entrou o bloco M — a apuração das contribuições e os ajustes dela
-VERSAO_DO_ESQUEMA = 3
+# 4 em 28/09/2026: ALVOS_PADRAO cresceu doze registros. O índice guardado não
+# diz quais alvos indexou, então um índice da versão 3 serviria sem o C870 e a
+# extração responderia "registro não indexado" para um arquivo que o tem. A
+# versão é o que força refazer — e refazer custa uma passada no arquivo
+VERSAO_DO_ESQUEMA = 4
 
 # Os registros cujas posições se guardam por padrão. Guardar de todos custaria
 # memória à toa: a contagem já responde a maior parte das perguntas, e posição
@@ -77,6 +81,13 @@ ALVOS_PADRAO: tuple[str, ...] = (
     "C100", "C170",
     "C180", "C181", "C185",
     "C190", "C191", "C195",
+    # o cupom fiscal (ECF) e o CF-e SAT: é o que o varejo emite, e a EFD não
+    # detalha em lugar nenhum além daqui. Entraram em 28/09/2026, quando a
+    # extração de registro passou a ser da pessoa e não só das etapas
+    "C400", "C405", "C460", "C481", "C485",
+    "C490", "C491", "C495",
+    "C500", "C800", "C860", "C870",
+    "D100", "D500", "F100",
     # o bloco M: a apuração, e é dele que sai o número que o cliente pergunta
     "M100", "M105", "M110", "M200", "M210", "M220",
     "M500", "M505", "M510", "M600", "M610", "M620",

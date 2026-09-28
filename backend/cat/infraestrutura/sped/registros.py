@@ -216,6 +216,44 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "VL_CONT_DIF", "VL_CONT_DISP", "IND_DESC_CONT", "VL_CONT_DESC", "SLD_CRED",
     ),
     "M620": ("REG", "IND_AJ", "VL_AJ", "COD_AJ", "NUM_DOC", "DESCR_AJ", "DT_REF"),
+    # ---- cupom fiscal (ECF) e CF-e SAT ----
+    # Entraram em 28/09/2026, com a extração de registro: são o que o varejo
+    # precisa e o que a EFD não detalha em lugar nenhum além daqui.
+    "C400": ("REG", "COD_MOD", "ECF_MOD", "ECF_FAB", "ECF_CX"),
+    "C405": ("REG", "DT_DOC", "CRO", "CRZ", "NUM_COO_FIN", "GT_FIN", "VL_BRT"),
+    "C460": (
+        "REG", "COD_MOD", "COD_SIT", "NUM_DOC_INI", "NUM_DOC_FIN", "DT_DOC_INI",
+        "DT_DOC_FIN", "VL_DOC", "VL_PIS", "VL_COFINS", "CNPJ_CPF", "NOM_ADQ",
+    ),
+    "C481": (
+        "REG", "CST_PIS", "VL_ITEM", "NAT_BC_CRED", "VL_BC_PIS", "ALIQ_PIS_PERC",
+        "QUANT_BC_PIS", "ALIQ_PIS_REAIS", "VL_PIS", "COD_CTA",
+    ),
+    "C485": (
+        "REG", "CST_COFINS", "VL_ITEM", "NAT_BC_CRED", "VL_BC_COFINS",
+        "ALIQ_COFINS_PERC", "QUANT_BC_COFINS", "ALIQ_COFINS_REAIS", "VL_COFINS",
+        "COD_CTA",
+    ),
+    "C800": (
+        "REG", "COD_MOD", "CHV_CFE", "NUM_CFE", "DT_DOC", "VL_CFE", "VL_PIS",
+        "VL_COFINS", "CNPJ_CPF", "NR_SAT", "NR_CFE",
+    ),
+    "C490": ("REG", "DT_DOC_INI", "DT_DOC_FIN", "COD_MOD"),
+    "C491": (
+        "REG", "COD_ITEM", "CST_PIS", "CFOP", "VL_ITEM", "VL_BC_PIS",
+        "ALIQ_PIS_PERC", "QUANT_BC_PIS", "ALIQ_PIS_QUANT", "VL_PIS", "COD_CTA",
+    ),
+    "C495": (
+        "REG", "COD_ITEM", "CST_COFINS", "CFOP", "VL_ITEM", "VL_BC_COFINS",
+        "ALIQ_COFINS_PERC", "QUANT_BC_COFINS", "ALIQ_COFINS_QUANT", "VL_COFINS",
+        "COD_CTA",
+    ),
+    "C860": ("REG", "COD_MOD", "NR_SAT", "DT_DOC", "DOC_INIC", "DOC_FIM"),
+    "C870": (
+        "REG", "COD_ITEM", "CFOP", "VL_ITEM", "VL_DESC", "CST_PIS", "VL_BC_PIS",
+        "ALIQ_PIS_PERC", "VL_PIS", "CST_COFINS", "VL_BC_COFINS",
+        "ALIQ_COFINS_PERC", "VL_COFINS", "COD_CTA",
+    ),
 }
 
 
