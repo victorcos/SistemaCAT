@@ -11,12 +11,16 @@ veio.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pyarrow.parquet as pq
 import pytest
 
 from cat.infraestrutura.analitico.quebra_de_sped import quebrar
+from cat.infraestrutura.sped.registros import CAMPOS
 from cat.infraestrutura.analitico.registros_do_sped import (
     AlvoDesconhecido,
+    Recorte,
     colunas_do_alvo,
     disponiveis,
     extrair,
@@ -24,35 +28,84 @@ from cat.infraestrutura.analitico.registros_do_sped import (
 
 CNPJ = "11222333000181"
 
-CABECALHO = ("|0000|006|0|||01062021|30062021|EMPRESA DO TESTE|"
-             f"{CNPJ}|SP|3550308||0|0|")
+def reg(nome: str, **campos: str) -> str:
+    """Uma linha de SPED montada **por nome de campo**, na ordem do leiaute.
+
+    Contar barras à mão é como se escreve um teste que passa pelo motivo
+    errado: na primeira versão deste arquivo o CST do PIS caiu na coluna do
+    valor, e o filtro "passou" testando outra coisa.
+    """
+    valores = [campos.get(c, "") for c in CAMPOS[nome]]
+    valores[0] = nome
+    return "|" + "|".join(valores) + "|"
 
 
 def sped(competencia_ini: str, competencia_fim: str) -> str:
-    """Uma EFD-Contribuições curtinha: duas notas, itens, cupom SAT e o bloco M."""
+    """Uma EFD-Contribuições curtinha: duas notas com itens, consolidação de
+    entradas com PIS e COFINS, cupom SAT e o bloco M."""
     return "\n".join([
-        ("|0000|006|0|||" + competencia_ini + "|" + competencia_fim +
-         f"|EMPRESA DO TESTE|{CNPJ}|SP|3550308||0|0|"),
-        "|0140|001|FILIAL UM|" + CNPJ + "|SP|123456789012|3550308|||",
-        "|0150|F001|FORNECEDOR ALFA|1058|99888777000166||||||||",
-        "|0200|P01|PAO FRANCES|||UN|00|19059090|||||",
-        "|0200|P02|LEITE INTEGRAL 1L|||UN|00|04012010|||||",
-        "|C010|" + CNPJ + "|0|",
-        "|C100|0|1|F001|55|00|001|123|35210511222333000181550010000001231000000001"
-        "|04062021|04062021|100,00|0|0|0|100,00|9|0|0|0|0|0|0|0|0|0|0|0|0|",
-        "|C170|1|P01|PAO FRANCES|10|UN|30,00|0|0|000|5102|||||||||||||01|30,00|1,65|0,50|"
-        "||||01|30,00|7,60|2,28|||",
-        "|C170|2|P02|LEITE INTEGRAL|5|UN|70,00|0|0|000|5102|||||||||||||01|70,00|1,65|1,16|"
-        "||||01|70,00|7,60|5,32|||",
-        "|C100|0|1|F001|55|00|001|124|35210511222333000181550010000001241000000002"
-        "|05062021|05062021|50,00|0|0|0|50,00|9|0|0|0|0|0|0|0|0|0|0|0|0|",
-        "|C170|1|P01|PAO FRANCES|20|UN|50,00|0|0|000|5102|||||||||||||01|50,00|1,65|0,83|"
-        "||||01|50,00|7,60|3,80|||",
-        "|C860|59|900001|04062021|1|9|",
-        "|C870|P01|5102|12,00|0,00|01|12,00|1,65|0,20|01|12,00|7,60|0,91|31010001|",
-        "|M200|10,00|0|0|0|10,00|0|0|0|10,00|0|0|0|",
-        "|M210|01|1000,00|1000,00|0|1000,00|1,65|16,50|0|0|16,50|0|0|16,50|",
-        "|M220|0|1,50|CODAJ|DOC-1|ajuste de teste|01062021|",
+        reg("0000", COD_VER="006", TIPO_ESCRIT="0", DT_INI=competencia_ini,
+            DT_FIN=competencia_fim, NOME="EMPRESA DO TESTE", CNPJ=CNPJ, UF="SP",
+            COD_MUN="3550308", IND_NAT_PJ="0", IND_ATIV="0"),
+        reg("0140", COD_EST="001", NOME="FILIAL UM", CNPJ=CNPJ, UF="SP",
+            IE="123456789012", COD_MUN="3550308"),
+        reg("0150", COD_PART="F001", NOME="FORNECEDOR ALFA", COD_PAIS="1058",
+            CNPJ="99888777000166"),
+        reg("0200", COD_ITEM="P01", DESCR_ITEM="PAO FRANCES", UNID_INV="UN",
+            TIPO_ITEM="00", COD_NCM="19059090"),
+        reg("0200", COD_ITEM="P02", DESCR_ITEM="LEITE INTEGRAL 1L", UNID_INV="UN",
+            TIPO_ITEM="00", COD_NCM="04012010"),
+        reg("0400", COD_NAT="N01", DESCR_NAT="VENDA DE MERCADORIA"),
+        reg("0500", COD_CTA="31010001", NOME_CTA="CLIENTES", COD_NAT_CC="01"),
+        reg("C010", CNPJ=CNPJ, IND_ESCRI="0"),
+        reg("C100", IND_OPER="0", IND_EMIT="1", COD_PART="F001", COD_MOD="55",
+            COD_SIT="00", SER="001", NUM_DOC="123",
+            CHV_NFE="35210511222333000181550010000001231000000001",
+            DT_DOC="04062021", DT_E_S="04062021", VL_DOC="100,00", VL_MERC="100,00"),
+        reg("C170", NUM_ITEM="1", COD_ITEM="P01", DESCR_COMPL="PAO FRANCES",
+            QTD="10", UNID="UN", VL_ITEM="30,00", CFOP="5102", COD_NAT="N01",
+            CST_PIS="01", VL_BC_PIS="30,00", ALIQ_PIS="1,65", VL_PIS="0,50",
+            CST_COFINS="01", VL_BC_COFINS="30,00", ALIQ_COFINS="7,60",
+            VL_COFINS="2,28"),
+        reg("C170", NUM_ITEM="2", COD_ITEM="P02", DESCR_COMPL="LEITE INTEGRAL",
+            QTD="5", UNID="UN", VL_ITEM="70,00", CFOP="5102", COD_NAT="N01",
+            CST_PIS="01", VL_BC_PIS="70,00", ALIQ_PIS="1,65", VL_PIS="1,16",
+            CST_COFINS="01", VL_BC_COFINS="70,00", ALIQ_COFINS="7,60",
+            VL_COFINS="5,32"),
+        reg("C100", IND_OPER="0", IND_EMIT="1", COD_PART="F001", COD_MOD="55",
+            COD_SIT="00", SER="001", NUM_DOC="124",
+            CHV_NFE="35210511222333000181550010000001241000000002",
+            DT_DOC="05062021", DT_E_S="05062021", VL_DOC="50,00", VL_MERC="50,00"),
+        reg("C170", NUM_ITEM="1", COD_ITEM="P01", DESCR_COMPL="PAO FRANCES",
+            QTD="20", UNID="UN", VL_ITEM="50,00", CFOP="5102", COD_NAT="N01",
+            CST_PIS="01", VL_BC_PIS="50,00", ALIQ_PIS="1,65", VL_PIS="0,83",
+            CST_COFINS="01", VL_BC_COFINS="50,00", ALIQ_COFINS="7,60",
+            VL_COFINS="3,80"),
+        reg("C190", COD_MOD="55", DT_INI=competencia_ini, DT_FIN=competencia_fim,
+            COD_ITEM="P01", COD_NCM="19059090", VL_TOT_ITEM="100,00"),
+        reg("C191", COD_PART="F001", CST_PIS="01", CFOP="1102", VL_ITEM="100,00",
+            VL_BC_PIS="100,00", ALIQ_PIS_PERC="1,65", VL_PIS="1,65",
+            COD_CTA="31010001"),
+        reg("C191", COD_PART="F001", CST_PIS="50", CFOP="1102", VL_ITEM="40,00",
+            VL_BC_PIS="40,00", ALIQ_PIS_PERC="1,65", VL_PIS="0,66",
+            COD_CTA="31010001"),
+        reg("C195", COD_PART="F001", CST_COFINS="01", CFOP="1102", VL_ITEM="100,00",
+            VL_BC_COFINS="100,00", ALIQ_COFINS_PERC="7,60", VL_COFINS="7,60",
+            COD_CTA="31010001"),
+        reg("C195", COD_PART="F001", CST_COFINS="50", CFOP="1102", VL_ITEM="40,00",
+            VL_BC_COFINS="40,00", ALIQ_COFINS_PERC="7,60", VL_COFINS="3,04",
+            COD_CTA="31010001"),
+        reg("C860", COD_MOD="59", NR_SAT="900001", DT_DOC="04062021",
+            DOC_INIC="1", DOC_FIM="9"),
+        reg("C870", COD_ITEM="P01", CFOP="5102", VL_ITEM="12,00", CST_PIS="01",
+            VL_BC_PIS="12,00", ALIQ_PIS_PERC="1,65", VL_PIS="0,20",
+            CST_COFINS="01", VL_BC_COFINS="12,00", ALIQ_COFINS_PERC="7,60",
+            VL_COFINS="0,91", COD_CTA="31010001"),
+        reg("M200", VL_TOT_CONT_NC_PER="10,00"),
+        reg("M210", COD_CONT="01", VL_REC_BRT="1000,00", VL_BC_CONT="1000,00",
+            ALIQ_PIS="1,65", VL_CONT_APUR="16,50"),
+        reg("M220", IND_AJ="0", VL_AJ="1,50", COD_AJ="CODAJ", NUM_DOC="DOC-1",
+            DESCR_AJ="ajuste de teste", DT_REF="01062021"),
     ]) + "\n"
 
 
@@ -173,3 +226,103 @@ class TestAHierarquia:
         assert linhas[0]["C870_COD_ITEM"] == "P01"
         assert linhas[0]["C860_NR_SAT"] == "900001"
         assert linhas[0]["0200_DESCR_ITEM"] == "PAO FRANCES"
+
+
+# ---------------------------------------------------------------------------
+# o par PIS+COFINS, o catálogo deduplicado e o recorte
+# ---------------------------------------------------------------------------
+class TestOParPisCofins:
+    def test_c191_e_c195_saem_na_mesma_linha_pareados_por_posicao(self, quebrado):
+        """É o leiaute do Sistema MA: um C190 traz todos os C191 e depois todos
+        os C195, na mesma ordem, e é contra o par que se confere."""
+        linhas = _linhas(extrair(quebrado, "C190+C191+C195"))
+
+        # duas linhas por arquivo (dois CST), dois arquivos
+        assert len(linhas) == 4
+        primeira = linhas[0]
+        assert primeira["C191_CST_PIS"] == "01"
+        assert primeira["C195_CST_COFINS"] == "01"
+        assert primeira["C191_VL_PIS"] == "1,65"
+        assert primeira["C195_VL_COFINS"] == "7,60"
+        # o pai e o cadastro acompanham
+        assert primeira["C190_COD_ITEM"] == "P01"
+        assert primeira["0200_DESCR_ITEM"] == "PAO FRANCES"
+        # o segundo par é o do CST 50
+        assert linhas[1]["C191_CST_PIS"] == "50"
+        assert linhas[1]["C195_CST_COFINS"] == "50"
+
+    def test_o_plano_de_contas_entra_pelo_cod_cta(self, quebrado):
+        linhas = _linhas(extrair(quebrado, "C190+C191+C195"))
+
+        assert linhas[0]["0500_COD_CTA"] == "31010001"
+        assert linhas[0]["0500_NOME_CTA"] == "CLIENTES"
+
+
+class TestOCatalogoDeItens:
+    def test_o_0200_sai_uma_vez_so_e_nao_uma_por_mes(self, quebrado):
+        """O 0200 é redeclarado inteiro em todo arquivo mensal: sem dedup, 59
+        competências devolvem o catálogo 59 vezes."""
+        linhas = _linhas(extrair(quebrado, "0140+0200"))
+
+        assert len(linhas) == 2                      # P01 e P02, e não 4
+        assert {l["0200_COD_ITEM"] for l in linhas} == {"P01", "P02"}
+        # fica a ocorrência mais recente: o último arquivo lido
+        assert {l["competencia"] for l in linhas} == {"2021-07"}
+
+
+class TestOsCadastrosDoC170:
+    def test_a_natureza_e_o_estabelecimento_entram_junto(self, quebrado):
+        linhas = _linhas(extrair(quebrado, "C100+C170"))
+
+        assert linhas[0]["0140_NOME"] == "FILIAL UM"
+        assert linhas[0]["0400_DESCR_NAT"] == "VENDA DE MERCADORIA"
+
+
+class TestORecorte:
+    def test_sem_recorte_sai_tudo(self, quebrado):
+        assert len(_linhas(extrair(quebrado, "C170"))) == 6
+
+    def test_periodo_pula_o_arquivo_inteiro_sem_abrir(self, quebrado):
+        linhas = _linhas(extrair(quebrado, "C170", Recorte(de="2021-07-01")))
+
+        assert {l["competencia"] for l in linhas} == {"2021-07"}
+        assert len(linhas) == 3
+
+    def test_cnpj_que_nao_existe_devolve_lista_vazia(self, quebrado):
+        assert _linhas(extrair(quebrado, "C170", Recorte(cnpjs=frozenset({"99999999"})))) == []
+
+    def test_cst_acha_a_coluna_pelo_sufixo_sem_lista_de_nomes(self, quebrado):
+        """`CST_PIS` acha `C170_CST_PIS` na hierarquia e `CST_PIS` no registro
+        simples — sem que ninguém mantenha os nomes possíveis escritos."""
+        na_hierarquia = _linhas(extrair(quebrado, "C100+C170", Recorte(cst_pis=frozenset({"01"}))))
+        no_simples = _linhas(extrair(quebrado, "C170", Recorte(cst_pis=frozenset({"01"}))))
+
+        assert len(na_hierarquia) == 6
+        assert len(no_simples) == 6
+        assert _linhas(extrair(quebrado, "C170", Recorte(cst_pis=frozenset({"99"})))) == []
+
+    def test_descricao_casa_por_pedaco_em_qualquer_coluna_de_descricao(self, quebrado):
+        linhas = _linhas(extrair(quebrado, "C100+C170", Recorte(descricao=("leite",))))
+
+        assert len(linhas) == 2
+        assert {l["C170_COD_ITEM"] for l in linhas} == {"P02"}
+
+    def test_valor_minimo_compara_como_numero_e_nao_como_texto(self, quebrado):
+        """"70,00" > "50,00" como texto por acaso; "8,00" > "50,00" não."""
+        linhas = _linhas(extrair(quebrado, "C170", Recorte(vl_item_min=Decimal("50"))))
+
+        assert sorted(l["VL_ITEM"] for l in linhas) == ["50,00", "50,00", "70,00", "70,00"]
+
+    def test_intervalo_de_data_do_documento(self, quebrado):
+        linhas = _linhas(extrair(quebrado, "C100+C170", Recorte(doc_de="2021-06-05")))
+
+        # a nota 123 é de 04/06 e a 124 de 05/06; do arquivo de julho, nenhuma
+        assert {l["C100_NUM_DOC"] for l in linhas} == {"124"}
+
+    def test_cada_recorte_tem_o_seu_parquet(self, quebrado):
+        """Pedir o C170 de um CNPJ e depois o de outro não pode servir o
+        primeiro arquivo para o segundo."""
+        inteiro = extrair(quebrado, "C170")
+        recortado = extrair(quebrado, "C170", Recorte(cst_pis=frozenset({"01"})))
+
+        assert inteiro != recortado

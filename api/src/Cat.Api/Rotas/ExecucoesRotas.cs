@@ -219,7 +219,8 @@ public static class ExecucoesRotas
                         return CorpoJson.Recusar("Informe o registro ou a hierarquia a extrair.",
                             StatusCodes.Status422UnprocessableEntity);
                     var formato = q["formato"].FirstOrDefault() is { Length: > 0 } f ? f : "xlsx";
-                    var pronta = await caso.ExtrairDaQuebra(execucaoId, new PedidoDeExtracao(alvo, formato),
+                    var pronta = await caso.ExtrairDaQuebra(execucaoId,
+                        new PedidoDeExtracao(alvo, formato, Recorte(q)),
                         http.UsuarioAtual(), http.RequestAborted);
                     return Arquivo(pronta, config, log);
                 }))
@@ -341,6 +342,30 @@ public static class ExecucoesRotas
             return CorpoJson.Recusar("A planilha não pôde ser entregue. Veja o log do servidor.", StatusCodes.Status502BadGateway);
         }
         return Results.File(caminho, pronta.Tipo, pronta.Nome, enableRangeProcessing: true);
+    }
+
+    /// <summary>
+    /// O recorte da extração, lido da consulta. Lista vem separada por vírgula.
+    ///
+    /// Campo ausente é ausência de filtro, e não filtro vazio: `cfop=` sem
+    /// valor não pode significar "nenhum CFOP passa".
+    /// </summary>
+    private static RecorteDaExtracao Recorte(IQueryCollection q)
+    {
+        IReadOnlyList<string> Lista(string nome) =>
+            q[nome].FirstOrDefault() is { Length: > 0 } bruto
+                ? bruto.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                : [];
+        string Texto(string nome) => q[nome].FirstOrDefault() is { Length: > 0 } v ? v : "";
+
+        return new RecorteDaExtracao(
+            Lista("cnpjs"), Texto("de"), Texto("ate"),
+            Lista("cst_pis"), Lista("cst_cofins"), Lista("cfop"), Lista("cod_item"),
+            Lista("cod_nat"), Lista("num_doc"), Lista("ind_aj"), Lista("cod_aj"),
+            Texto("ind_oper"), Lista("descricao"),
+            Texto("doc_de"), Texto("doc_ate"),
+            Texto("vl_pis_min"), Texto("vl_pis_max"),
+            Texto("vl_item_min"), Texto("vl_item_max"));
     }
 
     private static int Inteiro(Microsoft.Extensions.Primitives.StringValues valor, int padrao) =>

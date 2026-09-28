@@ -148,9 +148,18 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
     {
         // o prazo é o da planilha, e não o das linhas: extrair o C170 de 59
         // arquivos é leitura de disco, não uma consulta
+        var r = pedido.Recorte;
         var json = await Chamar("interno/quebra/extrair", JsonContent.Create(new Dictionary<string, object?>
         {
             ["execucao_id"] = execucaoId, ["alvo"] = pedido.Alvo, ["formato"] = pedido.Formato,
+            ["cnpjs"] = r.Cnpjs, ["de"] = r.De, ["ate"] = r.Ate,
+            ["cst_pis"] = r.CstPis, ["cst_cofins"] = r.CstCofins,
+            ["cfop"] = r.Cfop, ["cod_item"] = r.CodItem, ["cod_nat"] = r.CodNat,
+            ["num_doc"] = r.NumDoc, ["ind_aj"] = r.IndAj, ["cod_aj"] = r.CodAj,
+            ["ind_oper"] = r.IndOper, ["descricao"] = r.Descricao,
+            ["doc_de"] = r.DocDe, ["doc_ate"] = r.DocAte,
+            ["vl_pis_min"] = r.VlPisMin, ["vl_pis_max"] = r.VlPisMax,
+            ["vl_item_min"] = r.VlItemMin, ["vl_item_max"] = r.VlItemMax,
         }), PrazoPlanilha, cancelar);
         return new PlanilhaPronta(json.GetProperty("caminho").GetString()!,
             json.GetProperty("nome").GetString()!, json.GetProperty("tipo").GetString()!);

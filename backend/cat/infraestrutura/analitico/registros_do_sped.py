@@ -30,9 +30,11 @@ contra nada.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -69,6 +71,16 @@ class Hierarquia:
     `ancestrais` são os registros cujo **último visto antes da folha** vale —
     é assim que o leiaute amarra C170 ao C100 e M210 ao M200. `cadastros` são
     tabelas: o registro e o campo que liga a folha (ou um ancestral) a ele.
+
+    `par` é a segunda folha, **pareada por posição** dentro do grupo do pai: um
+    C190 traz primeiro todos os C191 (PIS) e depois todos os C195 (COFINS), na
+    mesma ordem, e o que se quer ver é o par lado a lado — é o leiaute do
+    Sistema MA, e é contra ele que a conferência é feita. Com `par`, a leitura
+    junta o grupo inteiro antes de emitir.
+
+    `dedup_por` guarda uma linha por valor daquela coluna, ficando com a
+    última: o 0200 é redeclarado **inteiro em todo arquivo mensal**, e 59
+    competências devolveriam o catálogo 59 vezes.
     """
 
     chave: str
@@ -76,25 +88,31 @@ class Hierarquia:
     folha: str
     ancestrais: tuple[str, ...] = ()
     cadastros: tuple[tuple[str, str], ...] = ()
+    par: str = ""
+    dedup_por: str = ""
 
     @property
     def registros(self) -> tuple[str, ...]:
-        return (*self.ancestrais, self.folha, *(r for r, _ in self.cadastros))
+        return (*self.ancestrais, self.folha, *(r for r, _ in self.cadastros),
+                *((self.par,) if self.par else ()))
+
+    @property
+    def pai_imediato(self) -> str:
+        return self.ancestrais[-1] if self.ancestrais else ""
 
 
 # As dezesseis da origem, com os mesmos agrupamentos. Acrescentar uma é
 # acrescentar uma linha aqui — o resto do módulo não sabe quais existem.
 HIERARQUIAS: tuple[Hierarquia, ...] = (
     Hierarquia("C100+C170", "Notas e itens (C100 + C170)", "C170", ("C010", "C100"),
-               (("0200", "COD_ITEM"), ("0150", "COD_PART"))),
-    Hierarquia("C190+C191", "Entradas consolidadas — PIS (C190 + C191)", "C191",
-               ("C010", "C190"), (("0200", "COD_ITEM"),)),
-    Hierarquia("C190+C195", "Entradas consolidadas — COFINS (C190 + C195)", "C195",
-               ("C010", "C190"), (("0200", "COD_ITEM"),)),
-    Hierarquia("C180+C181", "Vendas consolidadas — PIS (C180 + C181)", "C181",
-               ("C010", "C180"), (("0200", "COD_ITEM"),)),
-    Hierarquia("C180+C185", "Vendas consolidadas — COFINS (C180 + C185)", "C185",
-               ("C010", "C180"), (("0200", "COD_ITEM"),)),
+               (("0200", "COD_ITEM"), ("0150", "COD_PART"), ("0140", "CNPJ"),
+                ("0400", "COD_NAT"))),
+    Hierarquia("C190+C191+C195", "Entradas consolidadas — PIS e COFINS (C190 + C191 + C195)",
+               "C191", ("C010", "C190"), (("0200", "COD_ITEM"), ("0500", "COD_CTA")),
+               par="C195"),
+    Hierarquia("C180+C181+C185", "Vendas consolidadas — PIS e COFINS (C180 + C181 + C185)",
+               "C181", ("C010", "C180"), (("0200", "COD_ITEM"), ("0500", "COD_CTA")),
+               par="C185"),
     Hierarquia("C400+C405+C481", "Cupom fiscal — PIS (C405 + C481)", "C481",
                ("C010", "C400", "C405")),
     Hierarquia("C400+C405+C485", "Cupom fiscal — COFINS (C405 + C485)", "C485",
@@ -113,7 +131,8 @@ HIERARQUIAS: tuple[Hierarquia, ...] = (
     Hierarquia("M500+M510", "Ajustes do crédito de COFINS (M500 + M510)", "M510", ("M500",)),
     Hierarquia("M600+M610", "Detalhamento da COFINS (M600 + M610)", "M610", ("M600",)),
     Hierarquia("M600+M610+M620", "Ajustes da COFINS (M610 + M620)", "M620", ("M600", "M610")),
-    Hierarquia("0140+0200", "Itens por estabelecimento (0140 + 0200)", "0200", ("0140",)),
+    Hierarquia("0140+0200", "Catálogo de itens (0140 + 0200)", "0200", ("0140",),
+               dedup_por="0200_COD_ITEM"),
 )
 
 POR_CHAVE: dict[str, Hierarquia] = {h.chave: h for h in HIERARQUIAS}
@@ -135,6 +154,150 @@ BLOCOS: dict[str, str] = {
 
 def bloco_de(registro: str) -> str:
     return (registro or "0")[0].upper()
+
+
+@dataclass(frozen=True)
+class Recorte:
+    """O que entra na extração. Tudo vazio: sai inteira.
+
+    São os mesmos filtros da página de origem, em dois níveis. **No arquivo**
+    — CNPJ e período de apuração — o recorte é barato: o arquivo inteiro é
+    pulado sem ser aberto. **Na linha**, o campo é procurado pelo sufixo do
+    nome: `CST_PIS` acha `C170_CST_PIS`, `C870_CST_PIS` ou o `CST_PIS` nu do
+    registro simples, sem uma lista de nomes possíveis para manter.
+
+    Valor e data vêm do SPED como texto (`1.234,56`, `04062021`); a conversão
+    é feita aqui, na comparação, e não na saída — a planilha continua
+    entregando o que o arquivo escreveu.
+    """
+
+    # no arquivo
+    cnpjs: frozenset[str] = frozenset()
+    de: str = ""
+    ate: str = ""
+    # na linha
+    cst_pis: frozenset[str] = frozenset()
+    cst_cofins: frozenset[str] = frozenset()
+    cfop: frozenset[str] = frozenset()
+    cod_item: frozenset[str] = frozenset()
+    cod_nat: frozenset[str] = frozenset()
+    num_doc: frozenset[str] = frozenset()
+    ind_aj: frozenset[str] = frozenset()
+    cod_aj: frozenset[str] = frozenset()
+    ind_oper: str = ""
+    descricao: tuple[str, ...] = ()
+    doc_de: str = ""
+    doc_ate: str = ""
+    vl_pis_min: Decimal | None = None
+    vl_pis_max: Decimal | None = None
+    vl_item_min: Decimal | None = None
+    vl_item_max: Decimal | None = None
+
+    @property
+    def vazio(self) -> bool:
+        return self == Recorte()
+
+    def aceita_arquivo(self, cnpj: str, inicio: str, fim: str) -> bool:
+        """O arquivo inteiro passa? CNPJ e período vêm do 0000, pelo índice."""
+        if self.cnpjs and _so_digitos(cnpj) not in self.cnpjs:
+            return False
+        # o arquivo entra se o período dele **toca** o pedido: uma EFD de junho
+        # interessa a quem pediu de 15/06 a 15/07
+        if self.de and fim and fim < self.de:
+            return False
+        if self.ate and inicio and inicio > self.ate:
+            return False
+        return True
+
+    def aceita_linha(self, linha: dict[str, str]) -> bool:
+        for campo, valores in (("CST_PIS", self.cst_pis), ("CST_COFINS", self.cst_cofins),
+                               ("CFOP", self.cfop), ("COD_ITEM", self.cod_item),
+                               ("COD_NAT", self.cod_nat), ("NUM_DOC", self.num_doc),
+                               ("IND_AJ", self.ind_aj), ("COD_AJ", self.cod_aj)):
+            if valores and _do_campo(linha, campo) not in valores:
+                return False
+        if self.ind_oper and _do_campo(linha, "IND_OPER") != self.ind_oper:
+            return False
+        if self.descricao and not _casa_descricao(linha, self.descricao):
+            return False
+        if (self.doc_de or self.doc_ate) and not self._na_data(linha):
+            return False
+        if not self._no_valor(linha, "VL_PIS", self.vl_pis_min, self.vl_pis_max):
+            return False
+        if not self._no_valor(linha, "VL_ITEM", self.vl_item_min, self.vl_item_max):
+            return False
+        return True
+
+    def _na_data(self, linha: dict[str, str]) -> bool:
+        for campo in ("DT_DOC", "DT_DOC_INI", "DT_INI", "DT_REF"):
+            bruto = _do_campo(linha, campo)
+            if not bruto:
+                continue
+            data = _data_do_sped(bruto)
+            if data is None:
+                return True
+            if self.doc_de and data < self.doc_de:
+                return False
+            if self.doc_ate and data > self.doc_ate:
+                return False
+            return True
+        # a linha não tem data nenhuma: quem filtra por data não a quer
+        return False
+
+    def _no_valor(self, linha: dict[str, str], campo: str,
+                  minimo: Decimal | None, maximo: Decimal | None) -> bool:
+        if minimo is None and maximo is None:
+            return True
+        valor = _decimal_do_sped(_do_campo(linha, campo))
+        if valor is None:
+            return False
+        if minimo is not None and valor < minimo:
+            return False
+        return not (maximo is not None and valor > maximo)
+
+
+def _so_digitos(texto: str) -> str:
+    return "".join(c for c in texto if c.isdigit())
+
+
+def _do_campo(linha: dict[str, str], campo: str) -> str:
+    """O valor de um campo, ache-se ele nu ou prefixado pelo registro.
+
+    Pelo sufixo, e não por uma lista de nomes possíveis: `CST_PIS` acha o do
+    C170, o do C870 e o do C491 sem que ninguém precise mantê-los escritos.
+    """
+    if campo in linha:
+        return linha[campo]
+    sufixo = f"_{campo}"
+    for nome, valor in linha.items():
+        if nome.endswith(sufixo):
+            return valor
+    return ""
+
+
+def _casa_descricao(linha: dict[str, str], termos: tuple[str, ...]) -> bool:
+    """Pedaço de qualquer coluna de descrição, sem diferenciar maiúscula."""
+    textos = [v.lower() for nome, v in linha.items() if "DESCR" in nome and v]
+    return any(t in texto for texto in textos for t in termos)
+
+
+def _data_do_sped(bruto: str) -> str | None:
+    """`04062021` vira `2021-06-04`, que é o que se compara como texto."""
+    digitos = _so_digitos(bruto)
+    if len(digitos) != 8:
+        return None
+    return f"{digitos[4:]}-{digitos[2:4]}-{digitos[:2]}"
+
+
+def _decimal_do_sped(bruto: str) -> Decimal | None:
+    """`1.234,56` vira Decimal. Vazio e lixo viram None, e não zero."""
+    texto = (bruto or "").strip().replace(".", "").replace(",", ".")
+    if not texto:
+        return None
+    try:
+        return Decimal(texto)
+    except InvalidOperation:
+        return None
 
 
 class QuebraNaoEncontrada(FileNotFoundError):
@@ -188,6 +351,8 @@ def disponiveis(destino: str) -> dict:
                     "colunas": len(_colunas(h)), "hierarquia": True}
                    for h in HIERARQUIAS if total.get(h.folha, 0)]
 
+    estabelecimentos = sorted(
+        {(a.get("cnpj") or "", a.get("empresa") or "") for a in _arquivos(destino)} - {("", "")})
     log.info("alvos disponíveis para extração", extra={
         "execucao_pasta": os.path.basename(destino), "registros": len(simples),
         "hierarquias": len(hierarquias), "sem_indice": sem_indice})
@@ -195,6 +360,8 @@ def disponiveis(destino: str) -> dict:
         "linhas": [*hierarquias, *simples],
         "blocos": sorted({l["bloco"] for l in (*hierarquias, *simples)}),
         "rotulos_dos_blocos": BLOCOS,
+        # quem aparece nos arquivos: a tela oferece em vez de pedir digitado
+        "estabelecimentos": [{"cnpj": c, "empresa": e} for c, e in estabelecimentos],
         # arquivo cujo índice não serve mais: a extração sai sem ele, e quem
         # confere o total com o cliente precisa saber disso
         "sem_indice": sem_indice,
@@ -217,7 +384,7 @@ def _colunas(alvo: Hierarquia | str) -> list[str]:
     if isinstance(alvo, str):
         return [*COLUNAS_DA_ORIGEM, *CAMPOS[alvo]]
     colunas = list(COLUNAS_DA_ORIGEM)
-    for registro in (*alvo.ancestrais, alvo.folha):
+    for registro in (*alvo.ancestrais, alvo.folha, *((alvo.par,) if alvo.par else ())):
         colunas += _prefixadas(registro)
     for registro, _ in alvo.cadastros:
         colunas += _prefixadas(registro)
@@ -239,14 +406,21 @@ def _resolver(alvo: str) -> Hierarquia | str:
         f"{alvo or '(vazio)'} não é registro com leiaute nem hierarquia conhecida.")
 
 
-def extrair(destino: str, alvo: str,
+def extrair(destino: str, alvo: str, recorte: Recorte | None = None,
             deve_parar: Callable[[], bool] | None = None) -> str:
-    """Grava o parquet com todas as linhas do alvo e devolve o caminho."""
+    """Grava o parquet com as linhas do alvo e devolve o caminho.
+
+    Com `recorte`, o arquivo que não interessa nem é aberto e a linha que não
+    passa nem é gravada — filtrar depois, na planilha, obrigaria a escrever
+    milhões de linhas para jogar fora.
+    """
     resolvido = _resolver(alvo)
+    recorte = recorte or Recorte()
     colunas = _colunas(resolvido)
     esquema = pa.schema([(c, pa.string()) for c in colunas])
     nome = (resolvido if isinstance(resolvido, str) else resolvido.chave).replace("+", "_")
-    caminho = os.path.join(destino, ARQUIVO_DA_EXTRACAO.format(alvo=nome))
+    caminho = os.path.join(destino, ARQUIVO_DA_EXTRACAO.format(
+        alvo=nome + impressao_do_recorte(recorte)))
     # nome provisório: duas telas pedindo o mesmo alvo ao mesmo tempo leriam um
     # parquet pela metade, e isso não aparece como erro — aparece como linha
     # faltando na conferência
@@ -256,6 +430,7 @@ def extrair(destino: str, alvo: str,
     lote: dict[str, list[str]] = {c: [] for c in colunas}
     gravadas = 0
     lidos = 0
+    fora_do_recorte = 0
 
     def despejar() -> None:
         if not lote[colunas[0]]:
@@ -264,13 +439,28 @@ def extrair(destino: str, alvo: str,
         for valores in lote.values():
             valores.clear()
 
-    def acrescentar(linha: dict[str, str]) -> None:
+    # o catálogo deduplicado: uma linha por código, ficando com a última vista
+    unicas: dict[str, dict[str, str]] = {}
+    dedup = resolvido.dedup_por if isinstance(resolvido, Hierarquia) else ""
+    recusadas = 0
+
+    def gravar(linha: dict[str, str]) -> None:
         nonlocal gravadas
         for coluna in colunas:
             lote[coluna].append(linha.get(coluna, ""))
         gravadas += 1
         if gravadas % LINHAS_POR_LOTE == 0:
             despejar()
+
+    def acrescentar(linha: dict[str, str]) -> None:
+        nonlocal recusadas
+        if not recorte.aceita_linha(linha):
+            recusadas += 1
+            return
+        if dedup:
+            unicas[linha.get(dedup, "")] = linha
+            return
+        gravar(linha)
 
     try:
         for arquivo in _arquivos(destino):
@@ -286,10 +476,18 @@ def extrair(destino: str, alvo: str,
                 "empresa": arquivo.get("empresa") or "",
                 "competencia": (arquivo.get("inicio") or "")[:7],
             }
+            if not recorte.aceita_arquivo(indice.cabecalho.cnpj,
+                                          indice.cabecalho.inicio, indice.cabecalho.fim):
+                fora_do_recorte += 1
+                continue
             if isinstance(resolvido, str):
                 _do_registro(caminho_do_sped, indice, resolvido, origem, acrescentar)
             else:
                 _da_hierarquia(caminho_do_sped, indice, resolvido, origem, acrescentar)
+        # o deduplicado só pode sair no fim: a última ocorrência é a que vale,
+        # e ela pode estar no último arquivo
+        for linha in unicas.values():
+            gravar(linha)
         despejar()
         escritor.close()
     except BaseException:
@@ -301,8 +499,24 @@ def extrair(destino: str, alvo: str,
 
     log.info("extração concluída", extra={
         "execucao_pasta": os.path.basename(destino), "alvo": alvo,
-        "linhas": gravadas, "arquivos": lidos})
+        "linhas": gravadas, "arquivos": lidos,
+        "arquivos_fora_do_recorte": fora_do_recorte,
+        "linhas_fora_do_recorte": recusadas,
+        "deduplicadas": len(unicas) if dedup else 0,
+        "recortado": not recorte.vazio})
     return caminho
+
+
+def impressao_do_recorte(recorte: Recorte) -> str:
+    """Um sufixo curto e estável por recorte.
+
+    Sem ele, pedir o C170 de um CNPJ e depois o de outro serviria o primeiro
+    parquet para o segundo — é o mesmo defeito que o cache das planilhas já
+    tinha corrigido com o sufixo do recorte.
+    """
+    if recorte.vazio:
+        return ""
+    return "_" + hashlib.sha1(repr(recorte).encode()).hexdigest()[:8]
 
 
 def _do_registro(caminho: str, indice: IndiceDoArquivo, registro: str,
@@ -327,11 +541,32 @@ def _da_hierarquia(caminho: str, indice: IndiceDoArquivo, h: Hierarquia,
     Sequencial, e não por `seek`, porque o vínculo do SPED **é a ordem**: o
     C170 pertence ao C100 que veio antes dele. Pular direto para as posições da
     folha perderia exatamente a informação que se foi buscar.
+
+    Com `par`, o grupo do pai é acumulado e só sai quando fecha: o C190 traz
+    todos os C191 e depois todos os C195, e o que se quer é o par lado a lado.
     """
     de_interesse = {r.encode("ascii") for r in h.registros}
     atual: dict[str, list[str]] = {}
     tabelas: dict[str, dict[str, list[str]]] = {r: {} for r, _ in h.cadastros}
     ligacao = dict(h.cadastros)
+    folhas: list[list[str]] = []
+    pares: list[list[str]] = []
+
+    def fechar_grupo() -> None:
+        """Emite o grupo acumulado, pareando folha e par por posição."""
+        if not folhas and not pares:
+            return
+        for i in range(max(len(folhas), len(pares))):
+            linha = dict(origem)
+            for pai in h.ancestrais:
+                _nomear(linha, pai, atual.get(pai, []))
+            _nomear(linha, h.folha, folhas[i] if i < len(folhas) else [])
+            _nomear(linha, h.par, pares[i] if i < len(pares) else [])
+            _com_cadastros(linha, h, folhas[i] if i < len(folhas) else [], atual,
+                           tabelas, ligacao)
+            acrescentar(linha)
+        folhas.clear()
+        pares.clear()
 
     with open(caminho, "rb") as arquivo:
         for bruto in arquivo:
@@ -348,26 +583,46 @@ def _da_hierarquia(caminho: str, indice: IndiceDoArquivo, h: Hierarquia,
                 codigo = _campo(registro, valores, ligacao[registro])
                 if codigo:
                     tabelas[registro][codigo] = valores
+                if registro != h.folha:
+                    continue
             if registro in h.ancestrais:
+                if h.par and registro == h.pai_imediato:
+                    fechar_grupo()
                 atual[registro] = valores
                 continue
+            if h.par and registro == h.par:
+                pares.append(valores)
+                continue
             if registro != h.folha:
+                continue
+            if h.par:
+                folhas.append(valores)
                 continue
             linha = dict(origem)
             for pai in h.ancestrais:
                 _nomear(linha, pai, atual.get(pai, []))
             _nomear(linha, h.folha, valores)
-            for cadastro, campo in h.cadastros:
-                codigo = _campo(h.folha, valores, campo)
-                if not codigo:
-                    codigo = next(
-                        (c for pai in h.ancestrais
-                         if (c := _campo(pai, atual.get(pai, []), campo))), "")
-                _nomear(linha, cadastro, tabelas[cadastro].get(codigo, []))
+            _com_cadastros(linha, h, valores, atual, tabelas, ligacao)
             acrescentar(linha)
+    fechar_grupo()
+
+
+def _com_cadastros(linha: dict[str, str], h: Hierarquia, folha: list[str],
+                   atual: dict[str, list[str]], tabelas: dict[str, dict[str, list[str]]],
+                   ligacao: dict[str, str]) -> None:
+    """As tabelas de cadastro, ligadas pelo código que a folha (ou um pai) traz."""
+    for cadastro, campo in h.cadastros:
+        codigo = _campo(h.folha, folha, campo)
+        if not codigo:
+            codigo = next(
+                (c for pai in h.ancestrais
+                 if (c := _campo(pai, atual.get(pai, []), campo))), "")
+        _nomear(linha, cadastro, tabelas[cadastro].get(codigo, []))
 
 
 def _nomear(linha: dict[str, str], registro: str, valores: Iterable[str]) -> None:
+    if not registro:
+        return
     lista = list(valores)
     for i, campo in enumerate(CAMPOS[registro]):
         linha[f"{registro}_{campo}"] = lista[i] if i < len(lista) else ""

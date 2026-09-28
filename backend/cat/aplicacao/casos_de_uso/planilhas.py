@@ -343,7 +343,8 @@ def precisa_gerar(planilha: str, parquet: str) -> bool:
 # ---------------------------------------------------------------------------
 # a extração de registro: fora do catálogo, e por quê
 # ---------------------------------------------------------------------------
-def extrair_registro(execucao: ExecucaoDB, alvo: str, formato: str) -> PlanilhaPronta:
+def extrair_registro(execucao: ExecucaoDB, alvo: str, formato: str,
+                     recorte: extracao_de_registro.Recorte | None = None) -> PlanilhaPronta:
     """Extrai um registro (ou uma hierarquia) da quebra e devolve a planilha.
 
     Não entra em `PLANILHAS` porque a lista dali é fixa por etapa, e aqui o
@@ -362,13 +363,17 @@ def extrair_registro(execucao: ExecucaoDB, alvo: str, formato: str) -> PlanilhaP
 
     origem_da_quebra = os.path.join(pasta, ARQUIVO_DOS_ARQUIVOS)
     limpo = alvo.strip().upper()
-    parquet = os.path.join(
-        pasta, extracao_de_registro.ARQUIVO_DA_EXTRACAO.format(alvo=limpo.replace("+", "_")))
+    recorte = recorte or extracao_de_registro.Recorte()
+    # o parquet e a planilha carregam a marca do recorte: sem ela, pedir o C170
+    # de um CNPJ e depois o de outro serviria o primeiro arquivo para o segundo
+    marca = extracao_de_registro.impressao_do_recorte(recorte)
+    base = limpo.replace("+", "_") + marca
+    parquet = os.path.join(pasta, extracao_de_registro.ARQUIVO_DA_EXTRACAO.format(alvo=base))
     if precisa_gerar(parquet, origem_da_quebra):
         with contexto(etapa="quebra_de_sped", execucao_id=execucao.id, alvo=limpo):
-            extracao_de_registro.extrair(pasta, limpo)
+            extracao_de_registro.extrair(pasta, limpo, recorte)
 
-    nome = f"sped_{limpo.replace('+', '_')}.{formato}"
+    nome = f"sped_{base}.{formato}"
     destino = os.path.join(pasta, nome)
     if precisa_gerar(destino, parquet):
         with contexto(etapa="quebra_de_sped", execucao_id=execucao.id, alvo=limpo):

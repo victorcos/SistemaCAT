@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hmac
 import os
+from decimal import Decimal, InvalidOperation
 import shutil
 import tempfile
 from datetime import date
@@ -1069,10 +1070,69 @@ class PedidoDosAlvos(BaseModel):
 
 
 class PedidoDaExtracao(BaseModel):
+    """O alvo, o formato e o recorte.
+
+    O recorte chega campo a campo, e não num texto para esta camada
+    interpretar: o que a tela manda é o que o domínio recebe, e um filtro
+    escrito errado vira 422 na borda, e não linha faltando na planilha.
+    """
+
     execucao_id: int
     # um registro ("C170") ou uma hierarquia ("C100+C170")
     alvo: str = Field(min_length=1, max_length=40)
     formato: str = "xlsx"
+    # no arquivo
+    cnpjs: list[str] = Field(default_factory=list, max_length=500)
+    de: str = ""
+    ate: str = ""
+    # na linha
+    cst_pis: list[str] = Field(default_factory=list, max_length=100)
+    cst_cofins: list[str] = Field(default_factory=list, max_length=100)
+    cfop: list[str] = Field(default_factory=list, max_length=500)
+    cod_item: list[str] = Field(default_factory=list, max_length=2000)
+    cod_nat: list[str] = Field(default_factory=list, max_length=500)
+    num_doc: list[str] = Field(default_factory=list, max_length=2000)
+    ind_aj: list[str] = Field(default_factory=list, max_length=20)
+    cod_aj: list[str] = Field(default_factory=list, max_length=500)
+    ind_oper: str = ""
+    descricao: list[str] = Field(default_factory=list, max_length=100)
+    doc_de: str = ""
+    doc_ate: str = ""
+    vl_pis_min: str = ""
+    vl_pis_max: str = ""
+    vl_item_min: str = ""
+    vl_item_max: str = ""
+
+    def recorte(self) -> analitico_registros.Recorte:
+        return analitico_registros.Recorte(
+            cnpjs=frozenset(_digitos(c) for c in self.cnpjs if _digitos(c)),
+            de=self.de, ate=self.ate,
+            cst_pis=frozenset(self.cst_pis), cst_cofins=frozenset(self.cst_cofins),
+            cfop=frozenset(self.cfop), cod_item=frozenset(self.cod_item),
+            cod_nat=frozenset(self.cod_nat), num_doc=frozenset(self.num_doc),
+            ind_aj=frozenset(self.ind_aj), cod_aj=frozenset(self.cod_aj),
+            ind_oper=self.ind_oper,
+            descricao=tuple(t.strip().lower() for t in self.descricao if t.strip()),
+            doc_de=self.doc_de, doc_ate=self.doc_ate,
+            vl_pis_min=_valor(self.vl_pis_min), vl_pis_max=_valor(self.vl_pis_max),
+            vl_item_min=_valor(self.vl_item_min), vl_item_max=_valor(self.vl_item_max),
+        )
+
+
+def _digitos(texto: str) -> str:
+    return "".join(c for c in texto if c.isdigit())
+
+
+def _valor(texto: str):
+    """O limite de valor, como a tela mandou. Vazio é ausência, não zero."""
+    limpo = (texto or "").strip().replace(".", "").replace(",", ".")
+    if not limpo:
+        return None
+    try:
+        return Decimal(limpo)
+    except InvalidOperation as erro:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            f"Valor inválido no recorte: {texto!r}.") from erro
 
 
 def _quebra_concluida_para_extrair(execucao_id: int, sessao: Session) -> ExecucaoDB:
@@ -1116,5 +1176,6 @@ def extrair_da_quebra(
                             f"Formato desconhecido: {pedido.formato}. Vale xlsx ou csv.")
     with contexto(etapa=quebrar_sped.ETAPA, execucao_id=execucao.id, alvo=pedido.alvo):
         pronta = _traduzir_extracao(
-            lambda: planilhas.extrair_registro(execucao, pedido.alvo, pedido.formato))
+            lambda: planilhas.extrair_registro(execucao, pedido.alvo, pedido.formato,
+                                               pedido.recorte()))
     return PlanilhaDto(caminho=pronta.caminho, nome=pronta.nome, tipo=pronta.tipo)

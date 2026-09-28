@@ -126,3 +126,32 @@ class TestAPlanilha:
                          json={"execucao_id": quebra["id"], "alvo": "C170", "formato": "pdf"})
 
         assert r.status_code == 404
+
+
+class TestORecortePelaRota:
+    def test_o_recorte_muda_o_arquivo_entregue(self, cliente, quebra):
+        inteiro = cliente.post("/interno/quebra/extrair", headers=SEGREDO,
+                               json={"execucao_id": quebra["id"], "alvo": "C170"})
+        recortado = cliente.post("/interno/quebra/extrair", headers=SEGREDO,
+                                 json={"execucao_id": quebra["id"], "alvo": "C170",
+                                       "cst_pis": ["01"]})
+
+        assert inteiro.status_code == 200 and recortado.status_code == 200
+        # nomes diferentes: o cache de um não pode responder pelo outro
+        assert inteiro.json()["nome"] != recortado.json()["nome"]
+
+    def test_valor_escrito_errado_volta_422_na_borda(self, cliente, quebra):
+        r = cliente.post("/interno/quebra/extrair", headers=SEGREDO,
+                         json={"execucao_id": quebra["id"], "alvo": "C170",
+                               "vl_item_min": "mil reais"})
+
+        assert r.status_code == 422
+        assert "Valor inválido no recorte" in r.json()["detail"]
+
+    def test_os_estabelecimentos_saem_para_a_tela_oferecer(self, cliente, quebra):
+        r = cliente.post("/interno/quebra/alvos", headers=SEGREDO,
+                         json={"execucao_id": quebra["id"]})
+
+        estabelecimentos = r.json()["estabelecimentos"]
+        assert [e["cnpj"] for e in estabelecimentos] == [CNPJ]
+        assert estabelecimentos[0]["empresa"] == "EMPRESA DO TESTE"

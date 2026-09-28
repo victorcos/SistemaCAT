@@ -44,7 +44,29 @@ public sealed record PedidoDeOcorrencias(string Nome, int Pagina, int PorPagina)
 public sealed record PedidoDeEstabelecimentos(string? So, string? Busca, int Pagina, int PorPagina);
 
 /// <param name="Alvo">um registro ("C170") ou uma hierarquia ("C100+C170")</param>
-public sealed record PedidoDeExtracao(string Alvo, string Formato);
+public sealed record PedidoDeExtracao(string Alvo, string Formato, RecorteDaExtracao Recorte);
+
+/// <summary>
+/// O que entra na extração. Tudo vazio: sai inteira.
+///
+/// Dois níveis, como no motor: <c>Cnpjs</c>, <c>De</c> e <c>Ate</c> pulam o
+/// arquivo sem abri-lo; o resto filtra linha a linha. Os valores chegam como
+/// texto porque é assim que a tela os digita — quem converte, e recusa o que
+/// não é número, é o motor, na borda.
+/// </summary>
+public sealed record RecorteDaExtracao(
+    IReadOnlyList<string> Cnpjs, string De, string Ate,
+    IReadOnlyList<string> CstPis, IReadOnlyList<string> CstCofins,
+    IReadOnlyList<string> Cfop, IReadOnlyList<string> CodItem,
+    IReadOnlyList<string> CodNat, IReadOnlyList<string> NumDoc,
+    IReadOnlyList<string> IndAj, IReadOnlyList<string> CodAj,
+    string IndOper, IReadOnlyList<string> Descricao,
+    string DocDe, string DocAte,
+    string VlPisMin, string VlPisMax, string VlItemMin, string VlItemMax)
+{
+    public static readonly RecorteDaExtracao Inteiro = new(
+        [], "", "", [], [], [], [], [], [], [], [], "", [], "", "", "", "", "", "");
+}
 
 /// <summary>Quais produtos têm o crédito outorgado, neste trabalho.</summary>
 /// <param name="SemFiltro">rodar sem julgar nada, para ver o universo antes do primeiro termo</param>

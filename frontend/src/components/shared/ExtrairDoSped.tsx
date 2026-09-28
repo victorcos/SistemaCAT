@@ -9,11 +9,15 @@ import { useAcao } from "@/hooks/useAcao";
 import { cn } from "@/lib/cn";
 import { numero } from "@/lib/format";
 import type { Formato } from "@/services/conferencia";
+import { RecorteDoSped } from "@/components/shared/RecorteDoSped";
 import {
+  RECORTE_INTEIRO,
   alvosDaQuebra,
   baixarExtracao,
+  quantosFiltros,
   type AlvoDaQuebra,
   type AlvosDaQuebra,
+  type RecorteDaExtracao,
 } from "@/services/quebraDeSped";
 
 /**
@@ -39,6 +43,7 @@ export function ExtrairDoSped({ execucaoId }: { execucaoId: number }) {
   const [bloco, setBloco] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [baixando, setBaixando] = useState<{ alvo: string; formato: Formato } | null>(null);
+  const [recorte, setRecorte] = useState<RecorteDaExtracao>(RECORTE_INTEIRO);
   const leitura = useAcao();
   const download = useAcao();
 
@@ -64,7 +69,7 @@ export function ExtrairDoSped({ execucaoId }: { execucaoId: number }) {
 
   async function baixar(alvo: string, formato: Formato) {
     setBaixando({ alvo, formato });
-    await download.executar((sinal) => baixarExtracao(execucaoId, alvo, formato, sinal));
+    await download.executar((sinal) => baixarExtracao(execucaoId, alvo, formato, recorte, sinal));
     setBaixando(null);
   }
 
@@ -82,7 +87,11 @@ export function ExtrairDoSped({ execucaoId }: { execucaoId: number }) {
         <p className="m-0 mt-1 max-w-[760px] text-[13px] leading-relaxed text-texto-suave">
           O conteúdo, e não só a contagem: as linhas do registro escolhido, de todos os arquivos
           desta quebra, numa planilha só. As colunas saem com o nome do leiaute, e cada linha diz
-          de que arquivo veio.
+          de que arquivo veio. {quantosFiltros(recorte) > 0 && (
+            <strong className="font-bold text-texto">
+              O recorte abaixo vale para o que você extrair.
+            </strong>
+          )}
         </p>
       </div>
 
@@ -92,6 +101,12 @@ export function ExtrairDoSped({ execucaoId }: { execucaoId: number }) {
           extração sai sem eles — rode a quebra de novo para incluí-los.
         </Faixa>
       )}
+
+      <RecorteDoSped
+        recorte={recorte}
+        aoMudar={setRecorte}
+        estabelecimentos={dados.estabelecimentos}
+      />
 
       <Toolbar>
         <Busca valor={busca} aoMudar={setBusca} placeholder="Buscar registro (C170, M210…)" />
