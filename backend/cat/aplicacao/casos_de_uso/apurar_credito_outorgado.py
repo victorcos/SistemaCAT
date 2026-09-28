@@ -10,6 +10,11 @@ nenhum termo cadastrado a etapa se recusa a rodar, em vez de varrer 120 mil
 arquivos para entregar uma lista vazia — quem quer ver o universo antes de
 escrever o primeiro termo liga o `sem_filtro`, que é explícito.
 
+**Só o que a empresa vendeu.** O benefício é sobre a saída, e o lote costuma ter
+tudo junto: a nota que a empresa emitiu e a que ela recebeu do fornecedor. A
+direção sai do cruzamento entre o emitente e a raiz do CNPJ da empresa do
+trabalho — `tpNF` sozinho é do ponto de vista de quem emitiu.
+
 Não depende de etapa nenhuma: lê os XML do lote direto, como a quebra lê os
 SPED. Cada rodada guarda no resumo o filtro que a produziu.
 """
@@ -37,7 +42,7 @@ from cat.infraestrutura.analitico.credito_outorgado import (
 from cat.infraestrutura.arquivos.xml_compactado import contar_xml
 from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import (
-    ExecucaoDB, FiltroDoCreditoOutorgadoDB, ProjetoDB,
+    EmpresaDB, ExecucaoDB, FiltroDoCreditoOutorgadoDB, ProjetoDB,
 )
 from cat.log import contexto, obter_log
 
@@ -92,6 +97,19 @@ def gravar_filtro(projeto_id: int, ncms: list[str], termos: list[str], *,
         "sem_filtro": limpo.sem_filtro, "guardar_descartados": guardar_descartados,
         "usuario_id": usuario_id})
     return linha
+
+
+def raiz_da_empresa(projeto_id: int, sessao: Session) -> str:
+    """A raiz do CNPJ da empresa do trabalho: é ela que diz o que é saída nossa.
+
+    Vazia quando o trabalho não tem empresa — e aí a varredura não filtra
+    direção nenhuma, em vez de filtrar tudo por engano.
+    """
+    projeto = sessao.get(ProjetoDB, projeto_id)
+    if projeto is None:
+        return ""
+    empresa = sessao.get(EmpresaDB, projeto.empresa_id)
+    return (empresa.cnpj_raiz or "") if empresa is not None else ""
 
 
 def preparar(projeto_id: int, usuario_id: int, sessao: Session) -> ExecucaoDB:
@@ -194,7 +212,12 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
         diario.base["andamento"] = {"arquivos": p.arquivos_lidos, "elegiveis": p.elegiveis}
         diario.salvar_de_vez_em_quando()
 
-    progresso = varrer(xmls, destino, filtro, incluir_descartados=guardar_descartados,
+    raiz = raiz_da_empresa(execucao.projeto_id, sessao)
+    if not raiz:
+        diario.anotar("aviso", "O trabalho não tem empresa com CNPJ: a varredura não vai "
+                               "separar o que a empresa vendeu do que ela comprou.")
+    progresso = varrer(xmls, destino, filtro, raiz_do_cnpj=raiz,
+                       incluir_descartados=guardar_descartados,
                        avisar=andou, deve_parar=parar)
 
     segundos = round(time.time() - inicio, 1)
@@ -210,6 +233,10 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     if progresso.ilegiveis:
         diario.anotar("aviso", f"{milhar(progresso.ilegiveis)} XML não deram para abrir — "
                                "veja os avisos abaixo.")
+    if progresso.nao_sao_saida:
+        diario.anotar("info", f"{milhar(progresso.nao_sao_saida)} documento(s) ficaram de fora "
+                              "por não serem saída desta empresa — compra, ou nota de outra "
+                              "empresa que veio na mesma pasta.")
     if progresso.nao_autorizados:
         diario.anotar("aviso", f"{milhar(progresso.nao_autorizados)} nota(s) com protocolo de uso "
                                "denegado ficaram de fora: a operação não existiu.")

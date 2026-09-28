@@ -120,13 +120,14 @@ def det(n: int, codigo: str, descricao: str, ncm: str, valor: str) -> str:
             "<vCOFINS>0.76</vCOFINS></COFINSAliq></COFINS></imposto></det>")
 
 
-def nfe(chave: str, itens: str, cstat: str | None = "100") -> bytes:
+def nfe(chave: str, itens: str, cstat: str | None = "100",
+        emitente: str = CNPJ_EMITENTE, tp: str = "1") -> bytes:
     protocolo = (f"<protNFe><infProt><chNFe>{chave}</chNFe><cStat>{cstat}</cStat></infProt></protNFe>"
                  if cstat else "")
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><NFe><infNFe Id="NFe{chave}" versao="4.00">
-<ide><mod>55</mod><serie>1</serie><nNF>123</nNF><dhEmi>2021-05-04T10:00:00-03:00</dhEmi><tpNF>1</tpNF></ide>
-<emit><CNPJ>{CNPJ_EMITENTE}</CNPJ><xNome>EMPRESA A</xNome></emit>
+<ide><mod>55</mod><serie>1</serie><nNF>123</nNF><dhEmi>2021-05-04T10:00:00-03:00</dhEmi><tpNF>{tp}</tpNF></ide>
+<emit><CNPJ>{emitente}</CNPJ><xNome>EMPRESA A</xNome></emit>
 <dest><CPF>11122233344</CPF><xNome>CONSUMIDOR</xNome></dest>{itens}
 </infNFe></NFe>{protocolo}</nfeProc>""".encode()
 
@@ -218,6 +219,88 @@ def test_cupom_sat_entra_como_a_nfe(pasta, tmp_path):
     linhas = _linhas(f"{destino}/{ARQUIVO_ELEGIVEIS}")
     assert [l["modelo"] for l in linhas] == ["59"]
     assert linhas[0]["valor"] == D("3.75")
+
+
+# ---------------------------------------------------------------------------
+# entrada e saída
+# ---------------------------------------------------------------------------
+RAIZ = CNPJ_EMITENTE[:8]
+CNPJ_FORNECEDOR = "99888777000166"
+CHAVE_COMPRA = "35210599888777000166550010000005551000000005"
+CHAVE_DEVOLUCAO = "35210599888777000166550010000006661000000006"
+
+
+def test_a_nota_de_compra_nao_entra_no_beneficio(tmp_path):
+    """O benefício é sobre o que a empresa **vendeu**. A nota do fornecedor vem
+    na mesma pasta e tem tpNF=1 — saída, para ele —, e entraria se o filtro
+    olhasse só o tpNF."""
+    pasta = tmp_path / "xml"
+    pasta.mkdir()
+    (pasta / "venda.xml").write_bytes(nfe(CHAVE_UM, det(1, "P01", "PAO FRANCES", "19059090", "10.00")))
+    (pasta / "compra.xml").write_bytes(
+        nfe(CHAVE_COMPRA, det(1, "F01", "PAO DE FORMA", "19059090", "500.00"),
+            emitente=CNPJ_FORNECEDOR))
+    destino = str(tmp_path / "saida")
+
+    progresso = varrer(sorted(str(p) for p in pasta.glob("*.xml")), destino,
+                       Filtro.de(termos=["PAO"]), raiz_do_cnpj=RAIZ)
+
+    assert progresso.nao_sao_saida == 1
+    assert progresso.elegiveis == 1
+    assert progresso.centavos_elegiveis == 1000
+    assert [l["codigo"] for l in _linhas(f"{destino}/{ARQUIVO_ELEGIVEIS}")] == ["P01"]
+
+
+def test_a_nota_de_entrada_que_o_cliente_emite_e_saida_nossa(tmp_path):
+    """Quem emite com tpNF=0 está registrando uma entrada **dele** — a mercadoria
+    saiu de nós. O cruzamento acerta os dois lados; o tpNF sozinho erraria."""
+    pasta = tmp_path / "xml"
+    pasta.mkdir()
+    (pasta / "devolucao.xml").write_bytes(
+        nfe(CHAVE_DEVOLUCAO, det(1, "P01", "PAO FRANCES", "19059090", "7.00"),
+            emitente=CNPJ_FORNECEDOR, tp="0"))
+    destino = str(tmp_path / "saida")
+
+    progresso = varrer([str(pasta / "devolucao.xml")], destino,
+                       Filtro.de(termos=["PAO"]), raiz_do_cnpj=RAIZ)
+
+    assert progresso.nao_sao_saida == 0
+    assert progresso.elegiveis == 1
+
+
+def test_sem_raiz_nao_filtra_direcao_nenhuma(tmp_path):
+    """Sem saber de quem é a nota, filtrar seria adivinhar — e adivinhar aqui é
+    apagar a apuração inteira."""
+    pasta = tmp_path / "xml"
+    pasta.mkdir()
+    (pasta / "compra.xml").write_bytes(
+        nfe(CHAVE_COMPRA, det(1, "F01", "PAO DE FORMA", "19059090", "500.00"),
+            emitente=CNPJ_FORNECEDOR))
+    destino = str(tmp_path / "saida")
+
+    progresso = varrer([str(pasta / "compra.xml")], destino, Filtro.de(termos=["PAO"]))
+
+    assert progresso.nao_sao_saida == 0
+    assert progresso.elegiveis == 1
+
+
+def test_a_direcao_e_do_ponto_de_vista_de_quem_pergunta():
+    """A regra pura, sem arquivo: quatro combinações, duas de cada lado."""
+    from cat.dominio.notafiscal.xml import ler_documento_xml  # noqa: PLC0415
+
+    nossa_venda = ler_documento_xml(nfe(CHAVE_UM, det(1, "P", "X", "1", "1.00")))
+    compra = ler_documento_xml(
+        nfe(CHAVE_COMPRA, det(1, "P", "X", "1", "1.00"), emitente=CNPJ_FORNECEDOR))
+    nossa_entrada = ler_documento_xml(nfe(CHAVE_UM, det(1, "P", "X", "1", "1.00"), tp="0"))
+    devolucao = ler_documento_xml(
+        nfe(CHAVE_DEVOLUCAO, det(1, "P", "X", "1", "1.00"), emitente=CNPJ_FORNECEDOR, tp="0"))
+
+    assert nossa_venda.saida_de(RAIZ) is True
+    assert compra.saida_de(RAIZ) is False
+    assert nossa_entrada.saida_de(RAIZ) is False
+    assert devolucao.saida_de(RAIZ) is True
+    # sem raiz não há lado: não se inventa um
+    assert nossa_venda.saida_de("") is None
 
 
 def test_o_filtro_fica_gravado_com_o_resultado(pasta, tmp_path):

@@ -201,6 +201,28 @@ class DocumentoXml:
         """True autorizado, False denegado ou recusado, None quando o XML não diz."""
         return None if self.cstat is None else self.cstat in CSTAT_AUTORIZADOS
 
+    def saida_de(self, raiz_do_cnpj: str) -> bool | None:
+        """Se este documento é **saída** de quem tem esta raiz de CNPJ.
+
+        `tpNF` sozinho não responde: ele é do ponto de vista de **quem emitiu**.
+        A nota do fornecedor é saída para ele e entrada para nós; a nota de
+        entrada que o comprador emite ao receber mercadoria é entrada para ele
+        e saída para quem mandou. Quem decide é o cruzamento das duas coisas —
+        emitiu **e** diz saída, ou não emitiu **e** diz entrada.
+
+        A comparação é pela **raiz** (os oito primeiros dígitos), e não pelo
+        CNPJ inteiro: a nota emitida pela filial é tão nossa quanto a da matriz,
+        e um trabalho tem dezenas de estabelecimentos.
+
+        `None` quando não há raiz com que comparar — aí não se sabe de quem é a
+        nota, e inventar um lado seria pior que dizer que não se sabe.
+        """
+        raiz = "".join(c for c in raiz_do_cnpj if c.isdigit())
+        if not raiz:
+            return None
+        nossa = self.emitente[: len(raiz)] == raiz
+        return nossa == (self.tipo == "1")
+
 
 def cstat_do_fim(fim: bytes) -> str | None:
     """O cStat do protocolo, a partir dos bytes finais do XML. None sem protocolo.

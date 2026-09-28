@@ -13,6 +13,12 @@ então sobre 120 mil XML por vez. O que mudou na travessia:
 * **uma cópia por chave.** A mesma nota vem no zip do mês e no do trimestre; na
   Advertising foram 28.407 chaves repetidas. Contar duas vezes inflaria o valor
   elegível, que é o número que interessa;
+* **só o que a empresa vendeu.** O benefício é sobre a saída, e o lote costuma
+  ter tudo junto — a nota que a empresa emitiu e a que ela recebeu do
+  fornecedor. Na origem isso não era problema porque a pessoa apontava uma
+  pasta já separada; aqui a base é o lote inteiro do trabalho. Quem decide não é
+  o `tpNF` sozinho (ver `DocumentoXml.saida_de`), e o que fica de fora é
+  contado, não sumido;
 * **três listas viraram duas**: elegíveis, sempre, e descartados, a pedido. A
   terceira ("todos") era a soma das duas, e some quem soma.
 
@@ -107,6 +113,8 @@ class ProgressoDoCredito(Progresso):
     centavos_elegiveis: int = 0
     repetidos: int = 0
     nao_sao_documento: int = 0
+    # nota que não é saída da empresa do trabalho: compra, ou de outra empresa
+    nao_sao_saida: int = 0
     nao_autorizados: int = 0
     ilegiveis: int = 0
     exemplos_ilegiveis: list[str] = field(default_factory=list)
@@ -117,17 +125,20 @@ def _q(valor: Decimal, casas: Decimal) -> Decimal:
 
 
 def varrer(xmls: list[str], destino: str, filtro: Filtro, *,
+           raiz_do_cnpj: str = "",
            incluir_descartados: bool = False,
            avisar: Aviso | None = None,
            deve_parar: Callable[[], bool] | None = None) -> ProgressoDoCredito:
     """Grava em `destino` o que entra no benefício, e o que sobrou se pedirem."""
     progresso = ProgressoDoCredito(arquivos_totais=contar_xml(xmls))
     return varrer_conteudos(conteudos_de_xml(xmls, recusados=progresso.recusados), destino,
-                            filtro, incluir_descartados=incluir_descartados,
+                            filtro, raiz_do_cnpj=raiz_do_cnpj,
+                            incluir_descartados=incluir_descartados,
                             avisar=avisar, deve_parar=deve_parar, progresso=progresso)
 
 
 def varrer_conteudos(fontes: Iterable[tuple[str, bytes | None]], destino: str, filtro: Filtro, *,
+                     raiz_do_cnpj: str = "",
                      incluir_descartados: bool = False,
                      avisar: Aviso | None = None,
                      deve_parar: Callable[[], bool] | None = None,
@@ -144,7 +155,8 @@ def varrer_conteudos(fontes: Iterable[tuple[str, bytes | None]], destino: str, f
     try:
         for nome, conteudo in fontes:
             parar_se_pedirem(deve_parar)
-            _ler_um(nome, conteudo, filtro, elegiveis, descartados, vistas, negadas, progresso)
+            _ler_um(nome, conteudo, filtro, elegiveis, descartados, vistas, negadas,
+                    progresso, raiz_do_cnpj)
             progresso.arquivos_lidos += 1
             if avisar is not None:
                 avisar(progresso)
@@ -164,7 +176,8 @@ def varrer_conteudos(fontes: Iterable[tuple[str, bytes | None]], destino: str, f
         "centavos_elegiveis": progresso.centavos_elegiveis,
         "descartados": progresso.descartados, "repetidos": progresso.repetidos,
         "nao_autorizados": progresso.nao_autorizados,
-        "nao_sao_documento": progresso.nao_sao_documento, "ilegiveis": progresso.ilegiveis,
+        "nao_sao_documento": progresso.nao_sao_documento,
+        "nao_sao_saida": progresso.nao_sao_saida, "ilegiveis": progresso.ilegiveis,
         "ncms": len(filtro.ncms), "termos": len(filtro.termos), "sem_filtro": filtro.sem_filtro})
     return progresso
 
@@ -196,7 +209,7 @@ def _sem_as_denegadas(caminho: str, negadas: set[str],
 
 def _ler_um(caminho: str, conteudo: bytes | None, filtro: Filtro, elegiveis: _Escritor,
             descartados: _Escritor | None, vistas: dict[str, int], negadas: set[str],
-            progresso: ProgressoDoCredito) -> None:
+            progresso: ProgressoDoCredito, raiz_do_cnpj: str = "") -> None:
     nome = os.path.basename(caminho)
     try:
         if conteudo is None:
@@ -216,6 +229,12 @@ def _ler_um(caminho: str, conteudo: bytes | None, filtro: Filtro, elegiveis: _Es
         negadas.add(doc.chave)
         log.warning("XML com protocolo que não autoriza a nota", extra={
             "arquivo": nome, "chave": doc.chave, "cstat": doc.cstat})
+        return
+    # o benefício é sobre o que a empresa **vendeu**: a nota de compra que veio
+    # na mesma pasta não entra. `tpNF` sozinho não responde isso — ver
+    # `DocumentoXml.saida_de`
+    if raiz_do_cnpj and doc.saida_de(raiz_do_cnpj) is not True:
+        progresso.nao_sao_saida += 1
         return
     prioridade = _PRIORIDADE_AUTORIZADA if doc.autorizado else _PRIORIDADE_SEM_PROTOCOLO
     anterior = vistas.get(doc.chave)
@@ -438,6 +457,7 @@ def serializar(progresso: ProgressoDoCredito, filtro: Filtro) -> dict:
         "repetidos": progresso.repetidos,
         "nao_autorizados": progresso.nao_autorizados,
         "nao_sao_documento": progresso.nao_sao_documento,
+        "nao_sao_saida": progresso.nao_sao_saida,
         "ilegiveis": progresso.ilegiveis,
         "exemplos_ilegiveis": progresso.exemplos_ilegiveis[:20],
         "recusados": progresso.recusados[:20],
