@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import zipfile
 from dataclasses import dataclass
 
 from cat.aplicacao.casos_de_uso import (
@@ -381,3 +382,46 @@ def extrair_registro(execucao: ExecucaoDB, alvo: str, formato: str,
             log.info("planilha de registro gerada",
                      extra={"alvo": limpo, "linhas": linhas, "formato": formato})
     return PlanilhaPronta(caminho=destino, nome=nome, tipo=TIPOS[formato])
+
+
+# quantos alvos cabem num pedido de lote. Não é regra fiscal: é o que impede
+# um "marcar todos" de virar uma extração de setenta planilhas que ninguém
+# pediu de verdade — e que levaria a tarde
+LIMITE_DO_LOTE = 25
+
+
+def extrair_registros_em_zip(execucao: ExecucaoDB, alvos: list[str], formato: str,
+                             recorte: extracao_de_registro.Recorte | None = None) -> PlanilhaPronta:
+    """Vários alvos de uma vez, num zip.
+
+    **Por que zip e não vários downloads.** Baixar sete planilhas seguidas abre
+    sete caixas de "onde salvar", e quem marcou sete registros quer uma pasta,
+    não sete perguntas. É o mesmo motivo do pacote da entrega.
+
+    Cada alvo reaproveita o cache de sempre: extrair o C170 sozinho e depois
+    marcá-lo num lote não relê o arquivo.
+    """
+    if not alvos:
+        raise PlanilhaRecusada(422, "Marque ao menos um registro para extrair.")
+    if len(alvos) > LIMITE_DO_LOTE:
+        raise PlanilhaRecusada(
+            422, f"São {len(alvos)} registros de uma vez, e o limite é {LIMITE_DO_LOTE}. "
+                 "Marque menos, ou extraia em duas levas.")
+
+    pasta = execucao.pasta_de_trabalho or ""
+    prontas = [extrair_registro(execucao, alvo, formato, recorte) for alvo in alvos]
+
+    marca = extracao_de_registro.impressao_do_recorte(
+        recorte or extracao_de_registro.Recorte())
+    nome = f"sped_extracoes{marca}.zip"
+    destino = os.path.join(pasta, nome)
+    provisorio = f"{destino}.{os.getpid()}.tmp"
+    with zipfile.ZipFile(provisorio, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        for pronta in prontas:
+            z.write(pronta.caminho, arcname=pronta.nome)
+    os.replace(provisorio, destino)
+
+    log.info("extrações empacotadas", extra={
+        "execucao_id": execucao.id, "alvos": len(prontas), "formato": formato,
+        "zip": os.path.basename(destino)})
+    return PlanilhaPronta(caminho=destino, nome=nome, tipo=TIPOS["zip"])

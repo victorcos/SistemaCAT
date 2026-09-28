@@ -215,12 +215,16 @@ public static class ExecucoesRotas
                 {
                     var q = http.Request.Query;
                     var alvo = q["alvo"].FirstOrDefault() ?? "";
-                    if (alvo.Length is 0 or > 40)
+                    // `alvos` marca o lote: vários registros num zip só
+                    var alvos = q["alvos"].FirstOrDefault() is { Length: > 0 } muitos
+                        ? muitos.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        : [];
+                    if (alvo.Length > 40 || (alvo.Length == 0 && alvos.Length == 0))
                         return CorpoJson.Recusar("Informe o registro ou a hierarquia a extrair.",
                             StatusCodes.Status422UnprocessableEntity);
                     var formato = q["formato"].FirstOrDefault() is { Length: > 0 } f ? f : "xlsx";
                     var pronta = await caso.ExtrairDaQuebra(execucaoId,
-                        new PedidoDeExtracao(alvo, formato, Recorte(q)),
+                        new PedidoDeExtracao(alvo, formato, Recorte(q), alvos),
                         http.UsuarioAtual(), http.RequestAborted);
                     return Arquivo(pronta, config, log);
                 }))

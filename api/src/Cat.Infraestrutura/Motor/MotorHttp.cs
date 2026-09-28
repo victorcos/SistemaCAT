@@ -151,7 +151,8 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
         var r = pedido.Recorte;
         var json = await Chamar("interno/quebra/extrair", JsonContent.Create(new Dictionary<string, object?>
         {
-            ["execucao_id"] = execucaoId, ["alvo"] = pedido.Alvo, ["formato"] = pedido.Formato,
+            ["execucao_id"] = execucaoId, ["alvo"] = pedido.Alvo,
+            ["alvos"] = pedido.Alvos ?? [], ["formato"] = pedido.Formato,
             ["cnpjs"] = r.Cnpjs, ["de"] = r.De, ["ate"] = r.Ate,
             ["cst_pis"] = r.CstPis, ["cst_cofins"] = r.CstCofins,
             ["cfop"] = r.Cfop, ["cod_item"] = r.CodItem, ["cod_nat"] = r.CodNat,

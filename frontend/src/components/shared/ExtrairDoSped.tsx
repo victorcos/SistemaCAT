@@ -5,6 +5,7 @@ import { Aviso } from "@/components/ui/Aviso";
 import { Busca, Chip, Toolbar } from "@/components/ui/Filtros";
 import { Vazio } from "@/components/ui/Pagina";
 import { Celula, Linha, Tabela } from "@/components/ui/Tabela";
+import { Botao } from "@/components/ui/Botao";
 import { useAcao } from "@/hooks/useAcao";
 import { cn } from "@/lib/cn";
 import { numero } from "@/lib/format";
@@ -14,6 +15,7 @@ import {
   RECORTE_INTEIRO,
   alvosDaQuebra,
   baixarExtracao,
+  baixarExtracoes,
   quantosFiltros,
   type AlvoDaQuebra,
   type AlvosDaQuebra,
@@ -37,13 +39,23 @@ import {
  *
  * O filtro é por **bloco**, que é como o leiaute do SPED se organiza e como
  * quem trabalha com ele pensa: "o que eu preciso é do bloco M".
+ *
+ * **Marcar vários entrega um zip.** Sete registros marcados viravam sete
+ * downloads e sete caixas de "onde salvar"; agora é uma pasta só, cada
+ * registro na sua planilha.
  */
+
+/** O alvo fingido do lote, para a tela saber qual botão está baixando. */
+const LOTE = "__lote__";
 export function ExtrairDoSped({ execucaoId }: { execucaoId: number }) {
   const [dados, setDados] = useState<AlvosDaQuebra | null>(null);
   const [bloco, setBloco] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [baixando, setBaixando] = useState<{ alvo: string; formato: Formato } | null>(null);
   const [recorte, setRecorte] = useState<RecorteDaExtracao>(RECORTE_INTEIRO);
+  // o que vai no zip. Sobrevive à troca de bloco e à busca de propósito: quem
+  // marca o C170 no bloco C e depois vai ao M não quer perder a marcação
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const leitura = useAcao();
   const download = useAcao();
 
@@ -72,6 +84,25 @@ export function ExtrairDoSped({ execucaoId }: { execucaoId: number }) {
     await download.executar((sinal) => baixarExtracao(execucaoId, alvo, formato, recorte, sinal));
     setBaixando(null);
   }
+
+  async function baixarMarcados(formato: Formato) {
+    const alvos = [...marcados];
+    setBaixando({ alvo: LOTE, formato });
+    await download.executar((sinal) => baixarExtracoes(execucaoId, alvos, formato, recorte, sinal));
+    setBaixando(null);
+  }
+
+  function alternar(alvo: string) {
+    setMarcados((antes) => {
+      const novo = new Set(antes);
+      if (!novo.delete(alvo)) novo.add(alvo);
+      return novo;
+    });
+  }
+
+  // "marcar todos" vale para o que está à vista: marcar setenta registros que
+  // o filtro escondeu seria marcar o que ninguém viu
+  const todosAVista = visiveis.length > 0 && visiveis.every((l) => marcados.has(l.alvo));
 
   if (leitura.erro) {
     return (
@@ -135,6 +166,29 @@ export function ExtrairDoSped({ execucaoId }: { execucaoId: number }) {
         <Aviso titulo={download.erro.message} codigo={download.erro.requisicaoId} aoFechar={() => download.setErro(null)} />
       )}
 
+      {marcados.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-raio-g border border-laranja-500/35 bg-laranja-500/8 px-4 py-3">
+          <span className="text-[13px] font-bold text-texto">
+            {numero(marcados.size)} registro{marcados.size === 1 ? "" : "s"} marcado
+            {marcados.size === 1 ? "" : "s"}
+          </span>
+          <span className="flex-1 text-[12px] text-texto-suave">
+            Saem num zip só, cada um na sua planilha.
+          </span>
+          <Botao variante="fantasma" tamanho="sm" onClick={() => setMarcados(new Set())}>
+            Desmarcar
+          </Botao>
+          <BaixarPlanilha
+            destaque
+            rotulo={`Extrair ${numero(marcados.size)} em zip`}
+            aoBaixar={baixarMarcados}
+            desabilitado={download.carregando}
+            baixando={baixando?.alvo === LOTE ? baixando.formato : null}
+            aoCancelar={download.podeCancelar ? download.cancelar : undefined}
+          />
+        </div>
+      )}
+
       {visiveis.length === 0 ? (
         <Vazio titulo="Nada para extrair com este recorte">
           {busca
@@ -142,11 +196,37 @@ export function ExtrairDoSped({ execucaoId }: { execucaoId: number }) {
             : "Nenhum registro deste bloco apareceu nos arquivos desta quebra."}
         </Vazio>
       ) : (
-        <Tabela colunas={["Registro", "Linhas", "Colunas", ""]}>
+        <Tabela
+          colunas={[
+            <input
+              key="todos"
+              type="checkbox"
+              checked={todosAVista}
+              onChange={() =>
+                setMarcados((antes) => {
+                  const novo = new Set(antes);
+                  for (const l of visiveis) {
+                    if (todosAVista) novo.delete(l.alvo);
+                    else novo.add(l.alvo);
+                  }
+                  return novo;
+                })
+              }
+              aria-label={todosAVista ? "Desmarcar os visíveis" : "Marcar os visíveis"}
+              className="h-4 w-4 cursor-pointer accent-marca-laranja"
+            />,
+            "Registro",
+            "Linhas",
+            "Colunas",
+            "",
+          ]}
+        >
           {visiveis.map((l) => (
             <LinhaDoAlvo
               key={l.alvo}
               alvo={l}
+              marcado={marcados.has(l.alvo)}
+              aoAlternar={() => alternar(l.alvo)}
               ocupado={download.carregando}
               baixando={baixando?.alvo === l.alvo ? baixando.formato : null}
               aoBaixar={(formato) => baixar(l.alvo, formato)}
@@ -161,19 +241,32 @@ export function ExtrairDoSped({ execucaoId }: { execucaoId: number }) {
 
 function LinhaDoAlvo({
   alvo,
+  marcado,
+  aoAlternar,
   ocupado,
   baixando,
   aoBaixar,
   aoCancelar,
 }: {
   alvo: AlvoDaQuebra;
+  marcado: boolean;
+  aoAlternar: () => void;
   ocupado: boolean;
   baixando: Formato | null;
   aoBaixar: (formato: Formato) => void;
   aoCancelar?: () => void;
 }) {
   return (
-    <Linha>
+    <Linha className={cn(marcado && "bg-laranja-500/6")}>
+      <Celula>
+        <input
+          type="checkbox"
+          checked={marcado}
+          onChange={aoAlternar}
+          aria-label={`Marcar ${alvo.alvo}`}
+          className="h-4 w-4 cursor-pointer accent-marca-laranja"
+        />
+      </Celula>
       <Celula
         nota={alvo.hierarquia ? alvo.rotulo : undefined}
         className={cn(alvo.hierarquia && "font-bold")}

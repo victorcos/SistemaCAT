@@ -1078,8 +1078,10 @@ class PedidoDaExtracao(BaseModel):
     """
 
     execucao_id: int
-    # um registro ("C170") ou uma hierarquia ("C100+C170")
-    alvo: str = Field(min_length=1, max_length=40)
+    # um registro ("C170") ou uma hierarquia ("C100+C170"). Vazio quando o
+    # pedido é de lote, e aí valem os `alvos`
+    alvo: str = Field(default="", max_length=40)
+    alvos: list[str] = Field(default_factory=list, max_length=50)
     formato: str = "xlsx"
     # no arquivo
     cnpjs: list[str] = Field(default_factory=list, max_length=500)
@@ -1174,8 +1176,19 @@ def extrair_da_quebra(
     if pedido.formato not in planilhas.FORMATOS:
         raise HTTPException(status.HTTP_404_NOT_FOUND,
                             f"Formato desconhecido: {pedido.formato}. Vale xlsx ou csv.")
-    with contexto(etapa=quebrar_sped.ETAPA, execucao_id=execucao.id, alvo=pedido.alvo):
-        pronta = _traduzir_extracao(
-            lambda: planilhas.extrair_registro(execucao, pedido.alvo, pedido.formato,
-                                               pedido.recorte()))
+    if not pedido.alvo and not pedido.alvos:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            "Informe o registro (ou os registros) a extrair.")
+    alvos = pedido.alvos or [pedido.alvo]
+    with contexto(etapa=quebrar_sped.ETAPA, execucao_id=execucao.id,
+                  alvo=pedido.alvo or f"{len(alvos)} alvos"):
+        try:
+            pronta = _traduzir_extracao(
+                lambda: planilhas.extrair_registro(execucao, alvos[0], pedido.formato,
+                                                   pedido.recorte())
+                if len(alvos) == 1 and not pedido.alvos
+                else planilhas.extrair_registros_em_zip(execucao, alvos, pedido.formato,
+                                                        pedido.recorte()))
+        except planilhas.PlanilhaRecusada as erro:
+            raise HTTPException(erro.status, str(erro)) from erro
     return PlanilhaDto(caminho=pronta.caminho, nome=pronta.nome, tipo=pronta.tipo)

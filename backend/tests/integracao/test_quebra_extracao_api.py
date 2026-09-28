@@ -155,3 +155,39 @@ class TestORecortePelaRota:
         estabelecimentos = r.json()["estabelecimentos"]
         assert [e["cnpj"] for e in estabelecimentos] == [CNPJ]
         assert estabelecimentos[0]["empresa"] == "EMPRESA DO TESTE"
+
+
+class TestOLote:
+    def test_varios_registros_saem_num_zip_so(self, cliente, quebra):
+        import zipfile  # noqa: PLC0415
+
+        r = cliente.post("/interno/quebra/extrair", headers=SEGREDO,
+                         json={"execucao_id": quebra["id"], "alvos": ["C170", "C100+C170"]})
+
+        assert r.status_code == 200, r.text
+        pronta = r.json()
+        assert pronta["nome"] == "sped_extracoes.zip"
+        assert pronta["tipo"] == "application/zip"
+        with zipfile.ZipFile(pronta["caminho"]) as z:
+            assert sorted(z.namelist()) == ["sped_C100_C170.xlsx", "sped_C170.xlsx"]
+
+    def test_um_alvo_so_continua_saindo_solto(self, cliente, quebra):
+        r = cliente.post("/interno/quebra/extrair", headers=SEGREDO,
+                         json={"execucao_id": quebra["id"], "alvo": "C170"})
+
+        assert r.json()["nome"] == "sped_C170.xlsx"
+
+    def test_pedido_sem_alvo_nenhum_volta_422(self, cliente, quebra):
+        r = cliente.post("/interno/quebra/extrair", headers=SEGREDO,
+                         json={"execucao_id": quebra["id"]})
+
+        assert r.status_code == 422
+        assert "Informe o registro" in r.json()["detail"]
+
+    def test_o_recorte_vale_para_o_lote_inteiro(self, cliente, quebra):
+        r = cliente.post("/interno/quebra/extrair", headers=SEGREDO,
+                         json={"execucao_id": quebra["id"], "alvos": ["C170"],
+                               "cst_pis": ["01"]})
+
+        assert r.status_code == 200
+        assert r.json()["nome"].startswith("sped_extracoes_")

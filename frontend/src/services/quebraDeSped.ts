@@ -130,6 +130,32 @@ export const alvosDaQuebra = (execucaoId: number, sinal?: AbortSignal) =>
   chamar<AlvosDaQuebra>(`/quebra-de-sped/${execucaoId}/alvos`, { signal: sinal });
 
 /** Extrai o alvo e baixa a planilha. O nome do arquivo é o do servidor. */
+/**
+ * Extrai vários alvos de uma vez e baixa o zip.
+ *
+ * Zip, e não um download por registro: marcar sete e responder com sete caixas
+ * de "onde salvar" é transformar um clique em sete.
+ */
+export function baixarExtracoes(
+  execucaoId: number,
+  alvos: string[],
+  formato: Formato,
+  recorte: RecorteDaExtracao = RECORTE_INTEIRO,
+  sinal?: AbortSignal,
+): Promise<void> {
+  const q = new URLSearchParams({ alvos: alvos.join(",") });
+  if (formato !== "xlsx") q.set("formato", formato);
+  for (const [nome, valor] of Object.entries(recorte)) {
+    const texto = Array.isArray(valor) ? valor.join(",") : valor;
+    if (texto) q.set(nome, texto);
+  }
+  return baixarArquivo(
+    `/api/quebra-de-sped/${execucaoId}/extracao?${q}`,
+    "sped_extracoes.zip",
+    sinal,
+  );
+}
+
 export function baixarExtracao(
   execucaoId: number,
   alvo: string,

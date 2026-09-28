@@ -44,7 +44,9 @@ public sealed record PedidoDeOcorrencias(string Nome, int Pagina, int PorPagina)
 public sealed record PedidoDeEstabelecimentos(string? So, string? Busca, int Pagina, int PorPagina);
 
 /// <param name="Alvo">um registro ("C170") ou uma hierarquia ("C100+C170")</param>
-public sealed record PedidoDeExtracao(string Alvo, string Formato, RecorteDaExtracao Recorte);
+/// <param name="Alvos">vários de uma vez; saem num zip, e aí <c>Alvo</c> vai vazio</param>
+public sealed record PedidoDeExtracao(string Alvo, string Formato, RecorteDaExtracao Recorte,
+    IReadOnlyList<string>? Alvos = null);
 
 /// <summary>
 /// O que entra na extração. Tudo vazio: sai inteira.
