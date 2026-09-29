@@ -5,8 +5,9 @@ import { baixarArquivo, type Execucao, type Formato } from "./conferencia";
 /**
  * Apuração de PIS/COFINS: o par que se confronta.
  *
- * A **Consulta de Entradas (037)**, tirada da EFD-Contribuições, e o **razão
- * contábil**, tirado da ECD. Onde os dois discordam é onde está o trabalho.
+ * A **Consulta de Entradas (037)** e a **Consulta de Saídas (047)**, tiradas da
+ * EFD-Contribuições, e o **razão contábil**, tirado da ECD. Onde o fiscal e o
+ * contábil discordam é onde está o trabalho.
  *
  * Saiu de dentro da quebra de SPED em 23/09/2026. A quebra abre os arquivos;
  * esta confronta o fiscal com o contábil — e quem quer olhar um registro não
@@ -23,17 +24,22 @@ export interface ResumoDaApuracao {
   contribuicoes?: number;
   ecd?: number;
   ilegiveis?: number;
-  /** linhas da Consulta de Entradas e do razão contábil */
+  /** linhas das duas consultas e do razão contábil */
   entradas?: number;
+  saidas?: number;
   linhas_do_razao?: number;
   /** quantas entradas vieram de cada ramo de documento */
   por_ramo?: Record<string, number>;
+  /** e o mesmo do lado das saídas */
+  por_ramo_das_saidas?: Record<string, number>;
+  /** registros de saída que a 047 ainda não monta, e quantos apareceram */
+  nao_cobertos?: Record<string, number>;
   estabelecimentos?: string[];
   competencias?: string[];
   avisos?: string[];
   iniciada_por?: string;
   segundos?: number;
-  andamento?: { arquivos: number; entradas: number; razao: number };
+  andamento?: { arquivos: number; entradas: number; saidas: number; razao: number };
   log?: EntradaDoLog[];
 }
 
@@ -41,11 +47,12 @@ export interface ExecucaoDaApuracao extends Omit<Execucao, "resumo"> {
   resumo: ResumoDaApuracao | null;
 }
 
-/** As duas planilhas: o par que se confronta. */
-export type PlanilhaDaApuracao = "entradas" | "razao-contabil";
+/** As três planilhas: os dois lados do fiscal e o contábil. */
+export type PlanilhaDaApuracao = "entradas" | "saidas" | "razao-contabil";
 
 const NOME: Record<PlanilhaDaApuracao, string> = {
   entradas: "consulta_de_entradas",
+  saidas: "consulta_de_saidas",
   "razao-contabil": "razao_contabil",
 };
 

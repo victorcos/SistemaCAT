@@ -1,7 +1,8 @@
 """A apuração de PIS/COFINS: o par que se confronta.
 
 A Consulta de Entradas de um lado, o razão contábil do outro — e os dois saindo
-da mesma rodada, sobre a mesma base, sem ninguém precisar juntar depois.
+da mesma rodada, sobre a mesma base, sem ninguém precisar juntar depois. Desde
+29/09/2026 sai junto a **Consulta de Saídas (047)**, da mesma EFD.
 
 Era parte da quebra até 23/09/2026. A quebra abre os arquivos; esta confronta o
 fiscal com o contábil.
@@ -13,6 +14,7 @@ import pytest
 from cat.infraestrutura.analitico.escrita import LeituraCancelada
 from cat.infraestrutura.analitico.piscofins import (
     ARQUIVO_DAS_ENTRADAS,
+    ARQUIVO_DAS_SAIDAS,
     ARQUIVO_DO_RAZAO,
     confrontar,
     serializar,
@@ -26,7 +28,10 @@ CONTRIBUICOES = """|0000|006|0|||01062021|30062021|COMERCIO DO TESTE LTDA|112223
 |C010|11222333000181|0|
 |C100|0|1|F01|55|00|1|1001|35210611222333000181550010000010011000010017|01062021|02062021|1000,00||||900,00||||||||||||||
 |C170|1|SKU1||10,000|UN|500,00||0|000|1102|N01|500,00|18,00|90,00||||0||||||50|500,00|1,6500|||8,25|50|500,00|7,6000|||38,00|3.1.1|
-|9999|9|
+|C100|1|0|F01|55|00|1|2001|35210611222333000181550010000020011000020015|03062021|03062021|700,00||||700,00||||||||||||||
+|C170|1|SKU1||5,000|UN|700,00||0|000|5102|N01|700,00|18,00|126,00||||0||||||01|700,00|1,6500|||11,55|01|700,00|7,6000|||53,20|3.1.1|
+|C400|2D|ECF|ABC|001|
+|9999|12|
 """
 
 ECD = """|0000|LECD|0||01062021|30062021|COMERCIO DO TESTE LTDA|11222333000181|SP|111|3550308||||
@@ -58,6 +63,7 @@ class TestOParQueSeConfronta:
         resumo = confrontar([contrib], [ecd], destino)
 
         assert resumo.entradas == 1
+        assert resumo.saidas == 1
         assert resumo.linhas_do_razao == 2
         entradas = _ler(destino, ARQUIVO_DAS_ENTRADAS)
         razao = _ler(destino, ARQUIVO_DO_RAZAO)
@@ -76,6 +82,23 @@ class TestOParQueSeConfronta:
         assert resumo.estabelecimentos == ["11222333000181"]
         assert resumo.competencias == ["2021-06"]
         assert sum(resumo.por_ramo.values()) == 1
+        assert sum(resumo.por_ramo_das_saidas.values()) == 1
+        # o C400 é saída, existe no arquivo e a 047 ainda não o monta: tem de
+        # aparecer contado, e não sumir
+        assert resumo.nao_cobertos == {"C400": 1}
+        assert serializar(resumo)["nao_cobertos"] == {"C400": 1}
+
+    def test_a_047_sai_do_mesmo_arquivo_e_traz_so_a_saida(self, base):
+        contrib, ecd, destino = base
+
+        confrontar([contrib], [ecd], destino)
+
+        saidas = _ler(destino, ARQUIVO_DAS_SAIDAS)
+        assert [l["numero_do_documento"] for l in saidas] == ["2001"]
+        assert saidas[0]["cfop"] == "5102"
+        # na saída a origem somos nós: SP do estabelecimento, RJ do participante
+        assert saidas[0]["uf_origem_destino"] == "SP/RJ"
+        assert (saidas[0]["natureza"], saidas[0]["faturamento"]) == ("Venda", "Faturamento")
 
 
 class TestUmLadoSo:
@@ -84,7 +107,7 @@ class TestUmLadoSo:
 
         resumo = confrontar([contrib], [], destino)
 
-        assert resumo.entradas == 1
+        assert (resumo.entradas, resumo.saidas) == (1, 1)
         assert resumo.linhas_do_razao == 0
         # o parquet existe mesmo vazio: quem lê não precisa saber a diferença
         assert _ler(destino, ARQUIVO_DO_RAZAO) == []
@@ -95,8 +118,9 @@ class TestUmLadoSo:
         resumo = confrontar([], [ecd], destino)
 
         assert resumo.linhas_do_razao == 2
-        assert resumo.entradas == 0
+        assert (resumo.entradas, resumo.saidas) == (0, 0)
         assert _ler(destino, ARQUIVO_DAS_ENTRADAS) == []
+        assert _ler(destino, ARQUIVO_DAS_SAIDAS) == []
 
 
 class TestOQueDaErrado:

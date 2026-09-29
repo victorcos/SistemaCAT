@@ -54,6 +54,7 @@ from cat.infraestrutura.analitico.gestao import ARQUIVO_DOS_QUADROS
 from cat.infraestrutura.analitico import registros_do_sped as extracao_de_registro
 from cat.infraestrutura.analitico.piscofins import (
     ARQUIVO_DAS_ENTRADAS,
+    ARQUIVO_DAS_SAIDAS,
     ARQUIVO_DO_RAZAO,
 )
 from cat.infraestrutura.analitico.quebra_de_sped import (
@@ -98,6 +99,7 @@ from cat.infraestrutura.planilhas.quebra_de_sped import (
     gerar_contagens,
     gerar_entradas,
     gerar_razao_contabil,
+    gerar_saidas,
 )
 from cat.infraestrutura.planilhas.exclusoes import gerar_exclusoes
 from cat.infraestrutura.planilhas.itens_do_xml import gerar_itens_do_xml
@@ -141,6 +143,7 @@ PLANILHAS = {
     apurar_piscofins.ETAPA: {
         # o par que se confronta: o fiscal de um lado, o contábil do outro
         "entradas": ("consulta_de_entradas.xlsx", ARQUIVO_DAS_ENTRADAS, gerar_entradas),
+        "saidas": ("consulta_de_saidas.xlsx", ARQUIVO_DAS_SAIDAS, gerar_saidas),
         "razao-contabil": ("razao_contabil.xlsx", ARQUIVO_DO_RAZAO, gerar_razao_contabil),
     },
     quebrar_xml.ETAPA: {

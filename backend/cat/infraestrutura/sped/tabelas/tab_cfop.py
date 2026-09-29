@@ -585,3 +585,62 @@ TABELA: dict[str, str] = {
 def descricao(codigo: str) -> str:
     """Retorna a descrição do CFOP, ou string vazia se desconhecido."""
     return TABELA.get((codigo or "").strip(), "")
+
+
+# ---------------------------------------------------------------------------
+# a segunda grafia: a que o 047 escreve
+# ---------------------------------------------------------------------------
+# **O MA escreve o mesmo CFOP de dois jeitos.** Na Gestão e na 037 vem
+# abreviado — "Devol compra p/comercial" —, e é essa a grafia de `TABELA`,
+# conferida contra aqueles relatórios. No 047 vem quase por extenso — "Devol de
+# compra para comercialização" —, com as mesmas abreviações de sempre em
+# "terc" e "Devol", e um "Industrialização" com maiúscula que não é nosso.
+#
+# Não é escolha nossa, e não dá para ter uma grafia só: mudar `TABELA` quebraria
+# a comparação da Gestão, que `tools/validar_gestao.py` confere coluna a coluna.
+# Então convivem as duas, cada uma com a sua procedência.
+#
+# As 21 abaixo saíram do gabarito do 047 de 7.784.121 linhas, em 29/09/2026 —
+# são todos os CFOP que aquela base tem. Para o que não está aqui, a grafia
+# abreviada serve: descrição curta é melhor que coluna vazia.
+POR_EXTENSO: dict[str, str] = {
+    "5102": "Venda de mercadoria adquirida ou recebida de terc",
+    "5152": "Transferência de mercadoria adquirida ou recebida de terc",
+    "5202": "Devol de compra para comercialização",
+    "5209": "Devol de mercadoria recebida em transferência para comercialização",
+    "5403": ("Venda de mercadoria adquirida ou recebida de terc em operação com mercadoria "
+             "sujeita ao regime de substituição tributária, na condição de contribuinte "
+             "substituto"),
+    "5405": ("Venda de mercadoria adquirida ou recebida de terc em operação com mercadoria "
+             "sujeita ao regime de substituição tributária, na condição de contribuinte "
+             "substituído"),
+    "5409": ("Transferência de mercadoria adquirida ou recebida de terc em operação com "
+             "mercadoria sujeita ao regime de substituição tributária"),
+    "5411": ("Devol de compra para comercialização em operação com mercadoria sujeita ao "
+             "regime de substituição tributária"),
+    "5901": "Remessa para Industrialização por encomenda",
+    "5910": "Remessa em bonificação, doação ou brinde",
+    "5915": "Remessa de mercadoria ou bem para conserto ou reparo",
+    "5924": ("Remessa para Industrialização por conta e ordem do adquirente da mercadoria, "
+             "quando esta não transitar pelo estabelecimento do adquirente"),
+    "5927": ("Lançamento efetuado a título de baixa de estoque decorrente de perda, roubo ou "
+             "deterioração"),
+    "5949": "Outra saída de mercadoria ou prestação de serviço não especificado",
+    "6102": "Venda de mercadoria adquirida ou recebida de terc",
+    "6202": "Devol de compra para comercialização",
+    "6403": ("Venda de mercadoria adquirida ou recebida de terc em operação com mercadoria "
+             "sujeita ao regime de substituição tributária, na condição de contribuinte "
+             "substituto"),
+    "6404": ("Venda de mercadoria sujeita ao regime de substituição tributária, cujo imposto "
+             "já tenha sido retido anteriormente"),
+    "6411": ("Devol de compra para comercialização em operação com mercadoria sujeita ao "
+             "regime de substituição tributária"),
+    "6901": "Remessa para Industrialização por encomenda",
+    "6949": "Outra saída de mercadoria ou prestação de serviço não especificado",
+}
+
+
+def descricao_por_extenso(codigo: str) -> str:
+    """A grafia do 047; na falta dela, a abreviada. Ver `POR_EXTENSO`."""
+    limpo = (codigo or "").strip()
+    return POR_EXTENSO.get(limpo) or descricao(limpo)

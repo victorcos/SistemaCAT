@@ -86,6 +86,77 @@ COLUNAS_ENTRADAS = (
 )
 
 # ---------------------------------------------------------------------------
+# a Consulta de Saídas (047)
+# ---------------------------------------------------------------------------
+# A gêmea da 037, e não a mesma planilha: são 53 colunas noutra ordem, com
+# seguro, outras despesas e código do serviço que lá não existem, e com a
+# natureza da **operação** no lugar da natureza do **crédito**. Ver
+# `sped/saidas.py` — inclusive para por que a UF troca de lado.
+OPERACAO = "Operação"
+
+COLUNAS_SAIDAS = (
+    Coluna("cnpj", "CNPJ do Estabelecimento", "texto", 20, DOCUMENTO),
+    Coluna("periodo", "Período", "texto", 11, DOCUMENTO),
+    Coluna("registros", "Registros", "texto", 44, DOCUMENTO),
+    Coluna("modelo", "Modelo", "texto", 8, DOCUMENTO),
+    Coluna("situacao", "Situação", "texto", 9, DOCUMENTO),
+    Coluna("numero_do_documento", "Número do Documento", "texto", 14, DOCUMENTO),
+    Coluna("serie", "Série", "texto", 8, DOCUMENTO),
+    Coluna("chave", "Chave", "texto", 46, DOCUMENTO),
+    Coluna("data_do_documento", "Data do Documento", "texto", 12, DOCUMENTO),
+    Coluna("data_de_saida", "Data de Saída", "texto", 12, DOCUMENTO),
+    Coluna("valor_do_documento", "Valor do Documento", "texto", 15, DOCUMENTO),
+    Coluna("desconto_do_documento", "Desconto do Documento", "texto", 15, DOCUMENTO),
+    Coluna("valor_da_mercadoria", "Valor da Mercadoria", "texto", 15, DOCUMENTO),
+    Coluna("frete", "Frete", "texto", 12, DOCUMENTO),
+    Coluna("seguro", "Seguro", "texto", 12, DOCUMENTO),
+    Coluna("outras_despesas", "Outras Despesas", "texto", 14, DOCUMENTO),
+
+    Coluna("codigo_do_participante", "Código", "texto", 12, PARTICIPANTE),
+    Coluna("cnpj_do_participante", "CNPJ", "texto", 20, PARTICIPANTE),
+    Coluna("cpf_do_participante", "CPF", "texto", 16, PARTICIPANTE),
+    Coluna("nome_do_participante", "Nome", "texto", 34, PARTICIPANTE),
+    Coluna("uf_origem_destino", "UF Origem/Destino", "texto", 12, PARTICIPANTE),
+
+    Coluna("numero_do_item", "Número", "texto", 8, ITEM),
+    Coluna("codigo_do_item", "Código", "texto", 16, ITEM),
+    Coluna("descricao_complementar", "Descrição Complementar", "texto", 30, ITEM),
+    Coluna("descricao_do_item", "Descrição", "texto", 38, ITEM),
+    Coluna("ncm", "NCM", "texto", 11, ITEM),
+    Coluna("codigo_do_servico", "Código do Serviço", "texto", 12, ITEM),
+    Coluna("codigo_de_barra", "Código de Barra", "texto", 16, ITEM),
+    Coluna("tipo_do_item", "Tipo do Item", "texto", 26, ITEM),
+    Coluna("valor_do_item", "Valor", "texto", 14, ITEM),
+    Coluna("quantidade", "Quantidade", "texto", 13, ITEM),
+    Coluna("unidade", "Unidade", "texto", 9, ITEM),
+    Coluna("desconto_do_item", "Desconto", "texto", 13, ITEM),
+
+    Coluna("cfop", "CFOP", "texto", 8, OPERACAO),
+    Coluna("descricao_do_cfop", "Descrição do CFOP", "texto", 40, OPERACAO),
+    Coluna("faturamento", "Faturamento", "texto", 13, OPERACAO),
+    Coluna("natureza", "Natureza", "texto", 22, OPERACAO),
+    Coluna("icms", "ICMS", "texto", 13, OPERACAO),
+    Coluna("icms_st", "ICMS-ST", "texto", 13, OPERACAO),
+    Coluna("ipi", "IPI", "texto", 13, OPERACAO),
+
+    Coluna("cst_pis", "CST", "texto", 7, PIS),
+    Coluna("base_do_pis", "Base de Cálculo", "texto", 15, PIS),
+    Coluna("quantidade_base_do_pis", "Quantidade da Base", "texto", 15, PIS),
+    Coluna("aliquota_do_pis", "Alíquota", "texto", 11, PIS),
+    Coluna("quantidade_aliquota_do_pis", "Alíquota por Quantidade", "texto", 15, PIS),
+    Coluna("pis", "Valor", "texto", 13, PIS),
+
+    Coluna("cst_cofins", "CST", "texto", 7, COFINS),
+    Coluna("base_da_cofins", "Base de Cálculo", "texto", 15, COFINS),
+    Coluna("quantidade_base_da_cofins", "Quantidade da Base", "texto", 15, COFINS),
+    Coluna("aliquota_da_cofins", "Alíquota", "texto", 11, COFINS),
+    Coluna("quantidade_aliquota_da_cofins", "Alíquota por Quantidade", "texto", 15, COFINS),
+    Coluna("cofins", "Valor", "texto", 13, COFINS),
+
+    Coluna("conta_contabil", "Conta", "texto", 14, CONTABIL),
+)
+
+# ---------------------------------------------------------------------------
 # o razão contábil da ECD
 # ---------------------------------------------------------------------------
 CONTA = "Conta"
@@ -148,6 +219,11 @@ COLUNAS_CONTAGENS = (
 def gerar_entradas(parquet: str, destino: str, modelos=None, classificacoes=None,
                    formato: str = "xlsx") -> int:
     return gerar(parquet, destino, COLUNAS_ENTRADAS, "Consulta de Entradas", formato=formato)
+
+
+def gerar_saidas(parquet: str, destino: str, modelos=None, classificacoes=None,
+                 formato: str = "xlsx") -> int:
+    return gerar(parquet, destino, COLUNAS_SAIDAS, "Consulta de Saídas", formato=formato)
 
 
 def gerar_razao_contabil(parquet: str, destino: str, modelos=None, classificacoes=None,

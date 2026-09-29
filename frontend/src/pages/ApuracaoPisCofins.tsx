@@ -251,7 +251,7 @@ function EmCurso({ e }: { e: ExecucaoDaApuracao }) {
       <BarraFina fracao={e.fracao} classe="bg-marca-laranja" />
       <p className="m-0 font-mono text-xs text-texto-fraco">
         {numero(e.arquivos_lidos ?? 0)} de {numero(e.arquivos_totais ?? 0)} arquivos
-        {a ? ` · ${numero(a.entradas)} entradas · ${numero(a.razao)} linhas de razão` : ""}
+        {a ? ` · ${numero(a.entradas)} entradas · ${numero(a.saidas ?? 0)} saídas · ${numero(a.razao)} linhas de razão` : ""}
       </p>
     </Cartao>
   );
@@ -279,6 +279,8 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaApuracao; resumo:
   );
 
   const ramos = Object.entries(resumo.por_ramo ?? {}).sort((a, b) => b[1] - a[1]);
+  const ramosDasSaidas = Object.entries(resumo.por_ramo_das_saidas ?? {}).sort((a, b) => b[1] - a[1]);
+  const naoCobertos = Object.entries(resumo.nao_cobertos ?? {}).sort((a, b) => b[1] - a[1]);
   const competencias = resumo.competencias ?? [];
 
   return (
@@ -306,6 +308,19 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaApuracao; resumo:
         </Cartao>
 
         <Cartao className="flex flex-col gap-3">
+          <Rotulo>Consulta de Saídas (047)</Rotulo>
+          <p className="m-0 font-mono text-[32px] leading-none text-texto">
+            {numero(resumo.saidas ?? 0)}
+          </p>
+          <p className="m-0 text-xs leading-relaxed text-texto-fraco">
+            Linhas de saída da mesma EFD-Contribuições: nota fiscal item a item, o analítico da
+            NFC-e, nota de serviço e os demais documentos. É o que a escrituração registrou como
+            saída.
+          </p>
+          {par("saidas", "Baixar as saídas", true, (resumo.saidas ?? 0) === 0)}
+        </Cartao>
+
+        <Cartao className="flex flex-col gap-3">
           <Rotulo>Razão contábil (ECD)</Rotulo>
           <p className="m-0 font-mono text-[32px] leading-none text-texto">
             {numero(resumo.linhas_do_razao ?? 0)}
@@ -328,7 +343,7 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaApuracao; resumo:
         <Metrica rotulo="Arquivos lidos" valor={numero(resumo.arquivos ?? 0)}
                  nota={`${numero(resumo.contribuicoes ?? 0)} EFD-Contribuições · ${numero(resumo.ecd ?? 0)} ECD`} />
         <Metrica rotulo="Linhas da 037" valor={numero(resumo.entradas ?? 0)}
-                 nota={`${numero(resumo.linhas_do_razao ?? 0)} linhas de razão`} />
+                 nota={`${numero(resumo.saidas ?? 0)} da 047 · ${numero(resumo.linhas_do_razao ?? 0)} de razão`} />
         <Metrica rotulo="Estabelecimentos" valor={numero((resumo.estabelecimentos ?? []).length)}
                  nota={(resumo.estabelecimentos ?? []).slice(0, 2).map(cnpjFormatado).join(" · ")} />
         <Metrica
@@ -363,6 +378,49 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaApuracao; resumo:
             ))}
           </ul>
         </Cartao>
+      )}
+
+      {ramosDasSaidas.length > 0 && (
+        <Cartao className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="m-0 flex-1 text-base font-extrabold text-texto">De onde vêm as saídas</h2>
+            <span className="text-[11px] text-texto-fraco">
+              quem vende no varejo escritura quase tudo pelo C175
+            </span>
+          </div>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+            {ramosDasSaidas.map(([ramo, quantas]) => (
+              <li key={ramo} className="flex items-baseline gap-3 text-[13px] leading-relaxed">
+                <span className="min-w-[92px] text-right font-mono text-texto">{numero(quantas)}</span>
+                <span className="text-texto-suave">{ramo}</span>
+              </li>
+            ))}
+          </ul>
+        </Cartao>
+      )}
+
+      {/* a ausência tem de ser dita. Um cliente com cupom fiscal ou com o
+          bloco D tem saída que a 047 ainda não monta, e descobrir isso
+          somando a planilha é tarde */}
+      {naoCobertos.length > 0 && (
+        <section className="rounded-cartao border border-atencao/25 border-l-[3px] border-l-atencao bg-atencao-fundo px-5 py-4.5">
+          <p className="m-0 text-sm font-extrabold text-atencao">
+            Saídas que a 047 ainda não monta
+          </p>
+          <p className="m-0 mt-1 text-[13px] leading-relaxed text-texto-suave">
+            Estes registros existem nos arquivos e não entraram na planilha. Falta um relatório de
+            referência de um cliente que os tenha para saber o que o MA escreve em cada coluna —
+            sem ele, a regra seria invenção.
+          </p>
+          <ul className="m-0 mt-2.5 flex list-none flex-wrap gap-x-5 gap-y-1.5 p-0">
+            {naoCobertos.map(([registro, quantas]) => (
+              <li key={registro} className="flex items-baseline gap-2 text-[13px] text-texto">
+                <code className="font-mono font-bold">{registro}</code>
+                <span className="text-texto-suave">{numero(quantas)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {(resumo.avisos ?? []).length > 0 && (

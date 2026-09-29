@@ -35,11 +35,13 @@ from cat.infraestrutura.analitico.escrita import (
 from cat.infraestrutura.sped.ecd import EcdInvalida, indexar_ecd, razao
 from cat.infraestrutura.sped.entradas import colunas_da_entrada, entradas
 from cat.infraestrutura.sped.leitor import codificacao_de
+from cat.infraestrutura.sped.saidas import Contagem, colunas_da_saida, saidas
 from cat.log import obter_log
 
 log = obter_log(__name__)
 
 ARQUIVO_DAS_ENTRADAS = "entradas.parquet"
+ARQUIVO_DAS_SAIDAS = "saidas.parquet"
 ARQUIVO_DO_RAZAO = "razao.parquet"
 
 COLUNAS_DO_RAZAO = [
@@ -56,6 +58,7 @@ ApuracaoCancelada = LeituraCancelada
 class Andamento:
     arquivos: int = 0
     entradas: int = 0
+    saidas: int = 0
     razao: int = 0
 
 
@@ -68,9 +71,15 @@ class Resumo:
     ecd: int = 0
     ilegiveis: int = 0
     entradas: int = 0
+    saidas: int = 0
     linhas_do_razao: int = 0
     # quantas entradas vieram de cada ramo de documento (C100/C170, C500/C501…)
     por_ramo: dict[str, int] = field(default_factory=dict)
+    # e o mesmo do lado das saídas (C100/C170, C100/C175, A100/A170, F100)
+    por_ramo_das_saidas: dict[str, int] = field(default_factory=dict)
+    # registros de saída que a 047 ainda não sabe montar, e quantos apareceram.
+    # Ver `sped/saidas.py`: a ausência tem de ser dita, não descoberta somando
+    nao_cobertos: dict[str, int] = field(default_factory=dict)
     estabelecimentos: list[str] = field(default_factory=list)
     competencias: list[str] = field(default_factory=list)
     avisos: list[str] = field(default_factory=list)
@@ -80,8 +89,10 @@ def serializar(r: Resumo) -> dict:
     return {
         "versao": 1, "arquivos": r.arquivos, "contribuicoes": r.contribuicoes,
         "ecd": r.ecd, "ilegiveis": r.ilegiveis, "entradas": r.entradas,
-        "linhas_do_razao": r.linhas_do_razao,
+        "saidas": r.saidas, "linhas_do_razao": r.linhas_do_razao,
         "por_ramo": dict(sorted(r.por_ramo.items())),
+        "por_ramo_das_saidas": dict(sorted(r.por_ramo_das_saidas.items())),
+        "nao_cobertos": dict(sorted(r.nao_cobertos.items())),
         "estabelecimentos": sorted(r.estabelecimentos),
         "competencias": sorted(r.competencias), "avisos": r.avisos,
     }
@@ -90,22 +101,31 @@ def serializar(r: Resumo) -> dict:
 def confrontar(contribuicoes: list[str], ecds: list[str], destino: str,
                avisar: Callable[[Andamento], None] | None = None,
                deve_parar: Callable[[], bool] | None = None) -> Resumo:
-    """Escreve a 037 e o razão contábil. Devolve o resumo.
+    """Escreve a 037, a 047 e o razão contábil. Devolve o resumo.
 
-    As duas fontes são independentes: um trabalho sem ECD ainda tem a 037, e um
-    sem EFD-Contribuições ainda tem o razão. Cada ausência vira aviso, porque
-    descobri-la ao abrir a planilha é tarde.
+    As duas fontes são independentes: um trabalho sem ECD ainda tem as duas
+    consultas, e um sem EFD-Contribuições ainda tem o razão. Cada ausência vira
+    aviso, porque descobri-la ao abrir a planilha é tarde.
+
+    **A EFD-Contribuições é lida duas vezes**, uma para cada consulta. As duas
+    passadas montam contextos diferentes — a 037 carrega o 0500 e os oito ramos
+    de entrada, a 047 o cadastro por estabelecimento e os quatro de saída —, e
+    fundi-las economizaria uma leitura ao custo de um módulo que ninguém mais
+    entende. Ler de novo é barato; desentender o join é caro.
     """
     os.makedirs(destino, exist_ok=True)
     resumo = Resumo()
     andamento = Andamento()
 
     das_entradas = Escritor(os.path.join(destino, ARQUIVO_DAS_ENTRADAS), colunas_da_entrada())
+    das_saidas = Escritor(os.path.join(destino, ARQUIVO_DAS_SAIDAS), colunas_da_saida())
     do_razao = Escritor(os.path.join(destino, ARQUIVO_DO_RAZAO), COLUNAS_DO_RAZAO)
     try:
         for caminho in contribuicoes:
             parar_se_pedirem(deve_parar)
             _entradas_de(caminho, das_entradas, resumo, andamento)
+            parar_se_pedirem(deve_parar)
+            _saidas_de(caminho, das_saidas, resumo, andamento)
             if avisar:
                 avisar(andamento)
         for caminho in ecds:
@@ -115,9 +135,11 @@ def confrontar(contribuicoes: list[str], ecds: list[str], destino: str,
                 avisar(andamento)
     finally:
         das_entradas.fechar()
+        das_saidas.fechar()
         do_razao.fechar()
 
     resumo.entradas = das_entradas.gravadas
+    resumo.saidas = das_saidas.gravadas
     resumo.linhas_do_razao = do_razao.gravadas
     log.info("apuração de pis/cofins concluída", extra=serializar(resumo))
     return resumo
@@ -156,6 +178,34 @@ def _entradas_de(caminho: str, das_entradas: Escritor, resumo: Resumo,
     resumo.contribuicoes += 1
     andamento.arquivos += 1
     andamento.entradas = das_entradas.gravadas
+
+
+def _saidas_de(caminho: str, das_saidas: Escritor, resumo: Resumo,
+               andamento: Andamento) -> None:
+    """A 047 de uma EFD-Contribuições.
+
+    Não conta arquivo nem estabelecimento: quem fez isso foi `_entradas_de`,
+    sobre este mesmo arquivo, e contar de novo dobraria o número no diário. O
+    que sai daqui é só o que é da 047 — as linhas, os ramos e o que ela ainda
+    não cobre.
+    """
+    nome = os.path.basename(caminho)
+    contagem = Contagem()
+    try:
+        codificacao = codificacao_de(caminho)
+        for linha in saidas(caminho, codificacao, contagem):
+            das_saidas.escrever(linha.como_dicionario())
+            resumo.por_ramo_das_saidas[linha.registros] = (
+                resumo.por_ramo_das_saidas.get(linha.registros, 0) + 1)
+    except (OSError, ValueError) as erro:
+        log.warning("não deu para tirar a 047 da EFD-Contribuições",
+                    extra={"arquivo": nome, "erro": str(erro)})
+        resumo.avisos.append(f"{nome}: {type(erro).__name__} ao ler as saídas.")
+        return
+
+    for registro, quantos in (contagem.nao_cobertos or {}).items():
+        resumo.nao_cobertos[registro] = resumo.nao_cobertos.get(registro, 0) + quantos
+    andamento.saidas = das_saidas.gravadas
 
 
 def _razao_de(caminho: str, do_razao: Escritor, resumo: Resumo,

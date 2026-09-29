@@ -61,6 +61,7 @@ cadastro do trabalho editável com aviso de base fora do período (v0.51).
 | Pré-validação | Arquivos da BOA | recompõe 100% das quantidades e 99,99% dos valores a 5 centavos |
 | Leitura da EFD | 7.036 EFD reais, seis versões de leiaute | sem falha |
 | Conferência | 37,9 milhões de documentos do Amigão | três listas, validada também com relatório do cliente simulado |
+| Consulta de Saídas (047) | Gabarito do MA: 7.784.121 linhas, 57 competências | as 53 colunas iguais em 100% das linhas |
 
 ---
 
@@ -140,6 +141,23 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] Bloco M: a apuração e os ajustes, PIS e COFINS na mesma função (v0.72.0)
 - [x] Quebra da ECD: plano de contas, índice por conta e razão contábil (v0.73.0)
 - [x] Consulta de Entradas (037): os oito ramos de documento de entrada (v0.74.0)
+- [x] Consulta de Saídas (047): C100/C170, C100/C175, A100/A170 e F100, conferida
+      linha a linha contra as 7.784.121 do gabarito do MA (v0.111.0)
+- [ ] Os ramos de saída que faltam na 047 — C180/C185, C380/C385, C400/C405/C485,
+      C490/C495, C600/C605, C860/C880, o bloco D, F500 a F560 e I100. Dependem de
+      um cliente que os tenha **e** de um relatório de referência dele: sem os
+      dois não há como saber o rótulo do ramo nem o preenchimento das colunas. A
+      etapa já conta esses registros e a tela os mostra, para a ausência não ser
+      silenciosa
+- [ ] Conferir na 037 o par de UF quando falta uma das pontas: na 047 o MA
+      escreve a coluna **vazia** em vez de "MG/", e a 037 tem a mesma função com
+      a mesma forma. Não mexi lá porque não tenho gabarito da 037 desse cliente,
+      e mudar relatório validado sem medida é trocar um defeito conhecido por um
+      desconhecido
+- [ ] Estender o escopo por estabelecimento (`sped/cadastro.py`) a
+      `sped/extracao.py`, `sped/consolidado.py` e `analitico/registros_do_sped.py`:
+      têm o mesmo defeito que a 037 e a 047 tinham — o 0200 e o 0150 pendem do
+      0140, e uma tabela só por arquivo troca a mercadoria entre matriz e filial
 - [x] Enriquecimento: descrição de CFOP, município, indicadores e tipo de item, e a
       natureza do crédito deduzida do CFOP — não do tipo do item (v0.76.0)
 - [x] Gestão (36 quadros): o núcleo — agregador da EFD, os quadros de PIS e COFINS,

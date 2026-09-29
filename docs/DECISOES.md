@@ -5,6 +5,118 @@
 
 ---
 
+## 2026-09-29 — A 047 sai da EFD-Contribuições, e o gabarito confirma linha a linha
+
+**O que entrou.** A **Consulta de Saídas (047)** do Sistema MA, gerada só a
+partir da EFD-Contribuições, como a 037 já era. Quatro ramos: `C100/C170` (nota
+fiscal item a item), `C100/C175` (o analítico da NFC-e), `A100/A170` (nota de
+serviço) e `F100` (demais documentos). Sai na mesma etapa da 037, na mesma tela,
+num botão ao lado — é a mesma leitura do mesmo arquivo.
+
+**Conferida contra o gabarito inteiro**, e não por amostra: 7.784.121 linhas, 57
+competências, as 53 colunas comparadas texto contra texto, pelo
+`tools/validar_047.py`. Comparar total teria escondido tudo o que está abaixo —
+e as três primeiras rodadas, que erravam em 483, 27 e 3 linhas, não teriam
+mudado um centavo de nenhum somatório.
+
+**Resultado: 7.784.121 de 7.784.121, sem uma divergência.**
+
+**Uma única ressalva na comparação, e é do gabarito.** O CSV do MA não consegue
+transportar ponto-e-vírgula — é o separador dele —, e troca-o por ponto: o item
+que o SPED chama de "MARG DELICIA 1KG C/SAL C/CREME DE LEITE ;" aparece lá
+terminado em ponto. São 2 linhas em 7.784.121, o valor certo é o nosso, e o
+conferidor desfaz a troca para não acusar defeito onde não há.
+
+**A última divergência a cair foi um par de UF pela metade.** Um participante
+cadastrado no 0150 sem município: sem ele não há de onde tirar a UF, e nós
+escrevíamos "MG/". O MA escreve a coluna vazia — uma ponta só não é par de
+origem e destino. Uma linha em 7.784.121, e a única maneira de achá-la era
+comparar linha a linha.
+
+**A UF troca de lado.** Na 037 a coluna "UF Origem/Destino" é
+participante/estabelecimento; na 047 é estabelecimento/participante. Numa saída
+a origem somos nós. Um 6411 de Minas para São Paulo sai "MG/SP".
+
+**A natureza da operação é outra coisa que a natureza do crédito.** A 037 traz
+a Tabela 4.3.7 ("01 - Aquisição de bens para revenda"); a 047 traz uma palavra —
+Venda, Transferência, Devolução de compra, Remessa, Lançamento de valor, Outras
+saídas/prestações —, tirada do CFOP, e escreve "Faturamento" numa coluna própria
+quando a natureza é Venda. Nas 7.784.121 linhas, 7.687.522 são Venda e todas têm
+Faturamento; nenhuma das demais tem. A tabela está em
+`tab_cfop_natureza_operacao` com os 21 CFOP do gabarito, porque uma regra que
+lesse a descrição erraria o **5209** — "Devol de mercadoria recebida em
+transferência", que o MA classifica como Transferência, e não como Devolução.
+
+**O MA escreve o CFOP de dois jeitos.** Abreviado na Gestão e na 037 ("Devol
+compra p/comercial"), quase por extenso no 047 ("Devol de compra para
+comercialização"). Não dá para ter uma grafia só: mudar a que já existe quebraria
+a comparação da Gestão, que `tools/validar_gestao.py` confere coluna a coluna.
+Convivem as duas em `tab_cfop`, cada uma com a sua procedência.
+
+**A nota cancelada rende uma linha, e a NFC-e cancelada não rende nenhuma.**
+Documento com `COD_SIT` 02 a 05 é escriturado sem filho — o leiaute manda
+preencher só até a chave —, e o MA emite a linha assim mesmo: são 3.360 no
+gabarito. Mas o modelo 65 cancelado não aparece: 106 documentos numa competência,
+nenhuma linha. O MA trata o C100/C175 como consulta à parte, e a linha do
+documento sozinho só existe na do C100/C170.
+
+**O que não está aqui, e por quê.** A cadeia do 047 tem mais ramos — C180/C185,
+C380/C385, C400/C405/C485, C490/C495, C600/C605, C860/C880, as saídas do bloco D,
+F500 a F560 e o I100. O cliente de referência não tem uma ocorrência sequer de
+nenhum deles, e sem arquivo real não há como saber que rótulo o MA dá ao ramo nem
+o que põe em cada coluna. É a mesma escolha da 037, pelo mesmo motivo. Para que a
+ausência não seja silenciosa, a passada **conta** esses registros e a tela diz
+quantos apareceram — descobrir isso somando a planilha seria tarde.
+
+---
+
+## 2026-09-29 — O 0200 e o 0150 são do estabelecimento, não do arquivo
+
+**O defeito.** Na EFD-Contribuições o **0140 abre um bloco de cadastro próprio**
+— 0150, 0190, 0200, 0400, 0500 — e um segundo 0140 recomeça tudo. A 037, a 047 e
+a extração tratavam essas tabelas como uma só por arquivo, com o último a
+aparecer sobrescrevendo o primeiro.
+
+**Não é teórico.** No arquivo de outubro/2025 da empresa de referência, **134
+códigos de item existem nos dois estabelecimentos com produtos que não têm nada
+a ver um com o outro**: o código 10918 é "SABAO LIQ YPE 12X1L" na matriz e "PAO
+DE FORMA ILUSTRE 400G" na filial. A nota da matriz saía com a mercadoria da
+filial — descrição, NCM e código de barra trocados —, em 1.953 das 117.158 linhas
+daquela competência. **Sem nenhum sinal de que errou**: a coluna vem preenchida,
+com um produto que existe.
+
+**Como apareceu.** Montando a 047 contra o gabarito do MA. Foi a única razão de
+o defeito ter sido visto: nada no arquivo denuncia, e nenhum total muda — o
+valor, a quantidade e o imposto estão certos, só a mercadoria é outra.
+
+**A correção mora num módulo só**, `sped/cadastro.py`, e vale para as duas
+consultas: a regra é sutil, e escrita duas vezes ela ia divergir. Duas ressalvas,
+as duas tiradas do gabarito:
+
+* código que o estabelecimento corrente não tem ainda vale procurar nos outros,
+  mas **só se existir num só** — havendo mais de um não há desempate, e cadastro
+  errado com cara de certo é pior que coluna vazia;
+* campo vazio no cadastro certo o MA completa com o do **cadastro da matriz** —
+  o estabelecimento cujo CNPJ é o do 0000. É o código de barra (ou o NCM) de
+  outro produto e eu discordaria, mas está marcado no código como replicação, e
+  não como convicção.
+
+**"A matriz" e "quem cadastrou primeiro" não são a mesma coisa**, e a diferença
+custou 317 linhas erradas numa competência até eu medi-la. O item 911047 está
+em duas filiais e em nenhuma matriz: o gabarito deixa o NCM **em branco** nas 85
+linhas da segunda filial. Já o 911159 está na matriz — como "BISC. RENATA
+20X360G MAIZENA" — e na filial como "SALGADO" sem NCM: aí o gabarito escreve o
+NCM da matriz nas 10 linhas da filial. Só a regra da matriz acerta os dois.
+
+**Ainda não corrigidos**, e com o mesmo defeito: `sped/extracao.py`,
+`sped/consolidado.py` e `analitico/registros_do_sped.py` — a extração de
+registros e o consolidado. Não entraram aqui porque cada um tem a sua própria
+forma de montar o join e os seus próprios testes; entram na sequência, e até lá
+a coluna de descrição do item daqueles caminhos pode trazer o produto do outro
+estabelecimento num cliente com matriz e filial.
+
+---
+
 ## 2026-09-25 — `nItem` também vem como elemento, e sem ele o item do XML não casa com o C170
 
 **O defeito.** As 121 notas que a Dom Atacarejo entregou em 25/09/2026 vinham

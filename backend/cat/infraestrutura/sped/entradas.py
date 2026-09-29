@@ -40,6 +40,13 @@ o D010 abre o estabelecimento do bloco D, independente do C010 do bloco C. Sem
 ele, D100 e D500 de uma **filial** saíam com o CNPJ da **matriz** — o último
 C010 processado. Três CNPJ correntes convivem aqui, e é assim que tem de ser.
 
+**E o cadastro também é do estabelecimento.** Segundo bug da mesma família,
+achado em 29/09/2026 montando a 047: o 0150, o 0200 e o 0500 pendem do 0140, e
+aqui eram uma tabela só por arquivo. Num cliente com matriz e filial o mesmo
+`COD_ITEM` é outra mercadoria em cada uma — 134 códigos assim numa competência
+—, e a nota da matriz saía com a descrição, o NCM e o código de barra da filial.
+A regra mora em `sped/cadastro.py`, compartilhada com a 047.
+
 **Os filhos do C190 não vêm intercalados** — todos os C191, depois todos os
 C195, pareados por posição. É a mesma armadilha de `consolidado.py`.
 
@@ -65,6 +72,7 @@ from dataclasses import asdict, dataclass
 from datetime import date
 
 from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido, ler_cabecalho
+from cat.infraestrutura.sped.cadastro import CadastroPorEstabelecimento
 from cat.infraestrutura.sped.leitor import BUFFER_DE_REDE, campos, registro_de
 from cat.infraestrutura.sped.registros import nomes_dos_campos
 from cat.infraestrutura.sped.tabelas import (
@@ -98,8 +106,11 @@ _DE_INTERESSE = {
     b"F120", b"F130",
 }
 
-# onde está a chave de cada tabela do bloco 0
-_CHAVE_DA_TABELA = {b"0140": 3, b"0150": 1, b"0200": 1, b"0500": 5}
+# as tabelas de cadastro e onde está a chave de cada uma. **Elas são do
+# estabelecimento, não do arquivo** — ver `sped/cadastro.py`. Foi assim que
+# esteve até 29/09/2026, e num cliente com matriz e filial isso trocava a
+# descrição e o NCM do item em cerca de 1,7% das linhas, calado
+_CHAVE_DO_CADASTRO = {b"0150": 1, b"0200": 1, b"0500": 5}
 
 # IND_OPER = 0 é entrada; 1 é saída
 ENTRADA = "0"
@@ -297,7 +308,7 @@ class _Contexto:
     def __init__(self, codificacao: str) -> None:
         self.codificacao = codificacao
         self.periodo = ""
-        self.tabelas: dict[bytes, dict[str, list[str]]] = {r: {} for r in _CHAVE_DA_TABELA}
+        self.cadastro = CadastroPorEstabelecimento(_CHAVE_DO_CADASTRO)
         # três estabelecimentos correntes, um por bloco. Ver o topo do módulo:
         # sem o do bloco D, documento de filial saía com CNPJ de matriz
         self.cnpj_c = self.cnpj_d = self.cnpj_f = ""
@@ -316,14 +327,14 @@ class _Contexto:
         self.por_ramo: dict[str, int] = {}
 
     # ---------- busca nas tabelas do bloco 0 ----------
-    def _participante(self, codigo: str) -> dict[str, str]:
+    def _participante(self, codigo: str, cnpj: str) -> dict[str, str]:
         """Os dados do participante, município incluído.
 
         O 0150 traz o município como código do IBGE; o nome sai da tabela. Os
         ramos sem participante — o C190 consolidado, o F120 e o F130 — ficam com
         a coluna em branco, que é o que ela significa ali: não há de quem.
         """
-        d = _nomeados("0150", self.tabelas[b"0150"].get(codigo, []))
+        d = _nomeados("0150", self.cadastro.linha(b"0150", codigo, cnpj))
         return {
             "codigo_do_participante": codigo,
             "cnpj_do_participante": d["0150_CNPJ"],
@@ -332,16 +343,16 @@ class _Contexto:
             "municipio_do_participante": tab_municipio.descricao(d["0150_COD_MUN"]),
         }
 
-    def _conta(self, codigo: str) -> tuple[str, str]:
-        return codigo, _nomeados("0500", self.tabelas[b"0500"].get(codigo, []))["0500_NOME_CTA"]
+    def _conta(self, codigo: str, cnpj: str) -> tuple[str, str]:
+        return codigo, _nomeados("0500", self.cadastro.linha(b"0500", codigo, cnpj))["0500_NOME_CTA"]
 
-    def _item(self, codigo: str) -> dict[str, str]:
-        d = _nomeados("0200", self.tabelas[b"0200"].get(codigo, []))
+    def _item(self, codigo: str, cnpj: str) -> dict[str, str]:
+        d = _nomeados("0200", self.cadastro.linha(b"0200", codigo, cnpj))
         return {"descricao": d["0200_DESCR_ITEM"], "ncm": d["0200_COD_NCM"],
                 "barra": d["0200_COD_BARRA"], "tipo": d["0200_TIPO_ITEM"]}
 
     def _uf_do_estabelecimento(self, cnpj: str) -> str:
-        return _nomeados("0140", self.tabelas[b"0140"].get(cnpj, []))["0140_UF"]
+        return _nomeados("0140", self.cadastro.estabelecimento(cnpj))["0140_UF"]
 
     def _uf_origem_destino(self, participante: str, cnpj: str) -> str:
         """"UF do participante / UF do estabelecimento".
@@ -349,7 +360,8 @@ class _Contexto:
         O 0150 não traz UF — só o código do município. A UF sai dos dois
         primeiros dígitos do código do IBGE, que é convenção pública e fixa.
         """
-        municipio = _nomeados("0150", self.tabelas[b"0150"].get(participante, []))["0150_COD_MUN"]
+        municipio = _nomeados(
+            "0150", self.cadastro.linha(b"0150", participante, cnpj))["0150_COD_MUN"]
         do_participante = tab_municipio.uf_do_municipio(municipio)
         do_estabelecimento = self._uf_do_estabelecimento(cnpj)
         return (f"{do_participante}/{do_estabelecimento}"
@@ -362,18 +374,22 @@ class _Contexto:
 
     # ---------- a passada ----------
     def ver(self, registro: bytes, valores: list[str]) -> Iterator[LinhaDeEntrada]:
-        if (posicao := _CHAVE_DA_TABELA.get(registro)) is not None:
-            if len(valores) > posicao:
-                self.tabelas[registro][valores[posicao]] = valores
+        if self.cadastro.guardar(registro, valores):
             return
         primeiro = valores[1].strip() if len(valores) > 1 else ""
+        if registro == b"0140":
+            self.cadastro.abrir(valores)
+            return
         if registro == b"0000":
             # o período é o mesmo em todas as linhas do arquivo, e quem lê o
             # 0000 é o domínio — nunca este módulo, por posição fixa. Ver
             # DECISOES de 22/09/2026: ele já mordeu duas vezes
             try:
-                self.periodo = ler_cabecalho("|" + "|".join(valores) + "|").inicio.replace(
-                    day=1).strftime("%d/%m/%Y")
+                cabecalho = ler_cabecalho("|" + "|".join(valores) + "|")
+                self.periodo = cabecalho.inicio.replace(day=1).strftime("%d/%m/%Y")
+                # é do cadastro da matriz que sai o campo que o do
+                # estabelecimento deixou em branco. Ver `sped/cadastro.py`
+                self.cadastro.definir_matriz(str(cabecalho.cnpj or ""))
             except ArquivoNaoReconhecido as erro:
                 log.warning("registro 0000 não reconhecido; o período fica em branco",
                             extra={"motivo": str(erro)})
@@ -433,8 +449,8 @@ class _Contexto:
     def _do_c170(self, valores: list[str]) -> LinhaDeEntrada:
         nota = _nomeados("C100", self.c100)
         item = _nomeados("C170", valores)
-        cadastro = self._item(item["C170_COD_ITEM"])
-        conta, nome_da_conta = self._conta(item["C170_COD_CTA"])
+        cadastro = self._item(item["C170_COD_ITEM"], self.cnpj_c)
+        conta, nome_da_conta = self._conta(item["C170_COD_CTA"], self.cnpj_c)
         participante = nota["C100_COD_PART"]
         return self._emitir(LinhaDeEntrada(
             cnpj=self.cnpj_c, periodo=self.periodo, registros=RAMO_C100,
@@ -473,14 +489,14 @@ class _Contexto:
             conta_contabil=conta, nome_da_conta=nome_da_conta,
             debito_ou_credito=_debito_ou_credito_suposto(item["C170_CST_PIS"],
                                                          item["C170_VL_PIS"]),
-            **self._participante(participante)))
+            **self._participante(participante, self.cnpj_c)))
 
     def _do_c505(self, valores: list[str]) -> LinhaDeEntrada:
         """Energia, água e gás. O C500 é sempre entrada — não tem IND_OPER."""
         doc = _nomeados("C500", self.c500)
         pis = _nomeados("C501", self.c501 or [])
         cofins = _nomeados("C505", valores)
-        conta, nome_da_conta = self._conta(pis["C501_COD_CTA"])
+        conta, nome_da_conta = self._conta(pis["C501_COD_CTA"], self.cnpj_c)
         participante = doc["C500_COD_PART"]
         return self._emitir(LinhaDeEntrada(
             cnpj=self.cnpj_c, periodo=self.periodo, registros=RAMO_C500,
@@ -502,15 +518,15 @@ class _Contexto:
             conta_contabil=conta, nome_da_conta=nome_da_conta,
             debito_ou_credito=_debito_ou_credito_suposto(pis["C501_CST_PIS"],
                                                          pis["C501_VL_PIS"]),
-            **self._participante(participante)))
+            **self._participante(participante, self.cnpj_c)))
 
     def _do_c190(self, filho_pis: list[str], filho_cofins: list[str]) -> LinhaDeEntrada:
         """Consolidação de NF-e. Sempre entrada."""
         grupo = _nomeados("C190", self.c190)
         pis = _nomeados("C191", filho_pis)
         cofins = _nomeados("C195", filho_cofins)
-        cadastro = self._item(grupo["C190_COD_ITEM"])
-        conta, nome_da_conta = self._conta(pis["C191_COD_CTA"])
+        cadastro = self._item(grupo["C190_COD_ITEM"], self.cnpj_c)
+        conta, nome_da_conta = self._conta(pis["C191_COD_CTA"], self.cnpj_c)
         return self._emitir(LinhaDeEntrada(
             cnpj=self.cnpj_c, periodo=self.periodo, registros=RAMO_C190,
             modelo=grupo["C190_COD_MOD"],
@@ -550,7 +566,7 @@ class _Contexto:
         doc = _nomeados("D100", self.d100)
         pis = _nomeados("D101", self.d101 or [])
         cofins = _nomeados("D105", valores)
-        conta, nome_da_conta = self._conta(pis["D101_COD_CTA"])
+        conta, nome_da_conta = self._conta(pis["D101_COD_CTA"], self.cnpj_d)
         participante = doc["D100_COD_PART"]
         return self._emitir(LinhaDeEntrada(
             cnpj=self.cnpj_d, periodo=self.periodo, registros=RAMO_D100,
@@ -574,14 +590,14 @@ class _Contexto:
             conta_contabil=conta, nome_da_conta=nome_da_conta,
             debito_ou_credito=_debito_ou_credito_suposto(pis["D101_CST_PIS"],
                                                          pis["D101_VL_PIS"]),
-            **self._participante(participante)))
+            **self._participante(participante, self.cnpj_d)))
 
     def _do_d505(self, valores: list[str]) -> LinhaDeEntrada:
         """Serviço de comunicação. Também do D010."""
         doc = _nomeados("D500", self.d500)
         pis = _nomeados("D501", self.d501 or [])
         cofins = _nomeados("D505", valores)
-        conta, nome_da_conta = self._conta(pis["D501_COD_CTA"])
+        conta, nome_da_conta = self._conta(pis["D501_COD_CTA"], self.cnpj_d)
         participante = doc["D500_COD_PART"]
         return self._emitir(LinhaDeEntrada(
             cnpj=self.cnpj_d, periodo=self.periodo, registros=RAMO_D500,
@@ -608,13 +624,13 @@ class _Contexto:
             conta_contabil=conta, nome_da_conta=nome_da_conta,
             debito_ou_credito=_debito_ou_credito_suposto(pis["D501_CST_PIS"],
                                                          pis["D501_VL_PIS"]),
-            **self._participante(participante)))
+            **self._participante(participante, self.cnpj_d)))
 
     def _do_f100(self, valores: list[str]) -> LinhaDeEntrada:
         """Demais documentos e operações. O CNPJ é o do F010."""
         d = _nomeados("F100", valores)
-        cadastro = self._item(d["F100_COD_ITEM"])
-        conta, nome_da_conta = self._conta(d["F100_COD_CTA"])
+        cadastro = self._item(d["F100_COD_ITEM"], self.cnpj_f)
+        conta, nome_da_conta = self._conta(d["F100_COD_CTA"], self.cnpj_f)
         participante = d["F100_COD_PART"]
         return self._emitir(LinhaDeEntrada(
             cnpj=self.cnpj_f, periodo=self.periodo, registros=RAMO_F100,
@@ -635,12 +651,12 @@ class _Contexto:
             cofins=_dinheiro(d["F100_VL_COFINS"]),
             conta_contabil=conta, nome_da_conta=nome_da_conta,
             debito_ou_credito=_debito_ou_credito_suposto(d["F100_CST_PIS"], d["F100_VL_PIS"]),
-            **self._participante(participante)))
+            **self._participante(participante, self.cnpj_f)))
 
     def _do_f120(self, valores: list[str]) -> LinhaDeEntrada:
         """Ativo imobilizado — depreciação. Registro único, sem filhos."""
         d = _nomeados("F120", valores)
-        conta, nome_da_conta = self._conta(d["F120_COD_CTA"])
+        conta, nome_da_conta = self._conta(d["F120_COD_CTA"], self.cnpj_f)
         return self._emitir(LinhaDeEntrada(
             cnpj=self.cnpj_f, periodo=self.periodo, registros=RAMO_F120,
             uf_origem_destino=self._uf_do_estabelecimento(self.cnpj_f),
@@ -664,7 +680,7 @@ class _Contexto:
     def _do_f130(self, valores: list[str]) -> LinhaDeEntrada:
         """Ativo imobilizado — aquisição. Registro único, sem filhos."""
         d = _nomeados("F130", valores)
-        conta, nome_da_conta = self._conta(d["F130_COD_CTA"])
+        conta, nome_da_conta = self._conta(d["F130_COD_CTA"], self.cnpj_f)
         return self._emitir(LinhaDeEntrada(
             cnpj=self.cnpj_f, periodo=self.periodo, registros=RAMO_F130,
             uf_origem_destino=self._uf_do_estabelecimento(self.cnpj_f),

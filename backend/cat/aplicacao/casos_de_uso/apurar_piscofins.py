@@ -1,8 +1,9 @@
 """Etapa: apurar PIS/COFINS — o par que se confronta.
 
 Lê a **EFD-Contribuições** e a **ECD** do lote e deixa em disco os dois lados:
-a **Consulta de Entradas (037)**, do lado fiscal, e o **razão contábil**, do
-lado da contabilidade. Onde os dois discordam é onde está o trabalho.
+do fiscal, a **Consulta de Entradas (037)** e a **Consulta de Saídas (047)**;
+da contabilidade, o **razão contábil**. Onde os dois lados discordam é onde
+está o trabalho.
 
 Até 23/09/2026 isto vinha dentro da quebra de SPED, porque portei as duas no
 mesmo dia. Não são a mesma coisa: a quebra **abre** os arquivos — diz que
@@ -121,7 +122,7 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
                           f"{milhar(len(ecds))} ECD para confrontar.")
     if not contribuicoes:
         diario.anotar("aviso", "Nenhuma EFD-Contribuições no lote: não haverá Consulta de "
-                               "Entradas, só o lado contábil.")
+                               "Entradas nem de Saídas, só o lado contábil.")
     if not ecds:
         diario.anotar("aviso", "Nenhuma ECD no lote: não haverá razão contábil, só o lado "
                                "fiscal. Sem os dois não há confronto.")
@@ -131,11 +132,11 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
 
     def andou(a: Andamento) -> None:
         execucao.arquivos_lidos = a.arquivos
-        execucao.documentos = a.entradas + a.razao
+        execucao.documentos = a.entradas + a.saidas + a.razao
         execucao.fracao = min(0.99, a.arquivos / max(total, 1))
         execucao.passo = f"Apurando {a.arquivos} de {total}"
         diario.base["andamento"] = {"arquivos": a.arquivos, "entradas": a.entradas,
-                                    "razao": a.razao}
+                                    "saidas": a.saidas, "razao": a.razao}
         diario.salvar_de_vez_em_quando()
 
     resumo = confrontar(contribuicoes, ecds, destino, avisar=andou, deve_parar=parar)
@@ -145,7 +146,7 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     execucao.passo = "Concluída"
     execucao.fracao = 1.0
     execucao.arquivos_lidos = resumo.arquivos
-    execucao.documentos = resumo.entradas + resumo.linhas_do_razao
+    execucao.documentos = resumo.entradas + resumo.saidas + resumo.linhas_do_razao
     diario.base.update(serializar(resumo))
     diario.base["segundos"] = segundos
     if resumo.ilegiveis:
@@ -156,13 +157,22 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     if resumo.contribuicoes and not resumo.entradas:
         diario.anotar("aviso", "Nenhuma entrada saiu das EFD-Contribuições. Confira se os "
                                "arquivos são do período certo e se têm bloco C.")
+    if resumo.nao_cobertos:
+        quais = ", ".join(f"{registro} ({milhar(quantos)})"
+                          for registro, quantos in sorted(resumo.nao_cobertos.items()))
+        # dizer o que ficou de fora, em vez de deixar descobrir somando a
+        # planilha. Ver `sped/saidas.py`, "O que ainda não está aqui"
+        diario.anotar("aviso", f"A Consulta de Saídas ainda não monta estes registros, que "
+                               f"existem nos arquivos: {quais}.")
     execucao.terminada_em = datetime.now(timezone.utc)
-    diario.anotar("info", f"Concluída em {duracao(segundos)}: {milhar(resumo.entradas)} entradas "
-                          f"e {milhar(resumo.linhas_do_razao)} linhas de razão.")
+    diario.anotar("info", f"Concluída em {duracao(segundos)}: {milhar(resumo.entradas)} entradas, "
+                          f"{milhar(resumo.saidas)} saídas e "
+                          f"{milhar(resumo.linhas_do_razao)} linhas de razão.")
     registrar_de_etapa(
         sessao, execucao.projeto_id, TipoDeEvento.ETAPA_CONCLUIDA, ETAPA,
-        f"PIS/COFINS apurado · {milhar(resumo.entradas)} entradas e "
-        f"{milhar(resumo.linhas_do_razao)} linhas de razão",
+        f"PIS/COFINS apurado · {milhar(resumo.entradas)} entradas, "
+        f"{milhar(resumo.saidas)} saídas e {milhar(resumo.linhas_do_razao)} linhas de razão",
         dados={"execucao_id": execucao.id, "arquivos": resumo.arquivos,
-               "entradas": resumo.entradas, "razao": resumo.linhas_do_razao,
+               "entradas": resumo.entradas, "saidas": resumo.saidas,
+               "razao": resumo.linhas_do_razao,
                "segundos": segundos}, autor_id=execucao.criada_por)

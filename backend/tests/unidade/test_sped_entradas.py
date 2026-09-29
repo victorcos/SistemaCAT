@@ -5,6 +5,11 @@ origem achou contra arquivo real era o documento do bloco D de uma filial sair
 com o CNPJ da matriz, porque o bloco D tem abridor próprio (D010) e o código
 usava o último C010 visto. Três CNPJ correntes convivem no arquivo, e o teste
 cobra os três.
+
+E o **mesmo SKU1 é outro produto na filial**, que é o segundo defeito desta
+família, achado em 29/09/2026 montando a 047: o 0200 pende do 0140, e tratá-lo
+como tabela única do arquivo faz a nota da matriz sair com a mercadoria da
+filial. Ver `sped/cadastro.py`.
 """
 
 import pytest
@@ -28,11 +33,12 @@ FILIAL = "11222333000262"
 
 EFD = """|0000|006|0|||01062021|30062021|COMERCIO DO TESTE LTDA|11222333000181|SP|3550308||00|2|
 |0140|001|MATRIZ|11222333000181|SP|111|3550308||||
-|0140|002|FILIAL CURITIBA|11222333000262|PR|222|4106902||||
 |0150|F01|FORNECEDOR ALFA|1058|99888777000166||111|3304557||||||
 |0200|SKU1|XAMPU 350ML||||00|33051000||||||
 |0500|01062021|01|A|3|3.1.1|COMPRAS DE MERCADORIA||
 |0500|01062021|01|A|3|3.2.1|ENERGIA ELETRICA||
+|0140|002|FILIAL CURITIBA|11222333000262|PR|222|4106902||||
+|0200|SKU1|CAIXA DE PAPELAO||||07|48191000||||||
 |C010|11222333000181|0|
 |C100|0|1|F01|55|00|1|1001|35210611222333000181550010000010011000010017|01062021|02062021|1000,00||10,00||900,00||50,00|||900,00|162,00||||||||
 |C170|1|SKU1|XAMPU GRANDE|10,000|UN|500,00|5,00|0|000|1102|N01|500,00|18,00|90,00||||0||||||50|500,00|1,6500|||8,25|50|500,00|7,6000|||38,00|3.1.1|
@@ -108,6 +114,29 @@ class TestOBlocoDTemEstabelecimentoProprio:
         # o participante é do RJ (cód. 3304557); os estabelecimentos, SP e PR
         assert nota.uf_origem_destino == "RJ/SP"
         assert transporte.uf_origem_destino == "RJ/PR"
+
+
+class TestOCadastroEDoEstabelecimento:
+    def test_o_item_da_matriz_nao_vem_do_cadastro_da_filial(self, linhas):
+        """SKU1 é xampu na matriz e caixa de papelão na filial.
+
+        A nota é da matriz. Sem escopo, o cadastro da filial — que aparece
+        depois no arquivo — sobrescreveria o da matriz e a linha sairia com a
+        mercadoria errada, e com o NCM errado junto.
+        """
+        nota = next(l for l in linhas if l.registros == RAMO_C100)
+        assert nota.descricao_do_item == "XAMPU 350ML"
+        assert nota.ncm == "33051000"
+        assert nota.tipo_do_item.startswith("00")
+
+    def test_o_bloco_d_acha_o_participante_cadastrado_na_matriz(self, linhas):
+        """O F01 só existe no cadastro da matriz, e o D100 é da filial.
+
+        Código que existe num estabelecimento só não tem ambiguidade: vale
+        procurá-lo fora do escopo. É a única busca fora do escopo que se faz.
+        """
+        transporte = next(l for l in linhas if l.registros == RAMO_D100)
+        assert transporte.nome_do_participante == "FORNECEDOR ALFA"
 
 
 class TestONotaFiscal:

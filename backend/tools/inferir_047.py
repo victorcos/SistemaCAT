@@ -39,6 +39,18 @@ Quarenta e seis das 53 colunas são **cópia direta**, e sete são **derivadas**
 * `Faturamento` — "Faturamento" quando a natureza é Venda, vazio nas demais;
 * `Situação` — é o C100_COD_SIT; aparece aqui como "sempre vazia" só porque
   nesta base é sempre "00", e o filtro de valor informativo descarta zero.
+
+## Isto é o andaime, não a obra
+
+A 047 existe desde 29/09/2026 em `sped/saidas.py`, conferida linha a linha
+contra as 7.784.121 do gabarito. **É lá que está o mapa verdadeiro**, e em
+alguns pontos ele não é o que esta ferramenta havia sugerido: a UF sai
+estabelecimento/participante e não o contrário, o cadastro do item pende do
+0140 e não do arquivo, e a nota cancelada rende linha — menos a NFC-e.
+
+Esta ferramenta fica porque o método serve para o próximo relatório do MA que
+precisar ser portado sem documentação. Quem a rodar de novo, leia o resultado
+como hipótese a conferir, nunca como resposta.
 """
 
 from __future__ import annotations

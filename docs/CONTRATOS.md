@@ -313,19 +313,47 @@ valor de confronto (20)/(21) é subtraído para dar ressarcimento e complemento.
 | `POST` | `/api/quebra-de-sped/{execucaoId}/cancelar` | quem escreve |
 | `GET` | `/api/quebra-de-sped/{execucaoId}/planilhas/{qual}` | quem vê o trabalho |
 
-`qual` vale `entradas` (a 037), `razao-contabil`, `arquivos` e `contagens`, em
-xlsx ou csv. O resumo da execução traz `entradas`, `linhas_do_razao`,
-`contribuicoes`, `ecd`, `ilegiveis`, `por_ramo`, `estabelecimentos`,
-`competencias` e `avisos`.
+`qual` vale `entradas` (a 037), `saidas` (a 047), `razao-contabil`, `arquivos` e
+`contagens`, em xlsx ou csv. O resumo da execução traz `entradas`, `saidas`,
+`linhas_do_razao`, `contribuicoes`, `ecd`, `ilegiveis`, `por_ramo`,
+`por_ramo_das_saidas`, `nao_cobertos`, `estabelecimentos`, `competencias` e
+`avisos`.
 
-Em disco, na pasta da execução: `entradas.parquet`, `razao.parquet`,
-`arquivos.parquet`, `contagens.parquet` e a pasta `indices/`, com um índice por
-arquivo lido — cache de leitura, descartável.
+Em disco, na pasta da execução: `entradas.parquet`, `saidas.parquet`,
+`razao.parquet`, `arquivos.parquet`, `contagens.parquet` e a pasta `indices/`,
+com um índice por arquivo lido — cache de leitura, descartável.
 
 A 037 tem **52 colunas** (v0.76.0: entrou `Município`, ao lado de
 `UF Origem/Destino` — as duas saem do mesmo código do IBGE do 0150). A coluna
 `Natureza do Crédito` é deduzida **do CFOP** nos ramos em que o registro não
 traz `NAT_BC_CRED` (C100/C170 e C190/C191/C195); nos demais é lida do arquivo.
+
+A 047 (v0.111.0) tem **53 colunas**, na ordem em que o MA exporta, e quatro
+ramos: `C100/C170`, `C100/C175`, `A100/A170` e `F100`. Conferida contra o
+gabarito do MA linha a linha — 7.784.121 linhas, 57 competências, as 53 colunas
+iguais. Três diferenças de regra em relação à 037, e nenhuma delas é escolha
+nossa:
+
+* `UF Origem/Destino` é **estabelecimento/participante** — o inverso da 037,
+  porque numa saída a origem somos nós;
+* `Natureza` é a da **operação** (Venda, Transferência, Devolução de compra,
+  Remessa, Lançamento de valor, Outras saídas/prestações), tirada do CFOP, e
+  `Faturamento` traz "Faturamento" quando a natureza é Venda;
+* `Descrição CFOP` vem quase por extenso, e não abreviada como na Gestão e na
+  037 — o MA usa duas grafias, e `tab_cfop` guarda as duas.
+
+`nao_cobertos` conta os registros de saída que a 047 ainda não monta — C180,
+C380, C400, C490, C600, C860, o bloco D, F500 a F560 e I100 —, e a tela os
+mostra. Nenhum cliente validado tem ocorrência deles; a contagem existe para que
+a ausência apareça em vez de virar planilha curta sem aviso.
+
+**As tabelas do bloco 0 pendem do 0140** (`sped/cadastro.py`, v0.111.0): 0150,
+0200 e 0500 são do estabelecimento, não do arquivo. O mesmo `COD_ITEM` é outra
+mercadoria na filial, e tratá-las como tabela única trocava descrição, NCM e
+código de barra. Campo que o estabelecimento deixou vazio se completa com o do
+**cadastro da matriz** — o CNPJ do 0000 —, e com o de mais ninguém. Vale para a 037 e para a 047; `sped/extracao.py`,
+`sped/consolidado.py` e `analitico/registros_do_sped.py` ainda não foram
+corrigidos.
 
 ### Crédito outorgado (v0.94.0)
 
