@@ -107,6 +107,13 @@ HIERARQUIAS: tuple[Hierarquia, ...] = (
     Hierarquia("C100+C170", "Notas e itens (C100 + C170)", "C170", ("C010", "C100"),
                (("0200", "COD_ITEM"), ("0150", "COD_PART"), ("0140", "CNPJ"),
                 ("0400", "COD_NAT"))),
+    # o analítico da NFC-e: não tem item, tem uma linha por CFOP e CST. Por
+    # isso não casa com o 0200 — e por isso é o registro mais numeroso do
+    # varejo, quatro de cada cinco linhas do 047 numa base real
+    Hierarquia("C100+C175", "NFC-e e o analítico dela (C100 + C175)", "C175",
+               ("C010", "C100"), (("0150", "COD_PART"),)),
+    Hierarquia("A100+A170", "Notas de serviço e itens (A100 + A170)", "A170",
+               ("A010", "A100"), (("0150", "COD_PART"), ("0200", "COD_ITEM"))),
     Hierarquia("C190+C191+C195", "Entradas consolidadas — PIS e COFINS (C190 + C191 + C195)",
                "C191", ("C010", "C190"), (("0200", "COD_ITEM"), ("0500", "COD_CTA")),
                par="C195"),
@@ -632,7 +639,9 @@ def _nomear(linha: dict[str, str], registro: str, valores: Iterable[str]) -> Non
     for campo in CAMPOS[registro]:
         linha.setdefault(f"{registro}_{campo}", "")
     for i, campo in enumerate(campos_de(registro, len(lista))):
-        linha[f"{registro}_{campo}"] = lista[i]
+        # a linha pode vir mais curta que o leiaute — o pai que ainda não
+        # apareceu chega vazio, e o SPED corta campo final em branco
+        linha[f"{registro}_{campo}"] = lista[i] if i < len(lista) else ""
 
 
 def _campo(registro: str, valores: list[str], campo: str) -> str:

@@ -46,6 +46,32 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "COD_LST", "ALIQ_ICMS",
     ),
     "0400": ("REG", "COD_NAT", "DESCR_NAT"),
+
+    # --- serviços (bloco A) e o analítico da NFC-e (C175) ---
+    # Entraram em 29/09/2026, com o 047. Contagem e formato de cada campo
+    # conferidos contra a EFD real da DMINAS de 10/2025.
+    "A010": ("REG", "CNPJ"),
+    "A100": (
+        "REG", "IND_OPER", "IND_EMIT", "COD_PART", "COD_SIT", "SER", "SUB",
+        "NUM_DOC", "CHV_NFSE", "DT_DOC", "DT_EXE_SERV", "VL_DOC", "IND_PGTO",
+        "VL_DESC", "VL_BC_PIS", "VL_PIS", "VL_BC_COFINS", "VL_COFINS",
+        "VL_PIS_RET", "VL_COFINS_RET", "VL_ISS",
+    ),
+    "A170": (
+        "REG", "NUM_ITEM", "COD_ITEM", "DESCR_COMPL", "VL_ITEM", "VL_DESC",
+        "NAT_BC_CRED", "IND_ORIG_CRED", "CST_PIS", "VL_BC_PIS", "ALIQ_PIS",
+        "VL_PIS", "CST_COFINS", "VL_BC_COFINS", "ALIQ_COFINS", "VL_COFINS",
+        "COD_CTA", "COD_CCUS",
+    ),
+    # o analítico da NFC-e (modelo 65). Não tem item: tem uma linha por CFOP e
+    # CST, e é por isso que ele não casa com o 0200 — numa base de varejo é o
+    # registro mais numeroso de todos (6,7 milhões numa empresa de 57 meses)
+    "C175": (
+        "REG", "CFOP", "VL_OPR", "VL_DESC", "CST_PIS", "VL_BC_PIS", "ALIQ_PIS",
+        "QUANT_BC_PIS", "ALIQ_PIS_QUANT", "VL_PIS", "CST_COFINS", "VL_BC_COFINS",
+        "ALIQ_COFINS", "QUANT_BC_COFINS", "ALIQ_COFINS_QUANT", "VL_COFINS",
+        "COD_CTA", "INFO_COMPL",
+    ),
     "C010": ("REG", "CNPJ", "IND_ESCRIT"),
     "C100": (
         "REG", "IND_OPER", "IND_EMIT", "COD_PART", "COD_MOD", "COD_SIT",

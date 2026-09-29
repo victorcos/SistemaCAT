@@ -95,6 +95,24 @@ def sped(competencia_ini: str, competencia_fim: str) -> str:
         reg("C195", COD_PART="F001", CST_COFINS="50", CFOP="1102", VL_ITEM="40,00",
             VL_BC_COFINS="40,00", ALIQ_COFINS_PERC="7,60", VL_COFINS="3,04",
             COD_CTA="31010001"),
+        # a NFC-e e o analítico dela: sem item, uma linha por CFOP e CST
+        reg("C100", IND_OPER="1", IND_EMIT="0", COD_MOD="65", COD_SIT="00",
+            SER="002", NUM_DOC="900",
+            CHV_NFE="35210511222333000181650010000009001000000009",
+            DT_DOC="06062021", DT_E_S="06062021", VL_DOC="25,00", VL_MERC="25,00"),
+        reg("C175", CFOP="5102", VL_OPR="25,00", CST_PIS="01", VL_BC_PIS="25,00",
+            ALIQ_PIS="1,6500", VL_PIS="0,41", CST_COFINS="01", VL_BC_COFINS="25,00",
+            ALIQ_COFINS="7,6000", VL_COFINS="1,90", COD_CTA="31010001"),
+        # serviços, que têm bloco e abridor próprios
+        reg("A010", CNPJ=CNPJ),
+        reg("A100", IND_OPER="1", IND_EMIT="0", COD_PART="F001", COD_SIT="00",
+            NUM_DOC="7", DT_DOC="07062021", DT_EXE_SERV="07062021", VL_DOC="500,00",
+            IND_PGTO="0", VL_BC_PIS="500,00", VL_PIS="8,25",
+            VL_BC_COFINS="500,00", VL_COFINS="38,00"),
+        reg("A170", NUM_ITEM="1", COD_ITEM="S01", DESCR_COMPL="FRETE CONTRATADO",
+            VL_ITEM="500,00", CST_PIS="01", VL_BC_PIS="500,00", ALIQ_PIS="1,6500",
+            VL_PIS="8,25", CST_COFINS="01", VL_BC_COFINS="500,00",
+            ALIQ_COFINS="7,6000", VL_COFINS="38,00", COD_CTA="41010001"),
         reg("C860", COD_MOD="59", NR_SAT="900001", DT_DOC="04062021",
             DOC_INIC="1", DOC_FIM="9"),
         reg("C870", COD_ITEM="P01", CFOP="5102", VL_ITEM="12,00", CST_PIS="01",
@@ -150,7 +168,8 @@ class TestOQueDaParaExtrair:
     def test_os_blocos_saem_para_a_tela_filtrar(self, quebrado):
         d = disponiveis(quebrado)
 
-        assert set(d["blocos"]) == {"0", "C", "M"}
+        # o bloco A entrou com as notas de serviço, em 29/09/2026
+        assert set(d["blocos"]) == {"0", "A", "C", "M"}
         assert d["rotulos_dos_blocos"]["C"].startswith("Bloco C")
         assert {l["bloco"] for l in d["linhas"] if l["alvo"] == "C170"} == {"C"}
 
@@ -339,7 +358,8 @@ class TestOLeiauteQueMudou:
 
     def test_as_quantidades_batem_com_o_arquivo_real(self):
         esperado = {"0000": 14, "0140": 9, "0150": 13, "0200": 12, "0400": 3,
-                    "0500": 9, "C010": 3, "C100": 29, "C170": 37,
+                    "0500": 9, "C010": 3, "C100": 29, "C170": 37, "C175": 18,
+                    "A010": 2, "A100": 21, "A170": 18,
                     "M200": 13, "M210": 16, "M610": 16, "F100": 19}
 
         assert {r: len(CAMPOS[r]) for r in esperado} == esperado
@@ -367,3 +387,35 @@ class TestOLeiauteQueMudou:
         assert campos_de("C170", 37) == CAMPOS["C170"]
         assert campos_de("C170", 99) == CAMPOS["C170"]
         assert campos_de("ZZZZ", 5) == ()
+
+
+# ---------------------------------------------------------------------------
+# o que o 047 percorre: a NFC-e e o serviço
+# ---------------------------------------------------------------------------
+class TestOAnaliticoDaNfce:
+    def test_o_c175_sai_com_a_nota_e_sem_item(self, quebrado):
+        """O C175 é o analítico da NFC-e: uma linha por CFOP e CST, sem item.
+        Numa base de varejo ele é quatro de cada cinco linhas do 047."""
+        linhas = _linhas(extrair(quebrado, "C100+C175"))
+
+        assert len(linhas) == 2
+        assert linhas[0]["C100_COD_MOD"] == "65"
+        assert linhas[0]["C100_NUM_DOC"] == "900"
+        assert linhas[0]["C175_CFOP"] == "5102"
+        assert linhas[0]["C175_VL_OPR"] == "25,00"
+        assert linhas[0]["C175_CST_PIS"] == "01"
+        assert linhas[0]["C175_VL_COFINS"] == "1,90"
+        # não há item para casar: o C175 não tem COD_ITEM
+        assert "0200_DESCR_ITEM" not in linhas[0]
+
+    def test_o_bloco_a_tem_abridor_proprio(self, quebrado):
+        """O A010 abre o bloco de serviços, como o C010 abre o de mercadorias:
+        sem ele, a nota de serviço sairia pendurada no estabelecimento errado."""
+        linhas = _linhas(extrair(quebrado, "A100+A170"))
+
+        assert len(linhas) == 2
+        assert linhas[0]["A010_CNPJ"] == CNPJ
+        assert linhas[0]["A100_NUM_DOC"] == "7"
+        assert linhas[0]["A170_COD_ITEM"] == "S01"
+        assert linhas[0]["A170_VL_ITEM"] == "500,00"
+        assert linhas[0]["0150_NOME"] == "FORNECEDOR ALFA"

@@ -66,7 +66,8 @@ log = obter_log(__name__)
 # diz quais alvos indexou, então um índice da versão 3 serviria sem o C870 e a
 # extração responderia "registro não indexado" para um arquivo que o tem. A
 # versão é o que força refazer — e refazer custa uma passada no arquivo
-VERSAO_DO_ESQUEMA = 4
+# 5 em 29/09/2026: entraram o C175 e o bloco A, que o 047 precisa
+VERSAO_DO_ESQUEMA = 5
 
 # Os registros cujas posições se guardam por padrão. Guardar de todos custaria
 # memória à toa: a contagem já responde a maior parte das perguntas, e posição
@@ -78,7 +79,9 @@ VERSAO_DO_ESQUEMA = 4
 # jeito, metade do outro, e a apuração tem de ler os dois.
 ALVOS_PADRAO: tuple[str, ...] = (
     "0140", "0150", "0200", "0400", "0500", "C010",
-    "C100", "C170",
+    "C100", "C170", "C175",
+    # serviços: o bloco A tem abridor próprio, como o D
+    "A010", "A100", "A170",
     "C180", "C181", "C185",
     "C190", "C191", "C195",
     # o cupom fiscal (ECF) e o CF-e SAT: é o que o varejo emite, e a EFD não
