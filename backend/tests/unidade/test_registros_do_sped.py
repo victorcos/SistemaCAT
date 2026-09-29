@@ -326,3 +326,44 @@ class TestORecorte:
         recortado = extrair(quebrado, "C170", Recorte(cst_pis=frozenset({"01"})))
 
         assert inteiro != recortado
+
+
+# ---------------------------------------------------------------------------
+# o leiaute que muda de tamanho
+# ---------------------------------------------------------------------------
+class TestOLeiauteQueMudou:
+    """Cinco leiautes estavam errados, e o erro só apareceu ao medir contra
+    arquivo real (três competências da DMINAS, 29/09/2026). O que se fixa aqui
+    é a **quantidade de campos**: ela é o que o arquivo confirma, e um campo a
+    mais ou a menos desloca tudo o que vem depois sem erro nenhum."""
+
+    def test_as_quantidades_batem_com_o_arquivo_real(self):
+        esperado = {"0000": 14, "0140": 9, "0150": 13, "0200": 12, "0400": 3,
+                    "0500": 9, "C010": 3, "C100": 29, "C170": 37,
+                    "M200": 13, "M210": 16, "M610": 16, "F100": 19}
+
+        assert {r: len(CAMPOS[r]) for r in esperado} == esperado
+
+    def test_o_m210_antigo_nao_desloca_a_aliquota(self):
+        """Até 2018 o M210 tinha 13 campos; em 2019 ganhou três ajustes de base
+        **no meio**. Ler o antigo com o leiaute novo põe a alíquota na coluna do
+        ajuste — dois números de duas casas, e ninguém percebe."""
+        from cat.infraestrutura.sped.registros import campos_de  # noqa: PLC0415
+
+        antigo = campos_de("M210", 13)
+        novo = campos_de("M210", 16)
+
+        assert antigo[4] == "ALIQ_PIS"
+        assert novo[4] == "VL_AJUS_ACRES_BC"
+        assert novo[7] == "ALIQ_PIS"
+        # o antigo é o novo menos os três ajustes de base: mesmos nomes, mesma ordem
+        assert list(antigo) == [c for c in novo
+                                if c not in ("VL_AJUS_ACRES_BC", "VL_AJUS_REDUC_BC",
+                                             "VL_BC_CONT_AJUS")]
+
+    def test_registro_de_tamanho_desconhecido_cai_no_leiaute_da_tabela(self):
+        from cat.infraestrutura.sped.registros import campos_de  # noqa: PLC0415
+
+        assert campos_de("C170", 37) == CAMPOS["C170"]
+        assert campos_de("C170", 99) == CAMPOS["C170"]
+        assert campos_de("ZZZZ", 5) == ()

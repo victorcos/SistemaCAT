@@ -26,18 +26,24 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "IND_NAT_PJ", "IND_ATIV",
     ),
     # cadastro do estabelecimento; liga ao bloco C pelo CNPJ do C010
+    # 9 campos. Tinha um `IND_SIT_INI_PER` a mais, que é da EFD ICMS/IPI e não
+    # desta — ele empurrava o `IND_ATIV` para uma coluna que o arquivo não tem.
+    # Conferido contra três competências reais em 29/09/2026
     "0140": (
         "REG", "COD_EST", "NOME", "CNPJ", "UF", "IE", "COD_MUN",
-        "SUFRAMA", "IND_SIT_INI_PER", "IND_ATIV",
+        "SUFRAMA", "IND_ATIV",
     ),
     "0150": (
         "REG", "COD_PART", "NOME", "COD_PAIS", "CNPJ", "CPF", "IE",
         "COD_MUN", "SUFRAMA", "END", "NUM", "COMPL", "BAIRRO",
     ),
+    # 12 campos. O CEST saiu em 29/09/2026: ele existe no 0200 da EFD ICMS/IPI,
+    # e não no desta — a coluna vinha sempre vazia, prometendo um dado que o
+    # arquivo não traz
     "0200": (
         "REG", "COD_ITEM", "DESCR_ITEM", "COD_BARRA", "COD_ANT_ITEM",
         "UNID_INV", "TIPO_ITEM", "COD_NCM", "EX_IPI", "COD_GEN",
-        "COD_LST", "ALIQ_ICMS", "CEST",
+        "COD_LST", "ALIQ_ICMS",
     ),
     "0400": ("REG", "COD_NAT", "DESCR_NAT"),
     "C010": ("REG", "CNPJ", "IND_ESCRIT"),
@@ -50,9 +56,11 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "VL_PIS_ST", "VL_COFINS_ST",
     ),
     # plano de contas; o COD_CTA dos filhos consolidados aponta para cá
+    # 9 campos. Faltava o último, e o oitavo estava com o nome do leiaute do
+    # ICMS/IPI (`COD_CTA_SUP`); aqui ele é a conta do plano referencial
     "0500": (
         "REG", "DT_ALT", "COD_NAT_CC", "IND_CTA", "NIVEL", "COD_CTA", "NOME_CTA",
-        "COD_CTA_SUP",
+        "COD_CTA_REF", "CNPJ_EST",
     ),
     # --- o caminho consolidado: quando o contribuinte não escritura item a item ---
     # C180 é a consolidação das notas EMITIDAS; C190, das ADQUIRIDAS. Os dois têm
@@ -185,10 +193,16 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "VL_TOT_CONT_CUM_PER", "VL_RET_CUM", "VL_OUT_DED_CUM", "VL_CONT_CUM_REC",
         "VL_TOT_CONT_REC",
     ),
+    # 16 campos desde 2019, quando entraram os três ajustes de **base de
+    # cálculo**. O leiaute antigo, de 13, continua vivo em arquivo de 2018 para
+    # trás e está em `CAMPOS_ANTIGOS` — é `campos_de()` que escolhe, pela
+    # quantidade de campos da própria linha. Os nomes são os que a Gestão
+    # conferiu contra o MA em 59 competências
     "M210": (
-        "REG", "COD_CONT", "VL_REC_BRT", "VL_BC_CONT", "ALIQ_PIS", "QUANT_BC_PIS",
-        "ALIQ_PIS_REAIS", "VL_CONT_APU", "VL_AJUS_ACRES", "VL_AJUS_REDUC", "VL_CONT_DIF",
-        "VL_CONT_DISP", "IND_DESC_CONT", "VL_CONT_DESC", "SLD_CRED",
+        "REG", "COD_CONT", "VL_REC_BRT", "VL_BC_CONT", "VL_AJUS_ACRES_BC",
+        "VL_AJUS_REDUC_BC", "VL_BC_CONT_AJUS", "ALIQ_PIS", "QUANT_BC_PIS",
+        "ALIQ_PIS_QUANT", "VL_CONT_APUR", "VL_AJUS_ACRES", "VL_AJUS_REDUC",
+        "VL_CONT_DIFER", "VL_CONT_DIFER_ANT", "VL_CONT_PER",
     ),
     "M220": ("REG", "IND_AJ", "VL_AJ", "COD_AJ", "NUM_DOC", "DESCR_AJ", "DT_REF"),
     # e o espelho, na COFINS
@@ -210,10 +224,12 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "VL_TOT_CONT_CUM_PER", "VL_RET_CUM", "VL_OUT_DED_CUM", "VL_CONT_CUM_REC",
         "VL_TOT_CONT_REC",
     ),
+    # o espelho do M210, com os mesmos 16 — ver a nota lá
     "M610": (
-        "REG", "COD_CONT", "VL_REC_BRT", "VL_BC_CONT", "ALIQ_COFINS", "QUANT_BC_COFINS",
-        "ALIQ_COFINS_REAIS", "VL_CONT_APU", "VL_AJUS_ACRES", "VL_AJUS_REDUC",
-        "VL_CONT_DIF", "VL_CONT_DISP", "IND_DESC_CONT", "VL_CONT_DESC", "SLD_CRED",
+        "REG", "COD_CONT", "VL_REC_BRT", "VL_BC_CONT", "VL_AJUS_ACRES_BC",
+        "VL_AJUS_REDUC_BC", "VL_BC_CONT_AJUS", "ALIQ_COFINS", "QUANT_BC_COFINS",
+        "ALIQ_COFINS_QUANT", "VL_CONT_APUR", "VL_AJUS_ACRES", "VL_AJUS_REDUC",
+        "VL_CONT_DIFER", "VL_CONT_DIFER_ANT", "VL_CONT_PER",
     ),
     "M620": ("REG", "IND_AJ", "VL_AJ", "COD_AJ", "NUM_DOC", "DESCR_AJ", "DT_REF"),
     # ---- cupom fiscal (ECF) e CF-e SAT ----
@@ -255,6 +271,37 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "ALIQ_COFINS_PERC", "VL_COFINS", "COD_CTA",
     ),
 }
+
+
+# Leiautes que mudaram de tamanho e cujo arquivo antigo ainda circula. A chave
+# é (registro, quantidade de campos da linha).
+#
+# **Por que pela quantidade, e não pela data do arquivo.** A data diz quando a
+# competência é; o leiaute, qual PVA gerou o arquivo. Uma retificadora de 2018
+# transmitida em 2024 sai no leiaute novo, e ninguém avisa.
+CAMPOS_ANTIGOS: dict[tuple[str, int], tuple[str, ...]] = {
+    ("M210", 13): (
+        "REG", "COD_CONT", "VL_REC_BRT", "VL_BC_CONT", "ALIQ_PIS", "QUANT_BC_PIS",
+        "ALIQ_PIS_QUANT", "VL_CONT_APUR", "VL_AJUS_ACRES", "VL_AJUS_REDUC",
+        "VL_CONT_DIFER", "VL_CONT_DIFER_ANT", "VL_CONT_PER",
+    ),
+    ("M610", 13): (
+        "REG", "COD_CONT", "VL_REC_BRT", "VL_BC_CONT", "ALIQ_COFINS", "QUANT_BC_COFINS",
+        "ALIQ_COFINS_QUANT", "VL_CONT_APUR", "VL_AJUS_ACRES", "VL_AJUS_REDUC",
+        "VL_CONT_DIFER", "VL_CONT_DIFER_ANT", "VL_CONT_PER",
+    ),
+}
+
+
+def campos_de(registro: str, quantos: int) -> tuple[str, ...]:
+    """Os nomes **desta linha**, que nem sempre são os da tabela.
+
+    O M210 ganhou três campos em 2019, no meio do registro: ler um arquivo
+    antigo com o leiaute novo põe a alíquota na coluna do ajuste de base, e o
+    erro não aparece — os dois são número com duas casas.
+    """
+    antigo = CAMPOS_ANTIGOS.get((registro, quantos))
+    return antigo if antigo is not None else CAMPOS.get(registro, ())
 
 
 def nomes_dos_campos(registro: str) -> tuple[str, ...]:

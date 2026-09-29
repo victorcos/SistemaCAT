@@ -1,5 +1,10 @@
 """O bloco M: a apuração das contribuições e os ajustes dela.
 
+A amostra do M210 e do M610 foi refeita em 29/09/2026: ela tinha 15 campos,
+que é o leiaute que o nosso `registros.py` dizia — e que não existe. O de
+verdade tem 16 desde 2019, com três ajustes de **base de cálculo** no meio. O
+teste passava porque amostra e código erravam igual.
+
 A amostra tem as duas contribuições, para provar que PIS e COFINS são espelhos
 e que uma função só lê os dois. E tem o caso que estraga a leitura ingênua: dois
 M210 debaixo do mesmo M200, cada um com o seu ajuste — o M220 do segundo não
@@ -23,14 +28,14 @@ EFD = """|0000|006|0|||01062021|30062021|COMERCIO DO TESTE LTDA|11222333000181|S
 |M105|01|50|10000,00|0,00|10000,00|10000,00|||1|
 |M110|0|15,00|01|DOC1|AJUSTE DE CREDITO|30062021|
 |M200|330,00|165,00|0,00|165,00|0,00|0,00|165,00|0,00|0,00|0,00|0,00|165,00|
-|M210|01|20000,00|20000,00|1,6500|||330,00|10,00|0,00|0,00|330,00|0|330,00|0,00|
+|M210|01|20000,00|20000,00|0,00|0,00|20000,00|1,6500|||330,00|10,00|0,00|0,00|0,00|330,00|
 |M220|0|10,00|02|DOC2|AJUSTE DA CONTRIBUICAO A MAIOR|30062021|
-|M210|02|5000,00|5000,00|0,6500|||32,50|0,00|5,00|0,00|32,50|0|32,50|0,00|
+|M210|02|5000,00|5000,00|0,00|0,00|5000,00|0,6500|||32,50|0,00|5,00|0,00|0,00|32,50|
 |M220|1|5,00|03|DOC3|AJUSTE DA CONTRIBUICAO A MENOR|30062021|
 |M500|101|0|10000,00|7,6000||||0,00|0,00|0,00|760,00|0|760,00|0,00|
 |M505|01|50|10000,00|0,00|10000,00|10000,00|||1|
 |M600|1520,00|760,00|0,00|760,00|0,00|0,00|760,00|0,00|0,00|0,00|0,00|760,00|
-|M610|01|20000,00|20000,00|7,6000|||1520,00|0,00|0,00|0,00|1520,00|0|1520,00|0,00|
+|M610|01|20000,00|20000,00|0,00|0,00|20000,00|7,6000|||1520,00|0,00|0,00|0,00|0,00|1520,00|
 |M620|0|20,00|04|DOC4|AJUSTE COFINS|30062021|
 |9999|15|
 """
@@ -49,7 +54,7 @@ class TestACadeia:
 
         assert len(linhas) == 2
         assert [l["M210_COD_CONT"] for l in linhas] == ["01", "02"]
-        assert [l["M210_VL_CONT_APU"] for l in linhas] == ["330,00", "32,50"]
+        assert [l["M210_VL_CONT_APUR"] for l in linhas] == ["330,00", "32,50"]
         # o M200 é o mesmo nas duas: é a consolidação do período
         assert {l["M200_VL_TOT_CONT_REC"] for l in linhas} == {"165,00"}
 
@@ -65,7 +70,7 @@ class TestACadeia:
         linhas = list(cadeia(arquivo, "cp1252", "M220"))
 
         assert [l["M210_COD_CONT"] for l in linhas] == ["01", "02"]
-        assert [l["M210_VL_CONT_APU"] for l in linhas] == ["330,00", "32,50"]
+        assert [l["M210_VL_CONT_APUR"] for l in linhas] == ["330,00", "32,50"]
 
     def test_a_base_do_credito_sai_com_o_credito(self, arquivo):
         linhas = list(cadeia(arquivo, "cp1252", "M105"))

@@ -51,7 +51,7 @@ from cat.infraestrutura.analitico.quebra_de_sped import (
 from cat.infraestrutura.sped.extracao import RegistroNaoIndexado, registros
 from cat.infraestrutura.sped.indice import IndiceDoArquivo, buscar
 from cat.infraestrutura.sped.leitor import campos_da_linha
-from cat.infraestrutura.sped.registros import CAMPOS
+from cat.infraestrutura.sped.registros import CAMPOS, campos_de
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -526,10 +526,12 @@ def _do_registro(caminho: str, indice: IndiceDoArquivo, registro: str,
         linhas = registros(caminho, indice, registro)
     except RegistroNaoIndexado:
         return
-    nomes = CAMPOS[registro]
     for valores in linhas:
         linha = dict(origem)
-        for i, campo in enumerate(nomes):
+        # os nomes são os **desta linha**: o M210 ganhou três campos em 2019, e
+        # um arquivo antigo lido com o leiaute novo põe a alíquota na coluna do
+        # ajuste de base — dois números de duas casas, e o erro não aparece
+        for i, campo in enumerate(campos_de(registro, len(valores))):
             linha[campo] = valores[i] if i < len(valores) else ""
         acrescentar(linha)
 
@@ -624,13 +626,18 @@ def _nomear(linha: dict[str, str], registro: str, valores: Iterable[str]) -> Non
     if not registro:
         return
     lista = list(valores)
-    for i, campo in enumerate(CAMPOS[registro]):
-        linha[f"{registro}_{campo}"] = lista[i] if i < len(lista) else ""
+    # a coluna é a do leiaute canônico; o **nome de cada posição** é o da linha.
+    # Num arquivo antigo os três ajustes de base não existem, e as colunas deles
+    # ficam vazias — que é a verdade, e não um valor deslocado
+    for campo in CAMPOS[registro]:
+        linha.setdefault(f"{registro}_{campo}", "")
+    for i, campo in enumerate(campos_de(registro, len(lista))):
+        linha[f"{registro}_{campo}"] = lista[i]
 
 
 def _campo(registro: str, valores: list[str], campo: str) -> str:
     """O valor de um campo pelo nome do leiaute. Vazio quando o registro não o tem."""
-    nomes = CAMPOS.get(registro, ())
+    nomes = campos_de(registro, len(valores))
     if campo not in nomes:
         return ""
     i = nomes.index(campo)
