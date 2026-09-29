@@ -125,6 +125,16 @@ public interface IMotor
 
     Task<System.Text.Json.JsonElement> EstabelecimentosDoRazaoContabil(int execucaoId, CancellationToken cancelar);
 
+    /// <summary>O que há para escolher na 047, com o tamanho de cada escolha.</summary>
+    /// <exception cref="MotorRecusou">não é apuração (404), não terminou (409), material apagado (410)</exception>
+    Task<System.Text.Json.JsonElement> FiltrosDasSaidas(int execucaoId, RecorteDasSaidas recorte, CancellationToken cancelar);
+
+    /// <summary>Uma página das linhas da 047, com os totais do recorte inteiro.</summary>
+    Task<System.Text.Json.JsonElement> LinhasDasSaidas(int execucaoId, PedidoDasSaidas pedido, CancellationToken cancelar);
+
+    /// <summary>A planilha da 047 recortada como a tela está mostrando.</summary>
+    Task<PlanilhaPronta> PlanilhaDasSaidas(int execucaoId, PedidoDaPlanilhaDasSaidas pedido, CancellationToken cancelar);
+
     /// <summary>O que dá para extrair de uma quebra: registros, hierarquias e blocos.</summary>
     /// <exception cref="MotorRecusou">não é quebra (404), não terminou (409), material apagado (410)</exception>
     Task<System.Text.Json.JsonElement> AlvosDaQuebra(int execucaoId, CancellationToken cancelar);

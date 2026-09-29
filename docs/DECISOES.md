@@ -5,6 +5,48 @@
 
 ---
 
+## 2026-09-29 — A 047 ganha tela: recortar antes de olhar, e baixar o que se olhou
+
+**O problema que o download não resolve.** A 047 do cliente de referência tem
+7.784.121 linhas. O Excel para em 1.048.576 por aba, e mesmo que abrisse,
+ninguém lê sete milhões de linhas — quem confere quer uma competência, um CFOP,
+uma nota. O download continua valendo para quem leva o arquivo inteiro para
+outro sistema; a tela existe para o outro gesto.
+
+**Mesma forma do razão contábil**, e de propósito: recortar primeiro, olhar
+depois, tudo paginado no servidor. Quem já usou uma sabe usar a outra.
+
+**Os filtros dizem o tamanho de cada escolha.** Cada chip traz quantas linhas
+aquele valor rende, e é isso que permite decidir antes de pedir: "este CFOP são
+quatro milhões de linhas" muda o clique seguinte.
+
+**Cada lista é contada sem o próprio filtro.** Marcar o CFOP 5102 encolhe a
+lista de CST e a de competência — que é o que mostra o que aquele CFOP tem
+dentro —, mas **não** encolhe a lista de CFOP. Se encolhesse, o filtro seria de
+mão única: quem marcasse um CFOP nunca mais acharia outro para marcar junto.
+
+**A busca livre não entra no resumo, e a tela diz isso.** O resumo é agregado
+por estabelecimento, competência, ramo, CFOP e CST — não tem chave nem descrição
+de item, que é onde a busca procura. Então os chips contam sem a busca e o total
+do alto conta com ela; sem avisar, alguém somaria os chips e acharia que o
+sistema erra. Quem conta a busca é a consulta das linhas, que lê o parquet.
+
+**Os totais são do recorte inteiro, nunca da página.** Total que muda ao virar
+a página não serve para conferir nada.
+
+**O download sai do tamanho da tela**, com a marca do recorte no nome do
+arquivo: sem ela o primeiro download ficaria em cache e o segundo filtro
+devolveria a planilha errada, com o nome certo. É o mesmo cuidado que a extração
+de registro já tinha, pelo mesmo motivo.
+
+**Um resumo materializado responde os filtros.** Levantar os valores distintos
+varrendo 7,8 milhões de linhas a cada abertura seria segundos de tela branca — e
+tela branca é o que faz alguém achar que não há dado e ir embora. O resumo tem
+alguns milhares de linhas e responde em 0,03 s; a primeira leitura o escreve, e
+ele se refaz sozinho quando a apuração roda de novo.
+
+---
+
 ## 2026-09-29 — A 047 sai da EFD-Contribuições, e o gabarito confirma linha a linha
 
 **O que entrou.** A **Consulta de Saídas (047)** do Sistema MA, gerada só a

@@ -42,6 +42,7 @@ export const ROTAS = {
   quebraXml: (id: number | string) => `/projetos/${id}/quebra-xml`,
   /** o razão da ECD, com seletor de conta — sai da quebra de SPED */
   razaoContabil: (id: number | string) => `/projetos/${id}/razao-contabil`,
+  consultaDeSaidas: (id: number | string) => `/projetos/${id}/consulta-de-saidas`,
   entrega: (id: number | string) => `/projetos/${id}/entrega`,
   historico: (id: number | string) => `/projetos/${id}/historico`,
 } as const;

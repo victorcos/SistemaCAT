@@ -137,6 +137,42 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
             ["execucao_id"] = execucaoId,
         }), PrazoLinhas, cancelar);
 
+    // A 047 na tela. O recorte é um objeto só, e vai aninhado: são seis campos,
+    // e espalhá-los na raiz do corpo como a extração faz já se mostrou caro de
+    // manter — lá são dezenove, e cada um novo toca quatro arquivos.
+    private static Dictionary<string, object?> Corpo(int execucaoId, RecorteDasSaidas r) => new()
+    {
+        ["execucao_id"] = execucaoId,
+        ["recorte"] = new Dictionary<string, object?>
+        {
+            ["cnpjs"] = r.Cnpjs, ["competencias"] = r.Competencias, ["ramos"] = r.Ramos,
+            ["cfops"] = r.Cfops, ["cst_pis"] = r.CstPis, ["busca"] = r.Busca,
+        },
+    };
+
+    public async Task<JsonElement> FiltrosDasSaidas(int execucaoId, RecorteDasSaidas recorte, CancellationToken cancelar) =>
+        await Chamar("interno/saidas/filtros", JsonContent.Create(Corpo(execucaoId, recorte)),
+            PrazoLinhas, cancelar);
+
+    public async Task<JsonElement> LinhasDasSaidas(int execucaoId, PedidoDasSaidas pedido, CancellationToken cancelar)
+    {
+        var corpo = Corpo(execucaoId, pedido.Recorte);
+        corpo["pagina"] = pedido.Pagina;
+        corpo["por_pagina"] = pedido.PorPagina;
+        return await Chamar("interno/saidas/linhas", JsonContent.Create(corpo), PrazoLinhas, cancelar);
+    }
+
+    public async Task<PlanilhaPronta> PlanilhaDasSaidas(int execucaoId, PedidoDaPlanilhaDasSaidas pedido, CancellationToken cancelar)
+    {
+        // prazo de planilha, e não de linhas: recortar sete milhões de linhas e
+        // gravar o xlsx é escrita de disco, não consulta
+        var corpo = Corpo(execucaoId, pedido.Recorte);
+        corpo["formato"] = pedido.Formato;
+        var json = await Chamar("interno/saidas/planilha", JsonContent.Create(corpo), PrazoPlanilha, cancelar);
+        return new PlanilhaPronta(json.GetProperty("caminho").GetString()!,
+            json.GetProperty("nome").GetString()!, json.GetProperty("tipo").GetString()!);
+    }
+
     public async Task<JsonElement> AlvosDaQuebra(int execucaoId, CancellationToken cancelar) =>
         await Chamar("interno/quebra/alvos", JsonContent.Create(new Dictionary<string, object?>
         {

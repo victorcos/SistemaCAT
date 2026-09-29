@@ -342,6 +342,34 @@ nossa:
 * `Descrição CFOP` vem quase por extenso, e não abreviada como na Gestão e na
   037 — o MA usa duas grafias, e `tab_cfop` guarda as duas.
 
+### A 047 na tela (v0.112.0)
+
+| Método | Rota | Quem |
+| --- | --- | --- |
+| `GET` | `/api/apuracao-piscofins/{execucaoId}/saidas/filtros` | quem vê o trabalho |
+| `GET` | `/api/apuracao-piscofins/{execucaoId}/saidas` | quem vê o trabalho |
+| `GET` | `/api/apuracao-piscofins/{execucaoId}/saidas/planilha` | quem vê o trabalho |
+
+O recorte é o mesmo nas três, pela query: `cnpjs`, `competencias`, `ramos`,
+`cfops` e `cst_pis` separados por vírgula, mais `busca`. Vazio significa a
+consulta inteira.
+
+`saidas/filtros` devolve, para cada campo, os valores que existem e **quantas
+linhas cada um traz** — contados *sem o próprio filtro*, para que marcar um
+CFOP não suma com os outros da lista. Traz também `linhas_no_recorte`,
+`linhas_no_total`, `totais` e `busca_conta_no_resumo`: a busca livre varre as
+linhas e não entra no resumo agregado, e a tela diz isso em vez de deixar somar
+chips que não fecham.
+
+`saidas` devolve a página (`pagina`, `por_pagina`, `total`, `linhas`) com os
+`totais` do **recorte inteiro**, não da página. `saidas/planilha` devolve o
+xlsx ou csv do mesmo recorte — o arquivo carrega a marca do filtro no nome,
+para que dois recortes não se confundam na pasta de Downloads.
+
+Em disco: `saidas_por_recorte.parquet` (o resumo que responde os filtros) e um
+`saidas_recorte-<marca>.parquet` por recorte baixado. Ambos são cache: somem
+sem prejuízo e se refazem.
+
 `nao_cobertos` conta os registros de saída que a 047 ainda não monta — C180,
 C380, C400, C490, C600, C860, o bloco D, F500 a F560 e I100 —, e a tela os
 mostra. Nenhum cliente validado tem ocorrência deles; a contagem existe para que

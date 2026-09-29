@@ -32,6 +32,19 @@ public sealed record PedidoDeContasContabeis(string? Busca, string? Cnpj, string
 public sealed record PedidoDeLancamentos(string Cnpj, string Conta, string? Busca, string? De, string? Ate,
     int Pagina, int PorPagina);
 
+/// <summary>O recorte da tela da 047. Tudo vazio significa a consulta inteira.</summary>
+/// <param name="Competencias">no formato em que a 047 escreve: dd/mm/aaaa</param>
+/// <param name="Ramos">o rótulo do ramo, como sai na coluna Registros</param>
+/// <param name="Busca">procura na chave, no número do documento, no item e no participante</param>
+public sealed record RecorteDasSaidas(IReadOnlyList<string> Cnpjs, IReadOnlyList<string> Competencias,
+    IReadOnlyList<string> Ramos, IReadOnlyList<string> Cfops, IReadOnlyList<string> CstPis, string Busca);
+
+/// <summary>Uma página da 047, no recorte pedido.</summary>
+public sealed record PedidoDasSaidas(RecorteDasSaidas Recorte, int Pagina, int PorPagina);
+
+/// <summary>A planilha da 047 no recorte pedido, em xlsx ou csv.</summary>
+public sealed record PedidoDaPlanilhaDasSaidas(RecorteDasSaidas Recorte, string Formato);
+
 /// <param name="So">aptas, bloqueadas, ou o código de um motivo de bloqueio</param>
 public sealed record PedidoDeCompetencias(string? So, string? Busca, int Pagina, int PorPagina);
 
@@ -239,6 +252,31 @@ public sealed class Execucoes(
     {
         var e = await Detalhar(execucaoId, ApuracaoPisCofins, usuario, cancelar);
         return await motor.LancamentosDoRazaoContabil(e.Id, pedido, cancelar);
+    }
+
+    // A Consulta de Saídas (047): a mesma forma de tela do razão contábil —
+    // recortar e depois olhar —, pela mesma razão. Sete milhões de linhas não
+    // cabem numa resposta nem num Excel, e quem confere quer uma competência.
+
+    /// <summary>O que há para escolher na 047, com o tamanho de cada escolha.</summary>
+    public async Task<JsonElement> FiltrosDasSaidas(int execucaoId, RecorteDasSaidas recorte, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, ApuracaoPisCofins, usuario, cancelar);
+        return await motor.FiltrosDasSaidas(e.Id, recorte, cancelar);
+    }
+
+    /// <summary>Uma página das linhas da 047, com os totais do recorte inteiro.</summary>
+    public async Task<JsonElement> LinhasDasSaidas(int execucaoId, PedidoDasSaidas pedido, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, ApuracaoPisCofins, usuario, cancelar);
+        return await motor.LinhasDasSaidas(e.Id, pedido, cancelar);
+    }
+
+    /// <summary>A planilha da 047 recortada como a tela está mostrando.</summary>
+    public async Task<PlanilhaPronta> PlanilhaDasSaidas(int execucaoId, PedidoDaPlanilhaDasSaidas pedido, Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, ApuracaoPisCofins, usuario, cancelar);
+        return await motor.PlanilhaDasSaidas(e.Id, pedido, cancelar);
     }
 
     // A extração de registro: o que a quebra indexou, consolidado numa planilha.

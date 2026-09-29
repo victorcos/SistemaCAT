@@ -318,6 +318,12 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDaApuracao; resumo:
             saída.
           </p>
           {par("saidas", "Baixar as saídas", true, (resumo.saidas ?? 0) === 0)}
+          <Link
+            to={ROTAS.consultaDeSaidas(execucao.projeto_id)}
+            className="text-[12px] font-bold text-marca-laranja no-underline hover:underline"
+          >
+            Abrir na tela, com filtro →
+          </Link>
         </Cartao>
 
         <Cartao className="flex flex-col gap-3">

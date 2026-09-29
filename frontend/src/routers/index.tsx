@@ -24,6 +24,7 @@ import Exclusoes from "@/pages/Exclusoes";
 import ModulosDoSegmento from "@/pages/ModulosDoSegmento";
 import Razao from "@/pages/Razao";
 import Segmentos from "@/pages/Segmentos";
+import ConsultaDeSaidas from "@/pages/ConsultaDeSaidas";
 import RazaoContabil from "@/pages/RazaoContabil";
 import DePara from "@/pages/DePara";
 import Suportado from "@/pages/Suportado";
@@ -120,6 +121,7 @@ export const roteador = createBrowserRouter([
               { path: "/projetos/:id/frente/:trilha", element: <Projeto /> },
               { path: "/projetos/:id/apuracao-piscofins", element: <ApuracaoPisCofins /> },
               { path: "/projetos/:id/razao-contabil", element: <RazaoContabil /> },
+              { path: "/projetos/:id/consulta-de-saidas", element: <ConsultaDeSaidas /> },
               { path: "/projetos/:id/apuracao-contribuicoes", element: <Gestao /> },
               { path: "/projetos/:id/exclusoes", element: <Exclusoes /> },
               { path: "/projetos/:id/quebra-xml", element: <QuebraXml /> },

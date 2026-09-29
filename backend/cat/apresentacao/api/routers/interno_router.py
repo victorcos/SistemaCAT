@@ -69,6 +69,7 @@ from cat.infraestrutura.analitico import arquivo_digital as analitico_arquivo_di
 from cat.infraestrutura.analitico import entrega as analitico_entrega
 from cat.infraestrutura.analitico import pre_validacao_do_cliente as analitico_pre_validacao
 from cat.infraestrutura.analitico import razao as analitico_razao
+from cat.infraestrutura.analitico import consulta_de_saidas as analitico_saidas
 from cat.infraestrutura.analitico import razao_contabil as analitico_razao_contabil
 from cat.infraestrutura.analitico import registros_do_sped as analitico_registros
 from cat.infraestrutura.planilhas import itens_do_xml as planilha_do_xml
@@ -702,6 +703,56 @@ def lancamentos_do_razao_contabil(
             pedido.de, pedido.ate, pedido.pagina, pedido.por_pagina))
 
 
+class RecorteDaConsultaDeSaidas(BaseModel):
+    """O filtro da tela da 047. Tudo vazio significa a consulta inteira."""
+
+    cnpjs: list[str] = Field(default_factory=list, max_length=200)
+    competencias: list[str] = Field(default_factory=list, max_length=200)
+    ramos: list[str] = Field(default_factory=list, max_length=20)
+    cfops: list[str] = Field(default_factory=list, max_length=200)
+    cst_pis: list[str] = Field(default_factory=list, max_length=60)
+    busca: str = Field(default="", max_length=100)
+
+    def como_recorte(self) -> analitico_saidas.Recorte:
+        return analitico_saidas.Recorte(
+            cnpjs=tuple(self.cnpjs), competencias=tuple(self.competencias),
+            ramos=tuple(self.ramos), cfops=tuple(self.cfops),
+            cst_pis=tuple(self.cst_pis), busca=self.busca)
+
+
+class PedidoDeFiltrosDasSaidas(BaseModel):
+    execucao_id: int
+    recorte: RecorteDaConsultaDeSaidas = Field(default_factory=RecorteDaConsultaDeSaidas)
+
+
+class PedidoDeLinhasDasSaidas(PedidoDeFiltrosDasSaidas):
+    pagina: int = Field(default=1, ge=1)
+    por_pagina: int = Field(default=analitico_saidas.POR_PAGINA_PADRAO, ge=1)
+
+
+@router.post("/saidas/filtros", dependencies=[Depends(exigir_segredo)])
+def filtros_das_saidas(
+    pedido: PedidoDeFiltrosDasSaidas, sessao: Annotated[Session, Depends(obter_sessao)]
+) -> dict:
+    """O que há para escolher na 047, com o tamanho de cada escolha."""
+    execucao = _quebra_concluida(pedido.execucao_id, sessao)
+    with contexto(etapa=apurar_piscofins.ETAPA, execucao_id=execucao.id):
+        return _traduzir_leitura(lambda: analitico_saidas.filtros(
+            execucao.pasta_de_trabalho or "", pedido.recorte.como_recorte()))
+
+
+@router.post("/saidas/linhas", dependencies=[Depends(exigir_segredo)])
+def linhas_das_saidas(
+    pedido: PedidoDeLinhasDasSaidas, sessao: Annotated[Session, Depends(obter_sessao)]
+) -> dict:
+    """As linhas do recorte, paginadas, com os totais do recorte inteiro."""
+    execucao = _quebra_concluida(pedido.execucao_id, sessao)
+    with contexto(etapa=apurar_piscofins.ETAPA, execucao_id=execucao.id):
+        return _traduzir_leitura(lambda: analitico_saidas.linhas(
+            execucao.pasta_de_trabalho or "", pedido.recorte.como_recorte(),
+            pedido.pagina, pedido.por_pagina))
+
+
 @router.post("/razao-contabil/estabelecimentos", dependencies=[Depends(exigir_segredo)])
 def estabelecimentos_do_razao_contabil(
     pedido: PedidoDoRazaoContabil, sessao: Annotated[Session, Depends(obter_sessao)]
@@ -1153,6 +1204,26 @@ def _traduzir_extracao(funcao):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)) from erro
     except FileNotFoundError as erro:
         raise HTTPException(status.HTTP_410_GONE, str(erro)) from None
+
+
+class PedidoDaPlanilhaDasSaidas(PedidoDeFiltrosDasSaidas):
+    formato: str = "xlsx"
+
+
+@router.post("/saidas/planilha", response_model=PlanilhaDto,
+             dependencies=[Depends(exigir_segredo)])
+def planilha_das_saidas(
+    pedido: PedidoDaPlanilhaDasSaidas, sessao: Annotated[Session, Depends(obter_sessao)]
+) -> PlanilhaDto:
+    """A 047 recortada como a tela está mostrando, em xlsx ou csv."""
+    execucao = _quebra_concluida(pedido.execucao_id, sessao)
+    with contexto(etapa=apurar_piscofins.ETAPA, execucao_id=execucao.id, planilha="saidas"):
+        try:
+            pronta = planilhas.baixar_saidas(execucao, pedido.formato,
+                                             pedido.recorte.como_recorte())
+        except planilhas.PlanilhaRecusada as erro:
+            raise HTTPException(erro.status, str(erro)) from erro
+    return PlanilhaDto(caminho=pronta.caminho, nome=pronta.nome, tipo=pronta.tipo)
 
 
 @router.post("/quebra/alvos", dependencies=[Depends(exigir_segredo)])

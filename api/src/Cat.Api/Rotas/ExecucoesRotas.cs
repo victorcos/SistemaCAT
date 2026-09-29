@@ -201,6 +201,38 @@ public static class ExecucoesRotas
                     Results.Json(await caso.EstabelecimentosDoRazaoContabil(execucaoId, http.UsuarioAtual(), http.RequestAborted))))
             .ExigirUsuario();
 
+        // A Consulta de Saídas (047): recortar na tela e olhar, como o razão
+        // contábil acima. Pagina no servidor pelo mesmo motivo — sete milhões
+        // de linhas em cinco anos não cabem numa resposta nem num Excel.
+        api.MapGet("/apuracao-piscofins/{execucaoId:int}/saidas/filtros", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                    Results.Json(await caso.FiltrosDasSaidas(execucaoId, RecorteDeSaidas(http.Request.Query),
+                        http.UsuarioAtual(), http.RequestAborted))))
+            .ExigirUsuario();
+
+        api.MapGet("/apuracao-piscofins/{execucaoId:int}/saidas", async (int execucaoId, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                {
+                    var q = http.Request.Query;
+                    var pedido = new PedidoDasSaidas(RecorteDeSaidas(q),
+                        Inteiro(q["pagina"], 1), Inteiro(q["por_pagina"], 100));
+                    return Results.Json(await caso.LinhasDasSaidas(execucaoId, pedido, http.UsuarioAtual(), http.RequestAborted));
+                }))
+            .ExigirUsuario();
+
+        api.MapGet("/apuracao-piscofins/{execucaoId:int}/saidas/planilha",
+                async (int execucaoId, HttpContext http, Execucoes caso, ConfigCat config, ILogger<Execucoes> log) =>
+                await Traduzir(async () =>
+                {
+                    var q = http.Request.Query;
+                    var formato = q["formato"].FirstOrDefault() is { Length: > 0 } f ? f : "xlsx";
+                    var pronta = await caso.PlanilhaDasSaidas(execucaoId,
+                        new PedidoDaPlanilhaDasSaidas(RecorteDeSaidas(q), formato),
+                        http.UsuarioAtual(), http.RequestAborted);
+                    return Arquivo(pronta, config, log);
+                }))
+            .ExigirUsuario();
+
         // A extração de registro da quebra: o que há para extrair, e a planilha
         // de um alvo. Fica fora do `/planilhas/{qual}` das outras etapas porque
         // o que sai depende do registro pedido, e não de uma lista fixa.
@@ -354,6 +386,18 @@ public static class ExecucoesRotas
     /// Campo ausente é ausência de filtro, e não filtro vazio: `cfop=` sem
     /// valor não pode significar "nenhum CFOP passa".
     /// </summary>
+    /// <summary>O recorte da tela da 047, lido da query. Listas vêm separadas por vírgula.</summary>
+    private static RecorteDasSaidas RecorteDeSaidas(IQueryCollection q)
+    {
+        IReadOnlyList<string> Lista(string nome) =>
+            q[nome].FirstOrDefault() is { Length: > 0 } bruto
+                ? bruto.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                : [];
+        return new RecorteDasSaidas(
+            Lista("cnpjs"), Lista("competencias"), Lista("ramos"), Lista("cfops"),
+            Lista("cst_pis"), q["busca"].FirstOrDefault() is { Length: > 0 } b ? b : "");
+    }
+
     private static RecorteDaExtracao Recorte(IQueryCollection q)
     {
         IReadOnlyList<string> Lista(string nome) =>

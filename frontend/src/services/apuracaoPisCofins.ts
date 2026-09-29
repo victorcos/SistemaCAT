@@ -242,3 +242,182 @@ export function lancamentosDaConta(
 
 export const estabelecimentosDoRazaoContabil = (execucaoId: number, sinal?: AbortSignal) =>
   chamar<{ linhas: EstabelecimentoDoRazao[] }>(`/apuracao-piscofins/${execucaoId}/estabelecimentos`, { signal: sinal });
+
+/* -------------------------------------------------------------------------
+ * A Consulta de Saídas (047) na tela: recortar primeiro, olhar depois.
+ *
+ * Mesma forma do razão contábil acima, e pela mesma razão: a 047 de cinco anos
+ * de uma rede passa de sete milhões de linhas. Não cabe numa resposta, não abre
+ * no Excel, e ninguém lê. A tela recorta antes de mostrar, e o download sai
+ * recortado do mesmo jeito — quem está olhando uma competência quer aquela
+ * competência no arquivo.
+ * ------------------------------------------------------------------------- */
+
+/** O recorte da tela. Tudo vazio é a 047 inteira. */
+export interface RecorteDasSaidas {
+  cnpjs: string[];
+  competencias: string[];
+  ramos: string[];
+  cfops: string[];
+  cst_pis: string[];
+  busca: string;
+}
+
+export const RECORTE_DAS_SAIDAS_INTEIRO: RecorteDasSaidas = {
+  cnpjs: [],
+  competencias: [],
+  ramos: [],
+  cfops: [],
+  cst_pis: [],
+  busca: "",
+};
+
+export const quantosFiltrosNasSaidas = (r: RecorteDasSaidas) =>
+  [r.cnpjs, r.competencias, r.ramos, r.cfops, r.cst_pis].filter((l) => l.length).length +
+  (r.busca.trim() ? 1 : 0);
+
+/** Um valor possível num filtro, com quantas linhas ele traz. */
+export interface EscolhaDoFiltro {
+  valor: string;
+  linhas: number;
+  /** o texto ao lado do código, quando há: a descrição do CFOP */
+  rotulo?: string;
+}
+
+export interface FiltrosDasSaidas {
+  cnpjs: EscolhaDoFiltro[];
+  competencias: EscolhaDoFiltro[];
+  ramos: EscolhaDoFiltro[];
+  cfops: EscolhaDoFiltro[];
+  cst_pis: EscolhaDoFiltro[];
+  linhas_no_recorte: number;
+  linhas_no_total: number;
+  /** false quando há busca livre: o número acima ignora a busca, e a tela diz isso */
+  busca_conta_no_resumo: boolean;
+  totais: { valor: string; pis: string; cofins: string };
+}
+
+/** Uma linha da 047: as 53 colunas, todas como texto, como no relatório. */
+export interface LinhaDaSaida {
+  cnpj: string;
+  periodo: string;
+  registros: string;
+  modelo: string;
+  situacao: string;
+  codigo_do_participante: string;
+  cnpj_do_participante: string;
+  cpf_do_participante: string;
+  nome_do_participante: string;
+  uf_origem_destino: string;
+  numero_do_documento: string;
+  serie: string;
+  chave: string;
+  data_do_documento: string;
+  data_de_saida: string;
+  valor_do_documento: string;
+  desconto_do_documento: string;
+  valor_da_mercadoria: string;
+  frete: string;
+  seguro: string;
+  outras_despesas: string;
+  numero_do_item: string;
+  codigo_do_item: string;
+  descricao_complementar: string;
+  descricao_do_item: string;
+  ncm: string;
+  codigo_do_servico: string;
+  codigo_de_barra: string;
+  tipo_do_item: string;
+  valor_do_item: string;
+  quantidade: string;
+  unidade: string;
+  desconto_do_item: string;
+  cfop: string;
+  descricao_do_cfop: string;
+  faturamento: string;
+  natureza: string;
+  icms: string;
+  icms_st: string;
+  ipi: string;
+  cst_pis: string;
+  base_do_pis: string;
+  quantidade_base_do_pis: string;
+  aliquota_do_pis: string;
+  quantidade_aliquota_do_pis: string;
+  pis: string;
+  cst_cofins: string;
+  base_da_cofins: string;
+  quantidade_base_da_cofins: string;
+  aliquota_da_cofins: string;
+  quantidade_aliquota_da_cofins: string;
+  cofins: string;
+  conta_contabil: string;
+}
+
+export interface PaginaDasSaidas extends Pagina<LinhaDaSaida> {
+  recortado: boolean;
+  /** os totais são do recorte inteiro, não da página: total que muda ao virar
+   *  a página não serve para conferir nada */
+  totais: { valor: string; pis: string; cofins: string };
+}
+
+/** O recorte vira query: as listas separadas por vírgula. */
+function comoQuery(recorte: RecorteDasSaidas): URLSearchParams {
+  const p = new URLSearchParams();
+  const listas: [string, string[]][] = [
+    ["cnpjs", recorte.cnpjs],
+    ["competencias", recorte.competencias],
+    ["ramos", recorte.ramos],
+    ["cfops", recorte.cfops],
+    ["cst_pis", recorte.cst_pis],
+  ];
+  for (const [nome, valores] of listas) if (valores.length) p.set(nome, valores.join(","));
+  if (recorte.busca.trim()) p.set("busca", recorte.busca.trim());
+  return p;
+}
+
+export const filtrosDasSaidas = (
+  execucaoId: number,
+  recorte: RecorteDasSaidas,
+  sinal?: AbortSignal,
+) =>
+  chamar<FiltrosDasSaidas>(
+    `/apuracao-piscofins/${execucaoId}/saidas/filtros?${comoQuery(recorte)}`,
+    { signal: sinal },
+  );
+
+export function linhasDasSaidas(
+  execucaoId: number,
+  recorte: RecorteDasSaidas,
+  pagina: number,
+  porPagina = 100,
+  sinal?: AbortSignal,
+) {
+  const p = comoQuery(recorte);
+  p.set("pagina", String(pagina));
+  p.set("por_pagina", String(porPagina));
+  return chamar<PaginaDasSaidas>(`/apuracao-piscofins/${execucaoId}/saidas?${p}`, { signal: sinal });
+}
+
+/**
+ * Baixa a 047 recortada como a tela está mostrando.
+ *
+ * O nome carrega a marca do recorte para que dois downloads diferentes não se
+ * confundam na pasta de Downloads — é o mesmo cuidado do razão.
+ */
+export function baixarSaidas(
+  execucaoId: number,
+  recorte: RecorteDasSaidas,
+  formato: Formato,
+  sinal?: AbortSignal,
+): Promise<void> {
+  const p = comoQuery(recorte);
+  if (formato !== "xlsx") p.set("formato", formato);
+  const quantos = quantosFiltrosNasSaidas(recorte);
+  const marca = quantos ? `_${quantos}_filtro${quantos === 1 ? "" : "s"}` : "";
+  return baixarArquivo(
+    `/api/apuracao-piscofins/${execucaoId}/saidas/planilha?${p}`,
+    `consulta_de_saidas${marca}.${formato}`,
+    sinal,
+  );
+}

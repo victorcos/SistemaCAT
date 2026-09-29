@@ -51,6 +51,7 @@ from cat.infraestrutura.analitico.credito_outorgado import (
 from cat.infraestrutura.analitico.exclusoes import ARQUIVO_DAS_EXCLUSOES
 from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML
 from cat.infraestrutura.analitico.gestao import ARQUIVO_DOS_QUADROS
+from cat.infraestrutura.analitico import consulta_de_saidas as saidas_na_tela
 from cat.infraestrutura.analitico import registros_do_sped as extracao_de_registro
 from cat.infraestrutura.analitico.piscofins import (
     ARQUIVO_DAS_ENTRADAS,
@@ -384,6 +385,45 @@ def extrair_registro(execucao: ExecucaoDB, alvo: str, formato: str,
             linhas = gerar_extracao(parquet, destino, formato=formato, alvo=limpo)
             log.info("planilha de registro gerada",
                      extra={"alvo": limpo, "linhas": linhas, "formato": formato})
+    return PlanilhaPronta(caminho=destino, nome=nome, tipo=TIPOS[formato])
+
+
+def baixar_saidas(execucao: ExecucaoDB, formato: str,
+                  recorte: saidas_na_tela.Recorte | None = None) -> PlanilhaPronta:
+    """A 047 recortada como a tela está mostrando.
+
+    A planilha do catálogo sai inteira, e inteira são 7,8 milhões de linhas num
+    cliente de cinco anos — que o Excel não abre e que ninguém pediu. Quem está
+    olhando uma competência na tela quer **aquela** competência no arquivo.
+
+    Sem recorte, o nome e o caminho são os mesmos da planilha do catálogo: é o
+    mesmo conteúdo, e gerar duas vezes o mesmo arquivo com dois nomes só faria
+    a pasta crescer e a pessoa duvidar de qual é qual.
+    """
+    if formato not in FORMATOS:
+        raise PlanilhaRecusada(404, f"Formato desconhecido: {formato}. Vale xlsx ou csv.")
+    if execucao.situacao != "concluida":
+        raise PlanilhaRecusada(409, NAO_TERMINOU[apurar_piscofins.ETAPA])
+    pasta = execucao.pasta_de_trabalho or ""
+    if not os.path.isdir(pasta):
+        raise PlanilhaRecusada(
+            410, "Os arquivos desta apuração não estão mais em disco. Rode de novo.")
+
+    recorte = recorte or saidas_na_tela.RECORTE_INTEIRO
+    try:
+        parquet = saidas_na_tela.parquet_do_recorte(pasta, recorte)
+    except saidas_na_tela.SaidasNaoGeradas as erro:
+        raise PlanilhaRecusada(410, str(erro)) from erro
+
+    nome = f"consulta_de_saidas{saidas_na_tela.impressao_do_recorte(recorte)}.{formato}"
+    destino = os.path.join(pasta, nome)
+    if precisa_gerar(destino, parquet):
+        with contexto(etapa=apurar_piscofins.ETAPA, execucao_id=execucao.id,
+                      planilha="saidas"):
+            linhas = gerar_saidas(parquet, destino, formato=formato)
+            log.info("planilha da 047 gerada", extra={
+                "linhas": linhas, "formato": formato,
+                "filtros": recorte.quantos_filtros})
     return PlanilhaPronta(caminho=destino, nome=nome, tipo=TIPOS[formato])
 
 

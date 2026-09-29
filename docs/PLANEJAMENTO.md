@@ -143,6 +143,8 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] Consulta de Entradas (037): os oito ramos de documento de entrada (v0.74.0)
 - [x] Consulta de Saídas (047): C100/C170, C100/C175, A100/A170 e F100, conferida
       linha a linha contra as 7.784.121 do gabarito do MA (v0.111.0)
+- [x] A 047 na tela: recortar por competência, estabelecimento, ramo, CFOP e CST,
+      paginado no servidor, com o download saindo do tamanho do recorte (v0.112.0)
 - [ ] Os ramos de saída que faltam na 047 — C180/C185, C380/C385, C400/C405/C485,
       C490/C495, C600/C605, C860/C880, o bloco D, F500 a F560 e I100. Dependem de
       um cliente que os tenha **e** de um relatório de referência dele: sem os
