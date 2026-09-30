@@ -5,6 +5,57 @@
 
 ---
 
+## 2026-09-30 — O 933: o ISS, e a descoberta de que cada relatório tem a sua conta
+
+A exclusão do ISS da base do PIS/COFINS fecha **100% contra o gabarito do MA**:
+33 linhas, 32 colunas. Com ela, os três motores da família de exclusões estão
+medidos — 903 (ICMS), 839 (ICMS-ST) e 933 (ISS).
+
+**É o menor e o mais instrutivo.** Das 33 notas de serviço da DMINAS, **uma**
+tem ISS preenchido: R$ 5.586,51, que rendem R$ 646,71 corrigidos. O campo
+`VL_ISS` do registro A100 é facultativo, e quando vem vazio o valor não se
+perde — ele está na NFS-e, que este motor ainda não lê. Até lá a linha sai com a
+coluna do ISS **em branco**, e o resumo conta quantas são: é o número que diz
+quanto da tese está esperando o XML.
+
+**Uma linha só parecia pouco para conferir, e não era.** É ela que exerce a
+conta inteira — rateio, base STF, diferença, Selic e total —, e foi ela que
+revelou o achado abaixo. As outras 32 exercem o caminho oposto, o de não haver o
+que excluir, que é o que acontece na maioria das notas de serviço.
+
+### Cada relatório do MA tem a sua aritmética, e não dá para supor
+
+Foi a terceira vez neste dia que dois relatórios do mesmo sistema discordaram
+numa regra que parecia universal. Vale listar as três, porque juntas formam uma
+lição de método:
+
+1. **A diferença da contribuição.** O 903 calcula `PIS − PIS STF`; o 933 calcula
+   `diferença da base × alíquota`. Na única nota com ISS, a primeira dá 92,17 e
+   a segunda 92,18 — e o gabarito escreve 92,18. No 903, a subtração está medida
+   em 138.358 linhas. As duas estão certas, cada uma no seu relatório.
+2. **O completamento do cadastro pela matriz.** A 047 completa; o 839 não. Ver a
+   decisão do 839, hoje.
+3. **A base recalculada.** A do 903 subtrai o imposto; a do 933 não — ela é só
+   `valor − desconto`.
+
+A conclusão prática: **regra medida num relatório não se transporta para outro
+sem medir de novo.** Cada motor tem o seu conferidor, cada conferidor tem o seu
+gabarito, e nenhum deles empresta conclusão do vizinho.
+
+### Duas outras coisas que o gabarito ensinou
+
+**Vazio não é zero.** O MA preserva a ausência: `VL_DESC` em branco sai em
+branco na planilha, `VL_DESC` igual a "0,00" sai zero. Para quem confere são
+coisas diferentes — "não informou" e "informou zero" —, e tratá-las como a mesma
+divergia em todas as linhas sem desconto.
+
+**"Percentual Rateio" é fração.** Vale `1`, não `100`. Como todos os documentos
+do arquivo têm um item só, o rateio entre vários itens não tem uma linha sequer
+para conferir: a divisão está no código pela conta, não pela medida, e isso está
+dito no módulo.
+
+---
+
 ## 2026-09-30 — O 839: o ICMS-ST que não está escrito em lugar nenhum
 
 A exclusão do ICMS-ST da base do PIS/COFINS — a tese do contribuinte

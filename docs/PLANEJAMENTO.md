@@ -171,9 +171,14 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       (v0.116.0)
 - [ ] Ligar o 839 ao resto: tabela `aliquota_de_item` no banco com carregador,
       camada analítica, planilha, bloco próprio na tela e testes
-- [ ] **933 — ISS fora da base** (A100/A170): o ISS não está na
-      EFD-Contribuições, vem da NFS-e. O MA gera mesmo faltando o dado do
-      cliente — 33 linhas na DMINAS
+- [x] Motor do **933 — ISS fora da base** (A100/A170), conferido 100% contra as
+      33 linhas do gabarito. O `VL_ISS` do A100 é facultativo: quem não preenche
+      sai com a coluna em branco, e o resumo conta quantas notas esperam a
+      NFS-e (v0.117.0)
+- [ ] Ler a **NFS-e** para o 933: o XML (INF/SERVICO/VALORES) e o leiaute do
+      município de São Paulo, de onde sai o ISS que a escrituração não trouxe.
+      Sem isso a tese só alcança quem preencheu o A100 — 1 de 33 notas na DMINAS
+- [ ] Ligar o 933 ao resto: camada analítica, planilha, bloco na tela e testes
 - [ ] Varrer os outros motores atrás do mesmo descuido do `C010`: documento que
       fica em buffer e é emitido **depois** de o bloco seguinte já ter trocado o
       estabelecimento. Custou 61 linhas no 903 e estava latente no 037; a 047 já
