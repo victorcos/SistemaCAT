@@ -453,6 +453,46 @@ linha por (`tributo`, `quadro`, `ordem`, `rotulo`, `competencia`) com `valor` em
 centavos. `valor` nulo quer dizer fonte externa (DCTF, e-CAC), e não zero;
 `unidade` distingue dinheiro de percentual.
 
+### Exclusões da base do PIS/COFINS (v0.114.0)
+
+| Método | Rota | Quem |
+| --- | --- | --- |
+| `POST` | `/api/projetos/{id}/exclusoes` | quem escreve |
+| `GET` | `/api/projetos/{id}/exclusoes` | quem vê o trabalho |
+| `GET` | `/api/exclusoes/{execucaoId}` | quem vê o trabalho |
+| `POST` | `/api/exclusoes/{execucaoId}/cancelar` | quem escreve |
+| `GET` | `/api/exclusoes/{execucaoId}/planilhas/exclusoes` | quem vê o trabalho |
+| `GET` | `/api/exclusoes/{execucaoId}/planilhas/icms` | quem vê o trabalho |
+
+Duas teses numa rodada. `exclusoes` é uma linha por grupo (estabelecimento,
+competência, registro, CST e CFOP), das **duas**, separadas pela coluna `tese`:
+`piscofins_na_propria_base` e `icms_na_base`. `icms` é o Tema 69 item a item —
+uma linha por item de nota fiscal, nas quarenta colunas do relatório 903 do MA,
+na ordem em que ele exporta. As duas em xlsx ou csv.
+
+O resumo traz, no nível de cima, a tese das contribuições: `fonte`
+(`agregados` ou `sped`), `arquivos`, `grupos`, `base`, `excluido`,
+`diferenca_pis`, `diferenca_cofins`, `diferenca`, `prescrito`,
+`competencias_prescritas`, `data_de_referencia`, `por_competencia`, `fora` e
+`avisos`.
+
+E, em `icms`, a do Tema 69: `ate` (o mês da restituição até onde a Selic
+acumulou, em `aaaa-mm`), `linhas` (itens de nota), `base`, `icms_excluido`,
+`diferenca_pis`, `diferenca_cofins`, `selic`, `total_atualizado`, `prescrito`,
+`competencias_prescritas`, `estabelecimentos`, `competencias`,
+`por_competencia` e `avisos`. **Os valores vêm em reais, como texto** — Decimal
+não atravessa JSON sem perder casa. `icms` vem vazio quando a tese não pôde ser
+apurada (lote sem EFD-Contribuições, ou série da Selic que não alcança o mês da
+restituição); o motivo entra em `avisos`.
+
+`andamento` ganhou `fase`: `receita` enquanto a primeira tese lê, `icms` na
+segunda. São duas leituras do mesmo lote, e a barra da tela usa a fase para não
+voltar a zero no meio.
+
+Em disco, na pasta da execução: `exclusoes.parquet` (as duas teses agregadas) e
+`exclusao_do_icms.parquet` (o 903, item a item). O segundo **não existe** quando
+a rodada foi interrompida: parquet pela metade parece inteiro para quem o abre.
+
 ### Resumo por módulo (v0.81.0)
 
 | Método | Rota | Quem |

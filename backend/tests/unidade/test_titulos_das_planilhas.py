@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 from cat.infraestrutura.planilhas.conferencia import Coluna, titulos_do_csv
+from cat.infraestrutura.planilhas.exclusao_do_icms import COLUNAS_DA_EXCLUSAO_DO_ICMS
 from cat.infraestrutura.planilhas.exclusoes import COLUNAS_DAS_EXCLUSOES
 from cat.infraestrutura.planilhas.itens_do_xml import CAMPOS as CAMPOS_DO_XML
 from cat.infraestrutura.planilhas.quebra_de_sped import (
@@ -20,6 +21,7 @@ from cat.infraestrutura.planilhas.quebra_de_sped import (
 
 CATALOGOS: dict[str, tuple[Coluna, ...]] = {
     "exclusões": COLUNAS_DAS_EXCLUSOES,
+    "exclusão do ICMS": COLUNAS_DA_EXCLUSAO_DO_ICMS,
     "itens do XML": CAMPOS_DO_XML,
     "consulta de entradas": COLUNAS_ENTRADAS,
     "razão contábil": COLUNAS_RAZAO,

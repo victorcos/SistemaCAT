@@ -26,28 +26,39 @@ import { dinheiro, numero } from "@/lib/format";
 import { EM_CURSO, type Formato } from "@/services/conferencia";
 import {
   baixarPlanilhaDasExclusoes,
+  baixarPlanilhaDoIcms,
   cancelarExclusoes,
   detalharExclusoes,
   iniciarExclusoes,
   listarExclusoes,
+  type CompetenciaDoIcms,
   type ExecucaoDasExclusoes,
   type LinhaDaCompetencia,
   type ResumoDasExclusoes,
+  type ResumoDoIcms,
 } from "@/services/exclusoes";
 import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
 import type { ErroApi } from "@/types/erro";
 
 /**
- * Exclusões da base do PIS/COFINS.
+ * Exclusões da base do PIS/COFINS. Duas teses, uma rodada.
  *
- * Uma tese hoje: as próprias contribuições fora da base. A receita embute PIS e
- * COFINS, e a base de cada uma perde as duas — foi a leitura escolhida entre as
- * três possíveis, e vale só no débito.
+ * As **próprias contribuições fora da base**: a receita embute PIS e COFINS, e
+ * a base de cada uma perde as duas — a leitura escolhida entre as três
+ * possíveis, e vale só no débito.
+ *
+ * O **ICMS destacado fora da base**, o Tema 69: apurado item a item e corrigido
+ * pela Selic. Cada tese tem seu bloco, seu total e sua planilha — somar as duas
+ * num número só esconderia que são pedidos diferentes, com fundamentos
+ * diferentes.
  *
  * **A tela é feita para ser conferida, não para impressionar.** O número que
  * volta aparece grande, mas ao lado dele vem a base, o quanto saiu dela e —
  * com o mesmo destaque — o que a conta recusou e por quê. Número de tese que
  * não diz o que deixou de fora é número que ninguém assina.
+ *
+ * **E o Tema 69 vem sempre com a data da correção.** Selic acumulada sem o mês
+ * até onde acumulou é número que ninguém consegue reconferir depois.
  */
 
 const ESPERA_PARA_CANCELAR_MS = 400;
@@ -55,6 +66,10 @@ const ESPERA_PARA_CANCELAR_MS = 400;
 /** "2026-09-24" -> "24/09/2026". Vazio quando não há data. */
 const data = (iso: string | undefined) =>
   iso?.length === 10 ? iso.split("-").reverse().join("/") : "";
+
+/** "2026-09" -> "09/2026". O mês até onde a Selic acumulou. */
+const mesDe = (aaaamm: string | undefined) =>
+  aaaamm?.length === 7 ? `${aaaamm.slice(5)}/${aaaamm.slice(0, 4)}` : "";
 
 export default function Exclusoes() {
   const { id } = useParams<{ id: string }>();
@@ -244,12 +259,18 @@ export default function Exclusoes() {
 function EmCurso({ e }: { e: ExecucaoDasExclusoes }) {
   const lidos = e.resumo?.andamento?.arquivos ?? e.arquivos_lidos ?? 0;
   const total = e.arquivos_totais ?? 0;
+  // são duas leituras do mesmo lote, e uma barra que volta a zero no meio
+  // parece rodada travada. Dizer qual delas anda custa uma linha
+  const noIcms = e.resumo?.andamento?.fase === "icms";
   return (
     <Cartao>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <Rotulo>{e.passo || "Apurando"}</Rotulo>
         <span className="font-mono text-[13px] text-texto-suave">
           {numero(lidos)} de {numero(total)} arquivos
+          <span className="ml-2 text-[11px] font-sans text-texto-fraco">
+            {noIcms ? "· tese 2 de 2: o ICMS" : "· tese 1 de 2: as contribuições"}
+          </span>
         </span>
       </div>
       <BarraFina fracao={e.fracao ?? 0} classe="bg-marca-laranja" />
@@ -371,9 +392,219 @@ function Concluido({
       )}
 
       <PorCompetencia linhas={linhas} />
+
+      <Tema69 execucao={execucao} icms={resumo.icms} />
     </>
   );
 }
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * O ICMS fora da base — o Tema 69.
+ *
+ * Bloco próprio, e não mais uma linha na tabela da outra tese: são pedidos
+ * diferentes, com fundamentos diferentes, e quem assina precisa ver os dois
+ * separados. O que aqui aparece e na outra não é a **correção**: o principal e
+ * a Selic vêm em números distintos, porque a Selic é a parte que muda de valor
+ * a cada mês que o pedido demora.
+ */
+function Tema69({
+  execucao,
+  icms,
+}: {
+  execucao: ExecucaoDasExclusoes;
+  icms: ResumoDoIcms | undefined;
+}) {
+  const download = useAcao();
+  const [baixando, setBaixando] = useState<Formato | null>(null);
+
+  async function baixar(formato: Formato) {
+    setBaixando(formato);
+    await download.executar((sinal) => baixarPlanilhaDoIcms(execucao.id, formato, sinal));
+    setBaixando(null);
+  }
+
+  // sem `linhas` a tese não rodou — falta EFD-Contribuições, ou a série da
+  // Selic não alcança o mês. O porquê já está na lista de avisos acima
+  if (!icms || !(icms.linhas ?? 0)) {
+    return (
+      <Faixa titulo="O ICMS fora da base (Tema 69) não foi apurado nesta rodada">
+        Ele se calcula no item da nota fiscal, direto da EFD-Contribuições, e precisa da série da
+        Selic cobrindo o mês da restituição. O motivo está em{" "}
+        <strong>o que a conta não incluiu</strong>, acima.
+      </Faixa>
+    );
+  }
+
+  const prescritas = icms.competencias_prescritas ?? 0;
+  const ate = mesDe(icms.ate);
+
+  return (
+    <>
+      <section className="flex flex-wrap items-stretch gap-4 rounded-cartao border border-borda bg-superficie p-6 shadow-cat">
+        <div className="min-w-[280px] flex-1">
+          <Rotulo>Crédito no prazo, excluindo o ICMS da base · Tema 69</Rotulo>
+          <p className="m-0 mt-1 font-mono text-[34px] font-extrabold leading-none text-sucesso">
+            {dinheiro(icms.total_atualizado ?? "0")}
+          </p>
+          <p className="m-0 mt-2 text-[13px] text-texto-suave">
+            {dinheiro(icms.diferenca_pis ?? "0")} de PIS ·{" "}
+            {dinheiro(icms.diferenca_cofins ?? "0")} de COFINS · {dinheiro(icms.selic ?? "0")} de
+            Selic
+          </p>
+          {ate && (
+            <p className="m-0 mt-2 text-[12px] leading-relaxed text-texto-fraco">
+              Corrigido pela Selic até <strong className="font-mono">{ate}</strong>. A acumulada
+              cresce a cada mês: rodar de novo depois dá um total maior.
+            </p>
+          )}
+          {prescritas > 0 && (
+            <p className="m-0 mt-2 text-[12px] leading-relaxed text-erro">
+              <strong className="font-mono">{dinheiro(icms.prescrito ?? "0")}</strong> em{" "}
+              {numero(prescritas)} {prescritas === 1 ? "competência" : "competências"} fora dos
+              cinco anos
+              {data(icms.data_de_referencia)
+                ? `, contados de ${data(icms.data_de_referencia)}`
+                : ""}{" "}
+              — não entram no crédito.
+            </p>
+          )}
+        </div>
+
+        <dl className="m-0 grid min-w-[300px] flex-1 grid-cols-2 gap-x-6 gap-y-3 self-center">
+          <Numero rotulo="Base escriturada" valor={dinheiro(icms.base ?? "0")} />
+          <Numero rotulo="ICMS excluído" valor={dinheiro(icms.icms_excluido ?? "0")} />
+          <Numero rotulo="Itens de nota" valor={numero(icms.linhas ?? 0)} />
+          <Numero rotulo="Competências" valor={numero(icms.competencias?.length ?? 0)} />
+        </dl>
+
+        <div className="flex min-w-[240px] flex-col items-end justify-between gap-3">
+          <BaixarPlanilha
+            aoBaixar={baixar}
+            desabilitado={(icms.linhas ?? 0) === 0}
+            rotulo="Baixar o Tema 69"
+            baixando={baixando}
+            aoCancelar={download.cancelar}
+          />
+          <p className="m-0 text-right text-[11px] leading-relaxed text-texto-fraco">
+            Uma linha por item de nota fiscal, nas quarenta colunas do relatório 903 — na ordem em
+            que o escritório anterior exporta, para conferir lado a lado.
+            {icms.segundos ? ` Apurado em ${duracao(icms.segundos)}.` : ""}
+          </p>
+        </div>
+      </section>
+
+      {download.erro && <Aviso titulo={download.erro.message} codigo={download.erro.requisicaoId} />}
+
+      <PorCompetenciaDoIcms linhas={icms.por_competencia ?? []} />
+    </>
+  );
+}
+
+const COLUNAS_DO_ICMS = "grid-cols-[110px_.7fr_.7fr_1.1fr_1.1fr_1fr_1fr_1.1fr]";
+
+function PorCompetenciaDoIcms({ linhas }: { linhas: CompetenciaDoIcms[] }) {
+  if (linhas.length === 0) return null;
+
+  return (
+    <section className="overflow-hidden rounded-raio-g border border-borda bg-superficie">
+      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-borda px-5.5 py-3.5">
+        <Rotulo>Tema 69, competência a competência</Rotulo>
+        <span className="text-[11px] text-texto-fraco">
+          {numero(linhas.length)} {linhas.length === 1 ? "competência" : "competências"} · a Selic
+          de cada uma é a acumulada do mês dela até o da restituição
+        </span>
+      </div>
+
+      <div className="overflow-x-auto">
+        <div className="min-w-[980px]">
+          <div className={cn("grid gap-3 bg-tabela-cabecalho-fundo px-5.5 py-3", COLUNAS_DO_ICMS)}>
+            {[
+              "Competência",
+              "Itens",
+              "Selic",
+              "Base",
+              "ICMS excluído",
+              "PIS que volta",
+              "COFINS que volta",
+              "Total corrigido",
+            ].map((c, i) => (
+              <span
+                key={c}
+                className={cn(
+                  "text-[10px] font-extrabold uppercase tracking-[0.14em] text-tabela-cabecalho-texto",
+                  i >= 1 && "text-right",
+                )}
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+
+          {linhas.map((l) => (
+            <div
+              key={l.competencia}
+              title={l.prescrita ? "Fora dos cinco anos: não entra no crédito." : undefined}
+              className={cn(
+                "grid items-center gap-3 border-t border-borda-sutil px-5.5 py-2.5",
+                COLUNAS_DO_ICMS,
+                l.prescrita && "bg-erro/5 text-erro",
+              )}
+            >
+              <span
+                className={cn(
+                  "font-mono text-[13px]",
+                  l.prescrita ? "font-bold text-erro" : "text-texto",
+                )}
+              >
+                {mesAno(l.competencia)}
+              </span>
+              <span className="text-right font-mono text-[12px] tabular-nums text-texto-fraco">
+                {numero(l.linhas)}
+              </span>
+              <span className="text-right font-mono text-[12px] tabular-nums text-texto-fraco">
+                {l.selic_acumulada}%
+              </span>
+              <span
+                className={cn(
+                  "text-right text-[13px]",
+                  l.prescrita ? "text-erro" : "text-texto-suave",
+                )}
+              >
+                {dinheiro(l.base)}
+              </span>
+              <span
+                className={cn(
+                  "text-right text-[13px]",
+                  l.prescrita ? "text-erro" : "text-texto-suave",
+                )}
+              >
+                {dinheiro(l.icms_excluido)}
+              </span>
+              <span className="text-right text-[13px] text-texto-suave">
+                {dinheiro(l.diferenca_pis)}
+              </span>
+              <span className="text-right text-[13px] text-texto-suave">
+                {dinheiro(l.diferenca_cofins)}
+              </span>
+              <span
+                className={cn(
+                  "text-right font-mono text-[13px] font-bold",
+                  l.prescrita ? "text-erro line-through decoration-erro/50" : "text-sucesso",
+                )}
+              >
+                {dinheiro(l.total_atualizado)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 
 function Numero({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (

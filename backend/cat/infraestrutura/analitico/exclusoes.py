@@ -1,9 +1,22 @@
 """A rodada das exclusões da base do PIS/COFINS.
 
-Hoje há uma tese: as próprias contribuições fora da base
-(`exclusoes/piscofins_na_propria_base.py`). A do ICMS destacado — o Tema 69 —
-vem depois, e precisa de outra fonte: a EFD ICMS/IPI do mesmo CNPJ e da mesma
-competência.
+São duas teses, no mesmo parquet, separadas pela coluna `tese`:
+
+- as **próprias contribuições fora da base**
+  (`exclusoes/piscofins_na_propria_base.py`), somada do agregado da Gestão;
+- o **ICMS destacado fora da base** — o Tema 69
+  (`analitico/exclusao_do_icms.py`), apurada item a item.
+
+A segunda desmentiu uma previsão que estava escrita aqui: esperava-se precisar
+da EFD ICMS/IPI para achar o ICMS destacado. Não precisa — o C170 da própria
+EFD-Contribuições traz `VL_ICMS`, e foi de lá que saíram as 138.358 linhas que
+batem 100% com o relatório do MA. Uma fonte a menos para exigir do cliente.
+
+**A do ICMS não usa o agregado, e não tem como usar.** Ela se apura no item: a
+base recalculada se reconstrói do valor, do desconto, do rateio do frete e do
+ICMS de cada item, e é assim que se sabe quais notas **já** excluíram o ICMS —
+que são justamente as que não podem entrar no pedido. Por isso, quando ela
+roda, os SPED são lidos mesmo havendo agregado.
 
 **De onde vêm os números, e por que isso importa no relógio.** Do agregado que
 a Gestão deixou em disco: ler os 65 SPED desta casa custa uma hora, e o
@@ -28,6 +41,8 @@ import pyarrow.parquet as pq
 
 from cat.dominio.piscofins import prescricao
 from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido
+from cat.infraestrutura.analitico import exclusao_do_icms
+from cat.infraestrutura.analitico.escrita import LeituraCancelada
 from cat.infraestrutura.exclusoes.piscofins_na_propria_base import calcular
 from cat.infraestrutura.gestao.agregador import agregar_efd
 from cat.infraestrutura.gestao.agregados import gravar as gravar_agregados
@@ -64,10 +79,21 @@ ESQUEMA = pa.schema([
     ("cofins_novo", pa.decimal128(18, 2)),
     ("diferenca_pis", pa.decimal128(18, 2)),
     ("diferenca_cofins", pa.decimal128(18, 2)),
+    # a correção pela Selic, que só a tese do ICMS tem. Fica zerada na outra —
+    # e zero aqui quer dizer "esta tese não corrige", não "não rendeu juros"
+    ("selic", pa.decimal128(18, 2)),
+    ("total_atualizado", pa.decimal128(18, 2)),
 ])
 
 CEM = Decimal(100)
 DUAS_CASAS = Decimal("0.01")
+
+# o que se grava na coluna de correção de quem não corrige
+SEM_CORRECAO = Decimal(0)
+
+# as duas leituras que a etapa faz, na ordem
+FASE_DA_RECEITA = "receita"
+FASE_DO_ICMS = "icms"
 
 
 def reais(centavos: int) -> Decimal:
@@ -83,6 +109,9 @@ class ExclusaoCancelada(RuntimeError):
 class Andamento:
     arquivos: int = 0
     grupos: int = 0
+    # qual tese está andando, para a tela não repetir "Lendo 3 de 57" duas
+    # vezes sem dizer que são leituras diferentes
+    fase: str = FASE_DA_RECEITA
 
 
 @dataclass
@@ -106,6 +135,9 @@ class Resumo:
     por_competencia: list[dict] = field(default_factory=list)
     # motivo -> quantas chaves do agregado não entraram na tese
     fora: dict[str, int] = field(default_factory=dict)
+    # a segunda tese, já serializada — ou vazio quando não deu para apurá-la.
+    # Ver `analitico/exclusao_do_icms.py`
+    icms: dict = field(default_factory=dict)
     avisos: list[str] = field(default_factory=list)
     segundos: float = 0.0
 
@@ -127,18 +159,21 @@ def serializar(r: Resumo) -> dict:
         "competencias_prescritas": r.competencias_prescritas,
         "data_de_referencia": r.data_de_referencia,
         "por_competencia": r.por_competencia,
-        "fora": r.fora, "avisos": r.avisos, "segundos": r.segundos,
+        "fora": r.fora, "icms": r.icms, "avisos": r.avisos, "segundos": r.segundos,
     }
 
 
 def apurar(contribuicoes: list[str], destino: str, agregados_de: str | None = None,
            avisar: Callable[[Andamento], None] | None = None,
            deve_parar: Callable[[], bool] | None = None,
-           referencia: date | None = None) -> Resumo:
-    """Calcula as exclusões e grava o parquet. Devolve o resumo.
+           referencia: date | None = None, ate: str = "") -> Resumo:
+    """Calcula as duas teses e grava os parquets. Devolve o resumo.
 
     `referencia` é a data do pedido, que decide o que os cinco anos já levaram.
     Sem ela, hoje — que é o certo para quem está montando o cálculo agora.
+
+    `ate` é o mês da restituição, que decide até onde a Selic do Tema 69
+    acumula. Sem ele, o mês de `referencia`.
     """
     inicio = time.time()
     referencia = referencia or date.today()
@@ -189,13 +224,56 @@ def apurar(contribuicoes: list[str], destino: str, agregados_de: str | None = No
     resumo.fora = exclusao.resumo.fora
     resumo.avisos.extend(exclusao.resumo.avisos)
 
-    _gravar(exclusao, os.path.join(destino, ARQUIVO_DAS_EXCLUSOES), prescritas)
+    do_icms = _apurar_o_icms(contribuicoes, destino, resumo, avisar, deve_parar,
+                             referencia, ate)
+
+    _gravar(exclusao, os.path.join(destino, ARQUIVO_DAS_EXCLUSOES), prescritas, do_icms)
     if avisar is not None:
         avisar(Andamento(arquivos=resumo.arquivos, grupos=resumo.grupos))
 
     resumo.segundos = round(time.time() - inicio, 1)
     log.info("exclusões apuradas", extra=serializar(resumo))
     return resumo
+
+
+def _apurar_o_icms(contribuicoes: list[str], destino: str, resumo: Resumo,
+                   avisar: Callable[[Andamento], None] | None,
+                   deve_parar: Callable[[], bool] | None,
+                   referencia: date | None, ate: str):
+    """O Tema 69, item a item. Devolve o resumo dela, ou None.
+
+    **Lê os SPED mesmo havendo agregado**, porque não há como não ler: a conta
+    é no item. Sem EFD-Contribuições no lote não há tese — e isso vira aviso,
+    não erro: a outra tese já rodou, e derrubá-la junto não ajudaria ninguém.
+    """
+    if not contribuicoes:
+        resumo.avisos.append(
+            "Sem EFD-Contribuições no lote, o ICMS fora da base (Tema 69) não foi "
+            "apurado: ele se calcula no item da nota, e agregado não tem item.")
+        return None
+
+    # a Selic se confere **antes** de ler, não no meio: uma série curta faria a
+    # leitura inteira para morrer no fim, e a outra tese cairia junto
+    mes = ate or exclusao_do_icms.mes_de(referencia or date.today())
+    if falta := exclusao_do_icms.avisar_se_a_selic_nao_alcanca(mes):
+        resumo.avisos.append(f"O Tema 69 não foi apurado. {falta}")
+        return None
+
+    def andou(a: exclusao_do_icms.Andamento) -> None:
+        if avisar is not None:
+            avisar(Andamento(arquivos=a.arquivos, grupos=a.linhas, fase=FASE_DO_ICMS))
+
+    try:
+        do_icms = exclusao_do_icms.apurar(
+            contribuicoes, destino, ate=ate, avisar=andou,
+            deve_parar=deve_parar, referencia=referencia)
+    except LeituraCancelada as erro:
+        # a etapa conhece o nome dela, não o da leitura
+        raise ExclusaoCancelada("apuração das exclusões cancelada a pedido") from erro
+
+    resumo.icms = exclusao_do_icms.serializar(do_icms)
+    resumo.avisos.extend(do_icms.avisos)
+    return do_icms
 
 
 def _ler_os_sped(contribuicoes: list[str], destino: str, resumo: Resumo,
@@ -231,8 +309,8 @@ def _ler_os_sped(contribuicoes: list[str], destino: str, resumo: Resumo,
     return lidos
 
 
-def _gravar(exclusao, caminho: str, prescritas: set[str]) -> None:
-    """Uma linha por grupo. O parquet nasce mesmo sem nenhuma.
+def _gravar(exclusao, caminho: str, prescritas: set[str], do_icms=None) -> None:
+    """Uma linha por grupo, das duas teses. O parquet nasce mesmo sem nenhuma.
 
     Etapa que termina sem arquivo é etapa que a seguinte não distingue de etapa
     que não rodou.
@@ -258,5 +336,43 @@ def _gravar(exclusao, caminho: str, prescritas: set[str]) -> None:
         colunas["cofins_novo"].append(reais(a.cofins_novo))
         colunas["diferenca_pis"].append(reais(a.diferenca_pis))
         colunas["diferenca_cofins"].append(reais(a.diferenca_cofins))
+        # a tese das contribuições não corrige por Selic: o zero aqui é a
+        # ausência de correção, e não juros que deram zero
+        colunas["selic"].append(SEM_CORRECAO)
+        colunas["total_atualizado"].append(SEM_CORRECAO)
+
+    if do_icms is not None:
+        _somar_o_icms(colunas, do_icms)
 
     pq.write_table(pa.Table.from_pydict(colunas, schema=ESQUEMA), caminho)
+
+
+def _somar_o_icms(colunas: dict[str, list], do_icms) -> None:
+    """As linhas do Tema 69, na mesma unidade da outra tese.
+
+    Já vêm em reais do motor — que anda em `Decimal` de duas casas, não em
+    centavos inteiros como o agregado da Gestão. Converter aqui seria converter
+    duas vezes.
+    """
+    prescritas = {c["competencia"] for c in do_icms.por_competencia if c["prescrita"]}
+    for grupo, total in do_icms.grupos.items():
+        colunas["tese"].append(exclusao_do_icms.TESE_ICMS_NA_BASE)
+        colunas["cnpj"].append(grupo.cnpj)
+        colunas["competencia"].append(grupo.competencia)
+        colunas["registro"].append(grupo.registro)
+        colunas["cst"].append(grupo.cst)
+        colunas["cfop"].append(grupo.cfop)
+        colunas["prescrita"].append(grupo.competencia in prescritas)
+        colunas["base"].append(total.base)
+        colunas["excluido"].append(total.icms_excluido)
+        colunas["pis"].append(total.pis)
+        colunas["cofins"].append(total.cofins)
+        # a base do STF é uma só: o ICMS sai das duas bases do mesmo jeito
+        colunas["base_nova_pis"].append(total.base_stf)
+        colunas["base_nova_cofins"].append(total.base_stf)
+        colunas["pis_novo"].append(total.pis_stf)
+        colunas["cofins_novo"].append(total.cofins_stf)
+        colunas["diferenca_pis"].append(total.diferenca_pis)
+        colunas["diferenca_cofins"].append(total.diferenca_cofins)
+        colunas["selic"].append(total.selic)
+        colunas["total_atualizado"].append(total.total_atualizado)

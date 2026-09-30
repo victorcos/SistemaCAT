@@ -5,6 +5,84 @@
 
 ---
 
+## 2026-09-30 — Tema 69: sai da EFD-Contribuições sozinha, e a Selic estava errada em dois lugares
+
+O relatório 903 — a exclusão do ICMS da base do PIS/COFINS, item a item — fecha
+**100% contra o gabarito do MA**: 138.358 linhas, 40 colunas, conferidas uma a
+uma. O total a recuperar bate ao centavo: R$ 625.871,38.
+
+**A decisão de 22/09 foi revista, e o motivo é medição.** Aquela nota decidiu
+cruzar sempre a EFD-Contribuições com a EFD ICMS/IPI, porque `VL_ICMS` no C170
+da Contribuições não é de preenchimento obrigatório e um arquivo em branco seria
+"o caso normal de metade dos clientes". Nos 57 arquivos da DMINAS — cinco anos,
+três estabelecimentos, 138.358 itens com ICMS destacado — **não há um caso**. E o
+relatório do MA, que é o padrão que o cliente confere, sai do mesmo campo: se
+ele cruzasse com a EFD ICMS/IPI, nossos números não bateriam com os dele, e
+batem nos 40.
+
+Então a tese se apura da EFD-Contribuições sozinha. O risco que sobrava —
+cliente com o campo em branco — vira um sintoma visível, não um número errado:
+sem ICMS destacado, o item simplesmente não entra no relatório, e a competência
+aparece com zero. O risco de verdade, que a nota de 22/09 não via, é o oposto:
+**excluir duas vezes**. Quem já apurou o Tema 69 tem a base do PIS/COFINS
+escriturada já líquida de ICMS, e pedir de novo sobre ela seria pedir o que já
+foi pedido. É contra isso que existe a base recalculada.
+
+**Os quatro filtros, e o que cada um evita.** Entra o item que tem CFOP de venda
+ou de devolução de venda (o Tema 69 é sobre receita), ICMS destacado maior que
+zero (sem ele não há o que excluir), base de PIS/COFINS maior que zero, e
+contribuição efetivamente paga. O item que não passa não some do arquivo — ele
+nunca esteve no relatório; o que aparece com crédito **zero** é outro caso: a
+nota cuja base já excluiu o ICMS. Essa fica, porque conferir que algo foi feito
+certo também é trabalho, e some-la faria o relatório parecer menor do que o do
+escritório anterior sem explicar por quê.
+
+**O defeito que o CNPJ denunciou.** 61 linhas saíam com o CNPJ errado — o da
+filial seguinte. O motor guarda a nota em buffer (o rateio do frete só se reparte
+quando se conhecem todos os itens dela) e só fechava o documento no `C100`
+seguinte. Quando a nota era a **última do bloco `C010`**, o fechamento
+acontecia depois que o `C010` do próximo estabelecimento já tinha trocado o CNPJ.
+O mesmo descuido estava latente no 037; a 047 já fechava — foi lá que a lição
+apareceu primeiro, e não tinha sido levada às outras duas.
+
+Vale reparar em como o defeito se mostrou: a contagem batia, os valores batiam,
+99,96% das linhas eram idênticas. Só a conferência **coluna a coluna** das 61
+linhas sem par disse qual campo era. Conferir por total teria dado igual.
+
+**A tabela da Selic estava errada duas vezes, e nenhuma das duas aparecia.**
+
+A primeira: a série foi derivada das diferenças entre competências consecutivas
+do próprio gabarito, e cada diferença foi guardada sob a competência de origem.
+Mas `acumulada(M) − acumulada(M+1)` é a Selic de **M+1**. A série inteira estava
+deslocada um mês. Refeita da **série 4390 do SGS do Banco Central** — a mesma
+que a Receita publica —, e conferida: bate nos 56 meses que o gabarito cobre.
+
+A segunda: faltava a defasagem do pagamento. A regra corrige a partir do mês
+seguinte ao do **pagamento**, e o PIS/COFINS de uma competência vence no dia 25
+do mês seguinte a ela — logo a soma começa **dois** meses depois da competência.
+Sem isso, todas as 57 competências vinham com uma parcela a mais de Selic.
+
+Por que nenhuma das duas aparecia: a conferência do 903 rodava com
+`--selic-do-gabarito`, que empresta a acumulada do próprio gabarito e **pula a
+tabela inteira**. A tabela existia, era importada, e nunca era exercitada. Foi
+só tirar a muleta para os dois erros caírem juntos. Fica a regra:
+**conferência que contorna o código não confere o código** — e por isso
+`tests/unidade/test_tab_selic.py` agora compara a tabela com a série do Banco
+Central, mês a mês.
+
+**A tese não usa o agregado da Gestão, e não tem como usar.** A outra tese desta
+etapa parte de somas por competência, CST e CFOP, e volta em segundos. Esta se
+apura no item: a base recalculada se reconstrói do valor, do desconto, do rateio
+e do ICMS de cada item, e é assim que se sabe quais notas já excluíram o ICMS.
+Agregado não tem item; tem soma de item. São 57 arquivos em 53 segundos — barato
+perto de pedir restituição em duplicidade.
+
+**O que prescreveu aparece e não soma.** Sete competências da DMINAS estão fora
+dos cinco anos: R$ 72.445,95, que o relatório mostra em vermelho e o total não
+inclui. O relatório do MA soma as duas coisas num número só.
+
+---
+
 ## 2026-09-30 — Cinco rodadas longas recusavam cancelamento, e a lista era a culpada
 
 **O que o usuário viu.** "Esta etapa ainda não aceita cancelamento", com 71
@@ -1839,6 +1917,12 @@ leitura a mais e dá uma resposta só.
 CNPJ e da mesma competência — e é por isso que a leitura compartilhada entre
 trabalhos (v0.67.0) deixou de ser conveniência e virou requisito: sem ela, o
 trabalho de PIS/COFINS teria de reimportar a base que o de ICMS já tem.
+
+> **Revisto em 30/09/2026.** A previsão de que o campo viria em branco "em
+> metade dos clientes" não se sustentou na medição: 138.358 itens com ICMS
+> destacado nos 57 arquivos da DMINAS, nenhum em branco — e o relatório do MA,
+> que é o padrão conferido pelo cliente, sai do mesmo campo. A tese passou a
+> sair da EFD-Contribuições sozinha. Ver a decisão de 30/09/2026.
 
 ---
 

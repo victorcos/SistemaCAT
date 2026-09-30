@@ -130,14 +130,17 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [ ] **Reaproveitar o material derivado**: o parquet extraído de um arquivo é
       gerado uma vez por empresa, não uma vez por trabalho. É a fatia que corta o
       tempo de indexar 119 GB duas vezes
-- [ ] Cruzamento ICMS x PIS/COFINS para a exclusão do Tema 69, com cascata por
-      competência: C170 item a item quando houver, senão documento ou XML
+- [x] ~~Cruzamento ICMS x PIS/COFINS para a exclusão do Tema 69~~ — **não é
+      preciso cruzar**: o `VL_ICMS` do C170 da própria EFD-Contribuições sustenta
+      a tese nos 138.358 itens conferidos, e é dele que o relatório do MA sai.
+      Ver DECISOES de 30/09/2026 (v0.114.0)
 - [x] Roteiro de etapas por módulo, e o critério do que vira tabela (v0.69.0)
 - [x] Quebra de SPED: índice, cache e o join do item (v0.70.0)
 - [x] Etapa `quebra_de_sped` ligada à fila, com tela e downloads (v0.75.0)
-- [ ] Exclusão do Tema 69 **sempre pelo cruzamento** das duas EFD: o campo do ICMS
-      no C170 das Contribuições é facultativo, e dois caminhos de cálculo dariam
-      números diferentes para empresas iguais. Ver DECISOES de 22/09/2026
+- [x] ~~Exclusão do Tema 69 **sempre pelo cruzamento** das duas EFD~~ — a previsão
+      de que o campo viria em branco não se confirmou em nenhum dos 138.358 itens
+      medidos, e cruzar daria números diferentes dos do relatório que o cliente
+      confere. Revisto em DECISOES de 30/09/2026 (v0.114.0)
 - [x] Caminho consolidado: C180/C190 com os filhos de PIS e COFINS casados (v0.71.0)
 - [x] Bloco M: a apuração e os ajustes, PIS e COFINS na mesma função (v0.72.0)
 - [x] Quebra da ECD: plano de contas, índice por conta e razão contábil (v0.73.0)
@@ -157,6 +160,10 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [ ] O par de UF da 037 quando falta uma das pontas continua sem prova: nas
       458.792 linhas do gabarito não houve um caso, então a diferença que a 047
       mostrou (coluna vazia em vez de "MG/") segue sem medida do lado da 037
+- [ ] Varrer os outros motores atrás do mesmo descuido do `C010`: documento que
+      fica em buffer e é emitido **depois** de o bloco seguinte já ter trocado o
+      estabelecimento. Custou 61 linhas no 903 e estava latente no 037; a 047 já
+      fechava antes de trocar
 - [ ] Estender o escopo por estabelecimento (`sped/cadastro.py`) a
       `sped/extracao.py`, `sped/consolidado.py` e `analitico/registros_do_sped.py`:
       têm o mesmo defeito que a 037 e a 047 tinham — o 0200 e o 0150 pendem do
@@ -188,8 +195,17 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [ ] Em Quebras: escolher um registro e baixá-lo. O índice já guarda a posição
       de cada um; falta a rota e a tela
 - [x] Abas de Exclusões e Histórico na barra; o histórico não conta no progresso (v0.87.0)
-- [ ] `exclusoes`: declarada e sem código. O Tema 69 cruzando as duas EFD —
-      é a fatia fiscal que falta no módulo de PIS/COFINS
+- [x] `exclusoes`: as duas teses na mesma rodada — as contribuições fora da
+      própria base e o ICMS fora da base (Tema 69), este item a item, corrigido
+      pela Selic e conferido 100% contra as 138.358 linhas do relatório 903 do MA
+      (v0.114.0)
+- [ ] A Selic é tabela mantida à mão (`tab_selic.MENSAL`, série 4390 do SGS do
+      Banco Central): **uma linha por mês**, e a etapa recusa o que a série não
+      cobre em vez de corrigir a menos. Vale automatizar a atualização quando
+      houver um segundo cliente pedindo restituição
+- [ ] O mês da restituição do Tema 69 é o mês em que se roda. Quem precisar
+      simular outro — protocolo planejado para o trimestre que vem — ainda não
+      tem por onde pedir: falta o campo na tela e o parâmetro na rota
 - [x] Tela do gestor para liberar segmentos a cada pessoa: coluna na lista e
       chips nos formulários de criar e editar (v0.90.0)
 - [ ] `quebra_xml`: declarada e sem código. Abrir os XML do lote item a item

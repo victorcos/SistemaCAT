@@ -4,6 +4,12 @@ Uma linha por grupo — registro, CST e CFOP dentro da competência —, que é 
 unidade em que a conta arredonda. Somar a coluna da diferença tem de dar o
 total que a tela mostra: é por isso que o grupo aparece inteiro, com o que
 havia e o que passa a haver, lado a lado.
+
+**As duas teses saem juntas, e a coluna `Tese` é o que as separa.** Quem quiser
+só uma filtra; quem quiser comparar já as tem lado a lado. O detalhe do Tema 69
+— item a item, nas quarenta colunas do relatório 903 — sai em planilha própria,
+em `planilhas/exclusao_do_icms.py`: são coisas de tamanhos diferentes, e juntá-las
+numa aba só daria uma planilha que ninguém abre.
 """
 
 from __future__ import annotations
@@ -39,6 +45,10 @@ COLUNAS_DAS_EXCLUSOES = (
     # "PIS" aparecendo duas vezes deixa quem abre sem saber qual é qual
     Coluna("diferenca_pis", "PIS que Volta", "numero", 15, VOLTA),
     Coluna("diferenca_cofins", "COFINS que Volta", "numero", 16, VOLTA),
+    # só a tese do ICMS corrige: aqui, zero quer dizer "esta tese não corrige",
+    # e não "os juros deram zero"
+    Coluna("selic", "SELIC sobre o que Volta", "numero", 20, VOLTA),
+    Coluna("total_atualizado", "Total a Recuperar Atualizado", "numero", 22, VOLTA),
 
     Coluna("tese", "Tese", "texto", 26, ONDE),
 )

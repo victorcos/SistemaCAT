@@ -453,6 +453,11 @@ class _Contexto:
                 log.warning("registro 0000 não reconhecido; o período fica em branco",
                             extra={"motivo": str(erro)})
         elif registro == b"C010":
+            # a nota cancelada que estiver no buffer é do estabelecimento que
+            # termina aqui, não do que começa. Só o C010 precisa fechar: a linha
+            # de documento sozinho usa `cnpj_c` e mais nada. Ver o 903, onde o
+            # mesmo descuido trocou o CNPJ de 61 linhas
+            yield from self.fechar_documento()
             self.cnpj_c = primeiro
         elif registro == b"A010":
             self.cnpj_a = primeiro
