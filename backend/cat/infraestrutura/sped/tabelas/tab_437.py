@@ -39,6 +39,45 @@ TABELA: dict[str, str] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# a grafia do MA, que não é a da tabela oficial
+# ---------------------------------------------------------------------------
+# **O MA encurta o texto da 4.3.7.** Onde a tabela oficial diz "Energia
+# elétrica e térmica, inclusive sob a forma de vapor", a 037 escreve "Energia
+# elétrica e térmica"; onde diz "Amortização e Depreciação de edificações e
+# benfeitorias em imóveis", escreve "Amortização e deprec. de edificações em
+# imóveis". Não é truncamento por largura — o texto é reescrito, e o "Outras
+# operações" vira "Outras Operações", com maiúscula.
+#
+# `TABELA` fica com o texto oficial, que é o da lei e o que a extração mostra;
+# esta é a grafia de quem compara relatório com relatório. Mesmo arranjo de
+# `tab_cfop`, e pelo mesmo motivo.
+#
+# Das 10 naturezas do gabarito do 037 da DMINAS (458.792 linhas, 30/09/2026),
+# 6 batem com a oficial e estas 4 não:
+COMO_O_MA_ESCREVE: dict[str, str] = {
+    "04": "Energia elétrica e térmica",
+    "07": "Armazenagem e frete na operação de venda",
+    "11": "Amortização e deprec. de edificações em imóveis",
+    "13": "Outras Operações com direito a crédito",
+}
+
+
+def descricao_do_ma(codigo: str) -> str:
+    """A descrição como o MA a escreve; na falta dela, a oficial."""
+    limpo = (codigo or "").strip()
+    return COMO_O_MA_ESCREVE.get(limpo) or descricao(limpo)
+
+
+def rotulo_do_ma(codigo: str) -> str:
+    """"código - descrição", na grafia do MA. Vazio continua vazio."""
+    limpo = (codigo or "").strip()
+    if not limpo:
+        return ""
+    desc = descricao_do_ma(limpo)
+    return f"{limpo} - {desc}" if desc else limpo
+
+
 def descricao(codigo: str) -> str:
     """Retorna a descrição do código, ou string vazia se desconhecido."""
     return TABELA.get((codigo or "").strip(), "")

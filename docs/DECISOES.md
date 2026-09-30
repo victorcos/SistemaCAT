@@ -5,6 +5,94 @@
 
 ---
 
+## 2026-09-30 — O gabarito do 037 derruba cinco deduções, e a 037 passa a bater inteira
+
+**O que entrou.** O gabarito do 037 da DMINAS — 458.792 linhas, 57
+competências, em xlsx. Conferido linha a linha pelo `tools/validar_037.py`:
+**458.792 de 458.792, zero divergência.**
+
+A 037 existia desde a v0.74.0 e era tida por validada. Estava errada em sete
+pontos, e nenhum deles mudaria um centavo de somatório — são colunas de
+classificação, de texto e de crédito. É a segunda vez na semana que comparar
+linha a linha acha o que comparar total esconderia.
+
+### As cinco regras que eram dedução e viraram medida
+
+**O CFOP vem por extenso.** Montando a 047 eu concluíra que a grafia abreviada
+era a da 037; era da Gestão. As duas consultas do MA escrevem "Compra para
+comercialização", e a nossa `tab_cfop` dizia "Compra p/comercial" — 8.020 das
+8.040 linhas de uma competência. As 31 grafias de entrada foram geradas do
+próprio gabarito, sem transcrição.
+
+**A natureza do crédito não tem segunda tentativa.** Havia um recurso ao
+`TIPO_ITEM = "00"` para o CFOP que a tabela não conhece. Nas 107 linhas em que o
+gabarito deixa a natureza vazia, o CFOP é sempre um não mapeado — e em 84 delas
+o tipo é "00", exatamente onde a regra escrevia "01 - Aquisição de bens para
+revenda". Era natureza inventada, e o cliente a leria como lida. E a tabela
+estava incompleta: entraram 1124→03 (serviços), 1113→01 e 2122→02.
+
+**O MA encurta o texto da 4.3.7.** Onde a tabela oficial diz "Energia elétrica e
+térmica, inclusive sob a forma de vapor", a 037 escreve "Energia elétrica e
+térmica". Quatro dos dez textos. `tab_437` guarda as duas grafias, como
+`tab_cfop` — a oficial é a da lei e a da tela; a do MA é a de quem compara
+relatório com relatório.
+
+**O ICMS só sai no ramo do C170.** O C500, o D100 e o D500 trazem `VL_ICMS` e
+nós os escrevíamos. Não é "vazio porque é zero": no C170 o MA escreve `0` em
+centenas de milhares de linhas. É por ramo.
+
+**A conta contábil vem do registro da COFINS.** Nos 443 pares em que C501 e C505
+apontam a mesma conta, tanto faz; nos **2** em que divergem, o MA segue o C505
+nos dois. Um deles é conta de energia elétrica contra "mercadorias para
+revenda" — erro visível a olho nu para quem seguir o registro do PIS.
+
+### O D/C deixou de ser hipótese
+
+Era "C quando o CST é 50 e há PIS", declarado no código como ~98% de aderência
+com as discordâncias "concentradas em CFOP de devolução". **A concentração era
+real e me enganou**: todo branco era devolução, mas nem toda devolução era
+branco — das 17.460 devoluções, 7.881 têm "C". Inverti a regra e passei de 8
+para 116 erros numa competência.
+
+O que separa são três condições, e as três foram medidas contra as 458.792:
+
+1. o **CST dá direito a crédito** — 50 a 56 e 60 a 66, não só o 50; há CST 53;
+2. há **base de cálculo**, e não valor: alíquota zero sobre base positiva
+   continua gerando crédito. Pelo valor do PIS erra 9; sem condição erra 42;
+   pela base erra **zero**;
+3. o **participante não é pessoa física** — identificado e sem CNPJ. São as 879
+   linhas que me enganaram: é o consumidor, não a devolução, que tira o crédito.
+
+As três fazem sentido tributário, o que é bom sinal de que valem noutro cliente.
+
+### Duas ausências preenchidas
+
+**A coluna `Código Serviço`**, que o MA tem e nós não tínhamos — vem do
+`0200_COD_LST`. Nossa 037 fica com 53 colunas: as 52 do MA mais o **Município do
+Participante**, que é acréscimo nosso da v0.76.0 e não tem par no gabarito.
+
+**O ramo A100/A170**, nota de serviço tomada. O módulo declarava tê-lo deixado
+de fora por não haver ocorrência; o gabarito tem 2 linhas, e foi com elas na mão
+que o ramo entrou. A natureza do crédito dele é **lida** do `A170_NAT_BC_CRED` —
+nota de serviço não tem CFOP de onde deduzir. Dos outros dois ausentes,
+C395/C396 e F150, a DMINAS não tem nenhuma ocorrência.
+
+### O que o gabarito erra, e nós não
+
+Duas divergências eram defeito **dele**, e o conferidor passa a reproduzi-las
+para não acusar erro onde não há:
+
+* **a codificação.** A EFD é cp1252, onde o byte 0x92 é o apóstrofo `’`. O MA
+  decodifica como latin-1 e grava um caractere de controle no nome do
+  participante: "STELLA D⟨controle⟩ORO". São 10 linhas;
+* **o D105 inconsistente.** Em 2 fretes o D105 declara natureza diferente do
+  D101 do mesmo documento, e o MA descarta o lado da COFINS inteiro — valores e
+  conta. Aqui a escolha foi **replicar**, decidida em 30/09/2026: o efeito é
+  deixar de mostrar R$ 586,68 de COFINS que o arquivo declara. A prova são dois
+  casos contra 255, e isso está escrito na própria função.
+
+---
+
 ## 2026-09-29 — A 047 ganha tela: recortar antes de olhar, e baixar o que se olhou
 
 **O problema que o download não resolve.** A 047 do cliente de referência tem

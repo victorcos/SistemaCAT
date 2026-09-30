@@ -323,10 +323,25 @@ Em disco, na pasta da execução: `entradas.parquet`, `saidas.parquet`,
 `razao.parquet`, `arquivos.parquet`, `contagens.parquet` e a pasta `indices/`,
 com um índice por arquivo lido — cache de leitura, descartável.
 
-A 037 tem **52 colunas** (v0.76.0: entrou `Município`, ao lado de
-`UF Origem/Destino` — as duas saem do mesmo código do IBGE do 0150). A coluna
-`Natureza do Crédito` é deduzida **do CFOP** nos ramos em que o registro não
-traz `NAT_BC_CRED` (C100/C170 e C190/C191/C195); nos demais é lida do arquivo.
+A 037 tem **53 colunas** (v0.113.0): as 52 que o MA exporta mais `Município do
+Participante`, acréscimo nosso da v0.76.0 que não tem par no gabarito. Conferida
+contra o gabarito do MA linha a linha — 458.792 linhas, 57 competências,
+**458.792 iguais**. Nove ramos de documento, desde que o A100/A170 entrou na
+v0.113.0; C395/C396 e F150 seguem de fora, sem ocorrência em cliente validado.
+
+As regras que não saem do arquivo, e que o gabarito fixou:
+
+* `Natureza do Crédito` é deduzida **do CFOP** nos ramos sem `NAT_BC_CRED`
+  (C100/C170 e C190/C191/C195); nos demais é lida. CFOP fora do mapa deixa a
+  coluna **vazia** — não há recurso ao tipo do item;
+* `deb_cred` é `C` quando o **CST dá direito a crédito**, há **base de cálculo**
+  e o participante **não é pessoa física**. Não é o valor do PIS: base positiva
+  com alíquota zero credita;
+* `Vlr ICMS` só sai no ramo C100/C170;
+* a **conta contábil vem do registro da COFINS** (C505, D105, D505);
+* `Descrição CFOP` e `Natureza do Crédito` saem na **grafia do MA**, que difere
+  da abreviada da Gestão e do texto oficial da 4.3.7 — ver `tab_cfop.POR_EXTENSO`
+  e `tab_437.COMO_O_MA_ESCREVE`.
 
 A 047 (v0.111.0) tem **53 colunas**, na ordem em que o MA exporta, e quatro
 ramos: `C100/C170`, `C100/C175`, `A100/A170` e `F100`. Conferida contra o

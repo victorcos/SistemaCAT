@@ -11,9 +11,10 @@ referência real de duas empresas, e sem esse arquivo eu não teria como
 redescobrir nem revalidar. Onde eu discordaria, escrevi o comentário em vez de
 mudar a regra.
 
-## Os oito ramos de documento de entrada
+## Os nove ramos de documento de entrada
 
 ```
+A010 > A100 (IND_OPER=0) > A170               + 0150 + 0200 + 0500
 C010 > 0140 > C100 (IND_OPER=0) > C170        + 0150 + 0200 + 0500
 C500 (sempre entrada) > C501 + C505           + 0150 + 0500
 F010 > F100 (IND_OPER=0)                      + 0150 + 0200 + 0500
@@ -50,9 +51,25 @@ A regra mora em `sped/cadastro.py`, compartilhada com a 047.
 **Os filhos do C190 não vêm intercalados** — todos os C191, depois todos os
 C195, pareados por posição. É a mesma armadilha de `consolidado.py`.
 
-**O que ficou de fora**: A100/A170, C395/C396 e F150. Nenhuma empresa validada
-teve ocorrência, então não há regra de preenchimento confirmada. Inventá-la
-seria pior que a ausência.
+**A conta contábil vem do registro da COFINS**, não do de PIS. Nos 443 pares
+do gabarito em que C501 e C505 (ou D101 e D105) apontam a mesma conta, tanto
+faz; nos **2** em que apontam contas diferentes, o MA escreve a do C505 nas
+duas. Um deles é conta de energia elétrica contra "mercadorias para revenda" —
+a diferença é visível a olho nu, e sai errada quem seguir o registro do PIS.
+
+**O ICMS só sai no ramo do C170.** O C500, o D100 e o D500 trazem `VL_ICMS` no
+arquivo, e nós os escrevíamos; o gabarito deixa a coluna vazia nos três. Não é
+"vazio porque é zero" — no C170 o MA escreve `0` sem pudor, em centenas de
+milhares de linhas. É por ramo, e está medido: das 458.792 linhas do gabarito,
+as 457.896 com ICMS preenchido são todas C100/C170.
+
+**O bloco A entrou em 30/09/2026**, com o gabarito na mão: são 2 linhas no 037
+da DMINAS, e a 047 já montava o mesmo ramo do lado das saídas. Tem abridor
+próprio — o A010 —, como o D, e o quarto CNPJ corrente convive aqui.
+
+**O que ficou de fora**: C395/C396 e F150. Nenhuma empresa validada teve
+ocorrência, então não há regra de preenchimento confirmada. Inventá-la seria
+pior que a ausência.
 
 ## Duas heurísticas, marcadas como tais
 
@@ -79,6 +96,7 @@ from cat.infraestrutura.sped.tabelas import (
     tab_437,
     tab_cfop,
     tab_cfop_natureza_credito,
+    tab_cst_piscofins,
     tab_municipio,
     tab_tipo_item,
 )
@@ -95,11 +113,13 @@ RAMO_D100 = "D100/D105 - Aquisição de Serviços de Transporte"
 RAMO_D500 = "D500/D505 - Nota Fiscal de Serviço de Comunicação"
 RAMO_F120 = "F120 - Bens Incorporados ao Ativo Imobilizado - Depreciação"
 RAMO_F130 = "F130 - Bens Incorporados ao Ativo Imobilizado - Aquisição"
+RAMO_A100 = "A100/A170 - Nota Fiscal de Serviço"
 
 # os registros que a passada olha; o resto da linha nem é decodificado
 _DE_INTERESSE = {
     b"0000",
     b"0140", b"0150", b"0200", b"0500",
+    b"A010", b"A100", b"A170",
     b"C010", b"C100", b"C170", b"C190", b"C191", b"C195",
     b"C500", b"C501", b"C505", b"F010", b"F100",
     b"D010", b"D100", b"D101", b"D105", b"D500", b"D501", b"D505",
@@ -114,6 +134,10 @@ _CHAVE_DO_CADASTRO = {b"0150": 1, b"0200": 1, b"0500": 5}
 
 # IND_OPER = 0 é entrada; 1 é saída
 ENTRADA = "0"
+
+# a NFC-e: o único modelo cuja nota cancelada não rende linha. Ver
+# `fechar_documento` e, na 047, a mesma regra medida em 106 documentos
+MODELO_NFCE = "65"
 
 
 @dataclass
@@ -145,6 +169,7 @@ class LinhaDeEntrada:
     descricao_complementar: str = ""
     descricao_do_item: str = ""
     ncm: str = ""
+    codigo_do_servico: str = ""
     codigo_de_barra: str = ""
     tipo_do_item: str = ""
     valor_do_item: str = ""
@@ -228,49 +253,67 @@ def _rotulo_do_tipo(codigo: str) -> str:
 
 
 def _rotulo_da_natureza(codigo: str) -> str:
-    codigo = (codigo or "").strip()
-    descricao = tab_437.descricao(codigo) if codigo else ""
-    return f"{codigo} - {descricao}" if descricao else codigo
+    """Na grafia do MA, que encurta o texto oficial da 4.3.7. Ver `tab_437`."""
+    return tab_437.rotulo_do_ma(codigo)
 
 
 # ---------------------------------------------------------------------------
 # as duas heurísticas — deduzidas, não lidas
 # ---------------------------------------------------------------------------
-def _natureza_deduzida(cfop: str, tipo_do_item: str) -> str:
+def _natureza_deduzida(cfop: str) -> str:
     """A natureza do crédito quando o registro não tem campo para ela.
 
     É o caso do C170 e do C191/C195 — só o C501, o D101, o D501 e o bloco F
     trazem `NAT_BC_CRED` escrito.
 
-    **A dedução é pelo CFOP.** A natureza descreve a *operação*, e é o CFOP que
-    codifica a operação; o tipo do item descreve a *mercadoria*. A regra foi
-    conferida contra 43.497 linhas de um relatório de referência e reconfirmada
-    contra outras 81.150, em vinte CFOP distintos, sem uma exceção.
+    **A dedução é pelo CFOP, e só por ele.** A natureza descreve a *operação*, e
+    é o CFOP que codifica a operação. A regra foi conferida contra 43.497 linhas
+    de um relatório de referência, reconfirmada contra outras 81.150, e agora
+    contra as 458.792 do gabarito do 037 da DMINAS.
 
-    O tipo do item fica como segunda tentativa, e só para `TIPO_ITEM = "00"`.
-    Ele era a regra antes desta — e estava errado: na amostra que derrubou a
-    hipótese, o campo vinha constante em `"99"` em 100% das linhas, o que fazia
-    a natureza sumir de toda a base. Continua servindo para o CFOP que a tabela
-    não conhece, quando o cadastro diz que a mercadoria é de revenda.
+    **O CFOP que a tabela não conhece deixa a coluna vazia.** Havia aqui uma
+    segunda tentativa pelo `TIPO_ITEM = "00"`, e o gabarito a derrubou: nas 107
+    linhas em que o MA deixa a natureza em branco, o CFOP é sempre um que a
+    tabela não mapeia — e em 84 delas o tipo do item é "00", exatamente onde a
+    segunda tentativa escrevia "01 - Aquisição de bens para revenda". Era
+    natureza inventada, e o cliente a veria como lida.
 
-    Fora isso, branco de propósito: natureza errada com cara de certa é pior que
+    Branco de propósito, então: natureza errada com cara de certa é pior que
     coluna vazia.
     """
-    pelo_cfop = tab_cfop_natureza_credito.codigo(cfop)
-    if pelo_cfop:
-        return _rotulo_da_natureza(pelo_cfop)
-    return _rotulo_da_natureza("01") if (tipo_do_item or "").strip() == "00" else ""
+    return _rotulo_da_natureza(tab_cfop_natureza_credito.codigo(cfop))
 
 
-def _debito_ou_credito_suposto(cst_pis: str, pis: str) -> str:
-    """Hipótese com ~98% de aderência ao arquivo de referência.
+def _debito_ou_credito(cst_pis: str, base_do_pis: str, cnpj_do_participante: str,
+                       codigo_do_participante: str) -> str:
+    """"C" quando a entrada gera crédito; vazio no resto.
 
-    "C" quando o CST do PIS é 50 e há valor de PIS; vazio no resto. As
-    discordâncias concentram-se em CFOP de devolução (1202, 1411…). Fica isolada
-    aqui, com "suposto" no nome, para que ninguém a confunda com leitura — e
-    para que o dia de corrigi-la seja o dia de mexer numa função só.
+    **Três condições, e as três foram medidas.** Contra as 458.792 linhas do
+    gabarito do 037 da DMINAS, esta regra acerta as 458.792 — sem uma exceção:
+
+    1. o **CST dá direito a crédito** (50 a 56 e 60 a 66, ver
+       `tab_cst_piscofins.gera_credito`). Não só o 50: há CST 53 no gabarito, e
+       ele também credita;
+    2. há **base de cálculo**. É a base, e não o valor: alíquota zero sobre base
+       positiva continua sendo operação com direito a crédito, e o gabarito
+       marca "C" em 9 linhas com PIS zerado e base cheia. Testar pelo valor do
+       PIS erra essas 9; testar sem condição nenhuma erra 42;
+    3. o **participante não é pessoa física** — identificado, mas sem CNPJ. São
+       879 linhas assim, todas devolução de venda a consumidor.
+
+    Era hipótese até 30/09/2026: chamava-se `_debito_ou_credito_suposto`, olhava
+    só o CST 50 com PIS positivo, e a docstring dizia ter ~98% de aderência com
+    as discordâncias "concentradas em CFOP de devolução". A concentração era
+    real e me enganou: **todo branco era devolução, mas nem toda devolução era
+    branco** — das 17.460 devoluções do gabarito, 7.881 têm "C". O que separa
+    não é a devolução, é o consumidor pessoa física do outro lado dela.
     """
-    return "C" if (cst_pis or "").strip() == "50" and _numero(pis) > 0 else ""
+    if not tab_cst_piscofins.gera_credito(cst_pis) or _numero(base_do_pis) <= 0:
+        return ""
+    # participante identificado e sem CNPJ é pessoa física: não gera crédito
+    e_pessoa_fisica = bool((codigo_do_participante or "").strip()) and not (
+        cnpj_do_participante or "").strip()
+    return "" if e_pessoa_fisica else "C"
 
 
 def _nomeados(prefixo: str, valores: list[str]) -> dict[str, str]:
@@ -288,8 +331,10 @@ def entradas(caminho: str, codificacao: str) -> Iterator[LinhaDeEntrada]:
             if registro is None or registro not in _DE_INTERESSE:
                 continue
             yield from contexto.ver(registro, campos(linha.decode(codificacao, errors="replace")))
-        # o último grupo do C190 não vê outro C190 para fechá-lo
+        # o último grupo do C190 não vê outro C190 para fechá-lo, e o último
+        # documento não vê outro documento
         yield from contexto.fechar_c190()
+        yield from contexto.fechar_documento()
 
     log.info("consulta de entradas gerada", extra={
         "arquivo": os.path.basename(caminho), "linhas": contexto.saíram,
@@ -311,9 +356,14 @@ class _Contexto:
         self.cadastro = CadastroPorEstabelecimento(_CHAVE_DO_CADASTRO)
         # três estabelecimentos correntes, um por bloco. Ver o topo do módulo:
         # sem o do bloco D, documento de filial saía com CNPJ de matriz
-        self.cnpj_c = self.cnpj_d = self.cnpj_f = ""
+        self.cnpj_c = self.cnpj_d = self.cnpj_f = self.cnpj_a = ""
+        self.a100: list[str] = []
+        self.a100_e_entrada = False
         self.c100: list[str] = []
         self.c100_e_entrada = False
+        # se o documento já teve item: o que fecha sem nenhum é nota cancelada,
+        # e mesmo assim rende uma linha. Ver `fechar_documento`
+        self.c100_teve_item = False
         self.c190: list[str] = []
         self.c191: list[list[str]] = []
         self.c195: list[list[str]] = []
@@ -343,13 +393,22 @@ class _Contexto:
             "municipio_do_participante": tab_municipio.descricao(d["0150_COD_MUN"]),
         }
 
+    def _cnpj_do_participante(self, codigo: str, cnpj: str) -> str:
+        """O CNPJ do participante, para distinguir PJ de pessoa física.
+
+        Participante identificado e sem CNPJ é pessoa física — e devolução de
+        venda a consumidor não gera crédito. Ver `_debito_ou_credito`.
+        """
+        return _nomeados("0150", self.cadastro.linha(b"0150", codigo, cnpj))["0150_CNPJ"]
+
     def _conta(self, codigo: str, cnpj: str) -> tuple[str, str]:
         return codigo, _nomeados("0500", self.cadastro.linha(b"0500", codigo, cnpj))["0500_NOME_CTA"]
 
     def _item(self, codigo: str, cnpj: str) -> dict[str, str]:
         d = _nomeados("0200", self.cadastro.linha(b"0200", codigo, cnpj))
         return {"descricao": d["0200_DESCR_ITEM"], "ncm": d["0200_COD_NCM"],
-                "barra": d["0200_COD_BARRA"], "tipo": d["0200_TIPO_ITEM"]}
+                "barra": d["0200_COD_BARRA"], "tipo": d["0200_TIPO_ITEM"],
+                "servico": d["0200_COD_LST"]}
 
     def _uf_do_estabelecimento(self, cnpj: str) -> str:
         return _nomeados("0140", self.cadastro.estabelecimento(cnpj))["0140_UF"]
@@ -395,13 +454,22 @@ class _Contexto:
                             extra={"motivo": str(erro)})
         elif registro == b"C010":
             self.cnpj_c = primeiro
+        elif registro == b"A010":
+            self.cnpj_a = primeiro
+        elif registro == b"A100":
+            self.a100, self.a100_e_entrada = valores, primeiro == ENTRADA
+        elif registro == b"A170" and self.a100_e_entrada:
+            yield self._do_a170(valores)
         elif registro == b"D010":
             self.cnpj_d = primeiro
         elif registro == b"F010":
             self.cnpj_f = primeiro
         elif registro == b"C100":
-            self.c100, self.c100_e_entrada = valores, primeiro == ENTRADA
+            yield from self.fechar_documento()
+            self.c100, self.c100_e_entrada, self.c100_teve_item = (
+                valores, primeiro == ENTRADA, False)
         elif registro == b"C170" and self.c100_e_entrada:
+            self.c100_teve_item = True
             yield self._do_c170(valores)
         elif registro == b"C500":
             self.c500, self.c501 = valores, None
@@ -440,6 +508,34 @@ class _Contexto:
         elif registro == b"F130":
             yield self._do_f130(valores)
 
+    def fechar_documento(self) -> Iterator[LinhaDeEntrada]:
+        """O C100 de entrada que não teve item rende a linha do documento.
+
+        É a nota cancelada, denegada ou inutilizada: o leiaute manda escriturar
+        só até a chave, e o MA emite a linha assim mesmo — com CNPJ, período,
+        ramo, modelo, situação, número, série e chave, e nada mais. São 23 no
+        gabarito do 037, todas de `COD_SIT` 02, 03 ou 05.
+
+        **Menos a NFC-e**, como na 047: o modelo 65 sem filho não rende linha.
+        Aqui não há ocorrência para medir — entrada de NFC-e é rara —, mas a
+        regra é a mesma consulta do mesmo sistema, e divergir por conta própria
+        seria inventar.
+        """
+        if (self.c100 and self.c100_e_entrada and not self.c100_teve_item
+                and _nomeados("C100", self.c100)["C100_COD_MOD"] != MODELO_NFCE):
+            yield self._do_c100_sozinho()
+        self.c100, self.c100_e_entrada, self.c100_teve_item = [], False, False
+
+    def _do_c100_sozinho(self) -> LinhaDeEntrada:
+        """A nota sem item: sai o que o leiaute deixou escrever, e nada mais."""
+        nota = _nomeados("C100", self.c100)
+        participante = nota["C100_COD_PART"]
+        return self._emitir(LinhaDeEntrada(
+            cnpj=self.cnpj_c, periodo=self.periodo, registros=RAMO_C100,
+            modelo=nota["C100_COD_MOD"], situacao=nota["C100_COD_SIT"],
+            numero_do_documento=nota["C100_NUM_DOC"], serie=nota["C100_SER"],
+            chave=nota["C100_CHV_NFE"]))
+
     def fechar_c190(self) -> Iterator[LinhaDeEntrada]:
         """Pareia C191[i] com C195[i]. Par incompleto fica de fora."""
         for pis, cofins in zip(self.c191, self.c195):
@@ -466,13 +562,14 @@ class _Contexto:
             numero_do_item=item["C170_NUM_ITEM"], codigo_do_item=item["C170_COD_ITEM"],
             descricao_complementar=item["C170_DESCR_COMPL"],
             descricao_do_item=cadastro["descricao"], ncm=cadastro["ncm"],
+            codigo_do_servico=cadastro["servico"],
             codigo_de_barra=cadastro["barra"], tipo_do_item=_rotulo_do_tipo(cadastro["tipo"]),
             valor_do_item=_dinheiro(item["C170_VL_ITEM"]),
             quantidade=_quantidade(item["C170_QTD"]), unidade=item["C170_UNID"],
             desconto_do_item=_dinheiro(item["C170_VL_DESC"]),
             # o C170 não tem campo de natureza do crédito: ela é deduzida do CFOP
-            natureza_do_credito=_natureza_deduzida(item["C170_CFOP"], cadastro["tipo"]),
-            cfop=item["C170_CFOP"], descricao_do_cfop=tab_cfop.descricao(item["C170_CFOP"]),
+            natureza_do_credito=_natureza_deduzida(item["C170_CFOP"]),
+            cfop=item["C170_CFOP"], descricao_do_cfop=tab_cfop.descricao_por_extenso(item["C170_CFOP"]),
             icms=_dinheiro(item["C170_VL_ICMS"]), icms_st=_dinheiro(item["C170_VL_ICMS_ST"]),
             ipi=_dinheiro(item["C170_VL_IPI"]),
             cst_pis=item["C170_CST_PIS"], base_do_pis=_dinheiro(item["C170_VL_BC_PIS"]),
@@ -487,16 +584,61 @@ class _Contexto:
             quantidade_aliquota_da_cofins=item["C170_ALIQ_COFINS_REAIS"],
             cofins=_dinheiro(item["C170_VL_COFINS"]),
             conta_contabil=conta, nome_da_conta=nome_da_conta,
-            debito_ou_credito=_debito_ou_credito_suposto(item["C170_CST_PIS"],
-                                                         item["C170_VL_PIS"]),
+            debito_ou_credito=_debito_ou_credito(
+                item["C170_CST_PIS"], item["C170_VL_BC_PIS"],
+                self._cnpj_do_participante(participante, self.cnpj_c), participante),
             **self._participante(participante, self.cnpj_c)))
+
+    def _do_a170(self, valores: list[str]) -> LinhaDeEntrada:
+        """Serviço tomado. O CNPJ é o do A010, e não há modelo nem CFOP.
+
+        Entrou em 30/09/2026, com o gabarito na mão: são 2 linhas no 037 da
+        DMINAS, e a 047 já trazia o ramo do lado das saídas. O que ele ensinou e
+        o leiaute não diria: a **natureza do crédito é lida**, do
+        `A170_NAT_BC_CRED`, e não deduzida do CFOP — a nota de serviço não tem
+        CFOP nenhum. E o rótulo do ramo é o mesmo texto das duas consultas.
+        """
+        nota = _nomeados("A100", self.a100)
+        item = _nomeados("A170", valores)
+        cadastro = self._item(item["A170_COD_ITEM"], self.cnpj_a)
+        conta, nome_da_conta = self._conta(item["A170_COD_CTA"], self.cnpj_a)
+        participante = nota["A100_COD_PART"]
+        return self._emitir(LinhaDeEntrada(
+            cnpj=self.cnpj_a, periodo=self.periodo, registros=RAMO_A100,
+            situacao=nota["A100_COD_SIT"],
+            uf_origem_destino=self._uf_origem_destino(participante, self.cnpj_a),
+            numero_do_documento=nota["A100_NUM_DOC"], serie=nota["A100_SER"],
+            chave=nota["A100_CHV_NFSE"], data_do_documento=_dia(nota["A100_DT_DOC"]),
+            data_de_entrada=_dia(nota["A100_DT_EXE_SERV"]),
+            valor_do_documento=_dinheiro(nota["A100_VL_DOC"]),
+            desconto_do_documento=_dinheiro(nota["A100_VL_DESC"]),
+            numero_do_item=item["A170_NUM_ITEM"], codigo_do_item=item["A170_COD_ITEM"],
+            descricao_complementar=item["A170_DESCR_COMPL"],
+            descricao_do_item=cadastro["descricao"], ncm=cadastro["ncm"],
+            codigo_do_servico=cadastro["servico"], codigo_de_barra=cadastro["barra"],
+            tipo_do_item=_rotulo_do_tipo(cadastro["tipo"]),
+            valor_do_item=_dinheiro(item["A170_VL_ITEM"]),
+            desconto_do_item=_dinheiro(item["A170_VL_DESC"]),
+            natureza_do_credito=_rotulo_da_natureza(item["A170_NAT_BC_CRED"]),
+            cst_pis=item["A170_CST_PIS"], base_do_pis=_dinheiro(item["A170_VL_BC_PIS"]),
+            aliquota_do_pis=_aliquota(item["A170_ALIQ_PIS"]),
+            pis=_dinheiro(item["A170_VL_PIS"]),
+            cst_cofins=item["A170_CST_COFINS"],
+            base_da_cofins=_dinheiro(item["A170_VL_BC_COFINS"]),
+            aliquota_da_cofins=_aliquota(item["A170_ALIQ_COFINS"]),
+            cofins=_dinheiro(item["A170_VL_COFINS"]),
+            conta_contabil=conta, nome_da_conta=nome_da_conta,
+            debito_ou_credito=_debito_ou_credito(
+                item["A170_CST_PIS"], item["A170_VL_BC_PIS"],
+                self._cnpj_do_participante(participante, self.cnpj_a), participante),
+            **self._participante(participante, self.cnpj_a)))
 
     def _do_c505(self, valores: list[str]) -> LinhaDeEntrada:
         """Energia, água e gás. O C500 é sempre entrada — não tem IND_OPER."""
         doc = _nomeados("C500", self.c500)
         pis = _nomeados("C501", self.c501 or [])
         cofins = _nomeados("C505", valores)
-        conta, nome_da_conta = self._conta(pis["C501_COD_CTA"], self.cnpj_c)
+        conta, nome_da_conta = self._conta(cofins["C505_COD_CTA"], self.cnpj_c)
         participante = doc["C500_COD_PART"]
         return self._emitir(LinhaDeEntrada(
             cnpj=self.cnpj_c, periodo=self.periodo, registros=RAMO_C500,
@@ -508,7 +650,6 @@ class _Contexto:
             valor_do_documento=_dinheiro(doc["C500_VL_DOC"]),
             valor_do_item=_dinheiro(pis["C501_VL_ITEM"]),
             natureza_do_credito=_rotulo_da_natureza(pis["C501_NAT_BC_CRED"]),
-            icms=_dinheiro(doc["C500_VL_ICMS"]),
             cst_pis=pis["C501_CST_PIS"], base_do_pis=_dinheiro(pis["C501_VL_BC_PIS"]),
             aliquota_do_pis=_aliquota(pis["C501_ALIQ_PIS"]), pis=_dinheiro(pis["C501_VL_PIS"]),
             cst_cofins=cofins["C505_CST_COFINS"],
@@ -516,8 +657,9 @@ class _Contexto:
             aliquota_da_cofins=_aliquota(cofins["C505_ALIQ_COFINS"]),
             cofins=_dinheiro(cofins["C505_VL_COFINS"]),
             conta_contabil=conta, nome_da_conta=nome_da_conta,
-            debito_ou_credito=_debito_ou_credito_suposto(pis["C501_CST_PIS"],
-                                                         pis["C501_VL_PIS"]),
+            debito_ou_credito=_debito_ou_credito(
+                pis["C501_CST_PIS"], pis["C501_VL_BC_PIS"],
+                self._cnpj_do_participante(participante, self.cnpj_c), participante),
             **self._participante(participante, self.cnpj_c)))
 
     def _do_c190(self, filho_pis: list[str], filho_cofins: list[str]) -> LinhaDeEntrada:
@@ -540,12 +682,13 @@ class _Contexto:
             data_de_entrada=_dia(grupo["C190_DT_INI"]),
             valor_da_mercadoria=_dinheiro(grupo["C190_VL_TOT_ITEM"]),
             codigo_do_item=grupo["C190_COD_ITEM"], descricao_do_item=cadastro["descricao"],
-            ncm=cadastro["ncm"] or grupo["C190_COD_NCM"], codigo_de_barra=cadastro["barra"],
+            ncm=cadastro["ncm"] or grupo["C190_COD_NCM"], codigo_do_servico=cadastro["servico"],
+            codigo_de_barra=cadastro["barra"],
             tipo_do_item=_rotulo_do_tipo(cadastro["tipo"]),
             valor_do_item=_dinheiro(pis["C191_VL_ITEM"]),
             desconto_do_item=_dinheiro(pis["C191_VL_DESC"]),
-            natureza_do_credito=_natureza_deduzida(pis["C191_CFOP"], cadastro["tipo"]),
-            cfop=pis["C191_CFOP"], descricao_do_cfop=tab_cfop.descricao(pis["C191_CFOP"]),
+            natureza_do_credito=_natureza_deduzida(pis["C191_CFOP"]),
+            cfop=pis["C191_CFOP"], descricao_do_cfop=tab_cfop.descricao_por_extenso(pis["C191_CFOP"]),
             cst_pis=pis["C191_CST_PIS"], base_do_pis=_dinheiro(pis["C191_VL_BC_PIS"]),
             quantidade_base_do_pis=pis["C191_QUANT_BC_PIS"],
             aliquota_do_pis=_aliquota(pis["C191_ALIQ_PIS_PERC"]),
@@ -558,15 +701,31 @@ class _Contexto:
             quantidade_aliquota_da_cofins=cofins["C195_ALIQ_COFINS_QUANT"],
             cofins=_dinheiro(cofins["C195_VL_COFINS"]),
             conta_contabil=conta, nome_da_conta=nome_da_conta,
-            debito_ou_credito=_debito_ou_credito_suposto(pis["C191_CST_PIS"],
-                                                         pis["C191_VL_PIS"])))
+            debito_ou_credito=_debito_ou_credito(
+                pis["C191_CST_PIS"], pis["C191_VL_BC_PIS"], pis["C191_COD_PART"],
+                pis["C191_COD_PART"])))
 
     def _do_d105(self, valores: list[str]) -> LinhaDeEntrada:
-        """Serviço de transporte. O CNPJ é o do D010, não o do C010."""
+        """Serviço de transporte. O CNPJ é o do D010, não o do C010.
+
+        **O D105 que discorda do D101 não entra.** Os dois registros descrevem a
+        mesma operação de frete e ambos declaram a natureza da base de cálculo
+        do crédito; quando declaram naturezas diferentes, o arquivo está
+        internamente inconsistente e o MA descarta o lado da COFINS inteiro —
+        valores e conta contábil. São 2 pares assim no gabarito, contra 255 em
+        que tudo bate, e nos 2 o gabarito sai com a COFINS em branco.
+
+        É **replicação com prova de dois casos**, e está escrito aqui para que
+        quem a revisitar saiba o peso dela. O efeito é deixar de mostrar COFINS
+        que o arquivo declara — R$ 586,68 na base de referência —, e foi decisão
+        consciente de seguir o MA, tomada em 30/09/2026.
+        """
         doc = _nomeados("D100", self.d100)
         pis = _nomeados("D101", self.d101 or [])
         cofins = _nomeados("D105", valores)
-        conta, nome_da_conta = self._conta(pis["D101_COD_CTA"], self.cnpj_d)
+        if cofins["D105_NAT_BC_CRED"] != pis["D101_NAT_BC_CRED"]:
+            cofins = _nomeados("D105", [])
+        conta, nome_da_conta = self._conta(cofins["D105_COD_CTA"], self.cnpj_d)
         participante = doc["D100_COD_PART"]
         return self._emitir(LinhaDeEntrada(
             cnpj=self.cnpj_d, periodo=self.periodo, registros=RAMO_D100,
@@ -580,7 +739,6 @@ class _Contexto:
             valor_da_mercadoria=_dinheiro(doc["D100_VL_SERV"]),
             valor_do_item=_dinheiro(pis["D101_VL_ITEM"]),
             natureza_do_credito=_rotulo_da_natureza(pis["D101_NAT_BC_CRED"]),
-            icms=_dinheiro(doc["D100_VL_ICMS"]),
             cst_pis=pis["D101_CST_PIS"], base_do_pis=_dinheiro(pis["D101_VL_BC_PIS"]),
             aliquota_do_pis=_aliquota(pis["D101_ALIQ_PIS"]), pis=_dinheiro(pis["D101_VL_PIS"]),
             cst_cofins=cofins["D105_CST_COFINS"],
@@ -588,8 +746,9 @@ class _Contexto:
             aliquota_da_cofins=_aliquota(cofins["D105_ALIQ_COFINS"]),
             cofins=_dinheiro(cofins["D105_VL_COFINS"]),
             conta_contabil=conta, nome_da_conta=nome_da_conta,
-            debito_ou_credito=_debito_ou_credito_suposto(pis["D101_CST_PIS"],
-                                                         pis["D101_VL_PIS"]),
+            debito_ou_credito=_debito_ou_credito(
+                pis["D101_CST_PIS"], pis["D101_VL_BC_PIS"],
+                self._cnpj_do_participante(participante, self.cnpj_d), participante),
             **self._participante(participante, self.cnpj_d)))
 
     def _do_d505(self, valores: list[str]) -> LinhaDeEntrada:
@@ -597,7 +756,7 @@ class _Contexto:
         doc = _nomeados("D500", self.d500)
         pis = _nomeados("D501", self.d501 or [])
         cofins = _nomeados("D505", valores)
-        conta, nome_da_conta = self._conta(pis["D501_COD_CTA"], self.cnpj_d)
+        conta, nome_da_conta = self._conta(cofins["D505_COD_CTA"], self.cnpj_d)
         participante = doc["D500_COD_PART"]
         return self._emitir(LinhaDeEntrada(
             cnpj=self.cnpj_d, periodo=self.periodo, registros=RAMO_D500,
@@ -614,7 +773,6 @@ class _Contexto:
             frete="0,00",
             valor_do_item=_dinheiro(pis["D501_VL_ITEM"]),
             natureza_do_credito=_rotulo_da_natureza(pis["D501_NAT_BC_CRED"]),
-            icms=_dinheiro(doc["D500_VL_ICMS"]),
             cst_pis=pis["D501_CST_PIS"], base_do_pis=_dinheiro(pis["D501_VL_BC_PIS"]),
             aliquota_do_pis=_aliquota(pis["D501_ALIQ_PIS"]), pis=_dinheiro(pis["D501_VL_PIS"]),
             cst_cofins=cofins["D505_CST_COFINS"],
@@ -622,8 +780,9 @@ class _Contexto:
             aliquota_da_cofins=_aliquota(cofins["D505_ALIQ_COFINS"]),
             cofins=_dinheiro(cofins["D505_VL_COFINS"]),
             conta_contabil=conta, nome_da_conta=nome_da_conta,
-            debito_ou_credito=_debito_ou_credito_suposto(pis["D501_CST_PIS"],
-                                                         pis["D501_VL_PIS"]),
+            debito_ou_credito=_debito_ou_credito(
+                pis["D501_CST_PIS"], pis["D501_VL_BC_PIS"],
+                self._cnpj_do_participante(participante, self.cnpj_d), participante),
             **self._participante(participante, self.cnpj_d)))
 
     def _do_f100(self, valores: list[str]) -> LinhaDeEntrada:
@@ -639,7 +798,8 @@ class _Contexto:
             valor_do_documento=_dinheiro(d["F100_VL_OPER"]),
             valor_da_mercadoria=_dinheiro(d["F100_VL_OPER"]),
             codigo_do_item=d["F100_COD_ITEM"], descricao_do_item=cadastro["descricao"],
-            ncm=cadastro["ncm"], codigo_de_barra=cadastro["barra"],
+            ncm=cadastro["ncm"], codigo_do_servico=cadastro["servico"],
+            codigo_de_barra=cadastro["barra"],
             tipo_do_item=_rotulo_do_tipo(cadastro["tipo"]),
             valor_do_item=_dinheiro(d["F100_VL_OPER"]),
             natureza_do_credito=_rotulo_da_natureza(d["F100_NAT_BC_CRED"]),
@@ -650,7 +810,9 @@ class _Contexto:
             aliquota_da_cofins=_aliquota(d["F100_ALIQ_COFINS"]),
             cofins=_dinheiro(d["F100_VL_COFINS"]),
             conta_contabil=conta, nome_da_conta=nome_da_conta,
-            debito_ou_credito=_debito_ou_credito_suposto(d["F100_CST_PIS"], d["F100_VL_PIS"]),
+            debito_ou_credito=_debito_ou_credito(
+                d["F100_CST_PIS"], d["F100_VL_BC_PIS"],
+                self._cnpj_do_participante(participante, self.cnpj_f), participante),
             **self._participante(participante, self.cnpj_f)))
 
     def _do_f120(self, valores: list[str]) -> LinhaDeEntrada:
@@ -675,7 +837,8 @@ class _Contexto:
             aliquota_da_cofins=_aliquota(d["F120_ALIQ_COFINS"]),
             cofins=_dinheiro(d["F120_VL_COFINS"]),
             conta_contabil=conta, nome_da_conta=nome_da_conta,
-            debito_ou_credito=_debito_ou_credito_suposto(d["F120_CST_PIS"], d["F120_VL_PIS"])))
+            debito_ou_credito=_debito_ou_credito(
+                d["F120_CST_PIS"], d["F120_VL_BC_PIS"], "", "")))
 
     def _do_f130(self, valores: list[str]) -> LinhaDeEntrada:
         """Ativo imobilizado — aquisição. Registro único, sem filhos."""
@@ -698,4 +861,5 @@ class _Contexto:
             aliquota_da_cofins=_aliquota(d["F130_ALIQ_COFINS"]),
             cofins=_dinheiro(d["F130_VL_COFINS"]),
             conta_contabil=conta, nome_da_conta=nome_da_conta,
-            debito_ou_credito=_debito_ou_credito_suposto(d["F130_CST_PIS"], d["F130_VL_PIS"])))
+            debito_ou_credito=_debito_ou_credito(
+                d["F130_CST_PIS"], d["F130_VL_BC_PIS"], "", "")))

@@ -604,6 +604,56 @@ def descricao(codigo: str) -> str:
 # são todos os CFOP que aquela base tem. Para o que não está aqui, a grafia
 # abreviada serve: descrição curta é melhor que coluna vazia.
 POR_EXTENSO: dict[str, str] = {
+    # ── Entrada (1xxx/2xxx) — do gabarito do 037 da DMINAS, 458.792 linhas,
+    # conferido em 30/09/2026. São todos os CFOP de entrada daquela base
+    "1101": "Compra para Industrialização ou prod rural",
+    "1102": "Compra para comercialização",
+    "1113": ("Compra para comercialização, de mercadoria recebida anteriormente em "
+             "consignação mercantil"),
+    "1124": "Industrialização efetuada por outra empresa",
+    "1202": "Devol de venda de mercadoria adquirida ou recebida de terc",
+    "1209": "Devol de mercadoria adquirida ou recebida de terc, remetida em transferência",
+    "1401": ("Compra para Industrialização ou prod rural em operação com mercadoria "
+             "sujeita ao regime de substituição tributária"),
+    "1403": ("Compra para comercialização em operação com mercadoria sujeita ao regime "
+             "de substituição tributária"),
+    "1407": ("Compra de mercadoria para uso ou consumo cuja mercadoria está sujeita ao "
+             "regime de substituição tributária"),
+    "1409": ("Transferência para comercialização em operação com mercadoria sujeita ao "
+             "regime de substituição tributária"),
+    "1411": ("Devol de venda de mercadoria adquirida ou recebida de terc em operação com "
+             "mercadoria sujeita ao regime de substituição tributária"),
+    "1556": "Compra de material para uso ou consumo",
+    "1652": "Compra de combustível ou lubrificante para comercialização",
+    "1653": "Compra de combustível ou lubrificante por consumidor ou usuário final",
+    "1910": "Entrada de bonificação, doação ou brinde",
+    "1920": "Entrada de vasilhame ou sacaria",
+    "1925": ("Retorno de mercadoria remetida para Industrialização por conta e ordem do "
+             "adquirente da mercadoria, quando esta não transitar pelo estabelecimento "
+             "do adquirente"),
+    "1949": "Outra entrada de mercadoria ou prestação de serviço não especificada",
+    "2101": "Compra para Industrialização ou prod rural",
+    "2102": "Compra para comercialização",
+    "2121": ("Compra para comercialização, em venda à ordem, já recebida do vendedor "
+             "remetente"),
+    "2122": ("Compra para Industrialização em que a mercadoria foi remetida pelo "
+             "fornecedor ao industrializador sem transitar pelo estabelecimento "
+             "adquirente"),
+    "2202": "Devol de venda de mercadoria adquirida ou recebida de terc",
+    "2401": ("Compra para Industrialização ou prod rural em operação com mercadoria "
+             "sujeita ao regime de substituição tributária"),
+    "2403": ("Compra para comercialização em operação com mercadoria sujeita ao regime "
+             "de substituição tributária"),
+    "2407": ("Compra de mercadoria para uso ou consumo cuja mercadoria está sujeita ao "
+             "regime de substituição tributária"),
+    "2411": ("Devol de venda de mercadoria adquirida ou recebida de terc em operação com "
+             "mercadoria sujeita ao regime de substituição tributária"),
+    "2556": "Compra de material para uso ou consumo",
+    "2910": "Entrada de bonificação, doação ou brinde",
+    "2920": "Entrada de vasilhame ou sacaria",
+    "2949": "Outra entrada de mercadoria ou prestação de serviço não especificada",
+
+    # ── Saída (5xxx/6xxx) — do gabarito do 047, 7.784.121 linhas
     "5102": "Venda de mercadoria adquirida ou recebida de terc",
     "5152": "Transferência de mercadoria adquirida ou recebida de terc",
     "5202": "Devol de compra para comercialização",

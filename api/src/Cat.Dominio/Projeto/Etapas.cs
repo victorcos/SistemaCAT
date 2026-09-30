@@ -150,11 +150,13 @@ public static class Etapas
             "minutos.",
             Implementada: true, Aba: "Quebras"),
         new("apuracao_piscofins", "Apurar PIS/COFINS",
-            "Monta a Consulta de Entradas (037), do lado fiscal, e o razão da ECD, do " +
-            "lado contábil. O cruzamento entre os dois é seu: casar partida contábil " +
-            "com item de nota exige critério que muda de cliente para cliente, e um " +
-            "casamento automático erraria calado. Marque as contas no razão, extraia, " +
-            "e compare com a 037.",
+            "Monta as duas consultas do lado fiscal — a de Entradas (037) e a de " +
+            "Saídas (047), item a item — e o razão da ECD, do lado contábil. A 047 " +
+            "abre em tela própria, com filtro por competência, estabelecimento, CFOP " +
+            "e CST, e o download sai do tamanho do filtro. O cruzamento com a " +
+            "contabilidade é seu: casar partida contábil com item de nota exige " +
+            "critério que muda de cliente para cliente, e um casamento automático " +
+            "erraria calado. Marque as contas no razão, extraia, e compare.",
             Implementada: true, Aba: "Apuração"),
         new("apuracao_contribuicoes", "Gestão Fiscal",
             "Os quadros no padrão do MA: da EFD-Contribuições saem PIS e COFINS, nos " +
@@ -248,8 +250,9 @@ public static class Etapas
                     "com o M200 — filtrando pelo bloco do leiaute.",
                     ["importar", "quebra_de_sped"]),
                 new("piscofins", "Apuração de PIS/COFINS", "037",
-                    "O par que se confronta: a Consulta de Entradas (037), do lado fiscal, e o " +
-                    "razão da ECD, do lado contábil.",
+                    "As duas pontas do fiscal — a Consulta de Entradas (037) e a de Saídas " +
+                    "(047), item a item — e o razão da ECD, do lado contábil. A 047 abre em " +
+                    "tela própria, com filtro por competência, CFOP e CST.",
                     ["importar", "apuracao_piscofins"]),
                 new("exclusoes", "Exclusões da base", "EXC",
                     "O que sai da base de cálculo antes de apurar — a principal é o ICMS " +

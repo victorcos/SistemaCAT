@@ -206,12 +206,29 @@ class TestAsHeuristicas:
         assert nota.cfop == "1102"
         assert nota.natureza_do_credito.startswith("01 -")
 
-    def test_cfop_fora_da_tabela_cai_no_tipo_do_item(self, linhas):
-        """A regra antiga vira a segunda tentativa, e só para o código 00."""
-        assert _natureza_deduzida("9999", "00").startswith("01 -")
-        assert _natureza_deduzida("9999", "99") == ""
-        # e o CFOP manda mesmo quando o tipo do item diria outra coisa
-        assert _natureza_deduzida("1202", "00").startswith("12 -")
+    def test_cfop_fora_da_tabela_deixa_a_natureza_vazia(self, linhas):
+        """Não há segunda tentativa pelo tipo do item — o gabarito derrubou.
+
+        Havia aqui uma regra que, para `TIPO_ITEM = "00"`, escrevia "01" quando
+        o CFOP era desconhecido. Nas 458.792 linhas do gabarito do 037, as 107
+        em que o MA deixa a natureza em branco são todas de CFOP não mapeado —
+        e em 84 delas o tipo do item é "00". Era natureza inventada.
+        """
+        assert _natureza_deduzida("9999") == ""
+        assert _natureza_deduzida("1202").startswith("12 -")
+        # os três que o gabarito acrescentou ao mapa
+        assert _natureza_deduzida("1124").startswith("03 -")
+        assert _natureza_deduzida("1113").startswith("01 -")
+        assert _natureza_deduzida("2122").startswith("02 -")
+
+    def test_a_descricao_do_cfop_sai_por_extenso(self, linhas):
+        """As duas consultas do MA escrevem o CFOP por extenso.
+
+        A grafia abreviada da `tab_cfop` é a da Gestão, e continua lá para a
+        comparação daquele relatório. Ver `tab_cfop.POR_EXTENSO`.
+        """
+        nota = next(l for l in linhas if l.registros == RAMO_C100)
+        assert nota.descricao_do_cfop == "Compra para comercialização"
 
     def test_quando_o_registro_traz_a_natureza_ela_nao_e_deduzida(self, linhas):
         energia = next(l for l in linhas if l.registros == RAMO_C500)
@@ -253,7 +270,9 @@ class TestOsRamosRaros:
 class TestContrato:
     def test_as_colunas_sao_conhecidas_antes_de_ler(self, linhas):
         colunas = colunas_da_entrada()
-        assert len(colunas) == 52
+        # 52 no MA mais o município, que é acréscimo nosso (v0.76.0)
+        assert len(colunas) == 53
+        assert "codigo_do_servico" in colunas
         assert set(linhas[0].como_dicionario()) == set(colunas)
 
     def test_arquivo_sem_entrada_nenhuma_nao_quebra(self, tmp_path):
