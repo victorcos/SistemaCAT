@@ -384,8 +384,12 @@ class _Contexto:
 
         # o ST que ninguém escriturou, reconstruído. Ver o topo do módulo
         presumida = valor_do_item - desconto + rateio
-        aliquota = tab_aliquota_icms.aplicavel(origem, destino, self.cnpj,
-                                               codigo_do_item, self.excecoes)
+        # a competência entra porque **a alíquota interna tem data**: um pedido
+        # de cinco anos atravessa mudança de lei estadual, e uma tabela sem
+        # vigência aplicaria a de hoje a uma operação de 2021, calada
+        aliquota = tab_aliquota_icms.aplicavel(
+            origem, destino, self.competencia, self.cnpj, codigo_do_item,
+            self.excecoes)
         icms_st = _centavos(presumida * aliquota / CEM)
         stf = base - icms_st
 

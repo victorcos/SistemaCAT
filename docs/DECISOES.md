@@ -5,6 +5,64 @@
 
 ---
 
+## 2026-09-30 — A alíquota interna tem data, e a prova dela não pode vir do MA
+
+**O apontamento do Victor:** conferir a alíquota interna pela métrica do MA não
+serve. Está certo, e por duas razões que se somam.
+
+**A primeira é circularidade.** O relatório do MA traz a alíquota que **ele**
+atribuiu a cada produto. Conferir a nossa contra a dele é copiar a classificação
+alheia com aparência de medição — exatamente o que a decisão do 839, hoje mais
+cedo, existiu para evitar quando separou a regra (lei, no código) do cadastro
+(cliente, no banco). Usar o MA como prova desfaria a separação pela porta dos
+fundos.
+
+**A segunda apareceu ao procurar a primeira, e é pior.** A tabela que eu tinha
+escrito guardava **um número por estado, sem data**. Um pedido de restituição
+cobre cinco anos, e vários estados subiram a alíquota interna entre 2023 e 2025:
+a tabela aplicaria a alíquota de hoje a uma operação de 2021, calada. Em Minas
+não mudou — e é só por isso que a conferência do 839 fechou 100% sem esta coluna
+existir. Foi sorte, e sorte não é método.
+
+### O que passou a valer
+
+**A alíquota tem vigência.** Cada estado guarda uma linha por período, com o ato
+legal escrito, e `da_regra` recebe a competência. Acrescentar vigência é um ato
+comum; esquecê-la deixou de ser possível.
+
+**Só entra na tabela o que foi medido.** `INTERNA` tem hoje **uma** UF: MG a
+18%, conferida na EFD ICMS/IPI da DMINAS — 201 arquivos, 2021 a 2025, em que as
+saídas internas tributadas integralmente mostram 18% em 56% a 59% das linhas
+todos os anos, sem degrau. As outras 26 saíram para `A_CONFERIR`, que o motor
+**recusa**, com um recado que diz como conferir e avisa que o relatório do
+escritório anterior não serve de prova.
+
+Recusar bloqueia o 839 fora de Minas até alguém gastar meia hora com a lei. É
+deliberado: errar a interna em um ponto e meio sobre os R$ 117 milhões de base
+de um cliente médio são R$ 160 mil de crédito pedido indevidamente, e esse erro
+não aparece em lugar nenhum do relatório — vira só um número maior. Ninguém
+confere um número que veio grande a favor do cliente.
+
+**A exceção do produto vence a regra, e dispensa o estado estar conferido.**
+Quem cadastrou a exceção daquele item sabe dele mais do que a alíquota geral do
+estado. Isso também dá um caminho a quem tem o cadastro do cliente e não tem a
+lei na mão.
+
+### A prova que serve
+
+`tools/aferir_aliquota_interna.py` lê a EFD ICMS/IPI do próprio cliente e mostra,
+ano a ano, a alíquota que ele cobrou nas saídas internas tributadas
+integralmente — e aponta o **degrau**, quando a dominante muda de um ano para o
+outro, que é o que diz quantas vigências a tabela precisa ter.
+
+**É evidência, não decisão**, e o comando diz isso ao terminar: a moda das
+vendas de um cliente não é a lei. Um cliente cujo catálogo fosse todo de cesta
+básica mostraria 12% como dominante. Quem escreve a linha confronta este número
+com a legislação estadual e assume o que assinou — e a linha guarda o ato legal
+ao lado da alíquota, para que a assinatura tenha onde se apoiar.
+
+---
+
 ## 2026-09-30 — O 933: o ISS, e a descoberta de que cada relatório tem a sua conta
 
 A exclusão do ISS da base do PIS/COFINS fecha **100% contra o gabarito do MA**:

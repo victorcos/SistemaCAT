@@ -174,17 +174,19 @@ def excecoes_do_gabarito(parquet: str) -> dict[tuple[str, str, str, str], Decima
     """
     tabela = pq.read_table(parquet, columns=[
         "CNPJ", "UF Origem/Destino", "Código Item",
-        "Alíquota Interna ICMS/UF Origem/Destino"])
+        "Alíquota Interna ICMS/UF Origem/Destino", "Período"])
     fora: dict[tuple[str, str, str, str], Decimal] = {}
-    for cnpj, uf, item, aliquota in zip(
+    for cnpj, uf, item, aliquota, periodo in zip(
             tabela.column("CNPJ").to_pylist(),
             tabela.column("UF Origem/Destino").to_pylist(),
             tabela.column("Código Item").to_pylist(),
-            tabela.column("Alíquota Interna ICMS/UF Origem/Destino").to_pylist()):
+            tabela.column("Alíquota Interna ICMS/UF Origem/Destino").to_pylist(),
+            tabela.column("Período").to_pylist()):
         origem, destino = (str(uf).split("/") + [""])[:2]
         do_ma = Decimal(str(aliquota))
+        dia, mes, ano = str(periodo).split("/")
         try:
-            if tab_aliquota_icms.da_regra(origem, destino) == do_ma:
+            if tab_aliquota_icms.da_regra(origem, destino, f"{ano}-{mes}") == do_ma:
                 continue
         except tab_aliquota_icms.AliquotaDesconhecida:
             pass

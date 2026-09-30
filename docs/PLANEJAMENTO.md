@@ -184,6 +184,13 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       33 linhas do gabarito. O `VL_ISS` do A100 é facultativo: quem não preenche
       sai com a coluna em branco, e o resumo conta quantas notas esperam a
       NFS-e (v0.117.0)
+- [x] A alíquota interna com **vigência** e conferida contra a escrituração do
+      cliente, não contra o MA. `INTERNA` só tem o que foi medido (MG); as
+      outras 26 UF recusam até alguém provar (v0.120.0)
+- [ ] Conferir a alíquota interna dos outros 26 estados, uma por uma, no
+      primeiro trabalho de cada um: `tools/aferir_aliquota_interna.py` sobre a
+      EFD ICMS/IPI do cliente, mais o ato legal. Vários subiram entre 2023 e
+      2025, então quase todos vão precisar de **mais de uma vigência**
 - [ ] Ler a **NFS-e** para o 933: o XML (INF/SERVICO/VALORES) e o leiaute do
       município de São Paulo, de onde sai o ISS que a escrituração não trouxe.
       Sem isso a tese só alcança quem preencheu o A100 — 1 de 33 notas na DMINAS

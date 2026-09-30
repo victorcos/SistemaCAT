@@ -48,6 +48,7 @@ CNPJ = "CNPJ"
 UF = "UF Origem/Destino"
 ITEM = "Código Item"
 ALIQUOTA = "Alíquota Interna ICMS/UF Origem/Destino"
+PERIODO = "Período"
 
 
 def do_gabarito(parquet: str) -> dict[repositorio.Chave, Decimal]:
@@ -57,20 +58,24 @@ def do_gabarito(parquet: str) -> dict[repositorio.Chave, Decimal]:
     com 6.720 linhas dizendo "18%, como manda a lei de Minas", e trocaria uma
     regra auditável por uma tabela opaca.
     """
-    tabela = pq.read_table(parquet, columns=[CNPJ, UF, ITEM, ALIQUOTA])
+    tabela = pq.read_table(parquet, columns=[CNPJ, UF, ITEM, ALIQUOTA, PERIODO])
     fora: dict[repositorio.Chave, Decimal] = {}
-    for cnpj, uf, item, aliquota in zip(
+    for cnpj, uf, item, aliquota, periodo in zip(
             tabela.column(CNPJ).to_pylist(), tabela.column(UF).to_pylist(),
-            tabela.column(ITEM).to_pylist(), tabela.column(ALIQUOTA).to_pylist()):
+            tabela.column(ITEM).to_pylist(), tabela.column(ALIQUOTA).to_pylist(),
+            tabela.column(PERIODO).to_pylist()):
         origem, destino = (str(uf).split("/") + [""])[:2]
         try:
             do_ma = Decimal(str(aliquota))
-        except InvalidOperation:
+            dia, mes, ano = str(periodo).split("/")
+        except (InvalidOperation, ValueError):
             continue
         try:
-            if tab_aliquota_icms.da_regra(origem, destino) == do_ma:
+            if tab_aliquota_icms.da_regra(origem, destino, f"{ano}-{mes}") == do_ma:
                 continue
         except tab_aliquota_icms.AliquotaDesconhecida:
+            # estado sem alíquota conferida: tudo vira exceção, e é o certo —
+            # é o cadastro que responde enquanto a regra não está provada
             pass
         fora[(str(cnpj), origem, destino, str(item))] = do_ma
     return fora
