@@ -453,7 +453,7 @@ linha por (`tributo`, `quadro`, `ordem`, `rotulo`, `competencia`) com `valor` em
 centavos. `valor` nulo quer dizer fonte externa (DCTF, e-CAC), e não zero;
 `unidade` distingue dinheiro de percentual.
 
-### Exclusões da base do PIS/COFINS (v0.114.0)
+### Exclusões da base do PIS/COFINS (v0.119.0)
 
 | Método | Rota | Quem |
 | --- | --- | --- |
@@ -463,12 +463,25 @@ centavos. `valor` nulo quer dizer fonte externa (DCTF, e-CAC), e não zero;
 | `POST` | `/api/exclusoes/{execucaoId}/cancelar` | quem escreve |
 | `GET` | `/api/exclusoes/{execucaoId}/planilhas/exclusoes` | quem vê o trabalho |
 | `GET` | `/api/exclusoes/{execucaoId}/planilhas/icms` | quem vê o trabalho |
+| `GET` | `/api/exclusoes/{execucaoId}/planilhas/icms-st` | quem vê o trabalho |
+| `GET` | `/api/exclusoes/{execucaoId}/planilhas/iss` | quem vê o trabalho |
 
-Duas teses numa rodada. `exclusoes` é uma linha por grupo (estabelecimento,
-competência, registro, CST e CFOP), das **duas**, separadas pela coluna `tese`:
-`piscofins_na_propria_base` e `icms_na_base`. `icms` é o Tema 69 item a item —
-uma linha por item de nota fiscal, nas quarenta colunas do relatório 903 do MA,
-na ordem em que ele exporta. As duas em xlsx ou csv.
+**Quatro teses numa rodada.** `exclusoes` é uma linha por grupo
+(estabelecimento, competência, registro, CST e CFOP), das quatro, separadas pela
+coluna `tese`: `piscofins_na_propria_base`, `icms_na_base`, `icms_st_na_base` e
+`iss_na_base`.
+
+As outras três são o detalhe item a item de cada exclusão de imposto, nas
+colunas e na ordem em que o MA exporta — o que permite pôr os dois relatórios
+lado a lado:
+
+| alvo | relatório do MA | colunas | o que é |
+| --- | --- | --- | --- |
+| `icms` | 903 | 40 | o ICMS destacado, lido da nota |
+| `icms-st` | 839 | 46 | o ICMS-ST **presumido**: base × alíquota |
+| `iss` | 933 | 32 | o ISS da nota de serviço, rateado |
+
+Todas em xlsx ou csv.
 
 O resumo traz, no nível de cima, a tese das contribuições: `fonte`
 (`agregados` ou `sped`), `arquivos`, `grupos`, `base`, `excluido`,
@@ -476,14 +489,21 @@ O resumo traz, no nível de cima, a tese das contribuições: `fonte`
 `competencias_prescritas`, `data_de_referencia`, `por_competencia`, `fora` e
 `avisos`.
 
-E, em `icms`, a do Tema 69: `ate` (o mês da restituição até onde a Selic
-acumulou, em `aaaa-mm`), `linhas` (itens de nota), `base`, `icms_excluido`,
+E, em `icms`, `icms_st` e `iss`, uma por tese por item, todas com a mesma
+forma: `tese`, `ate` (o mês da restituição até onde a Selic acumulou, em
+`aaaa-mm`), `linhas`, `base`, `excluido` (o imposto que sai da base),
 `diferenca_pis`, `diferenca_cofins`, `selic`, `total_atualizado`, `prescrito`,
 `competencias_prescritas`, `estabelecimentos`, `competencias`,
 `por_competencia` e `avisos`. **Os valores vêm em reais, como texto** — Decimal
-não atravessa JSON sem perder casa. `icms` vem vazio quando a tese não pôde ser
-apurada (lote sem EFD-Contribuições, ou série da Selic que não alcança o mês da
-restituição); o motivo entra em `avisos`.
+não atravessa JSON sem perder casa.
+
+**Os totais das teses nunca são somados num campo só.** São pedidos diferentes,
+com fundamentos diferentes; quem quiser o total geral que some, sabendo o que
+está somando.
+
+As três vêm vazias quando não deu para apurá-las (lote sem EFD-Contribuições, ou
+série da Selic que não alcança o mês da restituição); o motivo entra em
+`avisos`.
 
 A Selic que corrige o Tema 69 **vem do banco** (tabela `selic_mensal`), que se
 atualiza sozinho pela série 4390 do SGS do Banco Central e só vai à rede pelos
@@ -491,13 +511,19 @@ meses que ainda faltam. Mês guardado nunca é rebuscado nem sobrescrito — tax
 mês fechado não muda. Rede fora não derruba a rodada; série que não alcança o
 mês da restituição, sim: a tese não é apurada e o motivo entra em `avisos`.
 
-`andamento` ganhou `fase`: `receita` enquanto a primeira tese lê, `icms` na
-segunda. São duas leituras do mesmo lote, e a barra da tela usa a fase para não
-voltar a zero no meio.
+`andamento` traz `fase`: `receita`, `icms`, `icms_st` ou `iss`. São **quatro**
+leituras do mesmo lote, cada uma um quarto da barra, e a tela usa a fase para
+não voltar a zero três vezes.
 
-Em disco, na pasta da execução: `exclusoes.parquet` (as duas teses agregadas) e
-`exclusao_do_icms.parquet` (o 903, item a item). O segundo **não existe** quando
-a rodada foi interrompida: parquet pela metade parece inteiro para quem o abre.
+Em disco, na pasta da execução: `exclusoes.parquet` (as quatro teses agregadas),
+`exclusao_do_icms.parquet`, `exclusao_do_icms_st.parquet` e
+`exclusao_do_iss.parquet` (o detalhe de cada uma). Os três detalhados **não
+existem** quando a rodada foi interrompida: parquet pela metade parece inteiro
+para quem o abre.
+
+A alíquota por produto do ICMS-ST sai da tabela `aliquota_de_item`, carregada
+por `tools/carregar_aliquotas.py`. Ela guarda **só o que a regra do estado não
+explica**; sem nenhuma linha lá, a regra do estado responde por tudo.
 
 ### Resumo por módulo (v0.81.0)
 

@@ -3,17 +3,21 @@ import { chamar } from "./api";
 import { baixarArquivo, type Execucao, type Formato } from "./conferencia";
 
 /**
- * Exclusões da base do PIS/COFINS. Duas teses, uma rodada.
+ * Exclusões da base do PIS/COFINS. Quatro teses, uma rodada.
  *
  * **As próprias contribuições fora da base**: a receita embute PIS e COFINS, e
  * a base de cada uma perde as duas — decidido em 24/09/2026 entre as três
  * leituras possíveis. Vale só no débito: o crédito das aquisições fica como
  * está.
  *
- * **O ICMS destacado fora da base**, o Tema 69: apurado item a item, no formato
- * do relatório 903, e corrigido pela Selic até o mês em que se roda. Esperava-se
- * precisar da EFD ICMS/IPI para achá-lo; não precisa — o C170 da própria
- * EFD-Contribuições traz o `VL_ICMS`.
+ * **Três exclusões de imposto da receita**, apuradas item a item e corrigidas
+ * pela Selic até o mês em que se roda: o **ICMS** (Tema 69, relatório 903), o
+ * **ICMS-ST** (839) e o **ISS** (933). Cada uma tem o seu total, o seu detalhe e
+ * a sua planilha, e elas nunca se somam num número só — são pedidos diferentes,
+ * com fundamentos diferentes.
+ *
+ * As três têm a mesma forma de resumo (`ResumoDaTese`), porque a rodada é a
+ * mesma; o que muda é a conta, e essa mora no motor de cada uma.
  *
  * **O número do Tema 69 só existe com a data ao lado.** A Selic acumulada cresce
  * a cada mês, então a tela mostra sempre até quando a rodada corrigiu. Rodar de
@@ -38,8 +42,8 @@ export interface LinhaDaCompetencia {
   diferenca: string;
 }
 
-/** O total de uma competência no Tema 69 — em reais, como texto. */
-export interface CompetenciaDoIcms {
+/** O total de uma competência numa tese por item — em reais, como texto. */
+export interface CompetenciaDaTese {
   competencia: string;
   prescrita: boolean;
   /** itens de nota que entraram */
@@ -47,15 +51,15 @@ export interface CompetenciaDoIcms {
   /** a acumulada aplicada nesta competência, em por cento */
   selic_acumulada: string;
   base: string;
-  icms_excluido: string;
+  excluido: string;
   diferenca_pis: string;
   diferenca_cofins: string;
   selic: string;
   total_atualizado: string;
 }
 
-/** O ICMS fora da base — o Tema 69. Vazio quando a tese não pôde ser apurada. */
-export interface ResumoDoIcms {
+/** Uma tese por item. Vazia quando ela não pôde ser apurada. */
+export interface ResumoDaTese {
   versao?: number;
   /** "aaaa-mm": o mês da restituição até onde a Selic acumulou */
   ate?: string;
@@ -66,7 +70,8 @@ export interface ResumoDoIcms {
   estabelecimentos?: string[];
   competencias?: string[];
   base?: string;
-  icms_excluido?: string;
+  /** o imposto que sai da base: ICMS, ICMS-ST ou ISS, conforme a tese */
+  excluido?: string;
   diferenca_pis?: string;
   diferenca_cofins?: string;
   /** só a correção, separada do principal: é o que mais cresce com o tempo */
@@ -75,7 +80,7 @@ export interface ResumoDoIcms {
   prescrito?: string;
   competencias_prescritas?: number;
   data_de_referencia?: string;
-  por_competencia?: CompetenciaDoIcms[];
+  por_competencia?: CompetenciaDaTese[];
   avisos?: string[];
   segundos?: number;
 }
@@ -102,12 +107,14 @@ export interface ResumoDasExclusoes {
   por_competencia?: LinhaDaCompetencia[];
   /** motivo -> quantas chaves não entraram na tese. Nada sai em silêncio */
   fora?: Record<string, number>;
-  /** a segunda tese. Ausente ou vazia quando não deu para apurá-la */
-  icms?: ResumoDoIcms;
+  /** as três teses por item. Ausentes ou vazias quando não deu para apurá-las */
+  icms?: ResumoDaTese;
+  icms_st?: ResumoDaTese;
+  iss?: ResumoDaTese;
   avisos?: string[];
   iniciada_por?: string;
   segundos?: number;
-  /** `fase` diz qual das duas leituras está andando: "receita" ou "icms" */
+  /** `fase` diz qual das quatro leituras anda: receita, icms, icms_st ou iss */
   andamento?: { arquivos: number; grupos: number; fase?: string };
   log?: EntradaDoLog[];
 }
@@ -129,18 +136,21 @@ export const cancelarExclusoes = (execucaoId: number) =>
   chamar<ExecucaoDasExclusoes>(`/exclusoes/${execucaoId}/cancelar`, { method: "POST" });
 
 /**
- * O Tema 69 item a item: as quarenta colunas do relatório 903, na ordem em que
- * o MA exporta — para que o cliente ponha as duas lado a lado e confira.
+ * O detalhe de uma tese por item, nas colunas e na ordem em que o MA exporta —
+ * para que o cliente ponha os dois relatórios lado a lado e confira.
+ *
+ * `alvo` é o nome da planilha na API: `icms`, `icms-st` ou `iss`.
  */
-export function baixarPlanilhaDoIcms(
+export function baixarPlanilhaDaTese(
   execucaoId: number,
+  alvo: string,
   formato: Formato,
   sinal?: AbortSignal,
 ): Promise<void> {
   const filtro = formato !== "xlsx" ? `?formato=${formato}` : "";
   return baixarArquivo(
-    `/api/exclusoes/${execucaoId}/planilhas/icms${filtro}`,
-    `exclusao_do_icms.${formato}`,
+    `/api/exclusoes/${execucaoId}/planilhas/${alvo}${filtro}`,
+    `exclusao_do_${alvo.replace("-", "_")}.${formato}`,
     sinal,
   );
 }

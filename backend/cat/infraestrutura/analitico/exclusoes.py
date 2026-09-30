@@ -1,22 +1,29 @@
 """A rodada das exclusões da base do PIS/COFINS.
 
-São duas teses, no mesmo parquet, separadas pela coluna `tese`:
+São **quatro teses**, no mesmo parquet, separadas pela coluna `tese`:
 
 - as **próprias contribuições fora da base**
   (`exclusoes/piscofins_na_propria_base.py`), somada do agregado da Gestão;
-- o **ICMS destacado fora da base** — o Tema 69
-  (`analitico/exclusao_do_icms.py`), apurada item a item.
+- o **ICMS fora da base** — o Tema 69, relatório 903;
+- o **ICMS-ST fora da base** — relatório 839;
+- o **ISS fora da base** — relatório 933.
 
-A segunda desmentiu uma previsão que estava escrita aqui: esperava-se precisar
+As três últimas se apuram **item a item** (`analitico/exclusoes_por_item.py`), e
+cada uma tem o seu parquet detalhado, a sua planilha e o seu bloco na tela. Elas
+nunca são somadas num número só: são pedidos diferentes, com fundamentos
+diferentes, e um total único esconderia isso de quem assina.
+
+A do ICMS desmentiu uma previsão que estava escrita aqui: esperava-se precisar
 da EFD ICMS/IPI para achar o ICMS destacado. Não precisa — o C170 da própria
 EFD-Contribuições traz `VL_ICMS`, e foi de lá que saíram as 138.358 linhas que
 batem 100% com o relatório do MA. Uma fonte a menos para exigir do cliente.
 
-**A do ICMS não usa o agregado, e não tem como usar.** Ela se apura no item: a
-base recalculada se reconstrói do valor, do desconto, do rateio do frete e do
-ICMS de cada item, e é assim que se sabe quais notas **já** excluíram o ICMS —
-que são justamente as que não podem entrar no pedido. Por isso, quando ela
-roda, os SPED são lidos mesmo havendo agregado.
+**As três por item não usam o agregado, e não têm como usar.** Elas se apuram no
+item: a base recalculada se reconstrói do valor, do desconto, do rateio e do
+imposto de cada item, e é assim que se sabe quais notas **já** excluíram — que
+são justamente as que não podem entrar no pedido. Por isso, quando rodam, os
+SPED são lidos mesmo havendo agregado. São quatro leituras do mesmo lote, e a
+tela diz qual está andando.
 
 **De onde vêm os números, e por que isso importa no relógio.** Do agregado que
 a Gestão deixou em disco: ler os 65 SPED desta casa custa uma hora, e o
@@ -38,12 +45,18 @@ from decimal import Decimal
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+from sqlalchemy.exc import SQLAlchemyError
 
 from cat.dominio.piscofins import prescricao
 from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido
-from cat.infraestrutura.analitico import exclusao_do_icms
-from cat.infraestrutura.analitico.escrita import LeituraCancelada
 from cat.infraestrutura import selic
+from cat.infraestrutura.aliquotas import excecoes_de
+from cat.infraestrutura.analitico import (
+    exclusao_do_icms,
+    exclusao_do_icms_st,
+    exclusao_do_iss,
+)
+from cat.infraestrutura.analitico.escrita import LeituraCancelada
 from cat.infraestrutura.exclusoes.piscofins_na_propria_base import calcular
 from cat.infraestrutura.gestao.agregador import agregar_efd
 from cat.infraestrutura.gestao.agregados import gravar as gravar_agregados
@@ -92,9 +105,14 @@ DUAS_CASAS = Decimal("0.01")
 # o que se grava na coluna de correção de quem não corrige
 SEM_CORRECAO = Decimal(0)
 
-# as duas leituras que a etapa faz, na ordem
+# as quatro leituras que a etapa faz, na ordem. A primeira é a tese da receita
+# (que pode sair do agregado); as três seguintes são as exclusões por item, e
+# cada uma lê os SPED inteiros porque a conta delas é no item
 FASE_DA_RECEITA = "receita"
 FASE_DO_ICMS = "icms"
+FASE_DO_ICMS_ST = "icms_st"
+FASE_DO_ISS = "iss"
+FASES = (FASE_DA_RECEITA, FASE_DO_ICMS, FASE_DO_ICMS_ST, FASE_DO_ISS)
 
 
 def reais(centavos: int) -> Decimal:
@@ -136,9 +154,12 @@ class Resumo:
     por_competencia: list[dict] = field(default_factory=list)
     # motivo -> quantas chaves do agregado não entraram na tese
     fora: dict[str, int] = field(default_factory=dict)
-    # a segunda tese, já serializada — ou vazio quando não deu para apurá-la.
-    # Ver `analitico/exclusao_do_icms.py`
+    # as três teses por item, já serializadas — vazias quando não deu para
+    # apurá-las. Cada uma no seu canto, nunca somadas num número só: são
+    # pedidos diferentes, com fundamentos diferentes
     icms: dict = field(default_factory=dict)
+    icms_st: dict = field(default_factory=dict)
+    iss: dict = field(default_factory=dict)
     avisos: list[str] = field(default_factory=list)
     segundos: float = 0.0
 
@@ -160,7 +181,8 @@ def serializar(r: Resumo) -> dict:
         "competencias_prescritas": r.competencias_prescritas,
         "data_de_referencia": r.data_de_referencia,
         "por_competencia": r.por_competencia,
-        "fora": r.fora, "icms": r.icms, "avisos": r.avisos, "segundos": r.segundos,
+        "fora": r.fora, "icms": r.icms, "icms_st": r.icms_st, "iss": r.iss,
+        "avisos": r.avisos, "segundos": r.segundos,
     }
 
 
@@ -168,7 +190,7 @@ def apurar(contribuicoes: list[str], destino: str, agregados_de: str | None = No
            avisar: Callable[[Andamento], None] | None = None,
            deve_parar: Callable[[], bool] | None = None,
            referencia: date | None = None, ate: str = "") -> Resumo:
-    """Calcula as duas teses e grava os parquets. Devolve o resumo.
+    """Calcula as quatro teses e grava os parquets. Devolve o resumo.
 
     `referencia` é a data do pedido, que decide o que os cinco anos já levaram.
     Sem ela, hoje — que é o certo para quem está montando o cálculo agora.
@@ -225,10 +247,10 @@ def apurar(contribuicoes: list[str], destino: str, agregados_de: str | None = No
     resumo.fora = exclusao.resumo.fora
     resumo.avisos.extend(exclusao.resumo.avisos)
 
-    do_icms = _apurar_o_icms(contribuicoes, destino, resumo, avisar, deve_parar,
-                             referencia, ate)
+    por_item = _apurar_por_item(contribuicoes, destino, resumo, avisar, deve_parar,
+                                referencia, ate)
 
-    _gravar(exclusao, os.path.join(destino, ARQUIVO_DAS_EXCLUSOES), prescritas, do_icms)
+    _gravar(exclusao, os.path.join(destino, ARQUIVO_DAS_EXCLUSOES), prescritas, por_item)
     if avisar is not None:
         avisar(Andamento(arquivos=resumo.arquivos, grupos=resumo.grupos))
 
@@ -237,48 +259,97 @@ def apurar(contribuicoes: list[str], destino: str, agregados_de: str | None = No
     return resumo
 
 
-def _apurar_o_icms(contribuicoes: list[str], destino: str, resumo: Resumo,
-                   avisar: Callable[[Andamento], None] | None,
-                   deve_parar: Callable[[], bool] | None,
-                   referencia: date | None, ate: str):
-    """O Tema 69, item a item. Devolve o resumo dela, ou None.
+def _apurar_por_item(contribuicoes: list[str], destino: str, resumo: Resumo,
+                     avisar: Callable[[Andamento], None] | None,
+                     deve_parar: Callable[[], bool] | None,
+                     referencia: date | None, ate: str) -> dict:
+    """As três exclusões por item: o ICMS, o ICMS-ST e o ISS.
 
-    **Lê os SPED mesmo havendo agregado**, porque não há como não ler: a conta
-    é no item. Sem EFD-Contribuições no lote não há tese — e isso vira aviso,
-    não erro: a outra tese já rodou, e derrubá-la junto não ajudaria ninguém.
+    **Leem os SPED mesmo havendo agregado**, porque não há como não ler: a conta
+    das três é no item, e agregado não tem item. Sem EFD-Contribuições no lote
+    não há nenhuma delas — e isso vira aviso, não erro: a tese da receita já
+    rodou, e derrubá-la junto não ajudaria ninguém.
+
+    Devolve `{nome da tese: resumo}`, com uma entrada por tese que rodou.
     """
     if not contribuicoes:
         resumo.avisos.append(
-            "Sem EFD-Contribuições no lote, o ICMS fora da base (Tema 69) não foi "
-            "apurado: ele se calcula no item da nota, e agregado não tem item.")
-        return None
+            "Sem EFD-Contribuições no lote, as exclusões por item — ICMS, ICMS-ST "
+            "e ISS — não foram apuradas: elas se calculam no item da nota, e "
+            "agregado não tem item.")
+        return {}
 
     # a série vem do banco, que a guarda para sempre e só vai ao Banco Central
     # pelos meses que ainda faltam. Ver `infraestrutura/selic`
     mes = ate or exclusao_do_icms.mes_de(referencia or date.today())
     mensal = selic.serie(mes)
 
-    # e se confere **antes** de ler, não no meio: uma série curta faria a
-    # leitura inteira para morrer no fim, e a outra tese cairia junto
+    # e se confere **antes** de ler, não no meio: uma série curta faria três
+    # leituras inteiras para morrer no fim, e a tese da receita cairia junto
     if falta := exclusao_do_icms.avisar_se_a_selic_nao_alcanca(mes, mensal):
-        resumo.avisos.append(f"O Tema 69 não foi apurado. {falta}")
-        return None
+        resumo.avisos.append(
+            f"As exclusões por item não foram apuradas. {falta}")
+        return {}
 
-    def andou(a: exclusao_do_icms.Andamento) -> None:
-        if avisar is not None:
-            avisar(Andamento(arquivos=a.arquivos, grupos=a.linhas, fase=FASE_DO_ICMS))
+    def andando(fase: str):
+        def andou(a) -> None:
+            if avisar is not None:
+                avisar(Andamento(arquivos=a.arquivos, grupos=a.linhas, fase=fase))
+        return andou
 
+    comum = {"ate": ate, "deve_parar": deve_parar, "referencia": referencia,
+             "mensal": mensal}
     try:
         do_icms = exclusao_do_icms.apurar(
-            contribuicoes, destino, ate=ate, avisar=andou,
-            deve_parar=deve_parar, referencia=referencia, mensal=mensal)
+            contribuicoes, destino, avisar=andando(FASE_DO_ICMS), **comum)
+
+        # a alíquota por produto que foge da regra do estado, dos
+        # estabelecimentos que este lote tem. Ver `infraestrutura/aliquotas`
+        excecoes = _excecoes_dos(do_icms.estabelecimentos)
+        do_icms_st = exclusao_do_icms_st.apurar(
+            contribuicoes, destino, avisar=andando(FASE_DO_ICMS_ST),
+            excecoes=excecoes, **comum)
+
+        do_iss = exclusao_do_iss.apurar(
+            contribuicoes, destino, avisar=andando(FASE_DO_ISS), **comum)
     except LeituraCancelada as erro:
         # a etapa conhece o nome dela, não o da leitura
         raise ExclusaoCancelada("apuração das exclusões cancelada a pedido") from erro
 
     resumo.icms = exclusao_do_icms.serializar(do_icms)
-    resumo.avisos.extend(do_icms.avisos)
-    return do_icms
+    resumo.icms_st = exclusao_do_icms_st.serializar(do_icms_st)
+    resumo.iss = exclusao_do_iss.serializar(do_iss)
+    for resultado in (do_icms, do_icms_st, do_iss):
+        resumo.avisos.extend(resultado.avisos)
+
+    return {
+        exclusao_do_icms.TESE_ICMS_NA_BASE: do_icms,
+        exclusao_do_icms_st.TESE_ICMS_ST_NA_BASE: do_icms_st,
+        exclusao_do_iss.TESE_ISS_NA_BASE: do_iss,
+    }
+
+
+def _excecoes_dos(estabelecimentos: list[str]) -> dict:
+    """A alíquota de exceção dos estabelecimentos do lote.
+
+    Sessão curta e própria, como a da Selic: a tabela é cadastro do cliente, não
+    é do projeto nem da rodada, e prendê-la à transação da etapa faria um
+    `rollback` de lá desfazer uma leitura.
+
+    Banco fora do ar não derruba a tese: sem exceção, a regra do estado responde
+    por tudo — e ela acerta 98,66% das linhas medidas. O aviso fica no log.
+    """
+    if not estabelecimentos:
+        return {}
+    from cat.infraestrutura.repositorios.banco import Sessao  # noqa: PLC0415
+
+    try:
+        with Sessao() as sessao:
+            return excecoes_de(sessao, estabelecimentos)
+    except SQLAlchemyError as erro:
+        log.warning("não deu para ler as alíquotas de exceção; vale a regra do estado",
+                    extra={"erro": str(erro), "estabelecimentos": len(estabelecimentos)})
+        return {}
 
 
 def _ler_os_sped(contribuicoes: list[str], destino: str, resumo: Resumo,
@@ -314,8 +385,8 @@ def _ler_os_sped(contribuicoes: list[str], destino: str, resumo: Resumo,
     return lidos
 
 
-def _gravar(exclusao, caminho: str, prescritas: set[str], do_icms=None) -> None:
-    """Uma linha por grupo, das duas teses. O parquet nasce mesmo sem nenhuma.
+def _gravar(exclusao, caminho: str, prescritas: set[str], por_item=None) -> None:
+    """Uma linha por grupo, das quatro teses. O parquet nasce mesmo sem nenhuma.
 
     Etapa que termina sem arquivo é etapa que a seguinte não distingue de etapa
     que não rodou.
@@ -346,22 +417,22 @@ def _gravar(exclusao, caminho: str, prescritas: set[str], do_icms=None) -> None:
         colunas["selic"].append(SEM_CORRECAO)
         colunas["total_atualizado"].append(SEM_CORRECAO)
 
-    if do_icms is not None:
-        _somar_o_icms(colunas, do_icms)
+    for tese, resultado in (por_item or {}).items():
+        _somar_por_item(colunas, tese, resultado)
 
     pq.write_table(pa.Table.from_pydict(colunas, schema=ESQUEMA), caminho)
 
 
-def _somar_o_icms(colunas: dict[str, list], do_icms) -> None:
-    """As linhas do Tema 69, na mesma unidade da outra tese.
+def _somar_por_item(colunas: dict[str, list], tese: str, resultado) -> None:
+    """As linhas de uma tese por item, na mesma unidade da tese da receita.
 
     Já vêm em reais do motor — que anda em `Decimal` de duas casas, não em
     centavos inteiros como o agregado da Gestão. Converter aqui seria converter
     duas vezes.
     """
-    prescritas = {c["competencia"] for c in do_icms.por_competencia if c["prescrita"]}
-    for grupo, total in do_icms.grupos.items():
-        colunas["tese"].append(exclusao_do_icms.TESE_ICMS_NA_BASE)
+    prescritas = {c["competencia"] for c in resultado.por_competencia if c["prescrita"]}
+    for grupo, total in resultado.grupos.items():
+        colunas["tese"].append(tese)
         colunas["cnpj"].append(grupo.cnpj)
         colunas["competencia"].append(grupo.competencia)
         colunas["registro"].append(grupo.registro)
@@ -372,7 +443,7 @@ def _somar_o_icms(colunas: dict[str, list], do_icms) -> None:
         colunas["excluido"].append(total.excluido)
         colunas["pis"].append(total.pis)
         colunas["cofins"].append(total.cofins)
-        # a base do STF é uma só: o ICMS sai das duas bases do mesmo jeito
+        # a base do STF é uma só: o imposto sai das duas bases do mesmo jeito
         colunas["base_nova_pis"].append(total.base_stf)
         colunas["base_nova_cofins"].append(total.base_stf)
         colunas["pis_novo"].append(total.pis_stf)

@@ -49,6 +49,8 @@ from cat.infraestrutura.analitico.credito_outorgado import (
     ARQUIVO_ELEGIVEIS,
 )
 from cat.infraestrutura.analitico.exclusao_do_icms import ARQUIVO_DA_EXCLUSAO_DO_ICMS
+from cat.infraestrutura.analitico.exclusao_do_icms_st import ARQUIVO_DA_EXCLUSAO_DO_ICMS_ST
+from cat.infraestrutura.analitico.exclusao_do_iss import ARQUIVO_DA_EXCLUSAO_DO_ISS
 from cat.infraestrutura.analitico.exclusoes import ARQUIVO_DAS_EXCLUSOES
 from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML
 from cat.infraestrutura.analitico.gestao import ARQUIVO_DOS_QUADROS
@@ -104,6 +106,8 @@ from cat.infraestrutura.planilhas.quebra_de_sped import (
     gerar_saidas,
 )
 from cat.infraestrutura.planilhas.exclusao_do_icms import gerar_exclusao_do_icms
+from cat.infraestrutura.planilhas.exclusao_do_icms_st import gerar_exclusao_do_icms_st
+from cat.infraestrutura.planilhas.exclusao_do_iss import gerar_exclusao_do_iss
 from cat.infraestrutura.planilhas.exclusoes import gerar_exclusoes
 from cat.infraestrutura.planilhas.itens_do_xml import gerar_itens_do_xml
 from cat.infraestrutura.planilhas.razao import gerar_conferencia, gerar_ficha3, gerar_fichas
@@ -157,10 +161,14 @@ PLANILHAS = {
         # uma linha por grupo, das duas teses: somar a coluna da diferença dá o
         # total da tela
         "exclusoes": ("exclusoes.xlsx", ARQUIVO_DAS_EXCLUSOES, gerar_exclusoes),
-        # e o Tema 69 item a item, nas quarenta colunas do relatório 903 — que é
-        # o formato em que o cliente confere contra o escritório anterior
+        # e cada tese por item no seu canto, no formato em que o cliente confere
+        # contra o escritório anterior: o 903, o 839 e o 933
         "icms": ("exclusao_do_icms.xlsx", ARQUIVO_DA_EXCLUSAO_DO_ICMS,
                  gerar_exclusao_do_icms),
+        "icms-st": ("exclusao_do_icms_st.xlsx", ARQUIVO_DA_EXCLUSAO_DO_ICMS_ST,
+                    gerar_exclusao_do_icms_st),
+        "iss": ("exclusao_do_iss.xlsx", ARQUIVO_DA_EXCLUSAO_DO_ISS,
+                gerar_exclusao_do_iss),
     },
     apurar_contribuicoes.ETAPA: {
         # uma planilha só: os quadros dos quatro tributos, uma aba cada, no

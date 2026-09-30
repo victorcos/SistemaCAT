@@ -1,16 +1,21 @@
 """Etapa: as exclusões da base do PIS/COFINS.
 
-Calcula duas teses no mesmo parquet, separadas pela coluna `tese`: as próprias
-contribuições fora da base, e o ICMS destacado fora da base — o Tema 69, que
-sai também item a item, no formato do relatório 903.
+Calcula **quatro teses** no mesmo parquet, separadas pela coluna `tese`: as
+próprias contribuições fora da base, e as três exclusões de imposto da receita —
+ICMS (903), ICMS-ST (839) e ISS (933) —, que saem também item a item, cada uma
+no formato do seu relatório.
 
 **A primeira não depende de a Gestão ter rodado, mas agradece quando rodou.**
 Se houver agregado de uma Gestão concluída, ela sai em segundos; se não houver,
 lê os SPED ela mesma e deixa o agregado gravado, para que a próxima não pague
 de novo.
 
-**A segunda lê os SPED sempre**, porque se apura no item e agregado não tem
-item. São duas leituras, e a tela diz qual está andando.
+**As outras três leem os SPED sempre**, porque se apuram no item e agregado não
+tem item. São quatro leituras do mesmo lote, cada uma um quarto da barra, e a
+tela diz qual está andando.
+
+**Cada tese tem o seu total, e eles nunca se somam.** São pedidos diferentes,
+com fundamentos diferentes; um número único esconderia isso de quem assina.
 
 **O número do Tema 69 só existe com uma data ao lado.** A Selic acumulada
 cresce a cada mês, então a etapa corrige até o mês em que se roda e grava qual
@@ -36,7 +41,11 @@ from cat.aplicacao.casos_de_uso.rodada import (
 from cat.dominio.lote import TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.exclusoes import (
+    FASE_DA_RECEITA,
     FASE_DO_ICMS,
+    FASE_DO_ICMS_ST,
+    FASE_DO_ISS,
+    FASES,
     Andamento,
     ExclusaoCancelada,
     apurar,
@@ -51,6 +60,22 @@ log = obter_log(__name__)
 
 ETAPA = "exclusoes"
 VERSAO_DO_RESUMO = 1
+
+# o que a tela escreve em cada fase da barra. Dizer "lendo 3 de 57" quatro
+# vezes seguidas, sem dizer lendo o quê, é o mesmo que não dizer nada
+NOME_DA_FASE = {
+    FASE_DA_RECEITA: "Reunindo a receita",
+    FASE_DO_ICMS: "ICMS",
+    FASE_DO_ICMS_ST: "ICMS-ST",
+    FASE_DO_ISS: "ISS",
+}
+
+# como cada tese por item se chama no diário e no evento do histórico
+TESES_POR_ITEM = (
+    ("icms", "ICMS fora da base (Tema 69)"),
+    ("icms_st", "ICMS-ST fora da base"),
+    ("iss", "ISS fora da base"),
+)
 
 
 class NadaParaExcluir(ValueError):
@@ -155,28 +180,35 @@ def executar(execucao_id: int) -> None:
                     autor_id=execucao.criada_por)
 
 
-def _anotar_o_icms(resumo, diario: Diario) -> None:
-    """A linha do Tema 69 no diário — com a data da correção, sempre.
+def _anotar_as_teses(resumo, diario: Diario) -> None:
+    """Uma linha de diário por tese por item — com a data da correção, sempre.
 
     Sem a data, o número não é conferível no mês seguinte: a Selic acumulada
     cresce, e quem reler a rodada antiga não vai saber por que o total mudou.
+
+    **Cada tese na sua linha, nunca somadas.** São pedidos diferentes, com
+    fundamentos diferentes, e um número só esconderia isso de quem assina.
     """
-    icms = resumo.icms
-    if not icms:
+    for campo, nome in TESES_POR_ITEM:
+        _anotar_uma(getattr(resumo, campo, None), nome, diario)
+
+
+def _anotar_uma(tese, nome: str, diario: Diario) -> None:
+    if not tese:
         return
-    ate = str(icms.get("ate", ""))
+    ate = str(tese.get("ate", ""))
     mes = f"{ate[5:]}/{ate[:4]}" if len(ate) == 7 else ate
-    volta = _reais(icms.get("total_atualizado", "0"))
-    prescrito = _reais(icms.get("prescrito", "0"))
+    volta = _reais(tese.get("total_atualizado", "0"))
     diario.anotar("info",
-                  f"ICMS fora da base (Tema 69): {milhar(int(icms.get('linhas', 0)))} "
-                  f"itens de nota em {len(icms.get('competencias', []))} competências. "
+                  f"{nome}: {milhar(int(tese.get('linhas', 0)))} linhas em "
+                  f"{len(tese.get('competencias', []))} competências. "
                   f"Corrigido pela Selic até {mes}, há R$ {volta} a recuperar.")
-    if icms.get("competencias_prescritas"):
+    if tese.get("competencias_prescritas"):
         diario.anotar("aviso",
-                      f"{icms['competencias_prescritas']} competência(s) do Tema 69 "
-                      f"fora dos cinco anos, com R$ {prescrito} que o relatório mostra "
-                      "e o total não soma.")
+                      f"{nome}: {tese['competencias_prescritas']} competência(s) "
+                      f"fora dos cinco anos, com R$ "
+                      f"{_reais(tese.get('prescrito', '0'))} que o relatório "
+                      "mostra e o total não soma.")
 
 
 def _reais(valor: str) -> str:
@@ -214,15 +246,15 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     def andou(a: Andamento) -> None:
         execucao.arquivos_lidos = a.arquivos
         execucao.documentos = a.grupos
-        # a segunda tese é a segunda metade da barra: as duas leem tudo, e uma
-        # barra que volta a zero no meio parece rodada travada
+        # são quatro leituras do mesmo lote, uma por tese, e cada uma ocupa um
+        # quarto da barra: uma barra que volta a zero três vezes parece rodada
+        # travada três vezes
+        quantas = len(FASES)
+        qual = FASES.index(a.fase) if a.fase in FASES else 0
         andada = a.arquivos / max(total, 1) if total else 1.0
-        cheia = (andada + 1) / 2 if a.fase == FASE_DO_ICMS else andada / 2
-        execucao.fracao = min(0.99, cheia)
-        do_icms = a.fase == FASE_DO_ICMS
-        execucao.passo = (
-            (f"Tema 69: {a.arquivos} de {total}" if do_icms
-             else f"Lendo {a.arquivos} de {total}") if total else "Calculando")
+        execucao.fracao = min(0.99, (qual + andada) / quantas)
+        execucao.passo = (f"{NOME_DA_FASE[a.fase]}: {a.arquivos} de {total}"
+                          if total else "Calculando")
         diario.base["andamento"] = {"arquivos": a.arquivos, "grupos": a.grupos,
                                     "fase": a.fase}
         diario.salvar_de_vez_em_quando()
@@ -251,15 +283,16 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
                   f"{len(resumo.competencias)} competências. Excluindo as contribuições da "
                   f"própria base, voltam R$ {volta:,.2f}".replace(",", "X")
                   .replace(".", ",").replace("X", ".") + ".")
-    _anotar_o_icms(resumo, diario)
+    _anotar_as_teses(resumo, diario)
     registrar_de_etapa(
         sessao, execucao.projeto_id, TipoDeEvento.ETAPA_CONCLUIDA, ETAPA,
         f"Exclusões apuradas · {milhar(resumo.grupos)} grupos em "
         f"{len(resumo.competencias)} competências",
         dados={"execucao_id": execucao.id, "grupos": resumo.grupos,
                "diferenca_centavos": resumo.diferenca, "fonte": resumo.fonte,
-               "icms_total_atualizado": resumo.icms.get("total_atualizado", ""),
-               "icms_ate": resumo.icms.get("ate", "")},
+               "ate": resumo.icms.get("ate", ""),
+               "por_tese": {campo: getattr(resumo, campo, {}).get(
+                   "total_atualizado", "") for campo, _ in TESES_POR_ITEM}},
         autor_id=execucao.criada_por)
     diario.salvar()
     sessao.commit()

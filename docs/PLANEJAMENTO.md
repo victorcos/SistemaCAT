@@ -177,8 +177,9 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] **Mapa de valores** (`tools/mapear_valores.py`): total por tese e por
       competência, o nosso contra o do arquivo base. Serve também sem gabarito,
       como retrato de cliente novo (v0.118.0)
-- [ ] Ligar as três ao resto: planilha própria de cada uma, bloco próprio na tela
-      e testes das camadas analíticas do 839 e do 933
+- [x] As três exclusões ligadas ponta a ponta: planilha própria de cada uma,
+      bloco próprio na tela, quatro fases na barra da rodada e testes das
+      camadas analíticas (v0.119.0)
 - [x] Motor do **933 — ISS fora da base** (A100/A170), conferido 100% contra as
       33 linhas do gabarito. O `VL_ISS` do A100 é facultativo: quem não preenche
       sai com a coluna em branco, e o resumo conta quantas notas esperam a
