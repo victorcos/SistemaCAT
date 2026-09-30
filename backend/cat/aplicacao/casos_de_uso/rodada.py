@@ -25,9 +25,20 @@ log = obter_log(__name__)
 SEGUNDOS_ENTRE_AVISOS = 2.0
 
 # só as etapas cuja rodada confere o freio. Nas outras, gravar "cancelando"
-# deixaria a tela dizendo que vai parar uma rodada que vai até o fim
-ETAPAS_CANCELAVEIS = frozenset({"st_suportado", "razao", "apuracao", "arquivo_digital", "pre_validacao",
-                                "entrega"})
+# deixaria a tela dizendo que vai parar uma rodada que vai até o fim.
+#
+# **Esta lista já envelheceu uma vez.** Ficou com seis etapas enquanto o sistema
+# passava a onze, e cinco rodadas longas — a quebra de SPED, a apuração de
+# PIS/COFINS, as exclusões, a Gestão e o crédito outorgado — recusavam
+# cancelamento mesmo sabendo parar. Quem tinha posto 71 arquivos na fila por
+# engano esperava a rodada inteira. Por isso `test_rodada.py` cobra que esta
+# lista seja exatamente o conjunto de casos de uso que constroem um `Freio`:
+# acrescentar o freio sem acrescentar aqui passa a quebrar o teste.
+ETAPAS_CANCELAVEIS = frozenset({
+    "apuracao", "apuracao_contribuicoes", "apuracao_piscofins", "arquivo_digital",
+    "credito_outorgado", "entrega", "exclusoes", "pre_validacao", "quebra_de_sped",
+    "razao", "st_suportado",
+})
 
 
 class Diario:

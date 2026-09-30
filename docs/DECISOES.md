@@ -5,6 +5,44 @@
 
 ---
 
+## 2026-09-30 — Cinco rodadas longas recusavam cancelamento, e a lista era a culpada
+
+**O que o usuário viu.** "Esta etapa ainda não aceita cancelamento", com 71
+arquivos na fila e uma apuração de PIS/COFINS no quinto deles.
+
+**A causa.** O cancelamento tem duas metades: a rodada precisa conferir o freio,
+e a etapa precisa estar em `ETAPAS_CANCELAVEIS`. As duas saíram de sincronia —
+o sistema passou a **onze** etapas com freio e a lista continuou com as **seis**
+originais. Recusavam cancelamento sabendo parar: quebra de SPED, apuração de
+PIS/COFINS, exclusões, Gestão Fiscal e crédito outorgado.
+
+**Por que passou despercebido.** É um defeito que não quebra nada: quem
+acrescenta o freio a uma etapa nova e esquece a lista não vê teste falhar, nem
+erro em log. Só o usuário descobre, e no pior momento — com a rodada longa em
+curso, que é exatamente quando cancelar importa.
+
+**A correção não foi completar a lista.** Foi escrever um teste que lê o
+**código-fonte** dos casos de uso: toda etapa que constrói um `Freio` tem de
+estar autorizada, e nenhuma sem freio pode estar. Autorizar quem não para seria
+pior que o defeito original — a tela diria que vai parar uma rodada que vai até
+o fim. As três que ainda não param — conferência, movimentos e quebra de XML —
+ficam nomeadas no teste, para que dar freio a uma delas cobre a atualização.
+
+## 2026-09-30 — O chip do CFOP sumia de rótulo, e era `any_value`
+
+Um teste da tela da 047 falhava de vez em quando e passava sozinho. Não era
+defeito de teste: o resumo montava o rótulo do CFOP com `any_value`, que o
+DuckDB resolve sem garantia nenhuma. Quando as linhas de um mesmo CFOP
+discordam — uma com descrição, outra sem —, o chip saía **sem rótulo, de forma
+aleatória, de uma carga para a outra**. `max` sobre texto prefere o não vazio e
+é determinístico.
+
+Fica a lição para as outras agregações da casa: `any_value` só serve onde todas
+as linhas do grupo são iguais por construção. Onde podem divergir, ele troca um
+dado por outro sem avisar.
+
+---
+
 ## 2026-09-30 — O gabarito do 037 derruba cinco deduções, e a 037 passa a bater inteira
 
 **O que entrou.** O gabarito do 037 da DMINAS — 458.792 linhas, 57

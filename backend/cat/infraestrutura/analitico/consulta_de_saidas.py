@@ -184,8 +184,13 @@ def _resumo(destino: str) -> str:
         con.execute(f"""
             COPY (
                 SELECT cnpj, periodo, registros, cfop, cst_pis,
-                       any_value(natureza)          AS natureza,
-                       any_value(descricao_do_cfop) AS descricao_do_cfop,
+                       -- `max` e não `any_value`: quando as linhas daquele CFOP
+                       -- discordam — uma com descrição, outra sem —, `any_value`
+                       -- pode devolver a vazia, e o chip da tela sai sem rótulo
+                       -- de forma aleatória. `max` sobre texto prefere o não
+                       -- vazio, e é determinístico
+                       max(natureza)                AS natureza,
+                       max(descricao_do_cfop)       AS descricao_do_cfop,
                        count(*)                     AS linhas,
                        sum({_VALOR})                AS valor,
                        sum({_PIS})                  AS pis,
@@ -218,7 +223,9 @@ def _distintos(con, caminho: str, coluna: str, onde: str, parametros: list[objec
     também — se a lista encolhesse para o que já está marcado, o filtro viraria
     uma armadilha de mão única.
     """
-    selecionado = f", any_value({extra}) AS rotulo" if extra else ""
+    # `max` pelo mesmo motivo do resumo: rótulo vazio escolhido a esmo some da
+    # tela sem explicação
+    selecionado = f", max({extra}) AS rotulo" if extra else ""
     cursor = con.execute(f"""
         SELECT {coluna} AS valor, sum(linhas) AS linhas{selecionado}
         FROM read_parquet('{_escapar(caminho)}')
