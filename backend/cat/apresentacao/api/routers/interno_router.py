@@ -112,6 +112,14 @@ def saude() -> dict[str, object]:
     A API em C# mostra isto dentro do próprio /api/saude. Sem isso, um motor
     antigo que sobreviveu a um reinício é indistinguível do novo: os dois
     respondem "ok", e só a versão e a pasta de trabalho os separam.
+
+    **E ele sobrevive mais do que parece.** No Windows dois uvicorn prendem a
+    mesma porta sem erro nenhum: o novo anuncia "running on 127.0.0.1:8020", o
+    velho continua atendendo, e o código novo não entra em lugar nenhum. Um
+    processo filho órfão também segura o socket do pai já morto. Quando a versão
+    daqui não for a do arquivo `VERSAO`, o motor que responde **não é** o que
+    você acabou de subir: `netstat -ano | findstr :8020` mostra mais de um
+    LISTENING, e todos têm de morrer antes de subir o novo.
     """
     cfg = obter_config()
     return {

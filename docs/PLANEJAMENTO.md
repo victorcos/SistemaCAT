@@ -160,6 +160,11 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [ ] O par de UF da 037 quando falta uma das pontas continua sem prova: nas
       458.792 linhas do gabarito não houve um caso, então a diferença que a 047
       mostrou (coluna vazia em vez de "MG/") segue sem medida do lado da 037
+- [ ] Matar os motores velhos antes de subir o novo, no script de desenvolvimento:
+      no Windows dois uvicorn prendem a mesma porta **sem erro**, e quem atende é
+      o mais antigo — o código novo simplesmente não entra. Já custou uma
+      investigação de "não subiu a alteração" nesta casa. `/api/saude` denuncia
+      (versão diferente da do arquivo `VERSAO`), mas só quem olha
 - [ ] Varrer os outros motores atrás do mesmo descuido do `C010`: documento que
       fica em buffer e é emitido **depois** de o bloco seguinte já ter trocado o
       estabelecimento. Custou 61 linhas no 903 e estava latente no 037; a 047 já
