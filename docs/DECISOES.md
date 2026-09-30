@@ -5,6 +5,74 @@
 
 ---
 
+## 2026-09-30 — O 839: o ICMS-ST que não está escrito em lugar nenhum
+
+A exclusão do ICMS-ST da base do PIS/COFINS — a tese do contribuinte
+**substituído** — fecha **100% contra o gabarito do MA**: 463.212 linhas, 46
+colunas. Vale R$ 2.668.059,20 para a DMINAS.
+
+**A pergunta que a medição respondeu antes de haver código.** A cadeia pedida
+cobre só a EFD-Contribuições, e ali o ICMS-ST simplesmente não existe: a revenda
+com ST já retido tem CST 60, que por definição não destaca imposto. Medido nos
+57 arquivos e também na EFD ICMS/IPI do mesmo cliente — **zero** linhas com ST
+destacado, nem na entrada, nem na saída, nem no analítico C190.
+
+Então o MA **presume**, e nós reproduzimos:
+
+```
+base presumida = valor do item − desconto + rateio de frete/seguro/despesas
+ICMS-ST        = base presumida × alíquota  (ao centavo)
+base STF       = base do PIS/COFINS − ICMS-ST
+```
+
+As três fecham em 100% das linhas. **Não há a guarda do "já excluiu" do 903**,
+e não faria sentido: o que nunca foi escriturado não pode ter sido excluído.
+
+**Isto é arbitramento, e está dito onde precisa estar.** O 903 devolve o que o
+arquivo tem; o 839 devolve uma reconstrução. A fórmula está no topo do módulo
+para que o pedido seja defendido por ela, e não por um número que saiu de uma
+caixa preta.
+
+**A alíquota: o que é lei ficou escrito como lei.** Podia-se copiar as 7.276
+alíquotas do relatório do MA e fechar 100% sem pensar. Não se fez. A regra —
+alíquota interna do estado, ou a Resolução 22/1989 do Senado na interestadual —
+mora em `tab_aliquota_icms` e **acerta sozinha 98,66%** das linhas. O que sobra
+são 556 pares de (estabelecimento, UF, item): cesta básica a 12%, supérfluo a
+25%, isento a 0%, importado a 4%. Isso é classificação fiscal de mercadoria, é
+cadastro do cliente, e por isso vai para o banco — nunca para o repositório.
+
+A tentativa de derivar essa classificação do próprio SPED foi feita e falhou, o
+que também está medido: o `ALIQ_ICMS` do registro 0200 é facultativo e veio
+vazio nos 8.061 cadastros; o NCM não determina a alíquota (71 NCMs têm mais de
+uma, atingindo 84% das linhas); e derivar das vendas tributadas do próprio
+cliente cobre 30 de 595 itens.
+
+**Os dois relatórios são disjuntos, e isso foi confirmado pelos dois lados.** Um
+item entra no 903 (ICMS próprio) ou no 839 (ICMS-ST), nunca nos dois — quem
+separa é a CST de ICMS: 00 é tributada integralmente e vai ao 903. As três
+linhas que sobravam aqui tinham CST 00, e as três estão no gabarito do 903. Dos
+601.570 itens dos dois relatórios, 8 aparecem em ambos: são CST 10 e 70, em que
+há ICMS próprio **e** ST na mesma linha, e aí a dupla presença é correta.
+
+**Nem todo relatório do MA completa o cadastro pela matriz.** A 047 completa — é
+de lá que a regra foi medida, em 29/09. O 839 não. Nas três linhas de
+setembro/2023 em que a filial cadastrou "SALAME ITALIANO PAMPLONA KG" sem código
+de barra e a matriz tem o mesmo código como "DETERGENTE LIMPOL", o 839 escreve o
+EAN em branco e a 047 escreveria o do detergente. Em vez de uma segunda classe
+quase igual, `CadastroPorEstabelecimento.linha()` ganhou `completar=False`, e a
+diferença entre os dois relatórios ficou escrita lá.
+
+**O zero negativo.** `Decimal("-0.001")` arredondado ao centavo vira `-0.00`, que
+sai na coluna como "-0"; o MA escreve "0". Eram 192 das 463.212 linhas, todas de
+produto com alíquota zero, em que a diferença é só resíduo de arredondamento.
+Menos um sinal não é menos dinheiro, mas é uma coluna que não bate.
+
+**O que ainda falta**, e está no roteiro: a tabela `aliquota_de_item` no banco
+com o seu carregador, a camada analítica, a planilha, o bloco próprio na tela e
+os testes.
+
+---
+
 ## 2026-09-30 — A Selic sai do código e vai para o banco, buscada só pelo que falta
 
 **O pedido do Victor.** Atualizar a Selic pela API, "porém sempre salvar no

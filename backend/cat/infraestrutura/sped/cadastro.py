@@ -100,11 +100,21 @@ class CadastroPorEstabelecimento:
                 dono[codigo] = None
         return True
 
-    def linha(self, registro: bytes, codigo: str, cnpj: str) -> list[str]:
+    def linha(self, registro: bytes, codigo: str, cnpj: str,
+              completar: bool = True) -> list[str]:
         """O cadastro daquele código, no estabelecimento daquele CNPJ.
 
         Vazio quando não há — nunca o de outro estabelecimento escolhido a
         esmo. Ver as duas ressalvas no topo do módulo.
+
+        `completar=False` desliga o preenchimento pela matriz. **Nem todo
+        relatório do MA completa**: a 047 completa — é de lá que a regra foi
+        medida —, e o 839 não. Nas três linhas de setembro/2023 em que a filial
+        cadastrou "SALAME ITALIANO PAMPLONA KG" sem código de barra e a matriz
+        tem o mesmo código como "DETERGENTE LIMPOL", o 839 escreve o EAN em
+        branco e a 047 escreveria o do detergente. Cada um replica o seu
+        gabarito, e a diferença fica aqui, escrita, em vez de virar uma segunda
+        classe quase igual a esta.
         """
         if not codigo:
             return []
@@ -112,7 +122,7 @@ class CadastroPorEstabelecimento:
         if direto is None:
             dono = self.donos[registro].get(codigo)
             return self.linhas[registro].get((dono, codigo), []) if dono else []
-        if not self.matriz or cnpj == self.matriz:
+        if not completar or not self.matriz or cnpj == self.matriz:
             return direto
         return completado(direto, self.linhas[registro].get((self.matriz, codigo), []))
 

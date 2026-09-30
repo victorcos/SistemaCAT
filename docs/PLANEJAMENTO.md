@@ -165,6 +165,15 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       o mais antigo — o código novo simplesmente não entra. Já custou uma
       investigação de "não subiu a alteração" nesta casa. `/api/saude` denuncia
       (versão diferente da do arquivo `VERSAO`), mas só quem olha
+- [x] Motor do **839 — ICMS-ST fora da base**: o ST presumido (base × alíquota),
+      conferido 100% contra as 463.212 linhas do gabarito do MA. A regra de
+      alíquota acerta 98,66%; as 556 exceções por item são dado de cliente
+      (v0.116.0)
+- [ ] Ligar o 839 ao resto: tabela `aliquota_de_item` no banco com carregador,
+      camada analítica, planilha, bloco próprio na tela e testes
+- [ ] **933 — ISS fora da base** (A100/A170): o ISS não está na
+      EFD-Contribuições, vem da NFS-e. O MA gera mesmo faltando o dado do
+      cliente — 33 linhas na DMINAS
 - [ ] Varrer os outros motores atrás do mesmo descuido do `C010`: documento que
       fica em buffer e é emitido **depois** de o bloco seguinte já ter trocado o
       estabelecimento. Custou 61 linhas no 903 e estava latente no 037; a 047 já
