@@ -169,8 +169,16 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       conferido 100% contra as 463.212 linhas do gabarito do MA. A regra de
       alíquota acerta 98,66%; as 556 exceções por item são dado de cliente
       (v0.116.0)
-- [ ] Ligar o 839 ao resto: tabela `aliquota_de_item` no banco com carregador,
-      camada analítica, planilha, bloco próprio na tela e testes
+- [x] Núcleo comum das três exclusões por item (`analitico/exclusoes_por_item.py`):
+      a rodada é idêntica, a conta não. Os três motores seguem separados, cada um
+      conferido contra o seu gabarito (v0.118.0)
+- [x] Tabela `aliquota_de_item` no banco, com carregador (`tools/carregar_aliquotas.py`)
+      e as 556 exceções da DMINAS carregadas (v0.118.0)
+- [x] **Mapa de valores** (`tools/mapear_valores.py`): total por tese e por
+      competência, o nosso contra o do arquivo base. Serve também sem gabarito,
+      como retrato de cliente novo (v0.118.0)
+- [ ] Ligar as três ao resto: planilha própria de cada uma, bloco próprio na tela
+      e testes das camadas analíticas do 839 e do 933
 - [x] Motor do **933 — ISS fora da base** (A100/A170), conferido 100% contra as
       33 linhas do gabarito. O `VL_ISS` do A100 é facultativo: quem não preenche
       sai com a coluna em branco, e o resumo conta quantas notas esperam a
@@ -178,7 +186,6 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [ ] Ler a **NFS-e** para o 933: o XML (INF/SERVICO/VALORES) e o leiaute do
       município de São Paulo, de onde sai o ISS que a escrituração não trouxe.
       Sem isso a tese só alcança quem preencheu o A100 — 1 de 33 notas na DMINAS
-- [ ] Ligar o 933 ao resto: camada analítica, planilha, bloco na tela e testes
 - [ ] Varrer os outros motores atrás do mesmo descuido do `C010`: documento que
       fica em buffer e é emitido **depois** de o bloco seguinte já ter trocado o
       estabelecimento. Custou 61 linhas no 903 e estava latente no 037; a 047 já

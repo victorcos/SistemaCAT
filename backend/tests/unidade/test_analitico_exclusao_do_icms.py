@@ -126,7 +126,7 @@ class TestOQueSoma:
         resumo = apurar(arquivos, destino, ate="2026-09", referencia=REFERENCIA)
 
         assert Decimal(resumo.base) == Decimal("2000.00")
-        assert Decimal(resumo.icms_excluido) == Decimal("360.00")
+        assert Decimal(resumo.excluido) == Decimal("360.00")
 
     def test_os_grupos_saem_por_estabelecimento_mes_cst_e_cfop(self, arquivos, destino):
         resumo = apurar(arquivos, destino, ate="2026-09", referencia=REFERENCIA)

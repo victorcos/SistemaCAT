@@ -369,7 +369,7 @@ def _somar_o_icms(colunas: dict[str, list], do_icms) -> None:
         colunas["cfop"].append(grupo.cfop)
         colunas["prescrita"].append(grupo.competencia in prescritas)
         colunas["base"].append(total.base)
-        colunas["excluido"].append(total.icms_excluido)
+        colunas["excluido"].append(total.excluido)
         colunas["pis"].append(total.pis)
         colunas["cofins"].append(total.cofins)
         # a base do STF é uma só: o ICMS sai das duas bases do mesmo jeito

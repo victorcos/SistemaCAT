@@ -493,3 +493,39 @@ class SelicMensalDB(Base):
     obtida_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=agora, server_default=func.now(), nullable=False,
     )
+
+
+class AliquotaDeItemDB(Base):
+    """A alíquota de ICMS de um produto, quando ela foge da regra do estado.
+
+    Serve ao ICMS-ST presumido do relatório 839: o ST que se exclui da base do
+    PIS/COFINS é `base × alíquota`, e a alíquota tem duas metades. A **regra** —
+    interna do estado, ou a Resolução 22/1989 do Senado na interestadual — é lei,
+    e mora em `sped/tabelas/tab_aliquota_icms.py`. A **exceção** é classificação
+    fiscal de mercadoria: cesta básica a 12%, supérfluo a 25%, isento a 0%,
+    importado a 4%. É esta tabela.
+
+    **Está no banco porque é dado de cliente.** Código de item é do ERP de quem
+    o cadastrou, e não faz sentido no de outro; versionar isso no repositório
+    seria publicar a carteira de produtos de quem nos contratou.
+
+    Medido no arquivo de referência: a regra sozinha acerta 98,66% das linhas, e
+    a exceção são 556 pares. `fonte` diz de onde veio — `gabarito-839` quando
+    extraída do relatório do escritório anterior, `cliente` quando veio do
+    cadastro dele, `time` quando alguém daqui a conferiu.
+    """
+
+    __tablename__ = "aliquota_de_item"
+
+    # o estabelecimento, e não a empresa: a mesma mercadoria pode ter
+    # tratamento diferente em filiais de estados diferentes
+    cnpj: Mapped[str] = mapped_column(String(14), primary_key=True)
+    uf_origem: Mapped[str] = mapped_column(String(2), primary_key=True)
+    uf_destino: Mapped[str] = mapped_column(String(2), primary_key=True)
+    codigo_do_item: Mapped[str] = mapped_column(String(60), primary_key=True)
+    # em por cento: 12 é 12%
+    aliquota: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
+    fonte: Mapped[str] = mapped_column(String(20), nullable=False)
+    atualizada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, server_default=func.now(), nullable=False,
+    )
