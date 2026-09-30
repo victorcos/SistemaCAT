@@ -383,7 +383,15 @@ export default function Projeto() {
           bloqueio={anda ? undefined : parado?.titulo}
         />
       ) : (
-        <FrentesDoTrabalho projetoId={p.id} modulo={p.modulo} trilhas={trilhas} />
+        <FrentesDoTrabalho
+          projetoId={p.id}
+          modulo={p.modulo}
+          trilhas={trilhas}
+          rota={(chave: string) => {
+            const destino = DESTINOS[chave];
+            return destino ? destino.rota(Number(id)) : null;
+          }}
+        />
       )}
 
       {/* A pré-validação é da CAT 42, e só aparece onde ela existe — e no

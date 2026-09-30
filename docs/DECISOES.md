@@ -5,6 +5,61 @@
 
 ---
 
+## 2026-09-30 — Importar ganha card próprio, e frente de uma etapa vai direto
+
+**O pedido do Victor:** subir arquivo pela Quebra de SPED não faz sentido; abrir
+um card para importar arquivos facilita a viabilidade dos processos.
+
+**O que estava errado.** `importar` era a **primeira etapa de cada trilha**. A
+intenção era boa — a base é a mesma para todas as frentes, quem importou para a
+CAT 42 já importou para o crédito outorgado — mas o efeito na tela era o oposto:
+para mandar a base de um cliente era preciso **entrar numa frente de trabalho**
+e achar o card de importar dentro dela. Quem só tinha arquivo para subir
+atravessava a Quebra de SPED, que não tem nada com isso.
+
+O erro não era de código: era de classificação. Importar não é etapa de nenhuma
+frente — é o que vem antes de todas.
+
+**O que passou a valer.** `importar` é o **primeiro card de todo módulo**, com
+uma etapa só, e nenhuma outra trilha a lista. Três testes cobram isso: que ela é
+a primeira de cada módulo, que nenhuma outra a repete, e que módulo sem frente
+de apuração construída ainda tem como importar.
+
+**Dois ganhos que não estavam no pedido.**
+
+O IRPJ/CSLL não tinha frente nenhuma construída, e a tela dizia só "nenhuma
+frente construída ainda" — **sem caminho nenhum para subir arquivo**, que é
+exatamente o que aquele módulo faz hoje. Agora tem o card.
+
+E a contagem de cada frente passou a ser sobre o trabalho dela. Antes a CAT 42
+dizia "1 de 8" com a base importada e mais nada feito; o "1" era o importar, que
+não é etapa da CAT 42.
+
+**Frente de uma etapa só vai direto para a tela dela.** Sem isso o card novo não
+resolveria nada: project → card → painel com um card → tela seriam os mesmos
+três cliques de antes. Abrir uma página para mostrar um card e nada mais é um
+clique cobrado sem nada em troca.
+
+A regra é geral, e não um caso especial do importar — tirar `importar` de dentro
+das trilhas deixou quase todas com uma etapa, e todas se beneficiam. A CAT 42,
+que tem sete, continua abrindo o painel.
+
+**Um defeito que a mudança acordou.** O DTO da trilha calculava "construída"
+com `Chave != "importar"`, para que nenhuma frente parecesse construída só por
+ter a base. Com `importar` virando trilha própria, essa exclusão passou a apagar
+justamente o card novo — ele ficaria cinza, dizendo "ainda não construída", e
+sem destino. A exclusão saiu: qualquer etapa própria da frente serve, porque
+agora `importar` só aparece na frente em que ela é a etapa.
+
+**A dependência não se perdeu.** Ela nunca morou na lista de etapas da trilha:
+continua cobrada por quem pode cobrá-la — o servidor, que recusa a etapa sem
+lote e devolve a frase que explica o que falta — e a faixa de leiautes, no topo
+das duas telas, continua dizendo quantos arquivos de cada tipo o trabalho tem. O
+roteiro do módulo também segue começando por `importar`, porque ele nunca saiu
+de lá: é derivado das trilhas com a base posta na frente.
+
+---
+
 ## 2026-09-30 — A alíquota interna tem data, e a prova dela não pode vir do MA
 
 **O apontamento do Victor:** conferir a alíquota interna pela métrica do MA não

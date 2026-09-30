@@ -159,9 +159,15 @@ public sealed class EtapasTestes
 /// </summary>
 public sealed class RoteiroPorModuloTestes
 {
-    /// <summary>A cadeia da CAT 42: a única ordem que é dependência real.</summary>
+    /// <summary>
+    /// A cadeia da CAT 42: a única ordem que é dependência real.
+    ///
+    /// **Sem `importar`**, que saiu das trilhas em 30/09/2026 para ter card
+    /// próprio. A base é pré-requisito de todas as frentes, e não elo da cadeia
+    /// de nenhuma.
+    /// </summary>
     private static readonly string[] CadeiaDaCat42 =
-        ["importar", "conferencia", "movimentos", "st_suportado", "razao", "apuracao",
+        ["conferencia", "movimentos", "st_suportado", "razao", "apuracao",
          "arquivo_digital", "entrega"];
 
     [Fact]
@@ -201,12 +207,39 @@ public sealed class RoteiroPorModuloTestes
     }
 
     [Fact]
-    public void Toda_trilha_comeca_por_importar()
+    public void Importar_e_o_primeiro_card_de_todo_modulo()
     {
-        // a base é a mesma para todas: quem importou para a CAT 42 já importou
-        // para o crédito outorgado, e o card de cada frente conta essa etapa
-        Assert.All(Etapas.TrilhasPorModulo.Values.SelectMany(t => t),
-            t => Assert.Equal("importar", t.Etapas[0]));
+        // trilha própria desde 30/09/2026: subir arquivo não é etapa de nenhuma
+        // frente, é o que vem antes de todas. Antes era a primeira etapa de
+        // cada uma, e isso obrigava a entrar na Quebra de SPED para mandar a
+        // base do cliente
+        Assert.All(Etapas.TrilhasPorModulo, par =>
+        {
+            Assert.NotEmpty(par.Value);
+            Assert.Equal("importar", par.Value[0].Chave);
+            Assert.Equal(["importar"], par.Value[0].Etapas);
+        });
+    }
+
+    [Fact]
+    public void Nenhuma_outra_trilha_lista_o_importar()
+    {
+        // repetir a etapa dentro de cada frente traria de volta o que o card
+        // próprio veio resolver, e faria a contagem de cada frente somar uma
+        // etapa que não é dela
+        var outras = Etapas.TrilhasPorModulo.Values
+            .SelectMany(t => t)
+            .Where(t => t.Chave != "importar");
+
+        Assert.All(outras, t => Assert.DoesNotContain("importar", t.Etapas));
+    }
+
+    [Fact]
+    public void O_modulo_sem_frente_ainda_tem_como_importar()
+    {
+        // IRPJ/CSLL não tem apuração construída, e antes a tela dizia só
+        // "nenhuma frente construída" — sem caminho nenhum para subir arquivo
+        Assert.All(Etapas.TrilhasPorModulo.Values, trilhas => Assert.NotEmpty(trilhas));
     }
 
     [Fact]
@@ -242,19 +275,16 @@ public sealed class RoteiroPorModuloTestes
     [Fact]
     public void A_cat42_e_a_primeira_frente_do_icms_e_as_outras_nao_dependem_dela()
     {
-        var trilhas = Etapas.TrilhasDo("icms");
+        // a primeira é importar, que não é frente de apuração nenhuma
+        var trilhas = Etapas.TrilhasDo("icms").Where(t => t.Chave != "importar").ToList();
 
         // a cadeia inteira mora numa trilha só, e é ela que tem ordem
         Assert.Equal("cat42", trilhas[0].Chave);
         Assert.Equal(CadeiaDaCat42, trilhas[0].Etapas);
-        // as demais leem o lote direto: a base, e a etapa delas. Nenhuma toma
+        // as demais leem o lote direto: só a etapa delas. Nenhuma toma
         // emprestada uma etapa da cadeia — se tomasse, dependeria dela
-        Assert.All(trilhas.Skip(1), t =>
-        {
-            Assert.Equal("importar", t.Etapas[0]);
-            Assert.All(t.Etapas.Skip(1),
-                c => Assert.DoesNotContain(c, CadeiaDaCat42));
-        });
+        Assert.All(trilhas.Skip(1),
+            t => Assert.All(t.Etapas, c => Assert.DoesNotContain(c, CadeiaDaCat42)));
         Assert.Contains(trilhas, t => t.Chave == "credito_outorgado");
     }
 
@@ -265,20 +295,23 @@ public sealed class RoteiroPorModuloTestes
         // entra para quebrar não deve atravessar a apuração para chegar lá.
         // Até 28/09/2026 as quatro moravam num card só, e isso desfazia a
         // separação pedida em 23/09.
-        var trilhas = Etapas.TrilhasDo("piscofins");
+        var trilhas = Etapas.TrilhasDo("piscofins").Where(t => t.Chave != "importar").ToList();
 
         Assert.Equal(
             ["quebra_de_sped", "piscofins", "exclusoes", "apuracao_contribuicoes", "quebra_xml"],
             trilhas.Select(t => t.Chave));
-        // a base, e a funcionalidade dela: nenhuma carrega a etapa de outra
-        Assert.All(trilhas, t => Assert.Equal(["importar", t.Chave == "piscofins"
+        // uma funcionalidade cada: nenhuma carrega a etapa de outra, e nenhuma
+        // carrega o importar, que tem card próprio
+        Assert.All(trilhas, t => Assert.Equal([t.Chave == "piscofins"
             ? "apuracao_piscofins" : t.Chave], t.Etapas));
     }
 
     [Fact]
     public void Modulo_sem_frente_construida_nao_inventa_nenhuma()
     {
-        Assert.Empty(Etapas.TrilhasDo("irpj_csll"));
+        // só o card de importar, que é o que este módulo faz hoje. Antes não
+        // havia nenhum, e a tela não oferecia caminho para subir arquivo
+        Assert.Equal(["importar"], Etapas.TrilhasDo("irpj_csll").Select(t => t.Chave));
         Assert.Equal(["importar", "historico"], Etapas.Roteiros["irpj_csll"]);
     }
 

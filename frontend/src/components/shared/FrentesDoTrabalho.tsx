@@ -19,16 +19,25 @@ import type { Trilha } from "@/services/importacao";
  * **Nada some por não existir ainda.** A frente sem nenhuma etapa construída
  * entra apagada e dizendo isso; lá dentro, a etapa explica o que falta. Card
  * que desaparece faz a pessoa procurar a frente que ela sabe que foi contratada.
+ *
+ * **Frente de uma etapa só vai direto para a tela dela.** Abrir uma página para
+ * mostrar um card e nada mais é um clique cobrado sem nada em troca. Vale para
+ * o card de importar, que nasceu assim em 30/09/2026 — e valia para as outras
+ * desde que `importar` saiu de dentro delas e quase todas ficaram com uma etapa.
+ * A CAT 42, que tem sete, continua abrindo o painel.
  */
 export function FrentesDoTrabalho({
   projetoId,
   modulo,
   trilhas,
+  rota,
 }: {
   projetoId: number;
   /** de onde sai a cor dos cards */
   modulo: string;
   trilhas: Trilha[];
+  /** a tela de uma etapa, para a frente que tem uma só ir direto */
+  rota: (chave: string) => string | null;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -42,7 +51,7 @@ export function FrentesDoTrabalho({
       ) : (
         <section className="grid grid-cols-[repeat(auto-fit,minmax(288px,1fr))] gap-4">
           {trilhas.map((t) => (
-            <CardDeEscolha key={t.chave} escolha={escolhaDe(t, projetoId, modulo)} />
+            <CardDeEscolha key={t.chave} escolha={escolhaDe(t, projetoId, modulo, rota)} />
           ))}
         </section>
       )}
@@ -50,12 +59,19 @@ export function FrentesDoTrabalho({
   );
 }
 
-function escolhaDe(t: Trilha, projetoId: number, modulo: string): Escolha {
+function escolhaDe(
+  t: Trilha,
+  projetoId: number,
+  modulo: string,
+  rota: (chave: string) => string | null,
+): Escolha {
+  // uma etapa só: o painel da frente mostraria um card e nada mais
+  const direto = t.etapas.length === 1 ? rota(t.etapas[0]) : null;
   return {
     chave: t.chave,
     rotulo: t.rotulo,
     descricao: t.descricao,
-    para: ROTAS.frente(projetoId, t.chave),
+    para: direto ?? ROTAS.frente(projetoId, t.chave),
     sigla: t.sigla,
     cor: modulo,
     apagado: !t.construida,
@@ -65,6 +81,10 @@ function escolhaDe(t: Trilha, projetoId: number, modulo: string): Escolha {
     contagem: t.construida
       ? { quantos: t.feitas, rotulo: `de ${t.totais} concluída${t.totais === 1 ? "" : "s"}` }
       : undefined,
-    chamada: t.construida ? "Abrir as etapas" : "Ver o que falta",
+    chamada: !t.construida
+      ? "Ver o que falta"
+      : direto
+        ? "Abrir"
+        : "Abrir as etapas",
   };
 }

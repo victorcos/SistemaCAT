@@ -243,6 +243,9 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] Tela do gestor para liberar segmentos a cada pessoa: coluna na lista e
       chips nos formulários de criar e editar (v0.90.0)
 - [ ] `quebra_xml`: declarada e sem código. Abrir os XML do lote item a item
+- [x] Importar com card próprio, primeiro de todo módulo, e frente de uma etapa
+      só indo direto para a tela dela — subir arquivo deixou de exigir entrar
+      numa frente de trabalho (v0.121.0)
 - [ ] Escolher entre a barra (`BarraDeFuncionalidades`) e os cards
       (`PainelDoTrabalho`): as duas foram construídas para o mesmo lugar
 - [ ] Correção à mão: editar na tela do razão, linha a linha

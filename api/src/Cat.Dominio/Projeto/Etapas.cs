@@ -200,9 +200,19 @@ public static class Etapas
     /// outorgado. Dois nomes para conceitos diferentes valem mais que um nome
     /// para dois.
     ///
-    /// **Toda trilha começa por importar.** A base é a mesma para todas — quem
-    /// importou para a CAT 42 já importou para o crédito outorgado —, e é por
-    /// isso que `importar` aparece em cada trilha e no roteiro uma vez só.
+    /// **Importar é trilha própria, e não o começo das outras.** Até
+    /// 30/09/2026 `importar` era a primeira etapa de cada trilha, e a base é
+    /// mesmo a mesma para todas — quem importou para a CAT 42 já importou para
+    /// o crédito outorgado. Só que isso obrigava a entrar numa frente de
+    /// trabalho para subir arquivo: quem só queria mandar a base do cliente
+    /// tinha de atravessar a Quebra de SPED, que não tem nada com isso. Pedido
+    /// do Victor em 30/09/2026, e ele tem razão — subir arquivo não é uma etapa
+    /// da quebra, é o que vem antes de todas.
+    ///
+    /// Agora ela é o **primeiro card de todo módulo**, com uma etapa só, e
+    /// nenhuma outra trilha a lista. A dependência não se perdeu: continua
+    /// cobrada por quem pode cobrá-la — o servidor, que recusa a etapa sem
+    /// lote e diz o que falta — e o roteiro segue começando por ela.
     /// </summary>
     /// <param name="Sigla">o quadrado do card, como no hub: "C42", "OUT".</param>
     public sealed record Trilha(string Chave, string Rotulo, string Sigla, string Descricao,
@@ -220,21 +230,27 @@ public static class Etapas
         {
             ["icms"] =
             [
+                new("importar", "Importar arquivos", "BASE",
+                    "Apontar a pasta com a base do trabalho e registrar o lote. É o que vem "
+                    + "antes de todas as frentes, e por isso tem card próprio: subir arquivo "
+                    + "não é etapa de nenhuma delas. Pode voltar quantas vezes a empresa "
+                    + "mandar arquivo.",
+                    ["importar"]),
                 new("cat42", "CAT 42", "C42",
                     "Ressarcimento e complemento de ICMS-ST: da conferência dos documentos " +
                     "ao arquivo digital no leiaute da CAT 42 e à entrega. A ordem aqui é de " +
                     "dependência real — sem movimentos não há razão.",
-                    ["importar", "conferencia", "movimentos", "st_suportado", "razao",
+                    ["conferencia", "movimentos", "st_suportado", "razao",
                      "apuracao", "arquivo_digital", "entrega"]),
                 new("credito_outorgado", "Crédito outorgado", "OUT",
                     "Quais itens vendidos são produto beneficiado, pela descrição e pela NCM. " +
                     "Lê os XML do lote direto: não depende da CAT 42 nem de etapa nenhuma dela.",
-                    ["importar", "credito_outorgado"]),
+                    ["credito_outorgado"]),
                 new("quebra_xml", "Quebra de XML", "XML",
                     "Abrir os XML do lote item a item e levar para planilha as colunas que " +
                     "interessam. No ICMS é o item que a EFD não traz: NF-e de emissão própria " +
                     "e NFC-e vão à escrituração só com o analítico.",
-                    ["importar", "quebra_xml"]),
+                    ["quebra_xml"]),
             ],
             // Cinco frentes, e não uma só com cinco etapas dentro. Até 28/09/2026
             // a quebra, a 037, as exclusões e a Gestão moravam num card chamado
@@ -244,30 +260,47 @@ public static class Etapas
             // atravessar a apuração para chegar lá.
             ["piscofins"] =
             [
+                new("importar", "Importar arquivos", "BASE",
+                    "Apontar a pasta com a base do trabalho e registrar o lote. É o que vem "
+                    + "antes de todas as frentes, e por isso tem card próprio: subir arquivo "
+                    + "não é etapa de nenhuma delas. Pode voltar quantas vezes a empresa "
+                    + "mandar arquivo.",
+                    ["importar"]),
                 new("quebra_de_sped", "Quebra de SPED", "SPED",
                     "Abrir os SPED do lote: o que há dentro de cada arquivo, e a extração de " +
                     "qualquer registro ou hierarquia — o C170 com a nota que o contém, o M210 " +
                     "com o M200 — filtrando pelo bloco do leiaute.",
-                    ["importar", "quebra_de_sped"]),
+                    ["quebra_de_sped"]),
                 new("piscofins", "Apuração de PIS/COFINS", "037",
                     "As duas pontas do fiscal — a Consulta de Entradas (037) e a de Saídas " +
                     "(047), item a item — e o razão da ECD, do lado contábil. A 047 abre em " +
                     "tela própria, com filtro por competência, CFOP e CST.",
-                    ["importar", "apuracao_piscofins"]),
+                    ["apuracao_piscofins"]),
                 new("exclusoes", "Exclusões da base", "EXC",
                     "O que sai da base de cálculo antes de apurar — a principal é o ICMS " +
                     "destacado, do Tema 69.",
-                    ["importar", "exclusoes"]),
+                    ["exclusoes"]),
                 new("apuracao_contribuicoes", "Gestão Fiscal", "GES",
                     "Os 36 quadros no padrão do MA: receitas e bases por CST, natureza dos " +
                     "créditos, ajustes e controle de saldos, competência a competência.",
-                    ["importar", "apuracao_contribuicoes"]),
+                    ["apuracao_contribuicoes"]),
                 new("quebra_xml", "Quebra de XML", "XML",
                     "Abrir os XML das notas do lote item a item, como a quebra faz com o SPED.",
-                    ["importar", "quebra_xml"]),
+                    ["quebra_xml"]),
             ],
-            // nenhuma frente construída ainda: o trabalho importa a base e para aí
-            ["irpj_csll"] = [],
+            // a base, e mais nada: nenhuma frente de apuração construída ainda.
+            // O card de importar aparece mesmo assim, porque é o que este
+            // módulo faz hoje — e antes a tela dizia só "nenhuma frente
+            // construída", sem caminho nenhum para subir arquivo
+            ["irpj_csll"] =
+            [
+                new("importar", "Importar arquivos", "BASE",
+                    "Apontar a pasta com a base do trabalho e registrar o lote. É o que vem "
+                    + "antes de todas as frentes, e por isso tem card próprio: subir arquivo "
+                    + "não é etapa de nenhuma delas. Pode voltar quantas vezes a empresa "
+                    + "mandar arquivo.",
+                    ["importar"]),
+            ],
         };
 
     /// <summary>As frentes do módulo. Módulo desconhecido cai no de ICMS.</summary>

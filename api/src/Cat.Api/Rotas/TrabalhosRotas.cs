@@ -261,7 +261,12 @@ public static class TrabalhosRotas
         {
             var minhas = t.Etapas.Where(porChave.ContainsKey).Select(c => porChave[c]).ToList();
             var (feitas, totais) = Cat.Dominio.Projeto.Etapas.Progresso(minhas);
-            var construida = minhas.Any(e => e.Definicao.Chave != "importar" && e.Definicao.Implementada);
+            // qualquer etapa própria da frente serve. O `!= "importar"` que havia
+            // aqui existia porque `importar` era a primeira etapa de **todas**,
+            // e sem a exclusão toda frente pareceria construída só por ter a
+            // base. Desde 30/09/2026 ela é trilha própria e só aparece na sua,
+            // onde é a etapa dela — a exclusão passou a apagar o card certo
+            var construida = minhas.Any(e => e.Definicao.Implementada);
             return new TrilhaDto(t.Chave, t.Rotulo, t.Sigla, t.Descricao,
                 minhas.Select(e => e.Definicao.Chave).ToList(), feitas, totais, construida);
         }).ToList();
