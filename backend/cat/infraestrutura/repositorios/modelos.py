@@ -465,3 +465,31 @@ class CorrecaoDB(Base):
     )
     desfeita_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     desfeita_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SelicMensalDB(Base):
+    """A Selic de um mês, guardada para nunca mais ser buscada.
+
+    **Taxa de mês fechado não muda.** É publicada uma vez e vale para sempre —
+    a de março de 2021 hoje é a mesma de daqui a dez anos. Guardá-la é o que
+    permite corrigir indébito sem depender de a API do Banco Central estar no
+    ar: a rodada só sai à rede pelos meses que ainda faltam.
+
+    `fonte` diz de onde veio — `bcb-sgs-4390` da API, `repositorio` da tabela
+    que o time mantinha em código antes desta tabela existir. Serve à auditoria
+    de um número que vira dinheiro.
+
+    Não tem empresa nem projeto: a Selic é a mesma para todo mundo.
+    """
+
+    __tablename__ = "selic_mensal"
+
+    # "aaaa-mm". Texto, e não data, porque o que existe é o mês — dia 1 seria
+    # um dia inventado, e a ordenação de texto neste formato já é cronológica
+    competencia: Mapped[str] = mapped_column(String(7), primary_key=True)
+    # em por cento no mês, como o Banco Central publica: 1,05 é 1,05%
+    taxa: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
+    fonte: Mapped[str] = mapped_column(String(20), nullable=False)
+    obtida_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, server_default=func.now(), nullable=False,
+    )

@@ -204,10 +204,10 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       própria base e o ICMS fora da base (Tema 69), este item a item, corrigido
       pela Selic e conferido 100% contra as 138.358 linhas do relatório 903 do MA
       (v0.114.0)
-- [ ] A Selic é tabela mantida à mão (`tab_selic.MENSAL`, série 4390 do SGS do
-      Banco Central): **uma linha por mês**, e a etapa recusa o que a série não
-      cobre em vez de corrigir a menos. Vale automatizar a atualização quando
-      houver um segundo cliente pedindo restituição
+- [x] A Selic no banco (`selic_mensal`), atualizada pela série 4390 do SGS do
+      Banco Central e buscada **só pelos meses que faltam**: mês fechado não muda,
+      então guardado é guardado. Rede fora não derruba a rodada; série curta
+      recusa a conta em vez de corrigir a menos (v0.115.0)
 - [ ] O mês da restituição do Tema 69 é o mês em que se roda. Quem precisar
       simular outro — protocolo planejado para o trimestre que vem — ainda não
       tem por onde pedir: falta o campo na tela e o parâmetro na rota

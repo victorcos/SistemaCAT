@@ -187,7 +187,8 @@ def serializar(r: Resumo) -> dict:
 def apurar(contribuicoes: list[str], destino: str, ate: str = "",
            avisar: Callable[[Andamento], None] | None = None,
            deve_parar: Callable[[], bool] | None = None,
-           referencia: date | None = None) -> Resumo:
+           referencia: date | None = None,
+           mensal: dict[str, Decimal] | None = None) -> Resumo:
     """Escreve o 903 em parquet e devolve o resumo.
 
     Cada arquivo que não der para ler vira aviso e segue — um SPED corrompido
@@ -198,6 +199,9 @@ def apurar(contribuicoes: list[str], destino: str, ate: str = "",
     inicio = time.time()
     referencia = referencia or date.today()
     ate = ate or mes_de(referencia)
+    # a série que corrige: do banco, quando quem chama a trouxe, e a semente de
+    # `tab_selic` quando não. Ver `infraestrutura/selic`
+    mensal = mensal or None
     os.makedirs(destino, exist_ok=True)
 
     resumo = Resumo(ate=ate, data_de_referencia=referencia.isoformat())
@@ -212,7 +216,7 @@ def apurar(contribuicoes: list[str], destino: str, ate: str = "",
         for caminho in contribuicoes:
             parar_se_pedirem(deve_parar)
             _de_um_arquivo(caminho, ate, escritor, resumo, andamento,
-                           totais, estabelecimentos)
+                           totais, estabelecimentos, mensal)
             if avisar:
                 avisar(andamento)
         inteira = True
@@ -242,11 +246,12 @@ def _apagar(caminho: str) -> None:
 
 def _de_um_arquivo(caminho: str, ate: str, escritor: Escritor, resumo: Resumo,
                    andamento: Andamento, totais: dict[str, Total],
-                   estabelecimentos: set[str]) -> None:
+                   estabelecimentos: set[str],
+                   mensal: dict[str, Decimal] | None = None) -> None:
     nome = os.path.basename(caminho)
     try:
         codificacao = codificacao_de(caminho)
-        for linha in exclusoes_do_icms(caminho, codificacao, ate):
+        for linha in exclusoes_do_icms(caminho, codificacao, ate, mensal=mensal):
             escritor.escrever(linha.como_dicionario())
             estabelecimentos.add(linha.cnpj)
             _somar(totais, resumo.grupos, linha)
@@ -307,15 +312,19 @@ def _fechar_as_contas(resumo: Resumo, totais: dict[str, Total],
         })
 
 
-def avisar_se_a_selic_nao_alcanca(ate: str) -> str:
+def avisar_se_a_selic_nao_alcanca(ate: str,
+                                  mensal: dict[str, Decimal] | None = None) -> str:
     """O aviso que a tela dá **antes** de rodar uma hora à toa.
 
-    Devolve vazio quando a série cobre o mês pedido.
+    Devolve vazio quando a série cobre o mês pedido. `mensal` é a série que
+    será usada de verdade — a do banco, em produção; conferir outra aqui seria
+    aprovar a rodada olhando para a série errada.
     """
-    ultimo = ultimo_mes()
-    if alcanca(ate):
+    if alcanca(ate, mensal):
         return ""
-    return (f"A série da Selic vai até {ultimo[5:]}/{ultimo[:4]} e a correção foi "
-            f"pedida até {ate[5:]}/{ate[:4]}. Acrescente os meses que faltam em "
-            "`tab_selic.MENSAL` antes de rodar: corrigir por série incompleta "
-            "devolveria menos do que o devido.")
+    ultimo = ultimo_mes(mensal)
+    onde = f"vai até {ultimo[5:]}/{ultimo[:4]}" if ultimo else "está vazia"
+    return (f"A série da Selic {onde} e a correção foi pedida até "
+            f"{ate[5:]}/{ate[:4]}. O Banco Central ainda não publicou esses "
+            "meses, ou não deu para falar com ele: corrigir por série "
+            "incompleta devolveria menos do que o devido.")

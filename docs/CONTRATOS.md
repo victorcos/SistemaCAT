@@ -485,6 +485,12 @@ não atravessa JSON sem perder casa. `icms` vem vazio quando a tese não pôde s
 apurada (lote sem EFD-Contribuições, ou série da Selic que não alcança o mês da
 restituição); o motivo entra em `avisos`.
 
+A Selic que corrige o Tema 69 **vem do banco** (tabela `selic_mensal`), que se
+atualiza sozinho pela série 4390 do SGS do Banco Central e só vai à rede pelos
+meses que ainda faltam. Mês guardado nunca é rebuscado nem sobrescrito — taxa de
+mês fechado não muda. Rede fora não derruba a rodada; série que não alcança o
+mês da restituição, sim: a tese não é apurada e o motivo entra em `avisos`.
+
 `andamento` ganhou `fase`: `receita` enquanto a primeira tese lê, `icms` na
 segunda. São duas leituras do mesmo lote, e a barra da tela usa a fase para não
 voltar a zero no meio.

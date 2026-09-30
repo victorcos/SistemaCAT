@@ -158,7 +158,7 @@ class TestQuandoNaoDaParaCalcular:
     def test_o_aviso_da_selic_vem_antes_de_ler(self):
         """Descobrir que falta mês depois de uma hora de leitura é tarde."""
         assert avisar_se_a_selic_nao_alcanca("2026-09") == ""
-        assert "tab_selic.MENSAL" in avisar_se_a_selic_nao_alcanca("2030-01")
+        assert "Banco Central" in avisar_se_a_selic_nao_alcanca("2030-01")
 
     def test_o_mes_da_restituicao_sai_da_referencia_quando_nao_vem(self, arquivos,
                                                                    destino):

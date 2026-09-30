@@ -5,6 +5,54 @@
 
 ---
 
+## 2026-09-30 — A Selic sai do código e vai para o banco, buscada só pelo que falta
+
+**O pedido do Victor.** Atualizar a Selic pela API, "porém sempre salvar no
+banco o que já existe", já que a de anos anteriores não muda.
+
+**A observação que sustenta o desenho.** Taxa de mês fechado é publicada uma vez
+e vale para sempre: a de março de 2021 hoje é a mesma de daqui a dez anos.
+Então buscar a série inteira a cada rodada seria pagar rede para receber o que
+já se sabe — e, pior, pôr um cálculo que vira pedido de restituição na
+dependência de um serviço de terceiro estar no ar naquele minuto.
+
+**A regra, em uma frase: o banco é a memória, a API é só o que falta.** Tabela
+`selic_mensal`, uma linha por mês, sem empresa e sem projeto — a Selic é a mesma
+para todo mundo. Na primeira vez o banco recebe a tabela que o time mantinha em
+código (`tab_selic.MENSAL`, marcada com fonte `repositorio`); daí em diante a
+rodada calcula quais meses faltam para corrigir até o mês da restituição e
+busca **só esses** na série 4390 do SGS. Quando não falta nenhum — o caso normal
+depois da primeira rodada do mês — não há chamada nenhuma.
+
+**Mês guardado nunca é sobrescrito.** Nem quando a API o devolve diferente.
+Deixar uma consulta de hoje reescrever o número que corrigiu um pedido de ontem
+seria mexer em dinheiro por conta própria. Divergência vira **aviso no log**,
+com o guardado e o recebido lado a lado, e alguém decide.
+
+**Um mês de sobreposição, de propósito.** A busca começa um mês antes do
+primeiro que falta. Esse mês já está no banco e não será sobrescrito — ele
+existe só para que a divergência acima possa ser detectada. Custa uma linha de
+JSON, e é o único sinal que teríamos de uma revisão do Banco Central.
+
+**Rede fora não derruba rodada.** Falha na consulta vira aviso e a rodada segue
+com o que está guardado. O que **não** muda é a recusa: se a série não cobre o
+mês da restituição, a etapa não corrige a menos — diz o que falta e para. Foi
+medido nos dois sentidos: apagando dois meses do banco, a rodada os rebusca e os
+grava com fonte `bcb-sgs-4390`; pedindo correção até 12/2026, que o Banco
+Central ainda não publicou, ela recusa.
+
+**Sem dependência nova.** `urllib` da própria Python resolve um GET que devolve
+JSON. Uma biblioteca a mais num motor que roda na máquina de quem trabalha custa
+mais do que as vinte linhas que pouparia.
+
+**O motor continua puro.** `sped/exclusao_do_icms.py` não conhece banco: recebe
+a série pronta no parâmetro `mensal`. Quem decide **qual série** é a camada de
+infraestrutura; quem sabe **somar** é `tab_selic`. Foi o que permitiu conferir a
+mudança inteira contra o gabarito sem tocar em nenhum número — 138.358 linhas e
+R$ 625.871,38, idênticos aos de antes.
+
+---
+
 ## 2026-09-30 — Tema 69: sai da EFD-Contribuições sozinha, e a Selic estava errada em dois lugares
 
 O relatório 903 — a exclusão do ICMS da base do PIS/COFINS, item a item — fecha

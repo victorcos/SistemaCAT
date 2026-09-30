@@ -62,7 +62,8 @@ class TestAAcumulada:
     def test_recusa_o_que_a_serie_nao_cobre(self) -> None:
         with pytest.raises(SelicDesconhecida) as erro:
             acumulada("2026-01", "2030-01")
-        assert "tab_selic.MENSAL" in str(erro.value)
+        assert "não cobre" in str(erro.value)
+        assert "Banco Central" in str(erro.value)
 
 
 class TestASerie:

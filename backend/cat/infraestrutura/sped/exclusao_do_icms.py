@@ -208,6 +208,7 @@ def _nomeados(prefixo: str, valores: list[str]) -> dict[str, str]:
 
 def exclusoes_do_icms(caminho: str, codificacao: str, ate: str,
                       acumulada: dict[str, Decimal] | None = None,
+                      mensal: dict[str, Decimal] | None = None,
                       ) -> Iterator[LinhaDaExclusao]:
     """As exclusões do ICMS da base, item a item, corrigidas até `ate`.
 
@@ -215,13 +216,17 @@ def exclusoes_do_icms(caminho: str, codificacao: str, ate: str,
     Não tem padrão de propósito — quem chama sabe de quando é o pedido, e um
     padrão silencioso faria o número mudar de sentido sem ninguém notar.
 
-    `acumulada` substitui a tabela: um mapa de "aaaa-mm" para a Selic acumulada
-    já pronta. Existe para a conferência contra gabarito — enquanto a série de
-    `tab_selic` não cobrir os meses do relatório de referência, é assim que se
-    confere **o cálculo** sem depender da **tabela**. Em produção fica vazio, e
-    a tabela responde.
+    `mensal` é a série da Selic, mês a mês. Em produção vem do banco
+    (`infraestrutura/selic`), que a mantém atualizada pela API do Banco Central
+    e nunca a esquece. Sem ela, a semente de `tab_selic` — que serve a teste e
+    a script.
+
+    `acumulada` é outra coisa, e mais forte: um mapa de "aaaa-mm" para a
+    acumulada **já pronta**, que dispensa somar. Existe para a conferência
+    contra gabarito — é assim que se confere **o cálculo** sem depender da
+    **série**. Em produção fica vazio.
     """
-    contexto = _Contexto(ate, acumulada)
+    contexto = _Contexto(ate, acumulada, mensal)
     with open(caminho, "rb", buffering=BUFFER_DE_REDE) as arquivo:
         for linha in arquivo:
             registro = registro_de(linha)
@@ -248,9 +253,11 @@ class _Contexto:
     haver buffer aqui — e ele guarda uma nota por vez, não o arquivo.
     """
 
-    def __init__(self, ate: str, acumulada: dict[str, Decimal] | None = None) -> None:
+    def __init__(self, ate: str, acumulada: dict[str, Decimal] | None = None,
+                 mensal: dict[str, Decimal] | None = None) -> None:
         self.ate = ate
         self.acumulada = acumulada or {}
+        self.mensal = mensal
         self.competencia = ""      # "aaaa-mm", para a Selic
         self.periodo = ""          # "dd/mm/aaaa", como o relatório escreve
         self.selic = ZERO
@@ -272,7 +279,8 @@ class _Contexto:
             self.competencia = inicio.strftime("%Y-%m")
             self.selic = (self.acumulada[self.competencia]
                           if self.competencia in self.acumulada
-                          else tab_selic.acumulada(self.competencia, self.ate))
+                          else tab_selic.acumulada(self.competencia, self.ate,
+                                                   self.mensal))
         elif registro == b"C010":
             # a última nota do estabelecimento anterior ainda está no buffer, e o
             # CNPJ dela é o de quem a emitiu — não o de quem abre o bloco novo.

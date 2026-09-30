@@ -37,10 +37,18 @@ aparecia em lugar nenhum. Por isso `tests/unidade/test_tab_selic.py` compara
 com a 4390 mês a mês: uma tabela que ninguém exerce é uma tabela que ninguém
 confere.
 
-**Manutenção.** Uma linha por mês, como já se faz com `tab_cfop`. `acumulada()`
-recusa o que não sabe em vez de devolver número a menos: corrigir por SELIC
-incompleta é pedir restituição menor do que a devida, e ninguém confere um
-número que veio pequeno.
+**Isto aqui é a semente, não a fonte.** Desde a v0.115.0 quem guarda a série é
+o **banco** (`infraestrutura/selic`), que se atualiza sozinho pela API do SGS e
+nunca esquece um mês. Esta tabela é o que o banco recebe na primeira vez — o
+conjunto já conferido contra o gabarito — e o que serve a teste e a script, que
+não têm banco. Em produção, quem chama `acumulada()` passa a série do banco em
+`mensal`.
+
+**Manutenção.** Nenhuma, em produção: os meses novos entram pela API. Acrescentar
+linha aqui só faz sentido para estender a semente para trás, antes de 2018.
+`acumulada()` recusa o que não sabe em vez de devolver número a menos: corrigir
+por SELIC incompleta é pedir restituição menor do que a devida, e ninguém
+confere um número que veio pequeno.
 """
 
 from __future__ import annotations
@@ -165,7 +173,7 @@ MENSAL: dict[str, Decimal] = {
 }
 
 
-def _meses(de: str, ate: str) -> list[str]:
+def meses(de: str, ate: str) -> list[str]:
     """Os meses de `de` a `ate`, inclusive, no formato "aaaa-mm"."""
     a, m = (int(x) for x in de.split("-"))
     fim = tuple(int(x) for x in ate.split("-"))
@@ -178,7 +186,18 @@ def _meses(de: str, ate: str) -> list[str]:
     return saida
 
 
-def acumulada(competencia: str, ate: str) -> Decimal:
+def seguinte(mes: str) -> str:
+    a, m = (int(x) for x in mes.split("-"))
+    return f"{a + 1:04d}-01" if m == 12 else f"{a:04d}-{m + 1:02d}"
+
+
+def anterior(mes: str) -> str:
+    a, m = (int(x) for x in mes.split("-"))
+    return f"{a - 1:04d}-12" if m == 1 else f"{a:04d}-{m - 1:02d}"
+
+
+def acumulada(competencia: str, ate: str,
+              mensal: dict[str, Decimal] | None = None) -> Decimal:
     """A Selic acumulada de uma competência até o mês da restituição.
 
     `competencia` e `ate` em "aaaa-mm". A regra corrige a partir do mês seguinte
@@ -191,39 +210,38 @@ def acumulada(competencia: str, ate: str) -> Decimal:
     gabarito do 903 batiam todas com um mês a mais de Selic. Corrigido e medido
     — as 57 fecham exatas contra a coluna "SELIC Acumulada" do MA.
 
+    `mensal` é a série a usar. Sem ela, a semente deste arquivo — que serve a
+    teste e a script; **em produção quem passa a série é o banco**, por
+    `infraestrutura/selic`, onde ela envelhece sozinha.
+
     Levanta `SelicDesconhecida` quando falta algum mês do caminho: devolver a
     soma do que se sabe daria restituição a menos, e número pequeno ninguém
     confere.
     """
-    pagamento = _seguinte(competencia)
+    serie = MENSAL if mensal is None else mensal
+    pagamento = seguinte(competencia)
     if pagamento >= ate:
         return UM_PORCENTO_DO_MES_FINAL
-    caminho = _meses(_seguinte(pagamento), _anterior(ate))
-    faltam = [m for m in caminho if m not in MENSAL]
+    caminho = meses(seguinte(pagamento), anterior(ate))
+    faltam = [m for m in caminho if m not in serie]
     if faltam:
         raise SelicDesconhecida(
             f"A série da Selic não cobre {', '.join(faltam[:3])}"
             f"{' e mais ' + str(len(faltam) - 3) if len(faltam) > 3 else ''}. "
-            f"Ela vai até {max(MENSAL)}; acrescente os meses em `tab_selic.MENSAL`.")
-    return sum((MENSAL[m] for m in caminho), UM_PORCENTO_DO_MES_FINAL)
+            f"Ela vai até {max(serie) if serie else 'lugar nenhum'}. "
+            "Os meses novos entram sozinhos pela série 4390 do Banco Central "
+            "(`infraestrutura/selic`); mês que ele ainda não publicou não tem "
+            "como ser corrigido.")
+    return sum((serie[m] for m in caminho), UM_PORCENTO_DO_MES_FINAL)
 
 
-def _seguinte(mes: str) -> str:
-    a, m = (int(x) for x in mes.split("-"))
-    return f"{a + 1:04d}-01" if m == 12 else f"{a:04d}-{m + 1:02d}"
-
-
-def _anterior(mes: str) -> str:
-    a, m = (int(x) for x in mes.split("-"))
-    return f"{a - 1:04d}-12" if m == 1 else f"{a:04d}-{m - 1:02d}"
-
-
-def ultimo_mes() -> str:
+def ultimo_mes(mensal: dict[str, Decimal] | None = None) -> str:
     """O mês mais novo da série. A tela usa para avisar antes de calcular."""
-    return max(MENSAL)
+    serie = MENSAL if mensal is None else mensal
+    return max(serie) if serie else ""
 
 
-def alcanca(ate: str) -> bool:
+def alcanca(ate: str, mensal: dict[str, Decimal] | None = None) -> bool:
     """A série cobre uma restituição neste mês?
 
     A acumulada soma até o mês **anterior** ao da restituição, então a série
@@ -231,4 +249,5 @@ def alcanca(ate: str) -> bool:
     antes de mandar ler os SPED: descobrir que falta mês depois de uma hora de
     leitura é descobrir tarde.
     """
-    return _anterior(ate) <= ultimo_mes()
+    ultimo = ultimo_mes(mensal)
+    return bool(ultimo) and anterior(ate) <= ultimo

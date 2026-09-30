@@ -43,6 +43,7 @@ from cat.dominio.piscofins import prescricao
 from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido
 from cat.infraestrutura.analitico import exclusao_do_icms
 from cat.infraestrutura.analitico.escrita import LeituraCancelada
+from cat.infraestrutura import selic
 from cat.infraestrutura.exclusoes.piscofins_na_propria_base import calcular
 from cat.infraestrutura.gestao.agregador import agregar_efd
 from cat.infraestrutura.gestao.agregados import gravar as gravar_agregados
@@ -252,10 +253,14 @@ def _apurar_o_icms(contribuicoes: list[str], destino: str, resumo: Resumo,
             "apurado: ele se calcula no item da nota, e agregado não tem item.")
         return None
 
-    # a Selic se confere **antes** de ler, não no meio: uma série curta faria a
-    # leitura inteira para morrer no fim, e a outra tese cairia junto
+    # a série vem do banco, que a guarda para sempre e só vai ao Banco Central
+    # pelos meses que ainda faltam. Ver `infraestrutura/selic`
     mes = ate or exclusao_do_icms.mes_de(referencia or date.today())
-    if falta := exclusao_do_icms.avisar_se_a_selic_nao_alcanca(mes):
+    mensal = selic.serie(mes)
+
+    # e se confere **antes** de ler, não no meio: uma série curta faria a
+    # leitura inteira para morrer no fim, e a outra tese cairia junto
+    if falta := exclusao_do_icms.avisar_se_a_selic_nao_alcanca(mes, mensal):
         resumo.avisos.append(f"O Tema 69 não foi apurado. {falta}")
         return None
 
@@ -266,7 +271,7 @@ def _apurar_o_icms(contribuicoes: list[str], destino: str, resumo: Resumo,
     try:
         do_icms = exclusao_do_icms.apurar(
             contribuicoes, destino, ate=ate, avisar=andou,
-            deve_parar=deve_parar, referencia=referencia)
+            deve_parar=deve_parar, referencia=referencia, mensal=mensal)
     except LeituraCancelada as erro:
         # a etapa conhece o nome dela, não o da leitura
         raise ExclusaoCancelada("apuração das exclusões cancelada a pedido") from erro
