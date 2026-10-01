@@ -180,13 +180,33 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] A tese das contribuições corrigida pela Selic e com o filtro de receita
       das outras três: base e exclusão batem ao centavo com o 680 do MA. Sobram
       0,06% do arredondamento por grupo, que é escolha de 24/09 (v0.122.0)
-- [ ] Conferidor linha a linha do **680**, como os outros quatro têm. Precisa
-      agregar o gabarito por grupo antes de comparar: ele é por item e a tese
-      arredonda por grupo
+- [x] Motor do **680 — as contribuições fora da própria base, item a item**
+      (`sped/exclusao_piscofins_na_base.py`), 35 colunas nos quatro ramos
+      (C100/C170, C100/C175, A100/A170 e F100), conferido **100,0000%** contra
+      as 3.568.362 linhas do gabarito nas 57 competências, com conferidor
+      próprio (`tools/validar_680.py`). Quatro regras só o dado contou: a
+      ausência é do ramo e não do campo; o rateio do frete obriga a guardar o
+      documento (10 linhas em 3,5 milhões); tributada basta, paga não; e o F100
+      sai somado por dia. E o erro que ele pegou: registro sem CFOP entrava como
+      faturamento por suposição, trazendo **aquisição** para dentro da tese — o
+      sentido vem do `IND_OPER` (v0.123.0)
+- [x] **Pacote das exclusões** num botão: zip com o consolidado e as quatro
+      teses por item, cada uma no leiaute do seu relatório do MA, mais um
+      `LEIA-ME.txt` que diz o que é cada arquivo, o que não entrou e por que as
+      duas frentes da tese 1 não batem ao centavo (v0.123.0)
 - [ ] Varrer as outras etapas atrás do mesmo buraco de conferência: tese
       conferida sozinha e costura nunca exercitada. O `serializar` que faltava
       nos módulos novos passou por 60 testes de exclusão e caiu na tela do
       cliente — ver DECISOES de 01/10/2026
+- [ ] Decidir o **F100 `IND_OPER = 2`** ("outros documentos e operações"): o
+      agregador da Gestão o conta como saída e o 680 o recusa. Na DMINAS não
+      existe nenhum, então não há como medir qual está certo — fica para a
+      primeira base que tiver. É divergência latente entre o número que se pede
+      e o detalhe que o acompanha (ver DECISOES de 01/10/2026)
+- [ ] Levar o **Cancelar para o lado do botão** nas outras telas que ainda o
+      põem no lugar dele (`ui/Botao.tsx` com `aoCancelar`, usado na Entrega): é o
+      mesmo defeito relatado em 01/10/2026 na tela de exclusões — clique
+      impaciente aborta o próprio download e apaga o arquivo já criado
 - [x] As três exclusões ligadas ponta a ponta: planilha própria de cada uma,
       bloco próprio na tela, quatro fases na barra da rodada e testes das
       camadas analíticas (v0.119.0)

@@ -72,9 +72,12 @@ class Motor:
     nome: str                       # "icms", "icms_st", "iss" — para o log
     tese: str                       # a coluna `tese` do parquet agregado
     arquivo: str                    # "exclusao_do_icms.parquet"
-    registro: str                   # de onde as linhas saem: "C170", "A170"
     ler: Callable[[str, str, str], Iterator]
     colunas: Callable[[], list[str]]
+    # de onde as linhas saem: "C170", "A170". **Vazio quando a linha é que diz**
+    # — o 680 sai de quatro registros, e um grupo que os misturasse somaria o
+    # item da nota com o analítico da NFC-e num número que não explica nenhum
+    registro: str = ""
     # o 933 não tem CFOP: nota de serviço não tem. O grupo fica sem a coluna,
     # e não com ela vazia — vazio numa chave de agrupamento é um valor
     por_cfop: bool = True
@@ -280,7 +283,8 @@ def _somar(motor: Motor, totais: dict[str, Total], grupos: dict[Grupo, Total],
     """A mesma linha entra nas duas somas: a da tela e a do parquet."""
     competencia = competencia_de(linha.periodo)
     totais.setdefault(competencia, Total()).somar(linha)
-    grupo = Grupo(cnpj=linha.cnpj, competencia=competencia, registro=motor.registro,
+    grupo = Grupo(cnpj=linha.cnpj, competencia=competencia,
+                  registro=motor.registro or linha.registro,
                   cst=linha.cst, cfop=linha.cfop if motor.por_cfop else "")
     grupos.setdefault(grupo, Total()).somar(linha)
 

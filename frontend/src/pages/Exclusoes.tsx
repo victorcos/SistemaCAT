@@ -15,7 +15,7 @@ import { TrabalhoParado } from "@/components/shared/TrabalhoParado";
 import { Aviso } from "@/components/ui/Aviso";
 import { Botao } from "@/components/ui/Botao";
 import { CabecalhoDePagina, Voltar } from "@/components/ui/Pagina";
-import { IconeParar, IconeTentarDeNovo } from "@/constants/icons";
+import { IconeBaixar, IconeParar, IconeTentarDeNovo } from "@/constants/icons";
 import { INTERVALO_POLL_MS } from "@/constants/polling";
 import { ROTAS } from "@/constants/routes";
 import { aceitaProcessamento } from "@/constants/status";
@@ -25,6 +25,7 @@ import { comoErro } from "@/lib/errors";
 import { dinheiro, numero } from "@/lib/format";
 import { EM_CURSO, type Formato } from "@/services/conferencia";
 import {
+  baixarPacoteDasExclusoes,
   baixarPlanilhaDasExclusoes,
   baixarPlanilhaDaTese,
   cancelarExclusoes,
@@ -41,7 +42,7 @@ import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
 import type { ErroApi } from "@/types/erro";
 
 /**
- * Exclusões da base do PIS/COFINS. Quatro teses, uma rodada.
+ * Exclusões da base do PIS/COFINS. Quatro teses, cinco leituras, uma rodada.
  *
  * As **próprias contribuições fora da base**: a receita embute PIS e COFINS, e
  * a base de cada uma perde as duas — a leitura escolhida entre as três
@@ -66,11 +67,12 @@ import type { ErroApi } from "@/types/erro";
 
 const ESPERA_PARA_CANCELAR_MS = 400;
 
-/** As quatro leituras da rodada, na ordem — o mesmo nome que o motor usa. */
-const FASES = ["receita", "icms", "icms_st", "iss"];
+/** As cinco leituras da rodada, na ordem — o mesmo nome que o motor usa. */
+const FASES = ["receita", "receita_por_item", "icms", "icms_st", "iss"];
 
 const NOME_DA_FASE: Record<string, string> = {
   receita: "as contribuições",
+  receita_por_item: "as contribuições item a item",
   icms: "o ICMS",
   icms_st: "o ICMS-ST",
   iss: "o ISS",
@@ -303,13 +305,21 @@ function Concluido({
   resumo: ResumoDasExclusoes;
 }) {
   const download = useAcao();
-  const [baixando, setBaixando] = useState<Formato | null>(null);
+  // "pacote" ao lado dos formatos: é o mesmo botão de baixar, com outro alvo
+  const [baixando, setBaixando] = useState<Formato | "pacote" | null>(null);
   const linhas = resumo.por_competencia ?? [];
   const fora = Object.entries(resumo.fora ?? {});
+  const vazia = (resumo.grupos ?? 0) === 0;
 
   async function baixar(formato: Formato) {
     setBaixando(formato);
     await download.executar((sinal) => baixarPlanilhaDasExclusoes(execucao.id, formato, sinal));
+    setBaixando(null);
+  }
+
+  async function baixarPacote() {
+    setBaixando("pacote");
+    await download.executar((sinal) => baixarPacoteDasExclusoes(execucao.id, sinal));
     setBaixando(null);
   }
 
@@ -352,16 +362,44 @@ function Concluido({
           <Numero rotulo="Competências" valor={numero(resumo.competencias?.length ?? 0)} />
         </dl>
 
-        <div className="flex min-w-[240px] flex-col items-end justify-between gap-3">
-          <BaixarPlanilha
-            aoBaixar={baixar}
-            desabilitado={(resumo.grupos ?? 0) === 0}
-            rotulo="Baixar as exclusões"
-            destaque
-            baixando={baixando}
-            aoCancelar={download.cancelar}
-          />
-          <p className="m-0 text-right text-[11px] leading-relaxed text-texto-fraco">
+        <div className="flex min-w-[260px] flex-col items-end justify-between gap-3">
+          <div className="flex flex-col items-end gap-2">
+            {/* o pacote é o que se entrega: o consolidado e as quatro teses por
+                item, do mesmo instante, com um LEIA-ME que diz o que é cada um.
+                Cinco downloads em cinco cliques são cinco chances de misturar
+                rodadas, e quem confere põe tudo lado a lado com os arquivos do
+                escritório anterior */}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Botao
+                variante="principal"
+                icone={IconeBaixar}
+                onClick={baixarPacote}
+                disabled={vazia}
+                carregando={baixando === "pacote"}
+                className="shadow-acao"
+              >
+                Baixar o pacote
+              </Botao>
+              {/* Cancelar **ao lado**, nunca no lugar: o botão que virava
+                  Cancelar punia o clique impaciente, que abortava o próprio
+                  download e apagava o arquivo. Ver `BaixarPlanilha` */}
+              {baixando === "pacote" && download.podeCancelar && (
+                <Botao variante="fantasma" tamanho="sm" onClick={download.cancelar}>
+                  Cancelar
+                </Botao>
+              )}
+            </div>
+            <BaixarPlanilha
+              aoBaixar={baixar}
+              desabilitado={vazia}
+              rotulo="Só o consolidado"
+              baixando={baixando === "pacote" ? null : baixando}
+              aoCancelar={download.cancelar}
+            />
+          </div>
+          <p className="m-0 max-w-[36ch] text-right text-[11px] leading-relaxed text-texto-fraco">
+            O pacote leva o consolidado e as quatro teses item a item, cada uma no leiaute do
+            relatório do escritório anterior — 680, 903, 839 e 933.{" "}
             Uma linha por grupo: somar a coluna da diferença dá exatamente este total.
             {resumo.segundos ? ` Apurado em ${duracao(resumo.segundos)}` : ""}
             {resumo.fonte === "agregados"
@@ -438,24 +476,54 @@ function Concluido({
  * a Selic vêm em números distintos, porque a Selic é a parte que muda de valor
  * a cada mês que o pedido demora.
  */
-/** Uma exclusão de imposto da receita, e como a tela a chama. */
+/** Uma tese por item, e como a tela a chama. */
 interface Tese {
   /** o campo do resumo e o alvo do download na API */
-  campo: "icms" | "icms_st" | "iss";
+  campo: "receita_por_item" | "icms" | "icms_st" | "iss";
   alvo: string;
   /** o número do relatório do MA, que é como o cliente a conhece */
   codigo: string;
+  /** como a tela chama o imposto: vira o rótulo da coluna e o da tabela */
   imposto: string;
   rotulo: string;
   detalhe: string;
+  /** o título da faixa quando a tese não rodou — frase inteira, porque
+   *  "O as contribuições fora da base não foi apurado" não é português */
+  semRodar: string;
+  /**
+   * **A outra frente da mesma tese**, dita em voz alta na tela.
+   *
+   * Sem isto, o 680 aparece como um segundo número grande e verde da tese que
+   * já está no topo, 0,06% diferente — e quem lê conclui que um dos dois está
+   * errado. Nenhum está: o consolidado arredonda uma vez por grupo e o detalhe
+   * arredonda por linha, como o MA (decisão de 24/09/2026).
+   */
+  mesmaTeseQue?: string;
 }
 
 const TESES: Tese[] = [
+  {
+    campo: "receita_por_item",
+    alvo: "receita-por-item",
+    codigo: "680",
+    imposto: "Contribuições",
+    rotulo: "As contribuições fora da própria base, item a item · relatório 680",
+    semRodar: "O detalhe por item das contribuições não foi apurado nesta rodada",
+    mesmaTeseQue:
+      "É a mesma tese do número lá em cima, vista item a item. Os dois totais não " +
+      "batem de propósito: o consolidado arredonda uma vez por grupo, com a " +
+      "alíquota efetiva do grupo, e este arredonda por linha, como o relatório do " +
+      "escritório anterior. Arredondar milhões de itens um a um move o total — " +
+      "cerca de 0,06%. O que se pede é o de cima; este é o que acompanha o pedido.",
+    detalhe:
+      "Uma linha por item, nas trinta e cinco colunas do relatório 680 (Metodologia 01) — nos quatro ramos que geram receita: o item da nota, o analítico da NFC-e, a nota de serviço e os demais documentos.",
+  },
   {
     campo: "icms",
     alvo: "icms",
     codigo: "903",
     imposto: "ICMS",
+    semRodar: "O ICMS fora da base não foi apurado nesta rodada",
     rotulo: "Crédito no prazo, excluindo o ICMS da base · Tema 69",
     detalhe:
       "Uma linha por item de nota fiscal, nas quarenta colunas do relatório 903 — na ordem em que o escritório anterior exporta, para conferir lado a lado.",
@@ -465,6 +533,7 @@ const TESES: Tese[] = [
     alvo: "icms-st",
     codigo: "839",
     imposto: "ICMS-ST",
+    semRodar: "O ICMS-ST fora da base não foi apurado nesta rodada",
     rotulo: "Crédito no prazo, excluindo o ICMS-ST da base",
     detalhe:
       "O ICMS-ST não está escrito em nota nenhuma: a revenda com ST já retido não o destaca. Ele é reconstruído de uma base presumida e da alíquota do produto, e a planilha mostra as duas colunas ao lado do resultado — pedido que nasce de arbitramento se defende mostrando a conta.",
@@ -474,6 +543,7 @@ const TESES: Tese[] = [
     alvo: "iss",
     codigo: "933",
     imposto: "ISS",
+    semRodar: "O ISS fora da base não foi apurado nesta rodada",
     rotulo: "Crédito no prazo, excluindo o ISS da base",
     detalhe:
       "Uma linha por item de nota de serviço, nas trinta e duas colunas do relatório 933. A coluna do ISS sai em branco quando o cliente não a escriturou: o valor está na NFS-e, e em branco não é zero.",
@@ -514,7 +584,7 @@ function BlocoDaTese({
   // Selic não alcança o mês. O porquê já está na lista de avisos acima
   if (!icms || !(icms.linhas ?? 0)) {
     return (
-      <Faixa titulo={`O ${tese.imposto} fora da base não foi apurado nesta rodada`}>
+      <Faixa titulo={tese.semRodar}>
         Ele se calcula no item da nota, direto da EFD-Contribuições, e precisa da série da Selic
         cobrindo o mês da restituição. O motivo está em{" "}
         <strong>o que a conta não incluiu</strong>, acima.
@@ -538,6 +608,11 @@ function BlocoDaTese({
             {dinheiro(icms.diferenca_cofins ?? "0")} de COFINS · {dinheiro(icms.selic ?? "0")} de
             Selic
           </p>
+          {tese.mesmaTeseQue && (
+            <p className="m-0 mt-2 max-w-[62ch] text-[12px] leading-relaxed text-atencao">
+              {tese.mesmaTeseQue}
+            </p>
+          )}
           {ate && (
             <p className="m-0 mt-2 text-[12px] leading-relaxed text-texto-fraco">
               Corrigido pela Selic até <strong className="font-mono">{ate}</strong>. A acumulada

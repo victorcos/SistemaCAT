@@ -10,6 +10,13 @@ import { baixarArquivo, type Execucao, type Formato } from "./conferencia";
  * leituras possíveis. Vale só no débito: o crédito das aquisições fica como
  * está.
  *
+ * **A tese das contribuições tem duas frentes.** A consolidada soma por grupo e
+ * arredonda uma vez por grupo — é o número que se pede, e é o que está nos
+ * campos do topo deste resumo. A detalhada (`receita_por_item`) é o relatório
+ * 680 do MA, uma linha por item. Os dois totais **não batem**, e é de propósito:
+ * arredondar milhões de itens um a um move o total, e na base em que a regra foi
+ * medida a diferença ficou em 0,06%. Ver a decisão de 24/09/2026.
+ *
  * **Três exclusões de imposto da receita**, apuradas item a item e corrigidas
  * pela Selic até o mês em que se roda: o **ICMS** (Tema 69, relatório 903), o
  * **ICMS-ST** (839) e o **ISS** (933). Cada uma tem o seu total, o seu detalhe e
@@ -117,14 +124,19 @@ export interface ResumoDasExclusoes {
   por_competencia?: LinhaDaCompetencia[];
   /** motivo -> quantas chaves não entraram na tese. Nada sai em silêncio */
   fora?: Record<string, number>;
-  /** as três teses por item. Ausentes ou vazias quando não deu para apurá-las */
+  /** as quatro teses por item. Ausentes ou vazias quando não deu para apurá-las.
+   *  `receita_por_item` não é um quinto pedido: é a mesma tese dos campos acima
+   *  vista item a item, no leiaute do 680. Somá-la ao resto pede a tese 1 duas
+   *  vezes */
+  receita_por_item?: ResumoDaTese;
   icms?: ResumoDaTese;
   icms_st?: ResumoDaTese;
   iss?: ResumoDaTese;
   avisos?: string[];
   iniciada_por?: string;
   segundos?: number;
-  /** `fase` diz qual das quatro leituras anda: receita, icms, icms_st ou iss */
+  /** `fase` diz qual das cinco leituras anda: receita, receita_por_item, icms,
+   *  icms_st ou iss */
   andamento?: { arquivos: number; grupos: number; fase?: string };
   log?: EntradaDoLog[];
 }
@@ -149,8 +161,18 @@ export const cancelarExclusoes = (execucaoId: number) =>
  * O detalhe de uma tese por item, nas colunas e na ordem em que o MA exporta —
  * para que o cliente ponha os dois relatórios lado a lado e confira.
  *
- * `alvo` é o nome da planilha na API: `icms`, `icms-st` ou `iss`.
+ * `alvo` é o nome da planilha na API: `receita-por-item`, `icms`, `icms-st` ou
+ * `iss`.
  */
+/** Como o arquivo baixado se chama, por tese. Derivar do `alvo` dava
+ *  `exclusao_do_receita_por_item`, que ninguém reconhece na pasta de downloads */
+const ARQUIVO_DA_TESE: Record<string, string> = {
+  "receita-por-item": "exclusao_piscofins_na_propria_base",
+  icms: "exclusao_do_icms",
+  "icms-st": "exclusao_do_icms_st",
+  iss: "exclusao_do_iss",
+};
+
 export function baixarPlanilhaDaTese(
   execucaoId: number,
   alvo: string,
@@ -158,12 +180,29 @@ export function baixarPlanilhaDaTese(
   sinal?: AbortSignal,
 ): Promise<void> {
   const filtro = formato !== "xlsx" ? `?formato=${formato}` : "";
+  const nome = ARQUIVO_DA_TESE[alvo] ?? `exclusao_${alvo.replace(/-/g, "_")}`;
   return baixarArquivo(
     `/api/exclusoes/${execucaoId}/planilhas/${alvo}${filtro}`,
-    `exclusao_do_${alvo.replace("-", "_")}.${formato}`,
+    `${nome}.${formato}`,
     sinal,
   );
 }
+
+/**
+ * **Tudo de uma vez**: o consolidado e as quatro teses por item, num zip.
+ *
+ * Quem confere põe os arquivos lado a lado com os do escritório anterior, e isso
+ * só funciona se os cinco saírem do **mesmo instante** — cinco downloads em
+ * cinco cliques são cinco chances de misturar rodadas. Vai com um `LEIA-ME.txt`
+ * que diz o que é cada arquivo e avisa da diferença de arredondamento entre as
+ * duas frentes da tese das contribuições.
+ */
+export const baixarPacoteDasExclusoes = (execucaoId: number, sinal?: AbortSignal) =>
+  baixarArquivo(
+    `/api/exclusoes/${execucaoId}/planilhas/pacote?formato=zip`,
+    "exclusoes_da_base.zip",
+    sinal,
+  );
 
 /** Uma linha por grupo: somar a coluna da diferença dá o total da tela. */
 export function baixarPlanilhaDasExclusoes(

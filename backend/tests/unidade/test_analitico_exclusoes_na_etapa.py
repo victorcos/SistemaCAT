@@ -20,6 +20,8 @@ frente.
 from __future__ import annotations
 
 import os
+import shutil
+import zipfile
 from datetime import date
 
 import pyarrow.parquet as pq
@@ -29,7 +31,13 @@ from cat.infraestrutura.analitico import (
     exclusao_do_icms,
     exclusao_do_icms_st,
     exclusao_do_iss,
+    exclusao_piscofins_na_base,
     exclusoes,
+)
+from cat.infraestrutura.planilhas.pacote_das_exclusoes import (
+    LEIA_ME,
+    PACOTE,
+    zip_das_exclusoes,
 )
 from cat.infraestrutura.repositorios.banco import criar_tabelas
 from cat.infraestrutura.sped.registros import CAMPOS
@@ -110,6 +118,7 @@ class TestACostura:
         """O teste que faltava: era aqui que o `AttributeError` aparecia."""
         resumo, _ = rodada
 
+        assert resumo.receita_por_item, "o resumo da receita por item não voltou"
         assert resumo.icms, "o resumo do ICMS não voltou"
         assert resumo.icms_st, "o resumo do ICMS-ST não voltou"
         assert resumo.iss, "o resumo do ISS não voltou"
@@ -119,30 +128,59 @@ class TestACostura:
         esperado = {"tese", "ate", "linhas", "base", "excluido", "total_atualizado",
                     "prescrito", "competencias_prescritas", "por_competencia"}
 
-        for nome in ("icms", "icms_st", "iss"):
+        for nome in ("receita_por_item", "icms", "icms_st", "iss"):
             tese = getattr(resumo, nome)
             assert esperado <= set(tese), f"{nome}: falta {esperado - set(tese)}"
             assert tese["ate"] == ATE
 
-    def test_as_tres_teses_vem_nomeadas_e_distintas(self, rodada):
+    def test_as_quatro_teses_vem_nomeadas_e_distintas(self, rodada):
         resumo, _ = rodada
-        nomes = {resumo.icms["tese"], resumo.icms_st["tese"], resumo.iss["tese"]}
+        nomes = {resumo.receita_por_item["tese"], resumo.icms["tese"],
+                 resumo.icms_st["tese"], resumo.iss["tese"]}
 
         assert nomes == {
+            exclusao_piscofins_na_base.TESE_PISCOFINS_POR_ITEM,
             exclusao_do_icms.TESE_ICMS_NA_BASE,
             exclusao_do_icms_st.TESE_ICMS_ST_NA_BASE,
             exclusao_do_iss.TESE_ISS_NA_BASE,
         }
 
+    def test_as_duas_frentes_da_receita_falam_da_mesma_tese(self, rodada):
+        """O consolidado e o detalhe por item: mesma base, arredondamento diferente.
+
+        Não é para baterem ao centavo — a decisão de 24/09/2026 escolheu
+        arredondar uma vez por grupo no número que se pede, e o detalhe
+        reproduz o do MA linha a linha. O que **tem** de bater é a base: se as
+        duas frentes partissem de receitas diferentes, uma das duas estaria
+        filtrando errado, e aí nenhuma serviria para conferir a outra.
+        """
+        resumo, _ = rodada
+
+        assert resumo.receita_por_item["base"] == str(exclusoes.reais(resumo.base))
+
 
 class TestOQueFicaEmDisco:
-    def test_os_quatro_parquets_nascem(self, rodada):
+    def test_os_cinco_parquets_nascem(self, rodada):
         _, destino = rodada
         for arquivo in (exclusoes.ARQUIVO_DAS_EXCLUSOES,
+                        exclusao_piscofins_na_base.ARQUIVO_DA_EXCLUSAO_PISCOFINS,
                         exclusao_do_icms.ARQUIVO_DA_EXCLUSAO_DO_ICMS,
                         exclusao_do_icms_st.ARQUIVO_DA_EXCLUSAO_DO_ICMS_ST,
                         exclusao_do_iss.ARQUIVO_DA_EXCLUSAO_DO_ISS):
             assert os.path.isfile(os.path.join(destino, arquivo)), arquivo
+
+    def test_o_detalhe_da_receita_nao_entra_no_agregado(self, rodada):
+        """Senão quem somar o parquet por tese pede a tese 1 duas vezes.
+
+        A tese da receita já está no agregado, consolidada. O detalhe por item
+        é a outra frente da **mesma** tese, e mora no seu próprio parquet.
+        """
+        _, destino = rodada
+        tabela = pq.read_table(os.path.join(destino, exclusoes.ARQUIVO_DAS_EXCLUSOES))
+        teses = set(tabela.column("tese").to_pylist())
+
+        assert exclusoes.TESE_PISCOFINS_NA_BASE in teses
+        assert exclusao_piscofins_na_base.TESE_PISCOFINS_POR_ITEM not in teses
 
     def test_o_agregado_separa_as_teses_por_item(self, rodada):
         """É a coluna `tese` que mantém as quatro no mesmo parquet sem se somarem."""
@@ -174,3 +212,77 @@ class TestOAndamento:
 
         assert set(fases) == set(exclusoes.FASES), (
             f"faltou avisar da fase {set(exclusoes.FASES) - set(fases)}")
+
+
+class TestOPacote:
+    """O botão que entrega tudo de uma vez.
+
+    Cinco planilhas em cinco downloads são cinco oportunidades de misturar
+    rodadas; quem confere contra o escritório anterior precisa dos cinco do
+    **mesmo instante**. Este é o teste de que o botão entrega os cinco.
+    """
+
+    def test_o_zip_traz_as_cinco_planilhas_e_o_leia_me(self, rodada, tmp_path):
+        _, destino = rodada
+        zip_ = tmp_path / "exclusoes_da_base.zip"
+
+        quantas = zip_das_exclusoes(
+            os.path.join(destino, exclusoes.ARQUIVO_DAS_EXCLUSOES), str(zip_))
+
+        assert quantas == len(PACOTE)
+        with zipfile.ZipFile(zip_) as z:
+            dentro = set(z.namelist())
+        assert dentro == {nome for nome, _, _, _ in PACOTE} | {LEIA_ME}
+
+    def test_o_nome_de_cada_arquivo_comeca_pelo_numero_do_relatorio(self):
+        """É por esse número que quem confere acha o arquivo de referência."""
+        por_item = [nome for nome, _, _, _ in PACOTE if "por item" in nome]
+
+        assert [nome.split(" ")[0] for nome in por_item] == ["680", "903", "839", "933"]
+
+    def test_o_leia_me_avisa_da_diferenca_de_arredondamento(self, rodada, tmp_path):
+        """Quem subtrair uma frente da outra tem de achar a diferença escrita.
+
+        Sem este aviso, a diferença de 0,06% entre o consolidado e o detalhe por
+        item parece defeito — e quem a encontra não tem como saber que foi
+        escolhida (decisão de 24/09/2026).
+        """
+        _, destino = rodada
+        zip_ = tmp_path / "exclusoes_da_base.zip"
+        zip_das_exclusoes(os.path.join(destino, exclusoes.ARQUIVO_DAS_EXCLUSOES),
+                          str(zip_))
+
+        with zipfile.ZipFile(zip_) as z:
+            leia_me = z.read(LEIA_ME).decode("ascii")
+
+        assert "E DE PROPOSITO" in leia_me
+        assert "0,06%" in leia_me
+
+    def test_tese_que_nao_rodou_sai_nomeada_no_leia_me(self, rodada, tmp_path):
+        """Zip com quatro arquivos onde deveriam ser cinco parece completo."""
+        _, destino = rodada
+        copia = tmp_path / "sem_o_iss"
+        shutil.copytree(destino, copia)
+        os.remove(copia / exclusao_do_iss.ARQUIVO_DA_EXCLUSAO_DO_ISS)
+        zip_ = tmp_path / "exclusoes_da_base.zip"
+
+        quantas = zip_das_exclusoes(
+            str(copia / exclusoes.ARQUIVO_DAS_EXCLUSOES), str(zip_))
+
+        assert quantas == len(PACOTE) - 1
+        with zipfile.ZipFile(zip_) as z:
+            dentro = set(z.namelist())
+            leia_me = z.read(LEIA_ME).decode("ascii")
+        assert not [nome for nome in dentro if nome.startswith("933")]
+        assert "O QUE NAO ENTROU" in leia_me
+        assert "933" in leia_me
+
+    def test_nao_deixa_zip_pela_metade(self, rodada, tmp_path):
+        """O `.tmp` não sobrevive à montagem: ele é renomeado, não copiado."""
+        _, destino = rodada
+        zip_ = tmp_path / "exclusoes_da_base.zip"
+
+        zip_das_exclusoes(os.path.join(destino, exclusoes.ARQUIVO_DAS_EXCLUSOES),
+                          str(zip_))
+
+        assert not os.path.exists(str(zip_) + ".tmp")

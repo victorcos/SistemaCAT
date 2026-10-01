@@ -55,6 +55,7 @@ from cat.infraestrutura.analitico import (
     exclusao_do_icms,
     exclusao_do_icms_st,
     exclusao_do_iss,
+    exclusao_piscofins_na_base,
 )
 from cat.infraestrutura.analitico.escrita import LeituraCancelada
 from cat.infraestrutura.sped.tabelas import tab_selic
@@ -106,14 +107,21 @@ DUAS_CASAS = Decimal("0.01")
 
 UM = Decimal(1)
 
-# as quatro leituras que a etapa faz, na ordem. A primeira é a tese da receita
-# (que pode sair do agregado); as três seguintes são as exclusões por item, e
-# cada uma lê os SPED inteiros porque a conta delas é no item
+# as cinco leituras que a etapa faz, na ordem. A primeira é a tese da receita
+# consolidada (que pode sair do agregado); as quatro seguintes leem os SPED
+# inteiros, porque a conta delas é no item e agregado não tem item.
+#
+# **A receita aparece duas vezes, e não é repetição**: são as duas frentes da
+# mesma tese — a consolidada, que arredonda uma vez por grupo e é o número que
+# se pede, e o detalhe por item nas 35 colunas do 680 do MA, que é o que
+# acompanha o pedido. Ver `analitico/exclusao_piscofins_na_base.py`
 FASE_DA_RECEITA = "receita"
+FASE_DA_RECEITA_POR_ITEM = "receita_por_item"
 FASE_DO_ICMS = "icms"
 FASE_DO_ICMS_ST = "icms_st"
 FASE_DO_ISS = "iss"
-FASES = (FASE_DA_RECEITA, FASE_DO_ICMS, FASE_DO_ICMS_ST, FASE_DO_ISS)
+FASES = (FASE_DA_RECEITA, FASE_DA_RECEITA_POR_ITEM, FASE_DO_ICMS,
+         FASE_DO_ICMS_ST, FASE_DO_ISS)
 
 
 def reais(centavos: int) -> Decimal:
@@ -163,9 +171,14 @@ class Resumo:
     por_competencia: list[dict] = field(default_factory=list)
     # motivo -> quantas chaves do agregado não entraram na tese
     fora: dict[str, int] = field(default_factory=dict)
-    # as três teses por item, já serializadas — vazias quando não deu para
+    # as quatro teses por item, já serializadas — vazias quando não deu para
     # apurá-las. Cada uma no seu canto, nunca somadas num número só: são
-    # pedidos diferentes, com fundamentos diferentes
+    # pedidos diferentes, com fundamentos diferentes.
+    #
+    # `receita_por_item` é a exceção que confirma a regra: não é um quinto
+    # pedido, é **a mesma tese dos campos acima** vista item a item. Somá-la ao
+    # que já está neste resumo seria pedir a tese 1 duas vezes
+    receita_por_item: dict = field(default_factory=dict)
     icms: dict = field(default_factory=dict)
     icms_st: dict = field(default_factory=dict)
     iss: dict = field(default_factory=dict)
@@ -198,7 +211,8 @@ def serializar(r: Resumo) -> dict:
         "competencias_prescritas": r.competencias_prescritas,
         "data_de_referencia": r.data_de_referencia,
         "por_competencia": r.por_competencia,
-        "fora": r.fora, "icms": r.icms, "icms_st": r.icms_st, "iss": r.iss,
+        "fora": r.fora, "receita_por_item": r.receita_por_item,
+        "icms": r.icms, "icms_st": r.icms_st, "iss": r.iss,
         "avisos": r.avisos, "segundos": r.segundos,
     }
 
@@ -341,20 +355,22 @@ def _apurar_por_item(contribuicoes: list[str], destino: str, resumo: Resumo,
                      deve_parar: Callable[[], bool] | None,
                      referencia: date | None, ate: str,
                      mensal: dict[str, Decimal]) -> dict:
-    """As três exclusões por item: o ICMS, o ICMS-ST e o ISS.
+    """As quatro exclusões por item: a receita, o ICMS, o ICMS-ST e o ISS.
 
     **Leem os SPED mesmo havendo agregado**, porque não há como não ler: a conta
-    das três é no item, e agregado não tem item. Sem EFD-Contribuições no lote
+    das quatro é no item, e agregado não tem item. Sem EFD-Contribuições no lote
     não há nenhuma delas — e isso vira aviso, não erro: a tese da receita já
-    rodou, e derrubá-la junto não ajudaria ninguém.
+    rodou consolidada, e derrubá-la junto não ajudaria ninguém.
 
-    Devolve `{nome da tese: resumo}`, com uma entrada por tese que rodou.
+    Devolve `{nome da tese: resumo}` das que entram no parquet agregado — **o
+    detalhe da receita não entra**, porque a tese dele já está lá consolidada.
+    Ver `analitico/exclusao_piscofins_na_base.py`.
     """
     if not contribuicoes:
         resumo.avisos.append(
-            "Sem EFD-Contribuições no lote, as exclusões por item — ICMS, ICMS-ST "
-            "e ISS — não foram apuradas: elas se calculam no item da nota, e "
-            "agregado não tem item.")
+            "Sem EFD-Contribuições no lote, as exclusões por item — receita, ICMS, "
+            "ICMS-ST e ISS — não foram apuradas: elas se calculam no item da nota, "
+            "e agregado não tem item.")
         return {}
 
     # a série já veio pronta de `apurar`, que a usou também na tese da receita:
@@ -377,6 +393,10 @@ def _apurar_por_item(contribuicoes: list[str], destino: str, resumo: Resumo,
     comum = {"ate": ate, "deve_parar": deve_parar, "referencia": referencia,
              "mensal": mensal}
     try:
+        da_receita = exclusao_piscofins_na_base.apurar(
+            contribuicoes, destino, avisar=andando(FASE_DA_RECEITA_POR_ITEM),
+            **comum)
+
         do_icms = exclusao_do_icms.apurar(
             contribuicoes, destino, avisar=andando(FASE_DO_ICMS), **comum)
 
@@ -393,12 +413,14 @@ def _apurar_por_item(contribuicoes: list[str], destino: str, resumo: Resumo,
         # a etapa conhece o nome dela, não o da leitura
         raise ExclusaoCancelada("apuração das exclusões cancelada a pedido") from erro
 
+    resumo.receita_por_item = exclusao_piscofins_na_base.serializar(da_receita)
     resumo.icms = exclusao_do_icms.serializar(do_icms)
     resumo.icms_st = exclusao_do_icms_st.serializar(do_icms_st)
     resumo.iss = exclusao_do_iss.serializar(do_iss)
-    for resultado in (do_icms, do_icms_st, do_iss):
+    for resultado in (da_receita, do_icms, do_icms_st, do_iss):
         resumo.avisos.extend(resultado.avisos)
 
+    # o detalhe da receita fica fora do agregado de propósito: ver o docstring
     return {
         exclusao_do_icms.TESE_ICMS_NA_BASE: do_icms,
         exclusao_do_icms_st.TESE_ICMS_ST_NA_BASE: do_icms_st,

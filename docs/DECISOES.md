@@ -5,6 +5,81 @@
 
 ---
 
+## 2026-10-01 — O 680 fecha em 100%, e quatro regras só o dado contou
+
+**O relatório.** 680 — Metodologia 01 — Todos Registros — Por Documento e Itens:
+as próprias contribuições fora da própria base, **item a item**, 35 colunas,
+3.568.362 linhas no arquivo de referência da DMINAS. Fecha **100,0000%**, sem
+linha a mais nem a menos, nas 57 competências.
+
+**Quatro frentes agora, e duas delas são da mesma tese.** O consolidado soma por
+grupo e arredonda uma vez por grupo — é o número que se pede; o 680 é o detalhe
+que acompanha o pedido. A diferença de 0,06% entre os dois é a decisão de
+24/09/2026, e está escrita nos dois módulos. Por isso o detalhe **não entra** no
+`exclusoes.parquet`: a tese dele já está lá, consolidada, e gravar as duas no
+mesmo arquivo daria a quem o somasse a tese 1 contada duas vezes.
+
+### As quatro regras que a conferência arrancou
+
+**1. A ausência é do ramo, não do campo.** O C170 traz ICMS, desconto e rateio
+nas 602.510 linhas, **mesmo zerados**; o C175 traz só o desconto, nas 2.965.485;
+o A170 e o F100 não trazem nenhum dos três — nem o A170, que tem `VL_DESC` no
+leiaute e vem preenchido. Escrever zero no lugar do vazio divergia em 71.837
+linhas de uma competência só. A primeira tentativa foi olhar se o campo de
+origem estava vazio: certo por acidente em três ramos, errado no quarto.
+
+**2. O rateio obriga a guardar o documento.** Frete, seguro e outras despesas
+repartidos pelo valor do item sobre a soma de **todos** os itens da nota — o
+frete foi pago pela nota inteira. São **10 linhas não-zero em 3,5 milhões**, e é
+a diferença entre reproduzir o relatório e quase reproduzi-lo. O módulo dizia,
+escrito por mim, que ali "não há buffer de documento"; o dado disse o contrário.
+
+**3. Tributada basta; paga não.** Uma linha de **R$ 0,06** com CST 01 e alíquota
+cheia recolhe R$ 0,00 nas duas contribuições por arredondamento, e o MA a traz.
+Era a única das 81.193 linhas de 05/2021 que o filtro "PIS ou COFINS pago"
+deixava de fora. A alíquota entra na pergunta **ao lado** do valor e não no lugar
+dele: o monofásico de pauta tem valor sem alíquota percentual.
+
+**4. O F100 sai somado por dia — uma linha, não várias.** Único ramo que o MA
+consolida, e a razão está no leiaute: o F100 não tem número de documento, nem
+modelo, nem item. Duas linhas suas com o mesmo CNPJ, CST, data e alíquota são
+indistinguíveis no relatório. Medido: em cada grupo (CNPJ, competência, CST), o
+número de linhas do gabarito é exatamente o número de datas distintas do grupo.
+Somar reduziu 841 linhas nossas às 334 dele, ao centavo.
+
+### O erro mais caro foi o que parecia inofensivo
+
+**Registro sem CFOP entrava como faturamento por suposição.** O F100 e o A170
+não têm CFOP, e eu os tratava como receita pelo simples fato de não haver o que
+perguntar. Entravam **aquisições**: F100 de compra e serviço contratado, com CST
+50 — CST de crédito, que só existe na entrada. R$ 193.939,37 de base num mês,
+R$ 81,3 mil em outro, em linhas idênticas a todas as outras do relatório.
+
+O sentido vem do `IND_OPER`: 1 no F100 é geração de receita (0 é aquisição, 2
+outros documentos); 1 no A100 é serviço prestado (0 é contratado). O erro oposto
+— perguntar o CFOP a quem não tem — é maior, e derruba R$ 10,28 milhões de base
+(01/10/2026). Nenhum dos dois é palpite: os dois foram medidos contra o gabarito.
+
+**O que fica em aberto, dito em voz alta.** O agregador da Gestão trata o F100
+`IND_OPER = 2` como saída (`gestao/agregador.py`), e o 680 só aceita o 1. **Na
+DMINAS não existe nenhum F100 com `IND_OPER = 2`** — 281 de aquisição e 558 de
+receita —, então as duas frentes concordam nesta base e não há como medir qual
+está certa. Fica anotado para a primeira base que tiver: é divergência latente
+entre o número que se pede e o detalhe que o acompanha.
+
+### O conferidor passou a ler o gabarito em lotes
+
+`tools/validar_680.py` materializava a tabela inteira — 3.568.362 × 35 = 125
+milhões de strings Python de uma vez — e passou a estourar com `MemoryError`
+antes de conferir coisa nenhuma. O arquivo não cresceu; a memória livre
+encolheu. Agora lê por lote de 65.536, e o filtro de competência corre no lote
+antes de virar objeto. Ganhou também: imprime **campo a campo** as linhas órfãs
+das duas pontas. Linha sem par é mais grave do que mil colunas divergentes —
+diz que não lemos o documento, e não que erramos a conta dele. Foi assim que as
+quatro regras apareceram.
+
+---
+
 ## 2026-10-01 — Um download que não baixava e não dizia nada
 
 **O que o Victor viu:** os dois botões da tese das contribuições — a planilha e

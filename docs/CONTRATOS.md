@@ -453,7 +453,7 @@ linha por (`tributo`, `quadro`, `ordem`, `rotulo`, `competencia`) com `valor` em
 centavos. `valor` nulo quer dizer fonte externa (DCTF, e-CAC), e não zero;
 `unidade` distingue dinheiro de percentual.
 
-### Exclusões da base do PIS/COFINS (v0.119.0)
+### Exclusões da base do PIS/COFINS (v0.123.0)
 
 | Método | Rota | Quem |
 | --- | --- | --- |
@@ -462,26 +462,42 @@ centavos. `valor` nulo quer dizer fonte externa (DCTF, e-CAC), e não zero;
 | `GET` | `/api/exclusoes/{execucaoId}` | quem vê o trabalho |
 | `POST` | `/api/exclusoes/{execucaoId}/cancelar` | quem escreve |
 | `GET` | `/api/exclusoes/{execucaoId}/planilhas/exclusoes` | quem vê o trabalho |
+| `GET` | `/api/exclusoes/{execucaoId}/planilhas/receita-por-item` | quem vê o trabalho |
 | `GET` | `/api/exclusoes/{execucaoId}/planilhas/icms` | quem vê o trabalho |
 | `GET` | `/api/exclusoes/{execucaoId}/planilhas/icms-st` | quem vê o trabalho |
 | `GET` | `/api/exclusoes/{execucaoId}/planilhas/iss` | quem vê o trabalho |
+| `GET` | `/api/exclusoes/{execucaoId}/planilhas/pacote` | quem vê o trabalho |
 
 **Quatro teses numa rodada.** `exclusoes` é uma linha por grupo
 (estabelecimento, competência, registro, CST e CFOP), das quatro, separadas pela
 coluna `tese`: `piscofins_na_propria_base`, `icms_na_base`, `icms_st_na_base` e
 `iss_na_base`.
 
-As outras três são o detalhe item a item de cada exclusão de imposto, nas
-colunas e na ordem em que o MA exporta — o que permite pôr os dois relatórios
-lado a lado:
+As outras quatro são o detalhe **item a item**, nas colunas e na ordem em que o
+MA exporta — o que permite pôr os dois relatórios lado a lado:
 
 | alvo | relatório do MA | colunas | o que é |
 | --- | --- | --- | --- |
+| `receita-por-item` | 680 | 35 | as próprias contribuições, nos quatro ramos |
 | `icms` | 903 | 40 | o ICMS destacado, lido da nota |
 | `icms-st` | 839 | 46 | o ICMS-ST **presumido**: base × alíquota |
 | `iss` | 933 | 32 | o ISS da nota de serviço, rateado |
 
 Todas em xlsx ou csv.
+
+**`pacote` sai só em zip**, e leva as cinco de uma vez — o consolidado e as
+quatro por item — mais um `LEIA-ME.txt` que diz o que é cada arquivo. Existe
+porque quem confere põe tudo lado a lado com os arquivos do escritório anterior,
+e cinco downloads em cinco cliques são cinco chances de misturar rodadas. Tese
+que não rodou não entra, e o LEIA-ME a nomeia: zip com quatro arquivos onde
+deveriam ser cinco é indistinguível de um zip completo.
+
+**A tese das contribuições aparece duas vezes, e é de propósito.** O consolidado
+soma por grupo e arredonda uma vez por grupo — é o número que se pede, e é o que
+está nos campos do topo do resumo. O `receita-por-item` é a mesma tese vista item
+a item, arredondando por linha como o MA. Os dois totais **não batem**: na base
+em que a regra foi medida a diferença ficou em 0,06%. Ver a decisão de
+24/09/2026, e o `LEIA-ME.txt` do pacote, que avisa quem for subtrair um do outro.
 
 O resumo traz, no nível de cima, a tese das contribuições: `fonte`
 (`agregados` ou `sped`), `arquivos`, `grupos`, `base`, `excluido`,
@@ -489,8 +505,8 @@ O resumo traz, no nível de cima, a tese das contribuições: `fonte`
 `competencias_prescritas`, `data_de_referencia`, `por_competencia`, `fora` e
 `avisos`.
 
-E, em `icms`, `icms_st` e `iss`, uma por tese por item, todas com a mesma
-forma: `tese`, `ate` (o mês da restituição até onde a Selic acumulou, em
+E, em `receita_por_item`, `icms`, `icms_st` e `iss`, uma por tese por item, todas
+com a mesma forma: `tese`, `ate` (o mês da restituição até onde a Selic acumulou, em
 `aaaa-mm`), `linhas`, `base`, `excluido` (o imposto que sai da base),
 `diferenca_pis`, `diferenca_cofins`, `selic`, `total_atualizado`, `prescrito`,
 `competencias_prescritas`, `estabelecimentos`, `competencias`,
@@ -501,8 +517,8 @@ não atravessa JSON sem perder casa.
 com fundamentos diferentes; quem quiser o total geral que some, sabendo o que
 está somando.
 
-As três vêm vazias quando não deu para apurá-las (lote sem EFD-Contribuições, ou
-série da Selic que não alcança o mês da restituição); o motivo entra em
+As quatro vêm vazias quando não deu para apurá-las (lote sem EFD-Contribuições,
+ou série da Selic que não alcança o mês da restituição); o motivo entra em
 `avisos`.
 
 A Selic que corrige o Tema 69 **vem do banco** (tabela `selic_mensal`), que se
@@ -511,15 +527,19 @@ meses que ainda faltam. Mês guardado nunca é rebuscado nem sobrescrito — tax
 mês fechado não muda. Rede fora não derruba a rodada; série que não alcança o
 mês da restituição, sim: a tese não é apurada e o motivo entra em `avisos`.
 
-`andamento` traz `fase`: `receita`, `icms`, `icms_st` ou `iss`. São **quatro**
-leituras do mesmo lote, cada uma um quarto da barra, e a tela usa a fase para
-não voltar a zero três vezes.
+`andamento` traz `fase`: `receita`, `receita_por_item`, `icms`, `icms_st` ou
+`iss`. São **cinco** leituras do mesmo lote, cada uma um quinto da barra, e a
+tela usa a fase para não voltar a zero quatro vezes.
 
 Em disco, na pasta da execução: `exclusoes.parquet` (as quatro teses agregadas),
-`exclusao_do_icms.parquet`, `exclusao_do_icms_st.parquet` e
-`exclusao_do_iss.parquet` (o detalhe de cada uma). Os três detalhados **não
-existem** quando a rodada foi interrompida: parquet pela metade parece inteiro
-para quem o abre.
+`exclusao_piscofins_na_base.parquet`, `exclusao_do_icms.parquet`,
+`exclusao_do_icms_st.parquet` e `exclusao_do_iss.parquet` (o detalhe de cada
+uma). Os quatro detalhados **não existem** quando a rodada foi interrompida:
+parquet pela metade parece inteiro para quem o abre.
+
+**O detalhe da receita não entra no `exclusoes.parquet`**, ao contrário dos
+outros três: a tese dele já está lá, consolidada. Gravar as duas frentes no mesmo
+arquivo daria a quem o somasse por `tese` a tese 1 contada duas vezes.
 
 A alíquota por produto do ICMS-ST sai da tabela `aliquota_de_item`, carregada
 por `tools/carregar_aliquotas.py`. Ela guarda **só o que a regra do estado não
