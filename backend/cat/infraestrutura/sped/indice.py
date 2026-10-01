@@ -89,7 +89,9 @@ ALVOS_PADRAO: tuple[str, ...] = (
     # extração de registro passou a ser da pessoa e não só das etapas
     "C400", "C405", "C460", "C481", "C485",
     "C490", "C491", "C495",
-    "C500", "C800", "C860", "C870",
+    # o C500 vem com os filhos: sem eles a tela oferece o registro e a
+    # extração sai vazia, porque o índice não guardou a posição
+    "C500", "C501", "C505", "C800", "C860", "C870",
     "D100", "D500", "F100",
     # o bloco M: a apuração, e é dele que sai o número que o cliente pergunta
     "M100", "M105", "M110", "M200", "M210", "M220",

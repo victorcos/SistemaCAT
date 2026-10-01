@@ -469,6 +469,8 @@ def extrair(destino: str, alvo: str, recorte: Recorte | None = None,
             return
         gravar(linha)
 
+    arquivos_com_o_alvo = 0
+
     try:
         for arquivo in _arquivos(destino):
             parar_se_pedirem(deve_parar)
@@ -483,6 +485,12 @@ def extrair(destino: str, alvo: str, recorte: Recorte | None = None,
                 "empresa": arquivo.get("empresa") or "",
                 "competencia": (arquivo.get("inicio") or "")[:7],
             }
+            # contado ANTES do recorte: "este registro existe na quebra?" é
+            # pergunta sobre o índice, não sobre o filtro. Contando depois, um
+            # CNPJ que não casa com nada devolveria "registro não indexado" em
+            # vez da lista vazia que o recorte pede.
+            if isinstance(resolvido, str) and indice.posicoes.get(resolvido):
+                arquivos_com_o_alvo += 1
             if not recorte.aceita_arquivo(indice.cabecalho.cnpj,
                                           indice.cabecalho.inicio, indice.cabecalho.fim):
                 fora_do_recorte += 1
@@ -491,6 +499,17 @@ def extrair(destino: str, alvo: str, recorte: Recorte | None = None,
                 _do_registro(caminho_do_sped, indice, resolvido, origem, acrescentar)
             else:
                 _da_hierarquia(caminho_do_sped, indice, resolvido, origem, acrescentar)
+
+        # Registro que nenhum índice guardou não pode virar planilha vazia: a
+        # contagem da tela vê todo registro do arquivo, mas o índice só guarda
+        # os de ALVOS_PADRAO, e a tela acaba oferecendo alvo que não se extrai
+        # (foi o caso do C501 e do C505). Planilha com só o cabeçalho é pior que
+        # erro — quem recebe lê como "não existe no SPED".
+        if isinstance(resolvido, str) and lidos and not arquivos_com_o_alvo:
+            raise AlvoDesconhecido(
+                f"O registro {resolvido} não foi indexado nesta quebra, então não "
+                f"há o que extrair. Rode a quebra de novo para indexá-lo."
+            )
         # o deduplicado só pode sair no fim: a última ocorrência é a que vale,
         # e ela pode estar no último arquivo
         for linha in unicas.values():
@@ -528,19 +547,29 @@ def impressao_do_recorte(recorte: Recorte) -> str:
 
 def _do_registro(caminho: str, indice: IndiceDoArquivo, registro: str,
                  origem: dict[str, str], acrescentar) -> None:
-    """Pelo índice: só as linhas daquele registro, por `seek`."""
+    """Pelo índice: só as linhas daquele registro, por `seek`.
+
+    Arquivo que não tem o registro é pulado, não derruba a extração: o C500 só
+    aparece em alguns meses, e a planilha tem de sair com o que existe.
+
+    O `for` fica **dentro** do `try` de propósito. `registros()` é um gerador —
+    chamá-lo não executa nada, e o `RegistroNaoIndexado` só é levantado no
+    primeiro `next()`, isto é, no `for`. Com o `try` só em volta da chamada, a
+    proteção nunca pegava e a extração do C500 morria com 500.
+    """
     try:
-        linhas = registros(caminho, indice, registro)
+        for valores in registros(caminho, indice, registro):
+            linha = dict(origem)
+            # os nomes são os **desta linha**: o M210 ganhou três campos em 2019,
+            # e um arquivo antigo lido com o leiaute novo põe a alíquota na coluna
+            # do ajuste de base — dois números de duas casas, e o erro não aparece
+            for i, campo in enumerate(campos_de(registro, len(valores))):
+                linha[campo] = valores[i] if i < len(valores) else ""
+            acrescentar(linha)
     except RegistroNaoIndexado:
+        log.info("registro ausente neste arquivo, pulado",
+                 extra={"arquivo": os.path.basename(caminho), "registro": registro})
         return
-    for valores in linhas:
-        linha = dict(origem)
-        # os nomes são os **desta linha**: o M210 ganhou três campos em 2019, e
-        # um arquivo antigo lido com o leiaute novo põe a alíquota na coluna do
-        # ajuste de base — dois números de duas casas, e o erro não aparece
-        for i, campo in enumerate(campos_de(registro, len(valores))):
-            linha[campo] = valores[i] if i < len(valores) else ""
-        acrescentar(linha)
 
 
 def _da_hierarquia(caminho: str, indice: IndiceDoArquivo, h: Hierarquia,

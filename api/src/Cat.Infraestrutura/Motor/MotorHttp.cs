@@ -187,16 +187,23 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
         var r = pedido.Recorte;
         var json = await Chamar("interno/quebra/extrair", JsonContent.Create(new Dictionary<string, object?>
         {
-            ["execucao_id"] = execucaoId, ["alvo"] = pedido.Alvo,
-            ["alvos"] = pedido.Alvos ?? [], ["formato"] = pedido.Formato,
-            ["cnpjs"] = r.Cnpjs, ["de"] = r.De, ["ate"] = r.Ate,
-            ["cst_pis"] = r.CstPis, ["cst_cofins"] = r.CstCofins,
-            ["cfop"] = r.Cfop, ["cod_item"] = r.CodItem, ["cod_nat"] = r.CodNat,
-            ["num_doc"] = r.NumDoc, ["ind_aj"] = r.IndAj, ["cod_aj"] = r.CodAj,
-            ["ind_oper"] = r.IndOper, ["descricao"] = r.Descricao,
-            ["doc_de"] = r.DocDe, ["doc_ate"] = r.DocAte,
-            ["vl_pis_min"] = r.VlPisMin, ["vl_pis_max"] = r.VlPisMax,
-            ["vl_item_min"] = r.VlItemMin, ["vl_item_max"] = r.VlItemMax,
+            // nada vai como null: o modelo do motor tem default para campo
+            // ausente, mas o Pydantic recusa `null` explícito num campo tipado
+            // `str` ou `list`. O `Alvo` é null justamente no pedido em lote — a
+            // tela manda `alvos` e omite `alvo` —, e o 422 que voltava chegava
+            // ao usuário como "o motor não respondeu". O tipo é `string` não
+            // anulável, mas isso é só de compilação: o corpo JSON sem o campo
+            // liga null em tempo de execução.
+            ["execucao_id"] = execucaoId, ["alvo"] = pedido.Alvo ?? "",
+            ["alvos"] = pedido.Alvos ?? [], ["formato"] = pedido.Formato ?? "xlsx",
+            ["cnpjs"] = r.Cnpjs ?? [], ["de"] = r.De ?? "", ["ate"] = r.Ate ?? "",
+            ["cst_pis"] = r.CstPis ?? [], ["cst_cofins"] = r.CstCofins ?? [],
+            ["cfop"] = r.Cfop ?? [], ["cod_item"] = r.CodItem ?? [], ["cod_nat"] = r.CodNat ?? [],
+            ["num_doc"] = r.NumDoc ?? [], ["ind_aj"] = r.IndAj ?? [], ["cod_aj"] = r.CodAj ?? [],
+            ["ind_oper"] = r.IndOper ?? "", ["descricao"] = r.Descricao ?? [],
+            ["doc_de"] = r.DocDe ?? "", ["doc_ate"] = r.DocAte ?? "",
+            ["vl_pis_min"] = r.VlPisMin ?? "", ["vl_pis_max"] = r.VlPisMax ?? "",
+            ["vl_item_min"] = r.VlItemMin ?? "", ["vl_item_max"] = r.VlItemMax ?? "",
         }), PrazoPlanilha, cancelar);
         return new PlanilhaPronta(json.GetProperty("caminho").GetString()!,
             json.GetProperty("nome").GetString()!, json.GetProperty("tipo").GetString()!);
@@ -332,13 +339,36 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
         }
     }
 
+    /// <summary>O motivo da recusa, em texto, venha ele como string ou como lista.</summary>
+    /// <remarks>
+    /// O motor recusa de dois jeitos. O nosso é `detail` em string ("Planilha
+    /// desconhecida."). O do FastAPI, quando o corpo não valida, é `detail` em
+    /// **lista** de erros — um por campo. Lendo só a string, todo 422 de
+    /// validação caía no `MotorIndisponivel` e chegava à tela como "o motor não
+    /// respondeu", que manda procurar o motor no ar quando o problema é o que
+    /// a API mandou.
+    /// </remarks>
     private static string? Detalhe(string texto)
     {
         try
         {
-            return JsonDocument.Parse(texto).RootElement.TryGetProperty("detail", out var d) && d.ValueKind == JsonValueKind.String
-                ? d.GetString()
-                : null;
+            if (!JsonDocument.Parse(texto).RootElement.TryGetProperty("detail", out var d))
+                return null;
+            if (d.ValueKind == JsonValueKind.String)
+                return d.GetString();
+            if (d.ValueKind != JsonValueKind.Array)
+                return null;
+
+            var partes = d.EnumerateArray().Select(e =>
+            {
+                var campo = e.TryGetProperty("loc", out var loc) && loc.ValueKind == JsonValueKind.Array
+                    ? string.Join(".", loc.EnumerateArray().Select(p => p.ToString()).Where(p => p != "body"))
+                    : "";
+                var msg = e.TryGetProperty("msg", out var m) ? m.GetString() : null;
+                return string.IsNullOrEmpty(campo) ? msg : $"{campo}: {msg}";
+            }).Where(p => !string.IsNullOrWhiteSpace(p)).Take(5).ToList();
+
+            return partes.Count == 0 ? null : string.Join("; ", partes);
         }
         catch (JsonException)
         {
