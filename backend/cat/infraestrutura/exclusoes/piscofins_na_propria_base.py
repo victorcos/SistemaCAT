@@ -9,6 +9,15 @@ R$ 76,00, a base nova é R$ 907,50 para os dois — não R$ 983,50 para o PIS e
 R$ 924,00 para a COFINS. É a leitura mais comum da tese, e a que o escritório
 pede. E vale **só no débito**: o crédito das aquisições fica como está.
 
+**"Só no débito" não quer dizer "só a saída", e isso custou duas pontas.** Até
+01/10/2026 o filtro era `operacao == SAIDA`, e ele errava nos dois sentidos:
+deixava entrar remessa, bonificação e baixa de estoque — que são saída e não são
+receita — e deixava de fora a **devolução de venda**, que é entrada e é estorno
+de receita tributada. Quem apontou foi o relatório 680 do MA, da mesma
+metodologia: R$ 215.706,22 de base a mais de um lado, R$ 723.198,32 a menos do
+outro. Agora o filtro é o CFOP, o mesmo das outras três teses
+(`tab_cfop_receita`).
+
 **De onde vêm os números.** Do mesmo `ApuracaoEFD` que a Gestão monta — uma
 passada pelo arquivo serve às duas, e qualquer correção na leitura vale para as
 duas de uma vez. Quem entrega os agregados a esta função é a etapa; hoje a
@@ -43,11 +52,16 @@ from dataclasses import dataclass, field
 
 from cat.infraestrutura.gestao.modelos import VL_BC, VL_TRIB, ApuracaoEFD
 from cat.infraestrutura.gestao.numeros import arredondar_div
+from cat.infraestrutura.sped.tabelas.tab_cfop_receita import (
+    FATURAMENTO,
+    classificacao_do_cfop,
+)
 from cat.log import obter_log
 
 log = obter_log(__name__)
 
-# a operação que interessa: a tese é do débito
+# a operação que interessa: a tese é do débito. **Não basta**, e isso só se viu
+# em 01/10/2026 — ver `_entra`, logo abaixo
 SAIDA = "S"
 
 # CST de receita com contribuição calculada sobre o valor
@@ -265,6 +279,23 @@ class Exclusao:
         return dict(sorted(total.items()))
 
 
+def _natureza(cfop: str, operacao: str) -> str:
+    """É receita? O CFOP responde quando há CFOP; o sentido, quando não há.
+
+    **O A170 e o F100 não têm CFOP** — a nota de serviço e os demais documentos
+    geradores de contribuição não o pedem no leiaute. Perguntar o CFOP deles
+    devolveria vazio e os derrubaria: são R$ 10,28 milhões de base na DMINAS, e
+    foi exatamente o que aconteceu na primeira versão desta regra.
+
+    O MA resolve do mesmo jeito, e deixa à vista: na coluna "CFOP" dessas
+    linhas ele escreve **"S"** — o sentido da operação, não um CFOP — e
+    classifica como faturamento.
+    """
+    if (cfop or "").strip():
+        return classificacao_do_cfop(cfop)
+    return FATURAMENTO if operacao == SAIDA else ""
+
+
 def calcular(apuracoes: list[ApuracaoEFD]) -> Exclusao:
     """A exclusão de um trabalho inteiro, a partir das apurações em cache.
 
@@ -281,8 +312,9 @@ def calcular(apuracoes: list[ApuracaoEFD]) -> Exclusao:
 
         for chave, somas in ap.documentos.items():
             tributo, registro, operacao, cst, cfop, _nat, _aliq = chave
-            if operacao != SAIDA:
-                fora["aquisição: a tese é do débito"] += 1
+            natureza = _natureza(cfop, operacao)
+            if not natureza:
+                fora["CFOP fora da receita: não é venda nem devolução de venda"] += 1
                 continue
 
             # a contribuição vem antes do CST de propósito: numa base real, a
@@ -293,15 +325,23 @@ def calcular(apuracoes: list[ApuracaoEFD]) -> Exclusao:
             if valor <= 0:
                 fora["grupo sem contribuição apurada"] += 1
                 continue
-            if cst == CST_POR_UNIDADE:
-                fora["alíquota em reais: a contribuição não vem da receita"] += 1
-                continue
-            if cst in CST_SEM_INCIDENCIA:
-                fora["receita sem contribuição: não há o que excluir"] += 1
-                continue
-            if cst not in CST_COM_INCIDENCIA:
-                fora[f"CST fora da tese, com contribuição apurada: {cst or 'em branco'}"] += 1
-                continue
+
+            # **a devolução de venda entra com o CST que ela tiver.** Ela se
+            # escritura com CST de crédito — 50, 73, 98, 99 nas 8.822 linhas do
+            # relatório 680 do MA —, porque é estorno de uma venda que já foi
+            # tributada, e não uma aquisição. Exigir CST de receita aqui era o
+            # que a deixava de fora
+            if natureza == FATURAMENTO:
+                if cst == CST_POR_UNIDADE:
+                    fora["alíquota em reais: a contribuição não vem da receita"] += 1
+                    continue
+                if cst in CST_SEM_INCIDENCIA:
+                    fora["receita sem contribuição: não há o que excluir"] += 1
+                    continue
+                if cst not in CST_COM_INCIDENCIA:
+                    fora[f"CST fora da tese, com contribuição apurada: "
+                         f"{cst or 'em branco'}"] += 1
+                    continue
 
             grupo = Grupo(ap.cnpj, ap.periodo, familia(registro), cst, cfop)
             alvo = resultado.grupos.setdefault(grupo, Apurado())

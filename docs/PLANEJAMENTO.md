@@ -177,6 +177,12 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] **Mapa de valores** (`tools/mapear_valores.py`): total por tese e por
       competência, o nosso contra o do arquivo base. Serve também sem gabarito,
       como retrato de cliente novo (v0.118.0)
+- [x] A tese das contribuições corrigida pela Selic e com o filtro de receita
+      das outras três: base e exclusão batem ao centavo com o 680 do MA. Sobram
+      0,06% do arredondamento por grupo, que é escolha de 24/09 (v0.122.0)
+- [ ] Conferidor linha a linha do **680**, como os outros quatro têm. Precisa
+      agregar o gabarito por grupo antes de comparar: ele é por item e a tese
+      arredonda por grupo
 - [ ] Varrer as outras etapas atrás do mesmo buraco de conferência: tese
       conferida sozinha e costura nunca exercitada. O `serializar` que faltava
       nos módulos novos passou por 60 testes de exclusão e caiu na tela do

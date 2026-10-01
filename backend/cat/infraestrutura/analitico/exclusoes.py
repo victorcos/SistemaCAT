@@ -41,7 +41,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -57,6 +57,8 @@ from cat.infraestrutura.analitico import (
     exclusao_do_iss,
 )
 from cat.infraestrutura.analitico.escrita import LeituraCancelada
+from cat.infraestrutura.sped.tabelas import tab_selic
+from cat.infraestrutura.sped.tabelas.tab_selic import SelicDesconhecida
 from cat.infraestrutura.exclusoes.piscofins_na_propria_base import calcular
 from cat.infraestrutura.gestao.agregador import agregar_efd
 from cat.infraestrutura.gestao.agregados import gravar as gravar_agregados
@@ -102,8 +104,7 @@ ESQUEMA = pa.schema([
 CEM = Decimal(100)
 DUAS_CASAS = Decimal("0.01")
 
-# o que se grava na coluna de correção de quem não corrige
-SEM_CORRECAO = Decimal(0)
+UM = Decimal(1)
 
 # as quatro leituras que a etapa faz, na ordem. A primeira é a tese da receita
 # (que pode sair do agregado); as três seguintes são as exclusões por item, e
@@ -145,7 +146,15 @@ class Resumo:
     excluido: int = 0
     diferenca_pis: int = 0
     diferenca_cofins: int = 0
-    # o que cinco anos já levaram: mostrado, nunca somado ao crédito
+    # a Selic sobre o que volta, e o total com ela. **Em 01/10/2026 esta tese
+    # não corrigia**: eram R$ 755.828,97 que o relatório do MA mostrava e o
+    # nosso não. Ver DECISOES daquele dia
+    selic: int = 0
+    # o mês da restituição até onde a Selic acumulou, em "aaaa-mm". Número
+    # corrigido sem a data da correção não se reconfere no mês seguinte
+    ate: str = ""
+    # o que cinco anos já levaram: mostrado, nunca somado ao crédito. **Já
+    # corrigido**, como nas outras três — meio corrigido seria incoerente
     prescrito: int = 0
     competencias_prescritas: int = 0
     data_de_referencia: str = ""
@@ -165,8 +174,13 @@ class Resumo:
 
     @property
     def diferenca(self) -> int:
-        """O crédito: só o que ainda está no prazo."""
+        """O principal que volta: só o que ainda está no prazo, sem a Selic."""
         return self.diferenca_pis + self.diferenca_cofins
+
+    @property
+    def total_atualizado(self) -> int:
+        """O que se pede: o principal no prazo, corrigido pela Selic."""
+        return self.diferenca + self.selic
 
 
 def serializar(r: Resumo) -> dict:
@@ -176,7 +190,10 @@ def serializar(r: Resumo) -> dict:
         "base": str(reais(r.base)), "excluido": str(reais(r.excluido)),
         "diferenca_pis": str(reais(r.diferenca_pis)),
         "diferenca_cofins": str(reais(r.diferenca_cofins)),
-        "diferenca": str(reais(r.diferenca)), "competencias": r.competencias,
+        "diferenca": str(reais(r.diferenca)),
+        "selic": str(reais(r.selic)),
+        "total_atualizado": str(reais(r.total_atualizado)),
+        "ate": r.ate, "competencias": r.competencias,
         "prescrito": str(reais(r.prescrito)),
         "competencias_prescritas": r.competencias_prescritas,
         "data_de_referencia": r.data_de_referencia,
@@ -223,14 +240,23 @@ def apurar(contribuicoes: list[str], destino: str, agregados_de: str | None = No
     resumo.excluido = exclusao.resumo.excluido
     resumo.competencias = exclusao.resumo.periodos
     resumo.competencias_prescritas = len(prescritas)
+
+    # a série vem do banco e serve às quatro teses. Buscá-la aqui, e não dentro
+    # de cada uma, é o que garante que as quatro corrijam pelo mesmo número
+    resumo.ate = ate or exclusao_do_icms.mes_de(referencia)
+    mensal = selic.serie(resumo.ate)
+    acumuladas, por_grupo, por_periodo = _corrigir(exclusao, mensal, resumo.ate, resumo)
+
     # o crédito soma só o que está no prazo; o resto vai à parte, e a tela o
     # mostra em vermelho. Somar os dois daria um número que ninguém pode pedir
     for competencia, total in exclusao.por_periodo().items():
+        selic_pis, selic_cofins = por_periodo.get(competencia, (0, 0))
         if competencia in prescritas:
-            resumo.prescrito += total.diferenca
+            resumo.prescrito += total.diferenca + selic_pis + selic_cofins
         else:
             resumo.diferenca_pis += total.diferenca_pis
             resumo.diferenca_cofins += total.diferenca_cofins
+            resumo.selic += selic_pis + selic_cofins
 
     resumo.por_competencia = [
         {"competencia": competencia, "grupos": total.grupos,
@@ -241,16 +267,21 @@ def apurar(contribuicoes: list[str], destino: str, agregados_de: str | None = No
          "cofins_novo": str(reais(total.cofins_novo)),
          "diferenca_pis": str(reais(total.diferenca_pis)),
          "diferenca_cofins": str(reais(total.diferenca_cofins)),
-         "diferenca": str(reais(total.diferenca))}
+         "diferenca": str(reais(total.diferenca)),
+         "selic_acumulada": str(acumuladas.get(competencia, "")),
+         "selic": str(reais(sum(por_periodo.get(competencia, (0, 0))))),
+         "total_atualizado": str(reais(
+             total.diferenca + sum(por_periodo.get(competencia, (0, 0)))))}
         for competencia, total in exclusao.por_periodo().items()
     ]
     resumo.fora = exclusao.resumo.fora
     resumo.avisos.extend(exclusao.resumo.avisos)
 
     por_item = _apurar_por_item(contribuicoes, destino, resumo, avisar, deve_parar,
-                                referencia, ate)
+                                referencia, resumo.ate, mensal)
 
-    _gravar(exclusao, os.path.join(destino, ARQUIVO_DAS_EXCLUSOES), prescritas, por_item)
+    _gravar(exclusao, os.path.join(destino, ARQUIVO_DAS_EXCLUSOES), prescritas,
+            por_item, por_grupo)
     if avisar is not None:
         avisar(Andamento(arquivos=resumo.arquivos, grupos=resumo.grupos))
 
@@ -259,10 +290,57 @@ def apurar(contribuicoes: list[str], destino: str, agregados_de: str | None = No
     return resumo
 
 
+def _corrigir(exclusao, mensal: dict[str, Decimal], ate: str, resumo: Resumo):
+    """A Selic sobre o que volta, **uma vez por grupo** — como a tese arredonda.
+
+    Até 01/10/2026 esta tese não corrigia nada. O relatório 680 do MA, da mesma
+    metodologia, trazia R$ 755.828,97 de Selic que o nosso não mostrava: o
+    principal batia em 0,3% e faltava uma parcela inteira. Era lacuna tratada
+    como característica — eu havia escrito no código que "esta tese não
+    corrige", e o que o dado dizia é que ela precisava corrigir.
+
+    **Por grupo, e não por competência**, porque é no grupo que esta tese
+    arredonda (ver DECISOES de 24/09/2026): corrigir a soma da competência
+    daria outro centavo, e os dois arredondamentos têm de morar no mesmo lugar.
+
+    Série que não alcança o mês vira aviso e correção nenhuma — o principal
+    continua valendo, e some só a parcela que não se sabe calcular.
+    """
+    acumuladas: dict[str, Decimal] = {}
+    por_grupo: dict[object, tuple[int, int]] = {}
+    por_periodo: dict[str, tuple[int, int]] = {}
+
+    for grupo, a in exclusao.grupos.items():
+        if not a.consistente:
+            continue
+        competencia = grupo.periodo
+        if competencia not in acumuladas:
+            try:
+                acumuladas[competencia] = tab_selic.acumulada(competencia, ate, mensal)
+            except SelicDesconhecida as erro:
+                resumo.avisos.append(
+                    f"As contribuições fora da base não foram corrigidas: {erro}")
+                return {}, {}, {}
+        acumulada = acumuladas[competencia]
+        pis = _selic_em_centavos(a.diferenca_pis, acumulada)
+        cofins = _selic_em_centavos(a.diferenca_cofins, acumulada)
+        por_grupo[grupo] = (pis, cofins)
+        antes = por_periodo.get(competencia, (0, 0))
+        por_periodo[competencia] = (antes[0] + pis, antes[1] + cofins)
+
+    return acumuladas, por_grupo, por_periodo
+
+
+def _selic_em_centavos(valor: int, acumulada: Decimal) -> int:
+    """A Selic sobre um valor em centavos. Esta tese anda em inteiro, não em reais."""
+    return int((Decimal(valor) * acumulada / CEM).quantize(UM, rounding=ROUND_HALF_UP))
+
+
 def _apurar_por_item(contribuicoes: list[str], destino: str, resumo: Resumo,
                      avisar: Callable[[Andamento], None] | None,
                      deve_parar: Callable[[], bool] | None,
-                     referencia: date | None, ate: str) -> dict:
+                     referencia: date | None, ate: str,
+                     mensal: dict[str, Decimal]) -> dict:
     """As três exclusões por item: o ICMS, o ICMS-ST e o ISS.
 
     **Leem os SPED mesmo havendo agregado**, porque não há como não ler: a conta
@@ -279,10 +357,9 @@ def _apurar_por_item(contribuicoes: list[str], destino: str, resumo: Resumo,
             "agregado não tem item.")
         return {}
 
-    # a série vem do banco, que a guarda para sempre e só vai ao Banco Central
-    # pelos meses que ainda faltam. Ver `infraestrutura/selic`
-    mes = ate or exclusao_do_icms.mes_de(referencia or date.today())
-    mensal = selic.serie(mes)
+    # a série já veio pronta de `apurar`, que a usou também na tese da receita:
+    # as quatro teses corrigem pelo mesmo número ou não corrigem nenhuma
+    mes = ate
 
     # e se confere **antes** de ler, não no meio: uma série curta faria três
     # leituras inteiras para morrer no fim, e a tese da receita cairia junto
@@ -385,7 +462,8 @@ def _ler_os_sped(contribuicoes: list[str], destino: str, resumo: Resumo,
     return lidos
 
 
-def _gravar(exclusao, caminho: str, prescritas: set[str], por_item=None) -> None:
+def _gravar(exclusao, caminho: str, prescritas: set[str], por_item=None,
+            por_grupo=None) -> None:
     """Uma linha por grupo, das quatro teses. O parquet nasce mesmo sem nenhuma.
 
     Etapa que termina sem arquivo é etapa que a seguinte não distingue de etapa
@@ -412,10 +490,10 @@ def _gravar(exclusao, caminho: str, prescritas: set[str], por_item=None) -> None
         colunas["cofins_novo"].append(reais(a.cofins_novo))
         colunas["diferenca_pis"].append(reais(a.diferenca_pis))
         colunas["diferenca_cofins"].append(reais(a.diferenca_cofins))
-        # a tese das contribuições não corrige por Selic: o zero aqui é a
-        # ausência de correção, e não juros que deram zero
-        colunas["selic"].append(SEM_CORRECAO)
-        colunas["total_atualizado"].append(SEM_CORRECAO)
+        selic_pis, selic_cofins = (por_grupo or {}).get(grupo, (0, 0))
+        colunas["selic"].append(reais(selic_pis + selic_cofins))
+        colunas["total_atualizado"].append(
+            reais(a.diferenca_pis + a.diferenca_cofins + selic_pis + selic_cofins))
 
     for tese, resultado in (por_item or {}).items():
         _somar_por_item(colunas, tese, resultado)

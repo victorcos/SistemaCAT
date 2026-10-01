@@ -111,12 +111,55 @@ class TestOArredondamento:
         assert a.pis == 3_300
 
 
-class TestOQueFicaDeFora:
-    def test_aquisicao_nao_entra_porque_a_tese_e_do_debito(self):
+class TestOQueEReceita:
+    """O filtro é o CFOP, e não o sentido da operação.
+
+    Até 01/10/2026 era `operacao == SAIDA`, e errava nos dois sentidos. O
+    relatório 680 do MA, da mesma metodologia, mostrou as duas pontas.
+    """
+
+    def test_aquisicao_nao_entra(self):
+        """Compra para revenda não é receita — e nunca foi."""
         r = calcular([_apuracao(_venda(operacao="E", cfop="1102"))])
 
         assert r.grupos == {}
-        assert "aquisição: a tese é do débito" in r.resumo.fora
+        assert "CFOP fora da receita: não é venda nem devolução de venda" in r.resumo.fora
+
+    def test_devolucao_de_venda_entra_apesar_de_ser_entrada(self):
+        """É estorno de uma venda tributada, não uma aquisição.
+
+        Ficava de fora pelo filtro antigo, e são R$ 723.198,32 de base na
+        DMINAS — CFOP 1411, 1202 e 2411.
+        """
+        r = calcular([_apuracao(_venda(operacao="E", cfop="1411", cst="50"))])
+
+        assert len(r.grupos) == 1
+
+    def test_devolucao_entra_com_o_cst_que_tiver(self):
+        """Ela se escritura com CST de crédito: 50, 73, 98 e 99 no 680."""
+        for cst in ("50", "73", "98", "99"):
+            r = calcular([_apuracao(_venda(operacao="E", cfop="1411", cst=cst))])
+
+            assert len(r.grupos) == 1, f"CST {cst} ficou de fora"
+
+    def test_remessa_e_bonificacao_nao_entram_mesmo_sendo_saida(self):
+        """Saída sem receita: remessa, bonificação, baixa de estoque.
+
+        Entravam pelo filtro antigo, e eram R$ 215.706,22 de base a mais.
+        """
+        for cfop in ("5924", "5927", "5901", "6901", "5910"):
+            r = calcular([_apuracao(_venda(cfop=cfop))])
+
+            assert r.grupos == {}, f"CFOP {cfop} entrou, e não é receita"
+
+    def test_o_cst_de_credito_so_vale_na_devolucao(self):
+        """Numa venda, CST 50 continua fora: ali ele não faz sentido."""
+        r = calcular([_apuracao(_venda(cfop="5102", cst="50"))])
+
+        assert r.grupos == {}
+
+
+class TestOQueFicaDeFora:
 
     def test_aliquota_em_reais_nao_entra(self):
         """CST 03: a contribuição vem da quantidade, não da receita."""
@@ -247,3 +290,29 @@ class TestOParDeRegistrosDaMesmaReceita:
         r = calcular([_apuracao(documentos)])
 
         assert len(r.grupos) == 2
+
+
+class TestORegistroSemCfop:
+    """A nota de serviço e os demais documentos não têm CFOP no leiaute.
+
+    Perguntar o CFOP deles devolve vazio, e a primeira versão do filtro por
+    CFOP os derrubou: R$ 10,28 milhões de base na DMINAS, que é o A170 mais o
+    F100. O MA deixa a solução à vista — escreve "S" na coluna do CFOP dessas
+    linhas e classifica como faturamento.
+    """
+
+    def test_nota_de_servico_entra_pelo_sentido_da_operacao(self):
+        r = calcular([_apuracao(_venda(registro="A170", cfop=""))])
+
+        assert len(r.grupos) == 1
+
+    def test_demais_documentos_entram_pelo_sentido(self):
+        r = calcular([_apuracao(_venda(registro="F100", cfop=""))])
+
+        assert len(r.grupos) == 1
+
+    def test_sem_cfop_a_entrada_continua_fora(self):
+        """Sem CFOP o sentido decide, e entrada não é receita."""
+        r = calcular([_apuracao(_venda(registro="F100", cfop="", operacao="E"))])
+
+        assert r.grupos == {}

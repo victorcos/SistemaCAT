@@ -85,21 +85,18 @@ from decimal import Decimal, ROUND_HALF_UP
 from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido, ler_cabecalho
 from cat.infraestrutura.sped.leitor import BUFFER_DE_REDE, campos, registro_de
 from cat.infraestrutura.sped.registros import nomes_dos_campos
-from cat.infraestrutura.sped.tabelas import (
-    tab_cfop_natureza_credito,
-    tab_cfop_natureza_operacao,
-    tab_selic,
+from cat.infraestrutura.sped.tabelas import tab_selic
+# a classificação de receita mora em `tab_cfop_receita` desde 01/10/2026, quando
+# a tese das contribuições passou a usá-la. Fica reexportada aqui porque nasceu
+# neste módulo e o conferidor do 903 a importa daqui
+from cat.infraestrutura.sped.tabelas.tab_cfop_receita import (
+    DEVOLUCAO_DE_FATURAMENTO,
+    FATURAMENTO,
+    classificacao_do_cfop,
 )
 from cat.log import obter_log
 
 log = obter_log(__name__)
-
-# como o MA classifica a operação na coluna "CFOP Faturamento"
-FATURAMENTO = "Faturamento"
-DEVOLUCAO_DE_FATURAMENTO = "Devolução Faturamento"
-
-# a natureza 12 da 4.3.7: devolução de vendas
-_DEVOLUCAO_DE_VENDA = "12"
 
 _DE_INTERESSE = {b"0000", b"C010", b"C100", b"C170"}
 
@@ -131,19 +128,6 @@ def _dia(bruto: str) -> str:
         return date(int(b[4:]), int(b[2:4]), int(b[:2])).strftime("%d/%m/%Y")
     except ValueError:
         return b
-
-
-def classificacao_do_cfop(cfop: str) -> str:
-    """"Faturamento", "Devolução Faturamento", ou vazio para o que não é nem um.
-
-    Vazio significa fora do relatório: o Tema 69 é sobre a **receita**, e o que
-    não é venda nem devolução de venda não compõe receita.
-    """
-    if tab_cfop_natureza_operacao.natureza(cfop, "") == tab_cfop_natureza_operacao.VENDA:
-        return FATURAMENTO
-    if tab_cfop_natureza_credito.codigo(cfop) == _DEVOLUCAO_DE_VENDA:
-        return DEVOLUCAO_DE_FATURAMENTO
-    return ""
 
 
 @dataclass

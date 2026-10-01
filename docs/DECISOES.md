@@ -5,6 +5,85 @@
 
 ---
 
+## 2026-10-01 — O 680 existia, e a tese 1 tinha duas lacunas de dinheiro
+
+**A pergunta do Victor:** "não encontrou nada de PIS/COFINS da própria base?"
+
+Eu havia respondido, no dia anterior, que **o MA não produz esse relatório** —
+conclusão tirada da ausência do arquivo na pasta do cliente. Ele produz: é o
+**680 — Metodologia 01 — Todos Registros — Por Documento e Itens**, 1,17 GB,
+3.568.362 linhas. Conclusão tirada de ausência é palpite com cara de fato, e
+esta base já havia ensinado isso duas vezes.
+
+**A metodologia é a nossa, e o próprio nome diz que há outras.** O MA numera:
+"Metodologia 01". Medido nas 3.568.362 linhas, a base do PIS e a da COFINS
+depois da exclusão são **iguais em 100%** — é a leitura escolhida em
+24/09/2026, a base de cada uma perdendo as duas. A leitura conservadora seria
+outra metodologia, com outro número.
+
+### A primeira lacuna: não corrigíamos pela Selic
+
+O 680 trazia R$ 755.828,97 de Selic que o nosso relatório não mostrava. Pior: eu
+havia **escrito no código** que "esta tese não corrige por Selic", ao
+acrescentar as colunas de correção ao parquet agregado. Tratei como
+característica o que era lacuna — e a frase no código fazia a lacuna parecer
+decidida.
+
+A correção é aplicada **uma vez por grupo**, que é onde esta tese arredonda
+desde 24/09. Corrigir a soma da competência daria outro centavo, e os dois
+arredondamentos têm de morar no mesmo lugar.
+
+### A segunda: "só no débito" não quer dizer "só a saída"
+
+O filtro era `operacao == SAIDA`, e errava nos **dois** sentidos:
+
+* deixava entrar **remessa, bonificação e baixa de estoque** (CFOP 5924, 5927,
+  5901, 6901, 5910) — são saída e não são receita: R$ 215.706,22 de base a mais;
+* deixava de fora a **devolução de venda** (1411, 1202, 2411) — é entrada, mas é
+  estorno de receita tributada, não aquisição: R$ 723.198,32 de base a menos.
+
+A decisão de 24/09 dizia "o crédito das **aquisições** fica como está", e o
+código lia isso como "toda entrada fica de fora". Devolução de venda não é
+aquisição.
+
+**A devolução entra com o CST que tiver.** Ela se escritura com CST de crédito —
+50, 73, 98 e 99 nas 8.822 linhas do 680 —, e exigir CST de receita era o que a
+derrubava mesmo depois de corrigir o filtro de CFOP.
+
+### E o registro que não tem CFOP
+
+A primeira versão do filtro por CFOP derrubou o **A170 e o F100**: eles não têm
+CFOP no leiaute, e a classificação devolvia vazio. Eram R$ 10,28 milhões de
+base — um erro maior que os dois que a mudança vinha consertar.
+
+O MA deixa a solução à vista: na coluna "CFOP" dessas linhas ele escreve **"S"**
+— o sentido da operação, não um CFOP — e classifica como faturamento. Então a
+regra é: **o CFOP responde quando há CFOP; o sentido, quando não há.**
+
+### O resultado
+
+Base e exclusão passaram a bater **ao centavo** com o 680:
+
+| | nosso | 680 |
+|---|---|---|
+| base escriturada | 228.466.346,24 | 228.466.346,24 |
+| excluído da base | 21.114.397,76 | 21.114.397,76 |
+| total | 2.708.188,08 | 2.709.812,46 |
+
+Os R$ 1.624,38 que sobram (0,06%) são a divergência **escolhida** em 24/09: o MA
+arredonda linha a linha nas 3,5 milhões de linhas; nós arredondamos uma vez por
+grupo, nos 433, com a alíquota efetiva de cada um. Aparece nas colunas: o nosso
+PIS é R$ 36,8 mil menor e a COFINS R$ 168,6 mil maior, e os dois se compensam.
+
+### A classificação de receita mudou de casa
+
+`classificacao_do_cfop` morava dentro de `sped/exclusao_do_icms.py`, de onde
+nasceu. Agora serve às **quatro** teses, e foi para
+`sped/tabelas/tab_cfop_receita.py`: tese nenhuma deve importar regra fiscal do
+módulo de outra, e regra que serve a quatro não é de uma.
+
+---
+
 ## 2026-10-01 — Sessenta testes de exclusão, e nenhum rodava a etapa
 
 **O defeito.** `exclusao_do_icms_st` e `exclusao_do_iss` não reexportavam
