@@ -65,12 +65,38 @@ function extensaoDe(nome: string): string {
 }
 
 /**
+ * Quanto tempo o seletor precisa ficar aberto para a recusa ser do usuário.
+ *
+ * Ninguém abre uma janela do sistema, lê o nome do arquivo e desiste em menos
+ * de um décimo de segundo. `AbortError` imediato não é alguém cancelando: é o
+ * seletor que **não chegou a aparecer**.
+ */
+const DEPRESSA_DEMAIS_PARA_SER_DESISTENCIA_MS = 150;
+
+/**
  * Abre o seletor de "salvar como".
  *
  * **Tem de ser chamado antes de qualquer `await`** a partir do clique. O
  * navegador só abre o seletor enquanto a ativação do gesto do usuário está
  * válida, e ela não sobrevive a uma ida à rede. Buscar primeiro e perguntar
  * depois faz o seletor ser recusado.
+ *
+ * ## Por que o relógio
+ *
+ * O seletor avisa das duas coisas do mesmo jeito — `AbortError` tanto para
+ * "desisti" quanto para "não consegui abrir". Tratar os dois como desistência
+ * custou um download que **não baixava e não dizia nada**: nenhuma requisição
+ * saía do navegador, nenhum arquivo aparecia no disco, nenhum erro na tela.
+ * Relatado em 01/10/2026, na tela de exclusões, e levou meia hora de
+ * investigação para provar que o clique morria aqui.
+ *
+ * Então mede-se. Abortou depressa demais para alguém ter lido a janela? O
+ * seletor não apareceu, e vale o caminho antigo — que entrega o arquivo na
+ * pasta de downloads e sempre funciona. Demorou o bastante? Foi decisão de
+ * quem clicou, e aí silêncio é a resposta certa.
+ *
+ * Errar a favor do download é de propósito: baixar para a pasta errada é um
+ * aborrecimento, não baixar nada é um defeito.
  */
 export async function escolherOndeSalvar(nomeSugerido: string): Promise<Destino> {
   const seletor = (window as ComSeletor).showSaveFilePicker;
@@ -78,6 +104,7 @@ export async function escolherOndeSalvar(nomeSugerido: string): Promise<Destino>
 
   const extensao = extensaoDe(nomeSugerido);
   const tipo = TIPOS[extensao];
+  const comecou = Date.now();
   try {
     return await seletor.call(window, {
       suggestedName: nomeSugerido,
@@ -86,9 +113,14 @@ export async function escolherOndeSalvar(nomeSugerido: string): Promise<Destino>
         : undefined,
     });
   } catch (e) {
-    if (foiAbortado(e)) throw new DownloadCancelado();
-    // seletor bloqueado por política ou contexto inseguro: segue pelo
-    // caminho antigo em vez de deixar o usuário sem download nenhum
+    const aberto = Date.now() - comecou;
+    if (foiAbortado(e) && aberto >= DEPRESSA_DEMAIS_PARA_SER_DESISTENCIA_MS) {
+      throw new DownloadCancelado();
+    }
+    // o seletor não apareceu — bloqueado por política, contexto inseguro, ou
+    // recusado sem dizer por quê. Segue pelo caminho antigo em vez de deixar
+    // a pessoa sem download nenhum e sem explicação
+    console.warn("o seletor de pasta não abriu; baixando para a pasta padrão", e);
     return null;
   }
 }

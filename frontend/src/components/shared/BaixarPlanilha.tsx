@@ -14,6 +14,11 @@ import type { Formato } from "@/services/conferencia";
  * carregar em outra ferramenta, ou baixar lista que passa do que o Excel
  * aguenta. Esconder isso atrás de um menu tornaria a saída comum mais
  * trabalhosa para dar destaque à rara.
+ *
+ * **O clique pode morrer antes da rede**, e já morreu: o seletor de "salvar
+ * como" fica no caminho, e quando ele não abre o download sumia em silêncio.
+ * Ver `lib/download.ts` — hoje o seletor que falha cai na pasta padrão em vez
+ * de não baixar nada.
  */
 export function BaixarPlanilha({
   aoBaixar,

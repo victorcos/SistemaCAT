@@ -320,12 +320,20 @@ function Concluido({
         <div className="min-w-[280px] flex-1">
           <Rotulo>Crédito no prazo, excluindo as contribuições da base</Rotulo>
           <p className="m-0 mt-1 font-mono text-[34px] font-extrabold leading-none text-sucesso">
-            {dinheiro(resumo.diferenca ?? "0")}
+            {dinheiro(resumo.total_atualizado ?? resumo.diferenca ?? "0")}
           </p>
           <p className="m-0 mt-2 text-[13px] text-texto-suave">
             {dinheiro(resumo.diferenca_pis ?? "0")} de PIS ·{" "}
-            {dinheiro(resumo.diferenca_cofins ?? "0")} de COFINS
+            {dinheiro(resumo.diferenca_cofins ?? "0")} de COFINS ·{" "}
+            {dinheiro(resumo.selic ?? "0")} de Selic
           </p>
+          {mesDe(resumo.ate) && (
+            <p className="m-0 mt-2 text-[12px] leading-relaxed text-texto-fraco">
+              Corrigido pela Selic até{" "}
+              <strong className="font-mono">{mesDe(resumo.ate)}</strong>. A acumulada cresce a
+              cada mês: rodar de novo depois dá um total maior.
+            </p>
+          )}
           {(resumo.competencias_prescritas ?? 0) > 0 && (
             <p className="m-0 mt-2 text-[12px] leading-relaxed text-erro">
               <strong className="font-mono">{dinheiro(resumo.prescrito ?? "0")}</strong> em{" "}
@@ -701,7 +709,7 @@ function Numero({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
-const COLUNAS = "grid-cols-[110px_.7fr_1.1fr_1fr_1fr_1fr_1.1fr]";
+const COLUNAS = "grid-cols-[110px_.7fr_1.1fr_1fr_1fr_1fr_.7fr_1.1fr]";
 
 function PorCompetencia({ linhas }: { linhas: LinhaDaCompetencia[] }) {
   if (linhas.length === 0) return null;
@@ -719,7 +727,7 @@ function PorCompetencia({ linhas }: { linhas: LinhaDaCompetencia[] }) {
       <div className="overflow-x-auto">
         <div className="min-w-[900px]">
           <div className={cn("grid gap-3 bg-tabela-cabecalho-fundo px-5.5 py-3", COLUNAS)}>
-            {["Competência", "Grupos", "Base", "Excluído", "PIS que volta", "COFINS que volta", "Total que volta"].map(
+            {["Competência", "Grupos", "Base", "Excluído", "PIS que volta", "COFINS que volta", "Selic", "Total corrigido"].map(
               (c, i) => (
                 <span
                   key={c}
@@ -763,13 +771,16 @@ function PorCompetencia({ linhas }: { linhas: LinhaDaCompetencia[] }) {
               <span className="text-right text-[13px] text-texto-suave">
                 {dinheiro(l.diferenca_cofins)}
               </span>
+              <span className="text-right text-[13px] text-texto-fraco">
+                {dinheiro(l.selic ?? "0")}
+              </span>
               <span
                 className={cn(
                   "text-right font-mono text-[13px] font-bold",
                   l.prescrita ? "text-erro line-through decoration-erro/50" : "text-sucesso",
                 )}
               >
-                {dinheiro(l.diferenca)}
+                {dinheiro(l.total_atualizado ?? l.diferenca)}
               </span>
             </div>
           ))}

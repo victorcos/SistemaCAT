@@ -5,6 +5,49 @@
 
 ---
 
+## 2026-10-01 — Um download que não baixava e não dizia nada
+
+**O que o Victor viu:** os dois botões da tese das contribuições — a planilha e
+o CSV — "bugados". Clicar não fazia nada.
+
+**O que a investigação provou, antes de qualquer palpite.** A rota existe e
+responde: chamada sem token devolve 401, e o middleware registra. O motor gera
+os oito arquivos da tela — as quatro teses em xlsx e csv — sem erro. E o log da
+API, no período inteiro, **não tem uma única requisição de planilha**. Nenhum
+arquivo apareceu em Downloads, na Área de Trabalho ou na pasta de trabalho.
+
+O clique morria no navegador, antes da rede.
+
+**Onde.** `baixarArquivo` abre o seletor de "salvar como" **antes** do fetch, e
+tem de ser assim: o navegador só mostra o seletor enquanto a ativação do gesto
+do clique vale, e ela não sobrevive a uma ida à rede. O seletor era o único
+ponto antes da requisição — e tinha um caminho que não deixava rastro.
+
+**O defeito.** `showSaveFilePicker` avisa das duas coisas do mesmo jeito:
+`AbortError` tanto para "o usuário desistiu" quanto para "não consegui abrir".
+O código tratava os dois como desistência e seguia em silêncio — que é a
+resposta certa para quem desistiu e a pior possível para quem clicou e não viu
+nada acontecer. Sem download, sem arquivo, sem erro na tela.
+
+**A correção: medir o tempo.** Ninguém abre uma janela do sistema, lê o nome do
+arquivo e desiste em menos de 150 ms. Abortou depressa demais para alguém ter
+lido? O seletor não apareceu, e vale o caminho antigo — entrega na pasta de
+downloads e sempre funciona. Demorou o bastante? Foi decisão de quem clicou, e
+silêncio é a resposta.
+
+**Errar a favor do download é de propósito.** Baixar para a pasta errada é um
+aborrecimento; não baixar nada é um defeito. E fica um `console.warn` dizendo
+que o seletor não abriu, para a próxima investigação começar com a resposta em
+vez de meia hora de eliminação.
+
+**A lição de método.** O que resolveu não foi ler o código — li o caminho
+inteiro, do botão ao fetch, e ele estava certo. Foi **provar onde o clique não
+chegava**: rota chamada por fora, log conferido, disco varrido. Defeito de
+front com sintoma "não faz nada" se acha por eliminação de caminhos, não por
+leitura.
+
+---
+
 ## 2026-10-01 — O 680 existia, e a tese 1 tinha duas lacunas de dinheiro
 
 **A pergunta do Victor:** "não encontrou nada de PIS/COFINS da própria base?"

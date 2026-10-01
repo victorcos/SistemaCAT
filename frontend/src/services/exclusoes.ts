@@ -40,6 +40,10 @@ export interface LinhaDaCompetencia {
   diferenca_pis: string;
   diferenca_cofins: string;
   diferenca: string;
+  selic: string;
+  total_atualizado: string;
+  /** a acumulada aplicada nesta competência, em por cento */
+  selic_acumulada: string;
 }
 
 /** O total de uma competência numa tese por item — em reais, como texto. */
@@ -97,7 +101,13 @@ export interface ResumoDasExclusoes {
   excluido?: string;
   diferenca_pis?: string;
   diferenca_cofins?: string;
+  /** o principal que volta, sem a Selic */
   diferenca?: string;
+  /** a correção, e o total com ela. Esta tese não corrigia até 01/10/2026 */
+  selic?: string;
+  total_atualizado?: string;
+  /** o mês até onde a Selic acumulou, em aaaa-mm */
+  ate?: string;
   competencias?: string[];
   /** o que os cinco anos levaram — mostrado, nunca somado ao crédito */
   prescrito?: string;
