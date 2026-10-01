@@ -32,6 +32,7 @@ from cat.infraestrutura.analitico.exclusoes_por_item import (
     Andamento,
     Motor,
     Resumo,
+    serializar,
 )
 from cat.infraestrutura.analitico.exclusoes_por_item import apurar as _apurar
 from cat.infraestrutura.sped.exclusao_do_iss import (

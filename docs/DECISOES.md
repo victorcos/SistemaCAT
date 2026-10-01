@@ -5,6 +5,53 @@
 
 ---
 
+## 2026-10-01 — Sessenta testes de exclusão, e nenhum rodava a etapa
+
+**O defeito.** `exclusao_do_icms_st` e `exclusao_do_iss` não reexportavam
+`serializar` de `exclusoes_por_item`. `exclusoes.apurar` chama `serializar` nos
+três módulos de tese, e a apuração morria com `AttributeError` — **na tela do
+usuário, no meio da rodada.**
+
+**Por que passou.** Havia 60 testes de exclusão e nenhum chamava
+`exclusoes.apurar`. Cada tese era conferida sozinha, e bem: os três motores
+batem 100% contra os gabaritos do MA, 601.603 linhas. Os validadores também
+chamam o motor direto. **A costura — a função que roda as quatro teses, junta os
+resumos e grava o parquet agregado — nunca era exercitada por ninguém.**
+
+A conferência que eu apresentei como completa tinha esse buraco, e ele não era
+pequeno: era justamente o caminho que a tela dispara. Motor conferido contra
+gabarito não é o mesmo que etapa que roda.
+
+**A forma do erro também explica como ele nasceu.** Quem escreve o terceiro
+módulo copia o segundo, e o segundo foi escrito copiando o primeiro — menos o
+que o primeiro não precisava declarar, porque era o único. A superfície do
+módulo é exatamente o tipo de coisa que a cópia perde e que nenhum teste de
+cálculo olha.
+
+**Duas portas fechadas, e são portas diferentes.**
+
+`test_analitico_superficie_das_exclusoes.py` cobra que os três módulos exponham
+o que a etapa chama — `apurar`, `serializar`, `Andamento`, `Resumo` —, que o
+`serializar` seja o mesmo nos três, e que cada tese tenha nome e arquivo
+próprios. É barato e pega a quarta tese que nascer por cópia.
+
+`test_analitico_exclusoes_na_etapa.py` roda `exclusoes.apurar` inteira sobre um
+SPED minúsculo com as três teses dentro, e confere o que fica em disco: os
+quatro parquets, a coluna `tese` separando as quatro no agregado, as colunas da
+correção, e as quatro fases chegando ao `avisar` — barra que não recebe uma fase
+é barra travada. Com a versão publicada, ele reproduz o `AttributeError`.
+
+A superfície pega o sintoma; a etapa pega a sala. Um argumento com nome errado,
+um resumo que não serializa ou o agregado sem uma tese passariam pela primeira e
+caem na segunda.
+
+**A regra que fica.** Tese conferida contra gabarito prova o **cálculo**. A
+etapa que a entrega precisa do seu próprio teste, e ele tem de ser o caminho que
+a tela dispara — não o motor por baixo dela. Vale varrer as outras etapas atrás
+do mesmo buraco.
+
+---
+
 ## 2026-09-30 — Importar ganha card próprio, e frente de uma etapa vai direto
 
 **O pedido do Victor:** subir arquivo pela Quebra de SPED não faz sentido; abrir

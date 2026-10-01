@@ -177,6 +177,10 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] **Mapa de valores** (`tools/mapear_valores.py`): total por tese e por
       competência, o nosso contra o do arquivo base. Serve também sem gabarito,
       como retrato de cliente novo (v0.118.0)
+- [ ] Varrer as outras etapas atrás do mesmo buraco de conferência: tese
+      conferida sozinha e costura nunca exercitada. O `serializar` que faltava
+      nos módulos novos passou por 60 testes de exclusão e caiu na tela do
+      cliente — ver DECISOES de 01/10/2026
 - [x] As três exclusões ligadas ponta a ponta: planilha própria de cada uma,
       bloco próprio na tela, quatro fases na barra da rodada e testes das
       camadas analíticas (v0.119.0)
