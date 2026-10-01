@@ -78,6 +78,10 @@ VERSAO_DO_ESQUEMA = 5
 # (C180/C190 com os filhos de PIS e COFINS). Metade dos clientes escritura de um
 # jeito, metade do outro, e a apuração tem de ler os dois.
 ALVOS_PADRAO: tuple[str, ...] = (
+    # o 0000 é o cabeçalho do arquivo, e o índice o deixava de fora por ser lido
+    # à parte (ler_cabecalho). Só que a tela o oferece como alvo, e extrair "a
+    # identificação de cada arquivo da quebra, numa planilha" é pedido legítimo
+    "0000",
     "0140", "0150", "0200", "0400", "0500", "C010",
     "C100", "C170", "C175",
     # serviços: o bloco A tem abridor próprio, como o D
@@ -92,7 +96,9 @@ ALVOS_PADRAO: tuple[str, ...] = (
     # o C500 vem com os filhos: sem eles a tela oferece o registro e a
     # extração sai vazia, porque o índice não guardou a posição
     "C500", "C501", "C505", "C800", "C860", "C870",
-    "D100", "D500", "F100",
+    # o F010 abre o bloco F como o A010 e o C010 abrem os seus; ficou de fora
+    # por descuido, e sem ele a tela oferece o alvo e a extração não acha índice
+    "D100", "D500", "F010", "F100",
     # o bloco M: a apuração, e é dele que sai o número que o cliente pergunta
     "M100", "M105", "M110", "M200", "M210", "M220",
     "M500", "M505", "M510", "M600", "M610", "M620",
