@@ -38,9 +38,15 @@ export function BaixarPlanilha({
   /** só chega depois de uns instantes: botão que pisca ninguém acerta */
   aoCancelar?: () => void;
 }) {
-  // o botão que está baixando vira Cancelar; o outro fica fora do caminho
-  const saida = (formato: Formato) =>
-    baixando === formato ? aoCancelar : undefined;
+  // **O botão que baixa não vira Cancelar.** Virava, e isso punia o clique
+  // impaciente: quem clicava de novo achando que travou abortava o próprio
+  // download — e o arquivo já criado era apagado, sem erro na tela. Relatado
+  // em 01/10/2026, na tela de exclusões.
+  //
+  // Agora o Cancelar aparece **ao lado**, e só depois dos 400 ms em que a
+  // ação ainda pode estar acontecendo. Clicar duas vezes no mesmo lugar passa
+  // a ser inofensivo, que é o que se espera de um botão de baixar.
+  const cancelavel = baixando !== null && aoCancelar !== undefined;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -50,7 +56,6 @@ export function BaixarPlanilha({
         onClick={() => aoBaixar("xlsx")}
         disabled={desabilitado}
         carregando={baixando === "xlsx"}
-        aoCancelar={saida("xlsx")}
         className={destaque ? "shadow-acao" : undefined}
       >
         {rotulo}
@@ -61,7 +66,6 @@ export function BaixarPlanilha({
         onClick={() => aoBaixar("csv")}
         disabled={desabilitado}
         carregando={baixando === "csv"}
-        aoCancelar={saida("csv")}
         // a chave de acesso tem 44 dígitos, e o Excel a converte em notação
         // científica ao abrir um CSV com dois cliques. Quem precisa do Excel
         // usa o botão ao lado, que é imune — este é para carregar em outra
@@ -70,6 +74,11 @@ export function BaixarPlanilha({
       >
         CSV
       </Botao>
+      {cancelavel && (
+        <Botao variante="fantasma" tamanho="sm" onClick={aoCancelar}>
+          Cancelar
+        </Botao>
+      )}
     </div>
   );
 }

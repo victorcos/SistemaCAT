@@ -191,7 +191,19 @@ export async function baixarArquivo(
     } catch (e) {
       // cancelou no meio da gravação: o arquivo pela metade não serve a
       // ninguém, e deixá-lo no disco é o mesmo que entregar dado truncado
-      if (e instanceof DownloadCancelado) await descartar(destino);
+      if (e instanceof DownloadCancelado) {
+        await descartar(destino);
+        // **só é cancelamento se alguém cancelou.** O `pipeTo` avisa do
+        // mesmo jeito quando a gravação falha por outro motivo, e tratar os
+        // dois como desistência deixava a pessoa sem arquivo, sem erro e sem
+        // explicação — depois de a requisição ter voltado 200. Relatado em
+        // 01/10/2026, e foi o que levou duas rodadas para achar
+        if (!sinal?.aborted) {
+          throw new ErroApi(
+            "A planilha veio do servidor, mas não deu para gravá-la no arquivo "
+            + "escolhido. Tente salvar em outra pasta.", 0);
+        }
+      }
       throw e;
     }
     return;

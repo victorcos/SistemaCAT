@@ -46,6 +46,39 @@ chegava**: rota chamada por fora, log conferido, disco varrido. Defeito de
 front com sintoma "não faz nada" se acha por eliminação de caminhos, não por
 leitura.
 
+### A segunda rodada, e o defeito de verdade
+
+A primeira correção não bastou, e o relato seguinte deu a informação que
+faltava: **o seletor abre, a pessoa escolhe, e ele volta a pedir o diretório.**
+Dessa vez o log mostrou uma requisição com **status 200 em 80 ms** — a planilha
+veio do servidor — e o disco continuou sem arquivo nenhum.
+
+Ou seja: o problema não era chegar ao servidor. Era o que acontecia **depois**
+dele, e ali todo caminho de falha era silencioso:
+
+* `pipeTo` abortado avisa com `AbortError`, igualzinho a um cancelamento;
+* `DownloadCancelado` é engolido de propósito pelo `executar` — quem cancelou
+  sabe que cancelou;
+* e `descartar` apaga o arquivo que o seletor já tinha criado.
+
+Três acertos isolados que, somados, produzem o pior resultado possível: 200 no
+servidor, nada no disco, nada na tela.
+
+**E havia uma armadilha que fecha o laço.** O botão que baixava **virava
+"Cancelar"** enquanto baixava, no mesmo lugar. Quem clicava de novo achando que
+travou abortava o próprio download e apagava o arquivo; o clique seguinte abria
+o seletor outra vez. O laço que o usuário descreveu era isso.
+
+**O que mudou.** O Cancelar saiu de cima do botão e foi para o lado — clicar
+duas vezes no mesmo lugar voltou a ser inofensivo, que é o que se espera de um
+botão de baixar. E a gravação que falha **sem ninguém ter cancelado** agora diz
+isso na tela, em vez de sumir: só é cancelamento quando o sinal foi abortado de
+verdade.
+
+**A regra que fica:** erro que o servidor não viu é erro que só o usuário vê.
+Caminho de cliente que termina em silêncio precisa provar que houve
+desistência — e, na dúvida, falar.
+
 ---
 
 ## 2026-10-01 — O 680 existia, e a tese 1 tinha duas lacunas de dinheiro
