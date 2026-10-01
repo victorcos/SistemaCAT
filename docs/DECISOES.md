@@ -5,6 +5,51 @@
 
 ---
 
+## 2026-10-01 — O formato dentro do pacote é o do arquivo de referência
+
+**O que se mediu, no 680 da DMINAS — 3.568.362 linhas, 35 colunas:**
+
+```
+csv      33 s     862 MB
+xlsx  1.181 s     512 MB   em quatro abas
+```
+
+Vinte minutos é mais do que qualquer download espera, e um xlsx de meio giga não
+abre no Excel nem quando chega. **O 680 vai em CSV no pacote**, e os outros três
+em xlsx — 839 com 463.212 linhas, 903 com 138.358, 933 com 33.
+
+**Não é contorno: é o formato do próprio MA.** O arquivo de referência do 680
+veio em **CSV de 1,17 GB**; os do 839 e do 933 vieram em xlsx. A razão é a mesma
+dos dois lados — o 680 é o detalhe geral da receita e não cabe num milhão de
+linhas. Quem escolhe o formato do relatório é o tamanho dele, e o MA já tinha
+escolhido.
+
+O pacote inteiro: **249,5 MB em 312 s**. O CSV comprime de 862 para 121 MB; o
+xlsx do 839 não comprime (107 → 105), porque xlsx já é um zip. O proxy da API
+roda com `Timeout.InfiniteTimeSpan`, então cinco minutos passa — e a tela agora
+**diz que leva alguns minutos**, ao lado do botão. Botão que demora cinco minutos
+sem avisar é o mesmo "botão bugado" de hoje de manhã, com outra causa: quem não
+sabe que vai demorar clica de novo.
+
+### A rodada inteira, conferida de ponta a ponta
+
+Cinco leituras dos 57 SPED em **497 s**. As duas frentes da tese 1:
+
+```
+                 consolidado        por item (680)
+base          228.466.346,24      228.466.346,24     igual ao centavo
+excluido       21.114.397,76       21.114.397,76     igual ao centavo
+total           2.379.774,25        2.381.054,95     0,0538%
+```
+
+**A base e a exclusão batem ao centavo, e só o total difere.** É exatamente o que
+tinha de acontecer: as duas partem da mesma receita — se divergissem aqui, uma
+das duas estaria filtrando errado e nenhuma serviria para conferir a outra — e se
+separam só no arredondamento, que é a escolha de 24/09/2026. O teste da etapa
+passou a cobrar essa igualdade de base.
+
+---
+
 ## 2026-10-01 — O 680 fecha em 100%, e quatro regras só o dado contou
 
 **O relatório.** 680 — Metodologia 01 — Todos Registros — Por Documento e Itens:

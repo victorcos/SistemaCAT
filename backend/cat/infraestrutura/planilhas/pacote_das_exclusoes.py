@@ -9,7 +9,7 @@ cinco cliques são cinco oportunidades de misturar rodadas.
 
 ```
 Exclusoes - consolidado - todas as teses.xlsx   uma linha por grupo, as 4 teses
-680 - PIS-Cofins da propria base - por item.xlsx    35 colunas, 100% conferido
+680 - PIS-Cofins da propria base - por item.csv     35 colunas, 100% conferido
 903 - ICMS na base - por item.xlsx                  40 colunas, 100% conferido
 839 - ICMS-ST presumido na base - por item.xlsx     46 colunas, 100% conferido
 933 - ISS na base - por item.xlsx                   32 colunas, 100% conferido
@@ -18,6 +18,27 @@ LEIA-ME.txt
 
 **O nome começa pelo número do relatório do MA** — 680, 903, 839, 933 — porque é
 por esse número que quem confere acha o arquivo de referência correspondente.
+
+## Por que o 680 vai em CSV, e os outros em xlsx
+
+**Porque é o formato em que o MA o exporta.** O arquivo de referência da DMINAS
+veio em CSV de 1,17 GB, e os do 839 e do 933 vieram em xlsx — e a razão é a
+mesma nos dois casos: o 680 é o detalhe geral da receita e não cabe no Excel.
+
+Medido no 680 da DMINAS, 3.568.362 linhas:
+
+```
+csv      33 s     862 MB
+xlsx  1.181 s     512 MB     ← vinte minutos, em quatro abas
+```
+
+Vinte minutos é mais do que qualquer download espera, e um xlsx de meio giga não
+abre no Excel nem quando chega. O CSV sai em trinta e três segundos, comprime
+bem no zip, e é o que se carrega no DuckDB, no Power BI ou no banco — que é o
+que se faz com três milhões e meio de linhas.
+
+Os outros três cabem: o 839 tem 463.212 linhas, o 903 tem 138.358 e o 933 tem
+33. Para eles o xlsx é o caminho de todo dia, e é o que o MA manda.
 
 ## As duas frentes da tese das contribuições, e o LEIA-ME
 
@@ -63,28 +84,32 @@ log = obter_log(__name__)
 
 LEIA_ME = "LEIA-ME.txt"
 
-# o que entra no zip: nome dentro do pacote, parquet de origem, gerador e a
-# linha que o descreve no LEIA-ME. **A descrição vai sem acento**, porque é ela
-# que entra no texto do pacote — ver `_leia_me`
-PACOTE: tuple[tuple[str, str, object, str], ...] = (
+# o que entra no zip: nome dentro do pacote, parquet de origem, gerador, formato
+# e a linha que o descreve no LEIA-ME. **A descrição vai sem acento**, porque é
+# ela que entra no texto do pacote — ver `_leia_me`.
+#
+# O formato é o do arquivo de referência do MA, e a razão está no topo do módulo:
+# o 680 não cabe no Excel, e os outros três cabem
+PACOTE: tuple[tuple[str, str, object, str, str], ...] = (
     ("Exclusoes - consolidado - todas as teses.xlsx", ARQUIVO_DAS_EXCLUSOES,
-     gerar_exclusoes,
+     gerar_exclusoes, "xlsx",
      "as quatro teses somadas por grupo (estabelecimento, competencia, "
      "registro, CST e CFOP). E o numero que se pede."),
-    ("680 - PIS-Cofins da propria base - por item.xlsx", ARQUIVO_DA_EXCLUSAO_PISCOFINS,
-     gerar_exclusao_piscofins,
+    ("680 - PIS-Cofins da propria base - por item.csv", ARQUIVO_DA_EXCLUSAO_PISCOFINS,
+     gerar_exclusao_piscofins, "csv",
      "as proprias contribuicoes fora da base, item a item - 35 colunas, no "
-     "leiaute do relatorio 680 (Metodologia 01)."),
+     "leiaute do relatorio 680 (Metodologia 01). Em CSV porque e assim que o MA "
+     "o exporta: nao cabe no Excel."),
     ("903 - ICMS na base - por item.xlsx", ARQUIVO_DA_EXCLUSAO_DO_ICMS,
-     gerar_exclusao_do_icms,
+     gerar_exclusao_do_icms, "xlsx",
      "o ICMS destacado fora da base, item a item - 40 colunas, no leiaute do "
      "relatorio 903 (Tema 69)."),
     ("839 - ICMS-ST presumido na base - por item.xlsx", ARQUIVO_DA_EXCLUSAO_DO_ICMS_ST,
-     gerar_exclusao_do_icms_st,
+     gerar_exclusao_do_icms_st, "xlsx",
      "o ICMS-ST presumido fora da base, item a item - 46 colunas, no leiaute "
      "do relatorio 839."),
     ("933 - ISS na base - por item.xlsx", ARQUIVO_DA_EXCLUSAO_DO_ISS,
-     gerar_exclusao_do_iss,
+     gerar_exclusao_do_iss, "xlsx",
      "o ISS da nota de servico fora da base, item a item - 32 colunas, no "
      "leiaute do relatorio 933."),
 )
@@ -101,15 +126,22 @@ def zip_das_exclusoes(parquet: str, destino: str, modelos=None, classificacoes=N
     Tese que não rodou não tem parquet, e aí ela não entra e o `LEIA-ME.txt` diz
     que não entrou. O zip é montado em `.tmp` e renomeado no fim: pacote pela
     metade parece inteiro para quem o baixa.
+
+    **As planilhas intermediárias nascem ao lado do zip**, e não no temp do
+    sistema: o 680 de um atacadista tem 3,5 milhões de linhas e quatro abas, e
+    sozinho passa de centenas de megabytes. Escrevê-lo no disco do sistema para
+    depois copiá-lo é enchê-lo sem precisar; a pasta da execução já é o disco
+    local que a rodada escolheu.
     """
     pasta = os.path.dirname(parquet)
     entraram: list[tuple[str, str]] = []
     faltaram: list[str] = []
     provisorio = destino + ".tmp"
 
-    with tempfile.TemporaryDirectory(prefix="exclusoes_") as temporaria:
+    with tempfile.TemporaryDirectory(prefix="pacote_",
+                                     dir=os.path.dirname(destino) or None) as temporaria:
         with zipfile.ZipFile(provisorio, "w", compression=zipfile.ZIP_DEFLATED) as z:
-            for nome, arquivo, gerar, descricao in PACOTE:
+            for nome, arquivo, gerar, formato_da_planilha, descricao in PACOTE:
                 origem = os.path.join(pasta, arquivo)
                 if not os.path.isfile(origem):
                     faltaram.append(nome)
@@ -117,7 +149,7 @@ def zip_das_exclusoes(parquet: str, destino: str, modelos=None, classificacoes=N
                                 extra={"arquivo": arquivo, "no_pacote": nome})
                     continue
                 caminho = os.path.join(temporaria, nome)
-                linhas = gerar(origem, caminho)
+                linhas = gerar(origem, caminho, formato=formato_da_planilha)
                 z.write(caminho, arcname=nome)
                 entraram.append((nome, descricao))
                 log.info("planilha no pacote das exclusões",
@@ -174,6 +206,17 @@ def _leia_me(entraram: list[tuple[str, str]], faltaram: list[str]) -> str:
         "Arredondar milhoes de itens um a um move o total. Na base em que a regra",
         "foi medida a diferenca ficou em 0,06% - cerca de R$ 1,6 mil em R$ 2,7",
         "milhoes. Se voce subtrair um do outro, e essa diferenca que vai achar.",
+        "",
+        "O 680 VAI EM CSV, E OS OUTROS EM XLSX",
+        "-" * 70,
+        "Porque e assim que o relatorio do MA sai. O 680 e o detalhe geral da",
+        "receita e passa de tres milhoes de linhas: nao cabe no Excel, que para em",
+        "pouco mais de um milhao. CSV com ponto-e-virgula e virgula decimal, que e",
+        "o que o Excel em portugues espera - mas para abrir nao use dois cliques,",
+        "e sim Dados > Obter Dados > De Texto/CSV, senao a chave de 44 digitos",
+        "vira notacao cientifica. Para carregar em ferramenta (DuckDB, Power BI,",
+        "banco), que e o uso natural de uma lista desse tamanho, ele ja esta no",
+        "formato certo.",
         "",
         "AS QUATRO TESES NUNCA SE SOMAM NUM NUMERO SO",
         "-" * 70,

@@ -400,7 +400,12 @@ function Concluido({
           <p className="m-0 max-w-[36ch] text-right text-[11px] leading-relaxed text-texto-fraco">
             O pacote leva o consolidado e as quatro teses item a item, cada uma no leiaute do
             relatório do escritório anterior — 680, 903, 839 e 933.{" "}
-            Uma linha por grupo: somar a coluna da diferença dá exatamente este total.
+            {/* **Dizer o tempo é o que evita o próximo "botão bugado".** Medido
+                na DMINAS: 312 s e 250 MB, porque o 680 tem 3,5 milhões de
+                linhas. Quem não sabe disso clica de novo, e já clicou */}
+            <strong>Numa base grande leva alguns minutos</strong> — o 680 passa de três milhões de
+            linhas. Só o consolidado sai na hora: uma linha por grupo, e somar a coluna da
+            diferença dá exatamente este total.
             {resumo.segundos ? ` Apurado em ${duracao(resumo.segundos)}` : ""}
             {resumo.fonte === "agregados"
               ? ", a partir do que a Gestão já tinha lido."
@@ -483,8 +488,11 @@ interface Tese {
   alvo: string;
   /** o número do relatório do MA, que é como o cliente a conhece */
   codigo: string;
-  /** como a tela chama o imposto: vira o rótulo da coluna e o da tabela */
+  /** como a tela chama o imposto: vira o título da tabela por competência */
   imposto: string;
+  /** o rótulo da coluna do que saiu da base. Concordância própria, porque
+   *  "Contribuições excluído" não é português */
+  excluido: string;
   rotulo: string;
   detalhe: string;
   /** o título da faixa quando a tese não rodou — frase inteira, porque
@@ -507,6 +515,7 @@ const TESES: Tese[] = [
     alvo: "receita-por-item",
     codigo: "680",
     imposto: "Contribuições",
+    excluido: "Contribuições excluídas",
     rotulo: "As contribuições fora da própria base, item a item · relatório 680",
     semRodar: "O detalhe por item das contribuições não foi apurado nesta rodada",
     mesmaTeseQue:
@@ -516,13 +525,14 @@ const TESES: Tese[] = [
       "escritório anterior. Arredondar milhões de itens um a um move o total — " +
       "cerca de 0,06%. O que se pede é o de cima; este é o que acompanha o pedido.",
     detalhe:
-      "Uma linha por item, nas trinta e cinco colunas do relatório 680 (Metodologia 01) — nos quatro ramos que geram receita: o item da nota, o analítico da NFC-e, a nota de serviço e os demais documentos.",
+      "Uma linha por item, nas trinta e cinco colunas do relatório 680 (Metodologia 01) — nos quatro ramos que geram receita: o item da nota, o analítico da NFC-e, a nota de serviço e os demais documentos. Numa base grande este é o relatório que não cabe no Excel, e é por isso que o MA o exporta em CSV: use o CSV, que sai em segundos.",
   },
   {
     campo: "icms",
     alvo: "icms",
     codigo: "903",
     imposto: "ICMS",
+    excluido: "ICMS excluído",
     semRodar: "O ICMS fora da base não foi apurado nesta rodada",
     rotulo: "Crédito no prazo, excluindo o ICMS da base · Tema 69",
     detalhe:
@@ -533,6 +543,7 @@ const TESES: Tese[] = [
     alvo: "icms-st",
     codigo: "839",
     imposto: "ICMS-ST",
+    excluido: "ICMS-ST excluído",
     semRodar: "O ICMS-ST fora da base não foi apurado nesta rodada",
     rotulo: "Crédito no prazo, excluindo o ICMS-ST da base",
     detalhe:
@@ -543,6 +554,7 @@ const TESES: Tese[] = [
     alvo: "iss",
     codigo: "933",
     imposto: "ISS",
+    excluido: "ISS excluído",
     semRodar: "O ISS fora da base não foi apurado nesta rodada",
     rotulo: "Crédito no prazo, excluindo o ISS da base",
     detalhe:
@@ -634,7 +646,7 @@ function BlocoDaTese({
 
         <dl className="m-0 grid min-w-[300px] flex-1 grid-cols-2 gap-x-6 gap-y-3 self-center">
           <Numero rotulo="Base escriturada" valor={dinheiro(icms.base ?? "0")} />
-          <Numero rotulo={`${tese.imposto} excluído`} valor={dinheiro(icms.excluido ?? "0")} />
+          <Numero rotulo={tese.excluido} valor={dinheiro(icms.excluido ?? "0")} />
           <Numero rotulo="Itens de nota" valor={numero(icms.linhas ?? 0)} />
           <Numero rotulo="Competências" valor={numero(icms.competencias?.length ?? 0)} />
         </dl>
@@ -692,7 +704,7 @@ function PorCompetenciaDaTese({
               "Itens",
               "Selic",
               "Base",
-              `${tese.imposto} excluído`,
+              tese.excluido,
               "PIS que volta",
               "COFINS que volta",
               "Total corrigido",

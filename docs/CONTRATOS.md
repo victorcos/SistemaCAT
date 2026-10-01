@@ -492,6 +492,12 @@ e cinco downloads em cinco cliques são cinco chances de misturar rodadas. Tese
 que não rodou não entra, e o LEIA-ME a nomeia: zip com quatro arquivos onde
 deveriam ser cinco é indistinguível de um zip completo.
 
+**Dentro do pacote, o formato de cada relatório é o do arquivo de referência do
+MA**: o 680 em **CSV** e os outros em xlsx. Medido no 680 da DMINAS (3.568.362
+linhas): csv em 33 s, xlsx em 1.181 s e 512 MB em quatro abas, que não abre no
+Excel. O pacote inteiro deu 249,5 MB em 312 s — **a chamada pode levar minutos**,
+e o proxy roda sem timeout de propósito.
+
 **A tese das contribuições aparece duas vezes, e é de propósito.** O consolidado
 soma por grupo e arredonda uma vez por grupo — é o número que se pede, e é o que
 está nos campos do topo do resumo. O `receita-por-item` é a mesma tese vista item

@@ -232,13 +232,29 @@ class TestOPacote:
         assert quantas == len(PACOTE)
         with zipfile.ZipFile(zip_) as z:
             dentro = set(z.namelist())
-        assert dentro == {nome for nome, _, _, _ in PACOTE} | {LEIA_ME}
+        assert dentro == {nome for nome, _, _, _, _ in PACOTE} | {LEIA_ME}
 
     def test_o_nome_de_cada_arquivo_comeca_pelo_numero_do_relatorio(self):
         """É por esse número que quem confere acha o arquivo de referência."""
-        por_item = [nome for nome, _, _, _ in PACOTE if "por item" in nome]
+        por_item = [nome for nome, _, _, _, _ in PACOTE if "por item" in nome]
 
         assert [nome.split(" ")[0] for nome in por_item] == ["680", "903", "839", "933"]
+
+    def test_o_680_vai_em_csv_e_os_outros_em_xlsx(self):
+        """O formato é o do arquivo de referência, e a razão foi medida.
+
+        O 680 da DMINAS tem 3.568.362 linhas: em xlsx leva 1.181 segundos e sai
+        com 512 MB em quatro abas, que nem abre no Excel; em CSV leva 33. E é
+        assim que o MA o exporta — o arquivo de referência veio em CSV de 1,17
+        GB, enquanto o do 839 e o do 933 vieram em xlsx.
+        """
+        formatos = {nome.split(" ")[0]: formato for nome, _, _, formato, _ in PACOTE}
+
+        assert formatos["680"] == "csv"
+        assert {formatos[n] for n in ("903", "839", "933")} == {"xlsx"}
+        assert all(nome.endswith(f".{formato}")
+                   for nome, _, _, formato, _ in PACOTE), (
+            "o nome dentro do pacote tem de dizer o formato que ele é")
 
     def test_o_leia_me_avisa_da_diferenca_de_arredondamento(self, rodada, tmp_path):
         """Quem subtrair uma frente da outra tem de achar a diferença escrita.
