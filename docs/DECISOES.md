@@ -5,6 +5,61 @@
 
 ---
 
+## 2026-10-02 — Nunca foi o IP: era o firewall, e a rede estava como pública
+
+**O relato.** "Não está rodando no IP local em outra máquina" — e, logo depois,
+que **com cabo também não funcionava**. Essa segunda frase é que fechou o
+diagnóstico: se o endereço antigo também não abria, o IP não era a causa.
+
+**O que o Windows tinha:**
+
+```
+firewall            ligado nos tres perfis
+rede Wi-Fi          NetworkCategory = Public    <- o mais restritivo
+regra de entrada    para 5173 ou 8010: NENHUMA
+```
+
+A porta escutava em `0.0.0.0` e ninguém de fora chegava nela. Em rede
+classificada como pública o Windows recusa praticamente todo tráfego não
+solicitado, e sem regra de entrada nenhum `netstat` saudável ajuda.
+
+**O que me enganou, e vale como método.** Meu primeiro teste foi `curl` da
+própria máquina para o próprio IP da rede, e deu **HTTP 200**. Isso não prova
+nada: tráfego que nasce e morre no mesmo host não atravessa o firewall. Testar
+alcance de rede exige outra máquina — ou, na falta dela, olhar as regras em vez
+do socket.
+
+### A correção, e por que ela abre uma porta em vez de duas
+
+`scripts/liberar-na-rede.ps1` faz as duas coisas que exigem administrador:
+reclassifica a rede da empresa como `Private` e abre **a porta da API**, com
+perfil `Private,Domain` — a regra não vale em rede pública, e levar o notebook
+para um café não abre a porta lá.
+
+Uma porta porque, desde a v0.127.0, a API serve o front e a própria API. Antes
+seriam duas: a 5173 do Vite e a 8010.
+
+### Dois presentes do caminho pela API
+
+**O endereço sobrevive à troca de IP.** O certificado cobre o hostname
+(`VBMS-0151`), e em Wi-Fi o IP muda a cada DHCP. `https://VBMS-0151:8010`
+continua valendo.
+
+E isso **só funciona pela API**: `http://VBMS-0151:5173` devolve **403**. É o
+`allowedHosts` do Vite, que recusa acesso por nome desde a 6.0.9 como proteção
+contra rebind de DNS. Pelo Vite seria preciso `CAT_HOSTS=VBMS-0151`; pela API,
+nada.
+
+### As três linhas ficaram comentadas no `.env`, de propósito
+
+`CAT_PASTA_DO_FRONT` e o par TLS estão escritos no `backend/.env`, **comentados**.
+Com elas ativas, qualquer reinício do `dotnet watch` — inclusive o que uma
+alteração de código de outra sessão dispara — subiria a API em HTTPS e derrubaria
+o proxy do Vite para quem estivesse usando o endereço antigo. Quem liga o modo
+escolhe a hora.
+
+---
+
 ## 2026-10-02 — A API passa a servir o front, em HTTPS e na mesma origem
 
 **A causa de fundo, finalmente atacada.** Os funcionários usavam um **servidor de

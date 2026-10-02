@@ -270,6 +270,18 @@ já não existe, pedindo arquivos que foram embora. As duas regras vivem numa
 `MapFallbackToFile`: quando eram duas, o mesmo arquivo saía com `no-cache`
 pedido como `/index.html` e sem cabeçalho nenhum pedido como `/`.
 
+### Liberar na rede
+
+Serve o front e escuta em `0.0.0.0`, e ainda assim nenhuma outra máquina chega:
+em 02/10/2026 o Windows tinha a rede como `Public` e **nenhuma regra de entrada**
+para as portas do sistema. `scripts/liberar-na-rede.ps1` faz as duas coisas que
+exigem administrador — reclassifica a rede da empresa como `Private` e abre a
+porta da API com perfil `Private,Domain`, que não vale em rede pública.
+
+**Uma porta, não duas**, porque a API serve o front. E prefira o **hostname** ao
+IP: o certificado o cobre, e em Wi-Fi o IP muda a cada DHCP. Pelo Vite o nome não
+serve — `allowedHosts` devolve 403 —, pela API serve.
+
 ### O que ainda não é
 
 Certificado **autoassinado**: avisa na primeira visita. Para produção de
