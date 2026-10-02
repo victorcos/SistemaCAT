@@ -83,6 +83,13 @@ export interface AlvosDaQuebra {
   estabelecimentos: { cnpj: string; empresa: string }[];
   /** arquivos cujo índice não serve mais: a extração sai sem eles */
   sem_indice: number;
+  /**
+   * Registro que existe nos arquivos mas esta quebra não indexou — fica fora
+   * de `linhas` porque não se extrai, e vem aqui porque existe. Some da lista
+   * de extração sem sumir da tela: oferecer o que não sai virava erro na mão
+   * do usuário, e esconder sem dizer vira "não existe no SPED".
+   */
+  nao_extraiveis: { alvo: string; quantidade: number; bloco: string }[];
 }
 
 /**

@@ -338,8 +338,20 @@ def disponiveis(destino: str) -> dict:
     extração sairia com colunas sem nome é oferecer trabalho, não resultado.
     A hierarquia aparece quando a **folha** existe em algum arquivo — é o
     mesmo critério da origem, e é o certo: o pai sem folha não gera linha.
+
+    **E só entra o que esta quebra consegue extrair.** São duas listas
+    diferentes: a contagem vê TODO registro do arquivo, e o índice só guarda a
+    posição dos de `ALVOS_PADRAO`. Oferecendo pela contagem, a tela prometia
+    registro que a extração não entregava — foi assim que 0000, F010, C501 e
+    C505 viraram erro na mão do usuário. O que foi contado e não indexado sai
+    em `nao_extraiveis`, com a contagem: some da lista de extração, mas não some
+    da tela, senão quem confere lê como "não existe no SPED".
+
+    A **hierarquia não entra nesse filtro**: ela lê o arquivo sequencialmente
+    (o vínculo do SPED é a ordem), não pelas posições do índice.
     """
     total: dict[str, int] = {}
+    com_posicao: set[str] = set()
     sem_indice = 0
     for linha in _arquivos(destino):
         indice = _indice(destino, linha.get("caminho") or "")
@@ -349,10 +361,13 @@ def disponiveis(destino: str) -> dict:
         for registro, quantos in indice.contagens.items():
             if quantos and registro in CAMPOS:
                 total[registro] = total.get(registro, 0) + quantos
+        com_posicao.update(r for r, posicoes in indice.posicoes.items() if posicoes)
 
     simples = [{"alvo": r, "rotulo": r, "bloco": bloco_de(r), "quantidade": q,
                 "colunas": len(COLUNAS_DA_ORIGEM) + len(CAMPOS[r]), "hierarquia": False}
-               for r, q in sorted(total.items())]
+               for r, q in sorted(total.items()) if r in com_posicao]
+    nao_extraiveis = [{"alvo": r, "quantidade": q, "bloco": bloco_de(r)}
+                      for r, q in sorted(total.items()) if r not in com_posicao]
     hierarquias = [{"alvo": h.chave, "rotulo": h.rotulo, "bloco": bloco_de(h.folha),
                     "quantidade": total.get(h.folha, 0),
                     "colunas": len(_colunas(h)), "hierarquia": True}
@@ -362,7 +377,13 @@ def disponiveis(destino: str) -> dict:
         {(a.get("cnpj") or "", a.get("empresa") or "") for a in _arquivos(destino)} - {("", "")})
     log.info("alvos disponíveis para extração", extra={
         "execucao_pasta": os.path.basename(destino), "registros": len(simples),
-        "hierarquias": len(hierarquias), "sem_indice": sem_indice})
+        "hierarquias": len(hierarquias), "sem_indice": sem_indice,
+        "nao_extraiveis": [n["alvo"] for n in nao_extraiveis]})
+    if nao_extraiveis:
+        log.warning("registros contados que esta quebra não indexou", extra={
+            "execucao_pasta": os.path.basename(destino),
+            "registros": [n["alvo"] for n in nao_extraiveis],
+            "acao": "rodar a quebra de novo para indexá-los"})
     return {
         "linhas": [*hierarquias, *simples],
         "blocos": sorted({l["bloco"] for l in (*hierarquias, *simples)}),
@@ -372,6 +393,11 @@ def disponiveis(destino: str) -> dict:
         # arquivo cujo índice não serve mais: a extração sai sem ele, e quem
         # confere o total com o cliente precisa saber disso
         "sem_indice": sem_indice,
+        # registro que existe nos arquivos mas esta quebra não indexou: fica
+        # fora de `linhas` porque não se extrai, e vem aqui porque existe —
+        # some da lista de extração sem sumir da tela. Resolve rodando a
+        # quebra de novo, que reindexa com o ALVOS_PADRAO de hoje.
+        "nao_extraiveis": nao_extraiveis,
     }
 
 

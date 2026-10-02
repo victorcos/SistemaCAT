@@ -1,12 +1,12 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-09-28, sobre a versão **0.108.1**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-10-02, sobre a versão **0.124.0**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
 errado é o código — não este documento.
 
-## 1. Rotas (29)
+## 1. Rotas (30)
 
 O endereço, a tela que o atende e se exige papel específico.
 
@@ -34,6 +34,7 @@ O endereço, a tela que o atende e se exige papel específico.
 | `/projetos/:id/frente/:trilha` | Projeto | — |
 | `/projetos/:id/apuracao-piscofins` | ApuracaoPisCofins | — |
 | `/projetos/:id/razao-contabil` | RazaoContabil | — |
+| `/projetos/:id/consulta-de-saidas` | ConsultaDeSaidas | — |
 | `/projetos/:id/apuracao-contribuicoes` | Gestao | — |
 | `/projetos/:id/exclusoes` | Exclusoes | — |
 | `/projetos/:id/quebra-xml` | QuebraXml | — |
@@ -42,7 +43,7 @@ O endereço, a tela que o atende e se exige papel específico.
 | `/usuarios` | Usuarios | sim |
 | `*` | NaoEncontrada | — |
 
-## 2. Telas (30)
+## 2. Telas (31)
 
 O resumo é o que o próprio arquivo diz de si no comentário do topo.
 
@@ -54,7 +55,7 @@ Etapa 6 — apurar ressarcimento e complemento. O fechamento por estabelecimento
 
 ### ApuracaoPisCofins
 
-`src/pages/ApuracaoPisCofins.tsx` · 429 linhas
+`src/pages/ApuracaoPisCofins.tsx` · 493 linhas
 
 Apuração de PIS/COFINS — o par que se confronta. A tela existe para entregar **um par**: a Consulta de Entradas (037), do lado
 
@@ -69,6 +70,12 @@ Etapa 7 — gerar o arquivo digital. Um arquivo por estabelecimento de SP e por 
 `src/pages/Conferencia.tsx` · 433 linhas
 
 Etapa 2 — conferir documentos. Cruza o que a EFD escriturou (C100 e C800) com o XML e o relatório do
+
+### ConsultaDeSaidas
+
+`src/pages/ConsultaDeSaidas.tsx` · 502 linhas
+
+Consulta de Saídas (047) — recortar primeiro, olhar depois. A 047 de cinco anos de uma rede passa de **sete milhões de linhas**. O
 
 ### CreditoOutorgado
 
@@ -90,9 +97,9 @@ Etapa 8 — relatórios e entrega. Três regras mandam na tela: **o relatório m
 
 ### Exclusoes
 
-`src/pages/Exclusoes.tsx` · 466 linhas
+`src/pages/Exclusoes.tsx` · 879 linhas
 
-Exclusões da base do PIS/COFINS. Uma tese hoje: as próprias contribuições fora da base. A receita embute PIS e
+Exclusões da base do PIS/COFINS. Quatro teses, cinco leituras, uma rodada.
 
 ### Gestao
 
@@ -162,7 +169,7 @@ Pré-validar os arquivos digitais que o cliente já transmitiu.
 
 ### Projeto
 
-`src/pages/Projeto.tsx` · 550 linhas
+`src/pages/Projeto.tsx` · 558 linhas
 
 Para onde cada funcionalidade leva, e com que palavras. A tela não decide o que está disponível — isso vem do domínio, em
 
@@ -261,7 +268,7 @@ está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
 | `CorrecoesAMao.tsx` | CorrecoesAMao | `projetoId` | Correção à mão do trabalho: a porta da planilha e a lista do que já foi |
 | `EditarCadastro.tsx` | EditarCadastro | `projeto, aberto, aoFechar, aoSalvar` | Nome e período do trabalho. Existe porque o período muda de verdade: o trabalho do Amigão nasceu como |
 | `ExtrairDoSped.tsx` | ExtrairDoSped | `execucaoId` | Extrair um registro do SPED, consolidado de todos os arquivos. |
-| `FrentesDoTrabalho.tsx` | FrentesDoTrabalho | `projetoId, modulo, trilhas` | As frentes de trabalho de um trabalho: a CAT 42, o crédito outorgado, e as |
+| `FrentesDoTrabalho.tsx` | FrentesDoTrabalho | `projetoId, modulo, trilhas, rota` | As frentes de trabalho de um trabalho: a CAT 42, o crédito outorgado, e as |
 | `OcorrenciasDoArquivo.tsx` | OcorrenciasDoArquivo | `chave, carregar, cabecalho` | O que a pré-validação achou num arquivo digital. Serve às duas telas que pré-validam — a do arquivo que o sistema gerou e a |
 | `PainelDoTrabalho.tsx` | PainelDoTrabalho, FaixaDeLeiautes | `projetoId, etapas, rota, bloqueio` | O painel do trabalho: o que há para ler, e o que dá para fazer. |
 | `RecorteDoSped.tsx` | RecorteDoSped | `recorte, aoMudar, estabelecimentos` | O recorte da extração: o que entra, e o que nem chega a ser lido. |
@@ -546,7 +553,7 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 | `--borda-sutil` | `rgb(255 255 255 / 8%)` | — |
 | `--brilho-acao` | `0 12px 28px rgb(255 127 0 / 30%)` | — |
 
-## 5. O que a tela pede ao servidor (106 chamadas)
+## 5. O que a tela pede ao servidor (111 chamadas)
 
 Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 `:id`, qualquer que seja o nome no código.
@@ -571,6 +578,9 @@ Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 | GET | `/api/apuracao-piscofins/:id/estabelecimentos` |
 | GET | `/api/apuracao-piscofins/:id/lancamentos` |
 | GET | `/api/apuracao-piscofins/:id/planilhas/:id` |
+| GET | `/api/apuracao-piscofins/:id/saidas` |
+| GET | `/api/apuracao-piscofins/:id/saidas/filtros` |
+| GET | `/api/apuracao-piscofins/:id/saidas/planilha` |
 | POST | `/api/projetos/:id/apuracao-piscofins` |
 
 ### `arquivoDigital`
@@ -644,7 +654,9 @@ Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 | --- | --- |
 | GET | `/api/exclusoes/:id` |
 | POST | `/api/exclusoes/:id/cancelar` |
+| GET | `/api/exclusoes/:id/planilhas/:id` |
 | GET | `/api/exclusoes/:id/planilhas/exclusoes:id` |
+| GET | `/api/exclusoes/:id/planilhas/pacote` |
 | POST | `/api/projetos/:id/exclusoes` |
 
 ### `gestao`

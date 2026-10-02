@@ -142,6 +142,18 @@ export function ExtrairDoSped({ execucaoId }: { execucaoId: number }) {
         </Faixa>
       )}
 
+      {dados.nao_extraiveis?.length > 0 && (
+        <Faixa
+          titulo={`${dados.nao_extraiveis.length} registro(s) nos arquivos que esta quebra não indexou`}
+        >
+          {dados.nao_extraiveis
+            .map((n) => `${n.alvo} (${numero(n.quantidade)})`)
+            .join(", ")}
+          . Eles existem no SPED, mas esta quebra foi feita antes de eles entrarem no índice, e
+          por isso não aparecem na lista acima. Rode a quebra de novo para extraí-los.
+        </Faixa>
+      )}
+
       <RecorteDoSped
         recorte={recorte}
         aoMudar={setRecorte}
