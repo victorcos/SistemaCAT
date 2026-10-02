@@ -278,9 +278,13 @@ para as portas do sistema. `scripts/liberar-na-rede.ps1` faz as duas coisas que
 exigem administrador — reclassifica a rede da empresa como `Private` e abre a
 porta da API com perfil `Private,Domain`, que não vale em rede pública.
 
-**Uma porta, não duas**, porque a API serve o front. E prefira o **hostname** ao
-IP: o certificado o cobre, e em Wi-Fi o IP muda a cada DHCP. Pelo Vite o nome não
-serve — `allowedHosts` devolve 403 —, pela API serve.
+**Uma porta, não duas**, porque a API serve o front.
+
+**O endereço é o IP, e o certificado cobre a sub-rede /24 inteira** para que a
+troca de DHCP não o invalide — 260 entradas no `subjectAltName`. O nome da máquina
+também está lá e funciona pela API (pelo Vite não: `allowedHosts` devolve 403),
+mas usá-lo depende do DNS interno, e isso depende da equipe de infra. Sub-rede
+diferente exige `npm run certificado -- --refazer`.
 
 ### O que ainda não é
 

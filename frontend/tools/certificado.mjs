@@ -15,8 +15,28 @@
  * ## O que este script faz, e o que ele não resolve
  *
  * Gera um par chave/certificado **autoassinado**, com o `subjectAltName`
- * cobrindo `localhost`, `127.0.0.1` e **todos os IPv4 da máquina** — sem o SAN
- * do endereço que a pessoa digita, o navegador nem oferece o "prosseguir".
+ * cobrindo `localhost`, `127.0.0.1`, todos os IPv4 da máquina e **a sub-rede
+ * /24 de cada um deles** — sem o SAN do endereço que a pessoa digita, o
+ * navegador nem oferece o "prosseguir".
+ *
+ * ## Por que a sub-rede inteira, e não só o IP de agora
+ *
+ * O endereço muda. Em 02/10/2026 ele mudou duas vezes em quinze minutos — cabo
+ * para Wi-Fi e de volta —, e o certificado ficou obsoleto nas duas. Usar o nome
+ * da máquina resolveria, mas depender do DNS interno da empresa é depender da
+ * equipe de infra, e isso foi recusado com razão.
+ *
+ * Então cobre-se o /24: `192.168.88.1` a `.254`. Qualquer endereço que o DHCP
+ * entregue já está no certificado, e não há o que refazer. São ~254 entradas
+ * por adaptador, o que um certificado aguenta sem reclamar.
+ *
+ * **Não é frouxidão de segurança.** O certificado continua autoassinado e a
+ * chave privada continua só aqui: cobrir um endereço não permite a ninguém se
+ * passar por ele. O que a sub-rede compra é o navegador parar de reclamar de
+ * nome quando o IP troca.
+ *
+ * Os adaptadores virtuais do Hyper-V (`vEthernet ...`) entram só com o próprio
+ * endereço, sem expansão: ninguém acessa o sistema por eles.
  *
  * Autoassinado significa aviso do navegador na primeira visita. Quem prosseguir
  * ganha contexto seguro de verdade (`isSecureContext === true`), que é tudo o
@@ -43,22 +63,37 @@ export const CERTIFICADO = join(PASTA, "dev.pem");
 /** O navegador recusa confiar em certificado com validade longa demais. */
 const DIAS = 825;
 
+/** Todo endereço da /24 de um IP. `192.168.88.185` -> `.1` até `.254`. */
+function subRede(ip) {
+  const partes = ip.split(".");
+  if (partes.length !== 4) return [ip];
+  const prefixo = partes.slice(0, 3).join(".");
+  return Array.from({ length: 254 }, (_, i) => `${prefixo}.${i + 1}`);
+}
+
 /** Onde este dev server pode ser alcançado. Sem isto no SAN, o navegador barra. */
 function enderecos() {
-  const ips = Object.values(networkInterfaces())
-    .flatMap((interfaces) => interfaces ?? [])
-    .filter((i) => i.family === "IPv4" && !i.internal)
-    .map((i) => i.address);
+  const reais = [];
+  const virtuais = [];
+  for (const [nome, interfaces] of Object.entries(networkInterfaces())) {
+    for (const i of interfaces ?? []) {
+      if (i.family !== "IPv4" || i.internal) continue;
+      // o switch virtual do Hyper-V não é por onde ninguém acessa o sistema
+      (nome.startsWith("vEthernet") ? virtuais : reais).push(i.address);
+    }
+  }
 
-  const nomes = ["localhost", hostname()];
+  const ips = ["127.0.0.1", ...virtuais, ...reais.flatMap(subRede)];
   return {
-    ips: [...new Set(["127.0.0.1", ...ips])],
-    nomes: [...new Set(nomes.filter(Boolean))],
+    ips: [...new Set(ips)],
+    nomes: [...new Set(["localhost", hostname()].filter(Boolean))],
+    // o que se imprime: a sub-rede inteira poluiria a saída
+    destaque: [...new Set(reais)],
   };
 }
 
 function gerar() {
-  const { ips, nomes } = enderecos();
+  const { ips, nomes, destaque } = enderecos();
   const san = [
     ...nomes.map((n) => `DNS:${n}`),
     ...ips.map((ip) => `IP:${ip}`),
@@ -86,9 +121,15 @@ function gerar() {
   );
 
   console.log(`certificado gerado em ${PASTA}`);
-  console.log(`  válido por ${DIAS} dias, cobrindo:`);
-  for (const n of nomes) console.log(`    https://${n}:5173`);
-  for (const ip of ips) console.log(`    https://${ip}:5173`);
+  console.log(`  válido por ${DIAS} dias, cobrindo ${ips.length} endereços.`);
+  console.log("  Os desta máquina agora:");
+  for (const n of nomes) console.log(`    https://${n}`);
+  for (const ip of destaque) console.log(`    https://${ip}`);
+  if (destaque.length) {
+    const r = destaque.map((ip) => ip.split(".").slice(0, 3).join(".") + ".1-254");
+    console.log(`  E a sub-rede inteira (${r.join(", ")}), para o IP poder mudar`);
+    console.log("  sem o certificado ficar obsoleto.");
+  }
   console.log(
     "\nO `npm run dev` já o encontra sozinho. Na primeira visita o navegador\n" +
       "avisa que o certificado é autoassinado — prosseguir dá contexto seguro,\n" +

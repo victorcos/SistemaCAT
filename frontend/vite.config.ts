@@ -18,6 +18,26 @@ import react from "@vitejs/plugin-react";
  * gerou certificado continua em HTTP sem configurar nada, e quem gerou nao
  * precisa lembrar de ligar. `npm run certificado` gera.
  */
+/**
+ * A API esta em HTTPS? Quem decide e o `backend/.env`, o mesmo arquivo que ela le.
+ *
+ * **Sem isto o desenvolvimento quebra quando o modo de rede e ligado.** O proxy
+ * apontava para `http://localhost:8010` fixo; no dia em que a API passou a servir
+ * o front em HTTPS (02/10/2026), `localhost:5173` continuou carregando a pagina e
+ * passou a dar 500 em toda chamada de API — pagina que abre e nao funciona, que e
+ * pior que pagina que nao abre.
+ *
+ * Ler o `.env` da API e nao uma variavel propria: uma fonte de verdade. Ligar o
+ * modo em um lugar nao pode exigir lembrar de um segundo.
+ */
+function apiEmHttps() {
+  const env = join(dirname(fileURLToPath(import.meta.url)), "..", "backend", ".env");
+  if (!existsSync(env)) return false;
+  return readFileSync(env, "utf8")
+    .split(/\r?\n/)
+    .some((l) => /^\s*CAT_TLS_CERTIFICADO\s*=\s*\S/.test(l));
+}
+
 function certificado() {
   const pasta = join(dirname(fileURLToPath(import.meta.url)), "certificado");
   const chave = join(pasta, "dev.key");
@@ -78,8 +98,12 @@ export default defineConfig({
     // nao serve: ele nao tem rota /api desde a fatia 7.
     proxy: {
       "/api": {
-        target: `http://localhost:${process.env.CAT_API_PORT ?? 8010}`,
+        target: `${apiEmHttps() ? "https" : "http"}://localhost:${process.env.CAT_API_PORT ?? 8010}`,
         changeOrigin: true,
+        // o certificado da API e autoassinado: validar aqui recusaria a propria
+        // maquina. O proxy nao sai do host, e quem valida de verdade e o
+        // navegador, na ponta
+        secure: false,
       },
     },
   },

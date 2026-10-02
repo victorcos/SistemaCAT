@@ -5,6 +5,48 @@
 
 ---
 
+## 2026-10-02 — O certificado cobre a sub-rede, para o IP poder mudar
+
+**A escolha é do Victor, e é a certa pelo motivo dele.** Usar o nome da máquina
+(`https://VBMS-0151:8010`) resolveria a troca de IP de graça — mas depende do DNS
+interno da empresa, e isso depende da equipe de infra. Recusado: "é muito
+trabalhoso, e problemático". Um endereço que exige abrir ticket não é um endereço
+que a equipe usa.
+
+Então vale o IP. E o IP tem o problema que apareceu na mesma tarde: **mudou duas
+vezes em quinze minutos** — cabo para Wi-Fi e de volta —, e o certificado ficou
+obsoleto nas duas.
+
+**A saída, inteiramente local: cobrir o /24 no `subjectAltName`.**
+`192.168.88.1` a `.254`, 260 entradas. Qualquer endereço que o DHCP entregue já
+está no certificado, e não há o que refazer quando ele troca.
+
+**Não é frouxidão.** O certificado continua autoassinado e a chave privada
+continua só na máquina: cobrir um endereço não permite a ninguém se passar por
+ele. O que a sub-rede compra é o navegador parar de reclamar de **nome** quando o
+IP muda — a reclamação de autoridade continua, e é a que se aceita uma vez.
+
+Os adaptadores virtuais do Hyper-V entram só com o próprio endereço, sem
+expansão: ninguém acessa o sistema por eles, e expandir dois /24 a mais só
+engordaria o certificado.
+
+**O limite, dito claro:** sub-rede diferente exige regerar. Se a empresa mudar a
+faixa, `npm run certificado -- --refazer`.
+
+### E o proxy do Vite passou a seguir o esquema da API
+
+Ligar o modo de rede quebrou o desenvolvimento: o proxy apontava para
+`http://localhost:8010` fixo, a API virou HTTPS, e `localhost:5173` passou a
+carregar a página e dar 500 em toda chamada — página que abre e não funciona, que
+é pior que página que não abre.
+
+Agora o `vite.config.ts` lê o `backend/.env` — o mesmo arquivo que a API lê — e
+segue o esquema dela, com `secure: false` porque o certificado é autoassinado e
+validar aqui recusaria a própria máquina. **Uma fonte de verdade:** ligar o modo
+num lugar não pode exigir lembrar de um segundo.
+
+---
+
 ## 2026-10-02 — Nunca foi o IP: era o firewall, e a rede estava como pública
 
 **O relato.** "Não está rodando no IP local em outra máquina" — e, logo depois,
