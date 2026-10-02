@@ -278,6 +278,18 @@ para as portas do sistema. `scripts/liberar-na-rede.ps1` faz as duas coisas que
 exigem administrador — reclassifica a rede da empresa como `Private` e abre a
 porta da API com perfil `Private,Domain`, que não vale em rede pública.
 
+Os scripts desta casa não rodam de primeira: o Windows cliente vem com a política
+de execução em `Restricted` e recusa qualquer `.ps1`. Vale para os três
+(`instalar.ps1`, `subir.ps1`, `liberar-na-rede.ps1`). O contorno que não mexe em
+nada permanente é o escopo de processo, que morre com a janela:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+```
+
+Se `Get-ExecutionPolicy -List` mostrar `MachinePolicy` ou `UserPolicy` definidos,
+a política vem por GPO da empresa e o Bypass por processo **não** vale.
+
 **Uma porta, não duas**, porque a API serve o front.
 
 **O endereço é o IP, e o certificado cobre a sub-rede /24 inteira** para que a

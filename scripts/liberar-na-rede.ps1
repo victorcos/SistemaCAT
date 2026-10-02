@@ -38,10 +38,23 @@
   que esteja em `Public` — que é o caso comum de quem trocou cabo por Wi-Fi.
 
 .EXAMPLE
+  # O Windows cliente vem com a politica de execucao em Restricted, e recusa
+  # QUALQUER script -- inclusive este. O escopo Process morre com a janela e nao
+  # mexe em nada permanente:
+  Set-ExecutionPolicy -Scope Process Bypass
   .\scripts\liberar-na-rede.ps1
 
 .EXAMPLE
+  # Ou sem tocar na politica, de uma janela de administrador qualquer:
+  powershell -ExecutionPolicy Bypass -File .\scripts\liberar-na-rede.ps1
+
+.EXAMPLE
   .\scripts\liberar-na-rede.ps1 -Porta 8010 -Interface "Wi-Fi 2"
+
+.NOTES
+  Se `Get-ExecutionPolicy -List` mostrar MachinePolicy ou UserPolicy definidos, a
+  empresa esta forcando a politica por GPO e o Bypass por processo NAO vale. Nesse
+  caso rode as duas linhas do corpo deste script a mao -- sao duas.
 #>
 [CmdletBinding()]
 param(
@@ -105,8 +118,11 @@ $nome = [System.Net.Dns]::GetHostName()
 
 Write-Host ""
 Write-Host "Pronto. Os endereços para o pessoal:" -ForegroundColor Cyan
-Write-Host "  https://${nome}:$Porta   <- sobrevive à troca de IP; prefira este"
 foreach ($ip in $ips) { Write-Host "  https://${ip}:$Porta" }
+Write-Host "  https://${nome}:$Porta   (pelo nome, se o DNS interno resolver)" -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "O IP pode mudar sem invalidar o certificado: ele cobre a sub-rede /24" -ForegroundColor DarkGray
+Write-Host "inteira. Faixa diferente, sim, exige refazer." -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "Se ainda não abrir, falta o lado que não é de administrador:" -ForegroundColor Yellow
 Write-Host "  cd frontend; npm run build"
