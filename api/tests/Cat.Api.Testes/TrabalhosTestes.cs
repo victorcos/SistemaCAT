@@ -570,6 +570,41 @@ public sealed class TrabalhosTestes(BancoDeTeste banco, MotorInternoFalso _motor
     }
 
     [Fact]
+    public async Task Tiquete_de_download_nao_impede_apagar_o_trabalho()
+    {
+        // **o tíquete vive dois minutos e nasceu travando o que não devia.** A
+        // chave estrangeira para `execucao` veio sem cascata, e o primeiro
+        // download de uma execução passava a impedir apagar o trabalho inteiro
+        // — 23503 na tela, com "Erro interno" e um código de suporte. Apareceu
+        // em 02/10/2026, horas depois de a tabela nascer, e numa tela que a
+        // pessoa já tinha confirmado com a própria senha
+        var (usuario, _, token) = await Pessoa("gestor");
+        var c = Cliente(token: token);
+        var (projeto, _, _) = await TrabalhoComBase(c);
+        var execucao = await banco.Escalar<int>(
+            $"SELECT id FROM execucao WHERE projeto_id = {projeto} LIMIT 1");
+        await banco.Comando($"""
+            INSERT INTO tiquete_de_download
+              (id, usuario_id, execucao_id, etapa, qual, formato, criado_em, expira_em)
+            VALUES ('tiquete-do-teste', {usuario}, {execucao}, 'conferencia',
+                    'a-cobrar', 'csv', now(), now() + interval '2 minutes')
+            """);
+        // **sem isto o teste e vazio.** Se o INSERT nao acontecer — execucao que
+        // nao existe, coluna que mudou de nome —, "zero tiquetes no fim" e
+        // verdade trivial e o teste passa sem exercitar nada. O banco de teste e
+        // recriado a cada rodada a partir das migracoes, entao nao da para
+        // simular o defeito aqui: o que guarda a cascata e esta afirmacao
+        Assert.Equal(1, await banco.Escalar<long>(
+            "SELECT count(*) FROM tiquete_de_download WHERE id = 'tiquete-do-teste'"));
+
+        var r = await c.SendAsync(Apagar(projeto, new { senha = BancoDeTeste.SenhaPadrao }));
+
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal(0, await banco.Escalar<long>(
+            "SELECT count(*) FROM tiquete_de_download WHERE id = 'tiquete-do-teste'"));
+    }
+
+    [Fact]
     public async Task Motor_fora_do_ar_nao_apaga_nada()
     {
         var (_, _, token) = await Pessoa("gestor");

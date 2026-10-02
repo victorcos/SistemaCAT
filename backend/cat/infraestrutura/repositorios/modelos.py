@@ -546,8 +546,14 @@ class TiqueteDeDownloadDB(Base):
 
     # o próprio segredo é a chave: 32 bytes aleatórios em base64url
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"), nullable=False)
-    execucao_id: Mapped[int] = mapped_column(ForeignKey("execucao.id"), nullable=False)
+    # **em cascata, e isso não é detalhe.** Um tíquete vive dois minutos e não
+    # pode ser o que impede apagar um trabalho: sem a cascata, o primeiro
+    # download de uma execução a trava para sempre. Apareceu na tela em
+    # 02/10/2026, horas depois de a tabela nascer — 23503 ao excluir o projeto
+    usuario_id: Mapped[int] = mapped_column(
+        ForeignKey("usuario.id", ondelete="CASCADE"), nullable=False)
+    execucao_id: Mapped[int] = mapped_column(
+        ForeignKey("execucao.id", ondelete="CASCADE"), nullable=False)
     # a etapa pela qual a tela pediu, que é de quem é o catálogo de planilhas
     etapa: Mapped[str] = mapped_column(String(30), nullable=False)
     qual: Mapped[str] = mapped_column(String(40), nullable=False)

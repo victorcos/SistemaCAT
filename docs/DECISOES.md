@@ -5,6 +5,52 @@
 
 ---
 
+## 2026-10-02 — O tíquete travava apagar o trabalho, e o teste que escrevi nasceu vazio
+
+**O defeito.** Apagar um trabalho devolvia "Erro interno" com código de suporte,
+numa tela em que a pessoa já tinha confirmado com a própria senha. O log disse o
+que era em uma linha:
+
+```
+23503: update or delete on table "execucao" violates foreign key constraint
+       "tiquete_de_download_execucao_id_fkey"
+```
+
+A tabela de tíquetes nasceu horas antes, com chave estrangeira **sem cascata**.
+Um tíquete vive dois minutos e passou a impedir apagar o trabalho inteiro: o
+primeiro download de uma execução a travava para sempre.
+
+**A correção** é `ON DELETE CASCADE` nas duas chaves — `execucao` e `usuario`.
+Tíquete não é dado de negócio; é autorização descartável, e nada deve esperar por
+ele. Migração `d1a5c38e7b94`.
+
+**O que o relato mostrou de bom:** o código de suporte na tela levou do sintoma à
+linha do banco em uma consulta ao log. É para isso que ele existe.
+
+### O teste que eu escrevi passou sem exercitar nada
+
+Primeira versão: inserir um tíquete, apagar o trabalho, conferir que sobrou zero.
+Passou — **inclusive com o defeito recriado**, o que provava que ele não media
+nada. Duas descobertas ao investigar o próprio teste:
+
+* desfazer a migração no banco **principal** não afeta o de teste;
+* o `BancoDeTeste` **derruba e recria** o banco a cada rodada e migra para
+  `head`, então não há como simular o defeito ali.
+
+E o mais importante: se o `INSERT` do tíquete falhasse por qualquer motivo —
+execução que não existe, coluna renomeada —, "zero tíquetes no fim" seria verdade
+trivial e o teste passaria para sempre sem tocar no assunto.
+
+**A correção do teste é uma asserção a mais, antes do ato:** o tíquete tem de
+existir. Com ela, o teste prova que o `INSERT` aconteceu e que o `DELETE`
+atravessou a chave estrangeira. Se a cascata sair da cadeia de migrações, o banco
+de teste nasce sem ela e o teste quebra.
+
+**Teste que passa pelo motivo errado é pior que teste nenhum**, porque compra
+confiança sem entregar nada.
+
+---
+
 ## 2026-10-02 — O certificado cobre a sub-rede, para o IP poder mudar
 
 **A escolha é do Victor, e é a certa pelo motivo dele.** Usar o nome da máquina
