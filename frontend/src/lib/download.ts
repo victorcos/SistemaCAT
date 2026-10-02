@@ -18,10 +18,20 @@
  * Onde o seletor não existe (Firefox, Safari) ou a página não está em
  * contexto seguro, cai no caminho antigo. Continua funcionando, só sem
  * escolher pasta — e aí vale o que estiver configurado no navegador.
+ *
+ * **E dizendo por quê.** Cair no caminho antigo em silêncio custou uma
+ * investigação em 02/10/2026: o 037 de um cliente de 7,53 GB foi pedido de
+ * outra máquina, pelo IP do dev server, e o relato foi "nem gerou a opção de
+ * escolher o caminho". Não havia defeito — `http` num IP de rede não é
+ * contexto seguro, a API não existe ali, e o código saía por este ramo sem
+ * uma linha no console. Ver `motivoSemSeletor`.
  */
 
 /** O que o seletor devolve. `null` = não há seletor; use o caminho antigo. */
 type Destino = FileSystemFileHandle | null;
+
+/** Por que não há seletor. Vazio quando há. Ver `motivoSemSeletor`. */
+export type MotivoSemSeletor = "" | "sem-suporte" | "contexto-inseguro";
 
 /**
  * Quem cancelou não errou nada: não há o que avisar.
@@ -58,6 +68,27 @@ const TIPOS: Record<string, { descricao: string; mime: string }> = {
   ".csv": { descricao: "CSV", mime: "text/csv" },
   ".zip": { descricao: "Arquivo compactado", mime: "application/zip" },
 };
+
+/**
+ * Por que esta página não tem seletor de pasta — se não tiver.
+ *
+ * **Os dois motivos têm soluções diferentes, e por isso são valores
+ * diferentes.** "Sem suporte" é o navegador (Firefox, Safari) e não há o que
+ * fazer além de aceitar a pasta de downloads. "Contexto inseguro" é a página,
+ * tem conserto imediato, e é o caso que aparece na prática: a
+ * `File System Access API` só existe em https, `localhost` ou `127.0.0.1`, e o
+ * dev server desta casa é aberto para a rede por padrão (`vite.config.ts`,
+ * `host: CAT_HOST ?? true`). Quem abre `http://<ip>:5173` de outra máquina
+ * perde o seletor sem saber por quê.
+ *
+ * Serve à tela, não só ao console: o analista não abre o console, e a diferença
+ * entre "não baixou" e "não baixou porque X, faça Y" é meia hora de
+ * investigação. Ver `BaixarPlanilha`.
+ */
+export function motivoSemSeletor(): MotivoSemSeletor {
+  if (typeof (window as ComSeletor).showSaveFilePicker === "function") return "";
+  return window.isSecureContext ? "sem-suporte" : "contexto-inseguro";
+}
 
 function extensaoDe(nome: string): string {
   const ponto = nome.lastIndexOf(".");
@@ -100,7 +131,20 @@ const DEPRESSA_DEMAIS_PARA_SER_DESISTENCIA_MS = 150;
  */
 export async function escolherOndeSalvar(nomeSugerido: string): Promise<Destino> {
   const seletor = (window as ComSeletor).showSaveFilePicker;
-  if (typeof seletor !== "function") return null;
+  if (typeof seletor !== "function") {
+    // **este ramo saía calado**, e era o mais comum dos dois. O `console.warn`
+    // de 01/10 ficou só no `catch`, que cobre o seletor que existe e falha
+    console.warn(
+      motivoSemSeletor() === "contexto-inseguro"
+        ? "sem seletor de pasta: a página não está em contexto seguro. `http` num " +
+          "IP de rede não vale — abra por `localhost` ou https. O arquivo vai para " +
+          "a pasta de downloads e passa inteiro pela memória antes de gravar."
+        : "sem seletor de pasta: este navegador não implementa `showSaveFilePicker`. " +
+          "O arquivo vai para a pasta de downloads e passa inteiro pela memória " +
+          "antes de gravar.",
+    );
+    return null;
+  }
 
   const extensao = extensaoDe(nomeSugerido);
   const tipo = TIPOS[extensao];

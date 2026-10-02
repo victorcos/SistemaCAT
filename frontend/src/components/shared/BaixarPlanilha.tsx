@@ -1,5 +1,6 @@
 import { Botao } from "@/components/ui/Botao";
 import { IconeBaixar } from "@/constants/icons";
+import { motivoSemSeletor } from "@/lib/download";
 import type { Formato } from "@/services/conferencia";
 
 /**
@@ -19,6 +20,14 @@ import type { Formato } from "@/services/conferencia";
  * como" fica no caminho, e quando ele não abre o download sumia em silêncio.
  * Ver `lib/download.ts` — hoje o seletor que falha cai na pasta padrão em vez
  * de não baixar nada.
+ *
+ * **E quando não há seletor nenhum, a tela diz.** Em 02/10/2026 um 037 de 2,93
+ * milhões de linhas foi pedido de outra máquina, pelo IP do dev server: sem
+ * contexto seguro não existe seletor, o arquivo foi para a pasta de downloads
+ * passando inteiro pela memória, e o relato foi "nem gerou a opção de escolher
+ * o caminho". Era o comportamento correto, mudo. O aviso aqui existe porque
+ * ninguém abre o console — e porque, nesse caminho, lista grande **falha**, e o
+ * CSV ao lado é a saída.
  */
 export function BaixarPlanilha({
   aoBaixar,
@@ -47,8 +56,9 @@ export function BaixarPlanilha({
   // ação ainda pode estar acontecendo. Clicar duas vezes no mesmo lugar passa
   // a ser inofensivo, que é o que se espera de um botão de baixar.
   const cancelavel = baixando !== null && aoCancelar !== undefined;
+  const semSeletor = motivoSemSeletor();
 
-  return (
+  const botoes = (
     <div className="flex flex-wrap items-center gap-2">
       <Botao
         variante={destaque ? "principal" : "secundario"}
@@ -79,6 +89,33 @@ export function BaixarPlanilha({
           Cancelar
         </Botao>
       )}
+    </div>
+  );
+
+  // **o DOM só muda quando há algo a dizer.** Este componente está em quinze
+  // telas, em contêineres de linha e de coluna; envolver sempre mudaria o
+  // layout de todas para avisar de um caso excepcional
+  if (!semSeletor) return botoes;
+
+  return (
+    <div className="flex flex-col items-end gap-1.5">
+      {botoes}
+      <p className="m-0 max-w-[46ch] text-right text-[11px] leading-relaxed text-atencao">
+        {semSeletor === "contexto-inseguro" ? (
+          <>
+            Vai para a pasta de downloads: esta página está em <strong>http</strong> por
+            IP, e escolher a pasta só funciona em <strong>localhost</strong> ou https.
+            Nesse caminho o arquivo passa inteiro pela memória — em lista grande,
+            prefira o CSV.
+          </>
+        ) : (
+          <>
+            Vai para a pasta de downloads: este navegador não tem seletor de pasta.
+            Nesse caminho o arquivo passa inteiro pela memória — em lista grande,
+            prefira o CSV.
+          </>
+        )}
+      </p>
     </div>
   );
 }

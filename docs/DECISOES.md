@@ -5,6 +5,60 @@
 
 ---
 
+## 2026-10-02 — O outro ramo do seletor também saía calado
+
+**O relato.** O 037 do MIX VALI pedido de outra máquina: "está carregando há um
+tempo, não sei se travou" e, logo depois, **"ele nem gerou a opção de selecionar
+o caminho para salvar"**.
+
+**Não havia defeito no download.** A segunda frase é o diagnóstico inteiro: o
+seletor abre **antes** do fetch, de propósito, porque a ativação do gesto do
+clique não sobrevive a uma ida à rede. Se ele não apareceu, a requisição nem
+saiu — e o que aconteceu depois foi o caminho antigo, que é o pior possível para
+esse arquivo.
+
+**A causa.** O `vite.config.ts` abre o dev server para a rede por padrão
+(`host: CAT_HOST ?? true`, e o comentário diz "de outra maquina"). Quem acessa
+`http://<ip>:5173` está fora de **contexto seguro**, e a `File System Access
+API` simplesmente não existe ali. O código saía por `if (typeof seletor !==
+"function") return null` — correto, e **sem uma linha no console**.
+
+A correção de 01/10 havia posto o `console.warn` só no `catch`, que cobre o
+seletor que existe e falha. O ramo em que ele **não existe** — o mais comum dos
+dois — continuou mudo por nove dias.
+
+**O que mudou.** `motivoSemSeletor()` responde por que não há seletor, e separa
+os dois motivos **porque as soluções são diferentes**: contexto inseguro se
+resolve abrindo por `localhost` ou https; navegador sem suporte (Firefox,
+Safari) não se resolve. Vai ao console e, principalmente, **à tela** — o
+analista não abre o console, e `BaixarPlanilha` está em quinze telas.
+
+O aviso diz as três coisas que importam: onde o arquivo vai cair, por quê, e que
+nesse caminho ele **passa inteiro pela memória** — então em lista grande vale o
+CSV ao lado. O DOM só muda quando há o que dizer: o componente vive em
+contêineres de linha e de coluna, e envolver sempre mudaria o layout de quinze
+telas para avisar de um caso excepcional.
+
+### O que a medição mostrou sobre a espera
+
+Medido no MIX VALI: **644 arquivos e 15,8 GB na pasta, mas só 59 arquivos e 7,53
+GB são EFD Contribuições** — o que o 037 lê. O resto é 567 EFD ICMS/IPI, 6 ECD,
+5 ECF e 7 cabeçalhos irreconhecíveis.
+
+```
+leitura dos 7,53 GB         93 s     (81 MB/s)
+itens de entrada            2.933.762 linhas
+xlsx                        ~16 min, em 4 abas
+csv                         27 s
+```
+
+**A leitura nunca foi o gargalo.** O xlsx é, e 2,93 milhões de linhas não cabem
+numa aba de Excel de todo jeito. É a mesma conclusão de 01/10 no 680, agora numa
+etapa diferente: acima de um milhão de linhas, o formato do MA é CSV porque o
+Excel não é opção.
+
+---
+
 ## 2026-10-01 — O formato dentro do pacote é o do arquivo de referência
 
 **O que se mediu, no 680 da DMINAS — 3.568.362 linhas, 35 colunas:**
