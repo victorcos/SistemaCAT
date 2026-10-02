@@ -5,6 +5,72 @@
 
 ---
 
+## 2026-10-02 — Quem baixa é o navegador, não a aba
+
+**O problema que o HTTPS não resolve.** Com contexto seguro o seletor de pasta
+volta e o `pipeTo` grava em fluxo — mas só no Chromium. Firefox e Safari não têm
+a API nem em https, e continuam no caminho antigo: `fetch` e `await r.blob()`,
+com o arquivo **inteiro na memória da aba**. Num 037 de 2,93 milhões de linhas
+isso não passa, e a API já servia do disco em fluxo: todo o desperdício era do
+navegador.
+
+**A decisão: baixar por navegação.** `<a download href>` num endereço da mesma
+origem faz o **navegador** baixar — o gerenciador dele grava direto no disco,
+mostra progresso, não tem teto de tamanho e funciona em qualquer navegador, com
+ou sem contexto seguro. A aba não toca nos bytes.
+
+Navegação não manda cabeçalho `Authorization`, e é essa lacuna que o **tíquete**
+fecha: `POST .../planilhas/{qual}/tiquete` devolve um segredo de vida curta, e o
+`GET` o aceita no lugar do cabeçalho.
+
+### Quatro escolhas que valem estar escritas
+
+**No banco, não em memória.** Haverá mais de uma instância da API; tíquete
+emitido numa tem de ser resgatável na outra. Tabela `tiquete_de_download`,
+migração `c4e07a91d5b2`.
+
+**Vida curta em vez de uso único.** Dois minutos, amarrado a um usuário e a um
+arquivo. Uso único seria mais apertado no papel e hostil na prática: o
+gerenciador de download do navegador **repete a requisição** — queda de rede,
+redirecionamento, às vezes um `HEAD` antes do `GET` —, e recusar a repetição
+transforma um soluço de rede em "o link morreu". Quem protege é o prazo;
+`usado_em` é auditoria. E porque não há trava, não há corrida entre instâncias.
+
+**O tíquete manda, não a URL.** O `GET` serve o que o tíquete descreve —
+`qual`, `formato` e recorte. Sem isso, um tíquete de um CSV pequeno pediria o
+xlsx inteiro trocando o parâmetro na barra de endereço.
+
+**Emitir não gera a planilha.** É a propriedade que faz tudo valer: gerar na
+emissão devolveria os dezesseis minutos para dentro da aba, com o botão travado.
+O `POST` confere o que é barato — a execução existe, é do escopo de quem pede, é
+da etapa certa — e o resto acontece no `GET`, com a espera no gerenciador de
+download e a pessoa livre para trabalhar.
+
+### O que se perde, dito claro
+
+**Erro de disco aparece depois.** Escopo e identificador errados viram aviso na
+tela, antes da espera — melhor que hoje, em que chegam depois de o arquivo
+inteiro ser montado. Mas "os arquivos não estão mais em disco" e "esta versão
+não tem esta lista" passam a aparecer como download que falhou no navegador, e
+não como aviso. É o preço de a espera sair da aba, e é um preço bom.
+
+**Cancelar vale até a autorização.** Depois dela o download é do navegador, e é
+lá que se cancela. O botão para de girar na hora, enquanto o servidor ainda monta
+o arquivo — quem acompanha é a barra de downloads.
+
+### Onde o desvio é reconhecido
+
+`baixarArquivo` decide pela **forma da rota**:
+`/api/<segmento>/<id>/planilhas/<qual>` é o desenho que `ExecucoesRotas.Etapa`
+registra para toda etapa, e é lá que vive o tíquete. A extração da quebra e a
+planilha da 047 têm rota própria, com corpo, e seguem pelo caminho antigo.
+Reconhecer a forma num lugar é o que fez as **vinte e duas** chamadas de
+download ganharem isso sem que nenhuma precisasse mudar — e é o que os testes de
+`conferencia.teste.ts` guardam, porque errar o desvio manda um `POST` para uma
+rota que não existe.
+
+---
+
 ## 2026-10-02 — HTTPS no dev server, porque contexto seguro não é firula
 
 **O problema, em uma frase:** os funcionários usam o dev server pela rede, e

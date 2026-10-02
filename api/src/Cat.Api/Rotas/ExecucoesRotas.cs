@@ -349,17 +349,52 @@ public static class ExecucoesRotas
                     Dto(await caso.Detalhar(execucaoId, exigida, http.UsuarioAtual(), http.RequestAborted)))))
             .ExigirUsuario();
 
+        // O tíquete: autoriza o download sem gerar nada, para o navegador poder
+        // baixar por navegação — sem o arquivo passar pela memória da aba. Ver
+        // `ITiquetesDeDownload`. É POST porque cria uma autorização
+        api.MapPost($"/{segmento}/{{execucaoId:int}}/planilhas/{{qual}}/tiquete",
+                async (int execucaoId, string qual, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                {
+                    var q = http.Request.Query;
+                    var formato = q["formato"].FirstOrDefault() is { Length: > 0 } f ? f : "xlsx";
+                    var emitido = await caso.TiqueteDePlanilha(execucaoId, etapa, exigida, qual,
+                        q["modelos"].FirstOrDefault(), q["classificacoes"].FirstOrDefault(),
+                        formato, http.UsuarioAtual(), http.RequestAborted);
+                    return Results.Json(new Dictionary<string, object>
+                    {
+                        ["tiquete"] = emitido.Tiquete,
+                        ["vale_por_segundos"] = emitido.ValePorSegundos,
+                    });
+                }))
+            .ExigirUsuario();
+
         api.MapGet($"/{segmento}/{{execucaoId:int}}/planilhas/{{qual}}",
                 async (int execucaoId, string qual, HttpContext http, Execucoes caso, ConfigCat config, ILogger<Execucoes> log) =>
                 await Traduzir(async () =>
                 {
                     var q = http.Request.Query;
                     var formato = q["formato"].FirstOrDefault() is { Length: > 0 } f ? f : "xlsx";
-                    var pronta = await caso.Planilha(execucaoId, etapa, exigida, qual, q["modelos"].FirstOrDefault(),
-                        q["classificacoes"].FirstOrDefault(), formato, http.UsuarioAtual(), http.RequestAborted);
+                    var modelos = q["modelos"].FirstOrDefault();
+                    var classificacoes = q["classificacoes"].FirstOrDefault();
+
+                    // **o tíquete manda, não a URL.** Quem entrou por tíquete
+                    // baixa exatamente o que foi autorizado: sem isto, um
+                    // tíquete de um CSV pequeno serviria para pedir o xlsx
+                    // inteiro trocando o parâmetro na barra de endereço
+                    if (http.TiqueteAtual() is { } autorizado)
+                    {
+                        qual = autorizado.Qual;
+                        formato = autorizado.Formato;
+                        modelos = autorizado.Modelos;
+                        classificacoes = autorizado.Classificacoes;
+                    }
+
+                    var pronta = await caso.Planilha(execucaoId, etapa, exigida, qual, modelos,
+                        classificacoes, formato, http.UsuarioAtual(), http.RequestAborted);
                     return Arquivo(pronta, config, log);
                 }))
-            .ExigirUsuario();
+            .ExigirUsuarioOuTiquete();
     }
 
     /// <summary>

@@ -39,3 +39,15 @@ if (!HTMLDialogElement.prototype.showModal) {
     this.dispatchEvent(new Event("close"));
   };
 }
+
+/**
+ * O jsdom não cria endereço de objeto, e o caminho antigo de download precisa.
+ *
+ * `baixarPelaPastaPadrao` monta um `blob:` para o link apontar. No jsdom a
+ * função ou falta ou tropeça nas entranhas do `Blob`, e o teste falha com
+ * `Cannot read properties of undefined (reading '_buffer')` — erro que parece
+ * do download e é do ambiente. O remendo devolve um endereço de mentira, que é
+ * tudo o que o teste precisa: o que se mede é o link, não o blob.
+ */
+URL.createObjectURL = () => "blob:de-mentira";
+URL.revokeObjectURL = () => {};

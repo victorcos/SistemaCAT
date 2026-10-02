@@ -134,6 +134,92 @@ export async function baixarPlanilha(
 }
 
 /**
+ * A rota de planilha tem um tíquete ao lado; as outras rotas de download, não.
+ *
+ * `/api/<segmento>/<id>/planilhas/<qual>` é o desenho que `ExecucoesRotas.Etapa`
+ * registra para toda etapa, e é lá que vive o `POST .../tiquete`. A extração da
+ * quebra e a planilha da 047 têm rota própria, com corpo, e seguem pelo caminho
+ * antigo — reconhecer a forma aqui é o que deixa as vinte e duas chamadas
+ * ganharem o download por navegação sem que nenhuma precise mudar.
+ */
+const ROTA_DE_PLANILHA = /^\/api\/[^/?]+\/\d+\/planilhas\/[^/?]+$/;
+
+/**
+ * Entrega a URL ao **navegador** e sai da frente.
+ *
+ * `download` num endereço da mesma origem faz o navegador baixar em vez de
+ * navegar: o gerenciador dele grava direto no disco, em fluxo, mostra progresso
+ * e a aba não toca nos bytes. É isso que tira o teto de memória — e funciona em
+ * qualquer navegador, com ou sem contexto seguro.
+ *
+ * `noreferrer` porque o tíquete anda na URL: sem isso ele viajaria no `Referer`
+ * de qualquer requisição que a página fizesse depois.
+ */
+function entregarAoNavegador(url: string, nome: string): void {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = nome;
+  link.rel = "noreferrer";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+/**
+ * Pede a autorização de download e deixa o navegador baixar.
+ *
+ * **Por que não buscar o arquivo aqui.** Buscar com `fetch` obriga a segurar a
+ * resposta em algum lugar — e sem o seletor de pasta (que não existe fora de
+ * contexto seguro) esse lugar é a **memória da aba**. Num 037 de 2,93 milhões
+ * de linhas isso não passa. Investigado em 02/10/2026.
+ *
+ * O `POST` é barato: ele **não gera a planilha**, só autoriza. Erro de escopo e
+ * de identificador aparece aqui, como `ErroApi` na tela, antes de qualquer
+ * espera. Arquivo que saiu do disco aparece depois, como download que falhou no
+ * navegador — é o preço de a espera sair da aba, e é um preço bom.
+ *
+ * **Cancelar vale até a autorização.** Depois dela o download é do navegador, e
+ * é lá que se cancela. O botão para de girar na hora, enquanto o servidor ainda
+ * monta o arquivo: quem acompanha é a barra de downloads.
+ */
+async function baixarPorTiquete(
+  endereco: string,
+  nomePadrao: string,
+  sinal?: AbortSignal,
+): Promise<void> {
+  const [caminho, query] = endereco.split("?");
+  const cabecalhos = new Headers();
+  const token = lerToken();
+  if (token) cabecalhos.set("Authorization", `Bearer ${token}`);
+
+  let r: Response;
+  try {
+    r = await fetch(`${caminho}/tiquete${query ? `?${query}` : ""}`,
+      { method: "POST", headers: cabecalhos, signal: sinal });
+  } catch (e) {
+    if (foiAbortado(e)) throw new DownloadCancelado();
+    throw new ErroApi("Não foi possível baixar a planilha.", 0);
+  }
+
+  const requisicaoId = r.headers.get("X-Request-Id") ?? undefined;
+  if (!r.ok) {
+    let detalhe = "Não foi possível gerar a planilha.";
+    try {
+      const corpo = await r.json();
+      if (typeof corpo?.detail === "string") detalhe = corpo.detail;
+    } catch {
+      /* resposta sem JSON */
+    }
+    throw new ErroApi(detalhe, r.status, requisicaoId);
+  }
+
+  const { tiquete } = (await r.json()) as { tiquete: string };
+  const separador = query ? "&" : "?";
+  entregarAoNavegador(
+    `${endereco}${separador}t=${encodeURIComponent(tiquete)}`, nomePadrao);
+}
+
+/**
  * Busca um arquivo autenticado e salva onde a pessoa escolher.
  *
  * Serve a qualquer etapa que exporte planilha: a rota exige o token no
@@ -154,6 +240,11 @@ export async function baixarArquivo(
   nomePadrao: string,
   sinal?: AbortSignal,
 ): Promise<void> {
+  // onde há tíquete, o navegador baixa — e a aba não toca nos bytes
+  if (ROTA_DE_PLANILHA.test(endereco.split("?")[0])) {
+    return baixarPorTiquete(endereco, nomePadrao, sinal);
+  }
+
   const destino = await escolherOndeSalvar(nomePadrao);
 
   const cabecalhos = new Headers();

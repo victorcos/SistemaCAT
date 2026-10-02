@@ -495,6 +495,77 @@ class SelicMensalDB(Base):
     )
 
 
+class TiqueteDeDownloadDB(Base):
+    """Autorização de **um** download, de vida curta, para baixar por navegação.
+
+    ## Por que existe
+
+    O front baixava com `fetch` e `await r.blob()` — o arquivo inteiro na
+    memória da aba antes de gravar. Numa lista de 2,93 milhões de linhas isso
+    não passa, e o servidor já fazia a parte dele certo: serve do disco em
+    fluxo. Todo o desperdício estava no navegador.
+
+    A saída é deixar o **navegador** baixar, por navegação: o gerenciador dele
+    grava direto no disco, mostra progresso, não tem teto de tamanho e funciona
+    em qualquer navegador, com ou sem contexto seguro. Mas navegação não manda
+    cabeçalho `Authorization`, e é para isso que este tíquete serve.
+
+    ## Por que no banco, e não em memória
+
+    Haverá mais de uma instância da API. Tíquete emitido numa e resgatado noutra
+    tem de ser encontrado, e memória de processo não atravessa instância. O
+    `UPDATE ... WHERE expira_em > now()` do Postgres também resolve a corrida
+    entre duas instâncias sem combinarem nada.
+
+    ## O que ele autoriza, e nada além
+
+    Cada campo abaixo faz parte do que o arquivo servido **é**: trocar o
+    `formato` ou o recorte muda o arquivo. Por isso o tíquete carrega todos, e a
+    rota serve exatamente o que ele descreve — não o que a URL pedir.
+
+    ## Vida curta em vez de uso único, e isso é escolha
+
+    `usado_em` registra o primeiro resgate, mas **não** barra o segundo dentro
+    da validade. Uso único seria mais apertado no papel e hostil na prática: o
+    gerenciador de download do navegador **repete a requisição** — numa queda de
+    rede, num redirecionamento, às vezes num `HEAD` antes do `GET` —, e recusar
+    a repetição transforma um soluço de rede em "o link morreu".
+
+    O que protege aqui é o prazo. Um tíquete que vive dois minutos, amarrado a
+    um arquivo e a um usuário, é inútil a quem o encontrar no histórico do
+    navegador ou no log depois disso. Uso único somaria pouco a isso e custaria
+    o botão de tentar de novo.
+
+    **A expiração vale no início da requisição, não durante.** Um xlsx de 16
+    minutos é autorizado quando o download começa; o prazo não interrompe
+    transferência em curso.
+    """
+
+    __tablename__ = "tiquete_de_download"
+    __table_args__ = (Index("ix_tiquete_expira", "expira_em"),)
+
+    # o próprio segredo é a chave: 32 bytes aleatórios em base64url
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"), nullable=False)
+    execucao_id: Mapped[int] = mapped_column(ForeignKey("execucao.id"), nullable=False)
+    # a etapa pela qual a tela pediu, que é de quem é o catálogo de planilhas
+    etapa: Mapped[str] = mapped_column(String(30), nullable=False)
+    qual: Mapped[str] = mapped_column(String(40), nullable=False)
+    formato: Mapped[str] = mapped_column(String(10), nullable=False)
+    # o recorte: lista diferente é arquivo diferente, e o tíquete autoriza um
+    modelos: Mapped[str | None] = mapped_column(Text)
+    classificacoes: Mapped[str | None] = mapped_column(Text)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=agora, server_default=func.now(),
+        nullable=False,
+    )
+    expira_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+    )
+    # quando foi resgatado pela primeira vez. Auditoria, não trava — ver acima
+    usado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class AliquotaDeItemDB(Base):
     """A alíquota de ICMS de um produto, quando ela foge da regra do estado.
 

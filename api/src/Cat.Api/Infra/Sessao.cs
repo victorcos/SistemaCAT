@@ -1,5 +1,6 @@
 using Cat.Aplicacao.Acesso;
 using Cat.Aplicacao.Log;
+using Cat.Aplicacao.Trabalhos;
 using Cat.Dominio.Acesso;
 
 namespace Cat.Api.Infra;
@@ -14,7 +15,9 @@ namespace Cat.Api.Infra;
 public static class Sessao
 {
     private const string Chave = "cat.usuario";
+    private const string ChaveTiquete = "cat.tiquete";
     public const string MensagemInvalida = "Sessão inválida ou expirada.";
+    public const string MensagemDeTiquete = "Link de download inválido ou expirado. Peça o arquivo de novo na tela.";
 
     /// <summary>A rota só roda com usuário válido; sem ele, 401.</summary>
     public static RouteHandlerBuilder ExigirUsuario(this RouteHandlerBuilder rota) =>
@@ -27,6 +30,74 @@ public static class Sessao
             http.Items[Chave] = usuario;
             return await proximo(contexto);
         });
+
+    /// <summary>
+    /// A rota aceita o cabeçalho <c>Authorization</c> **ou** um tíquete na URL.
+    ///
+    /// Só para download. A navegação do navegador não manda cabeçalho, e é por
+    /// isso que o tíquete existe — ver <see cref="ITiquetesDeDownload"/>. Em
+    /// nenhuma outra rota isto é aceitável: credencial em URL anda no histórico
+    /// e no log, e só se justifica por ser de vida curta e por autorizar **um**
+    /// arquivo.
+    ///
+    /// O usuário é relido do banco nos dois caminhos, com a mesma regra: quem
+    /// foi desativada depois de o tíquete ser emitido não baixa.
+    /// </summary>
+    public static RouteHandlerBuilder ExigirUsuarioOuTiquete(this RouteHandlerBuilder rota) =>
+        rota.AddEndpointFilter(async (contexto, proximo) =>
+        {
+            var http = contexto.HttpContext;
+            var usuario = await Identificar(http);
+            if (usuario is null)
+            {
+                var (porTiquete, autorizacao) = await PorTiquete(http);
+                if (porTiquete is null)
+                    return NaoAutorizado(http, TemTiquete(http) ? MensagemDeTiquete : MensagemInvalida);
+                usuario = porTiquete;
+                http.Items[ChaveTiquete] = autorizacao;
+            }
+            http.Items[Chave] = usuario;
+            return await proximo(contexto);
+        });
+
+    /// <summary>
+    /// O que o tíquete desta requisição autoriza, ou nulo se veio por cabeçalho.
+    ///
+    /// **A rota tem de servir o que ele diz, e não o que a URL pede.** Sem isso,
+    /// um tíquete de um CSV pequeno pediria o xlsx inteiro trocando o parâmetro.
+    /// </summary>
+    public static AutorizacaoDeDownload? TiqueteAtual(this HttpContext http) =>
+        http.Items.TryGetValue(ChaveTiquete, out var valor) ? valor as AutorizacaoDeDownload : null;
+
+    private static bool TemTiquete(HttpContext http) =>
+        !string.IsNullOrWhiteSpace(http.Request.Query[Tiquete.Parametro].FirstOrDefault());
+
+    private static async Task<(Usuario?, AutorizacaoDeDownload?)> PorTiquete(HttpContext http)
+    {
+        var segredo = http.Request.Query[Tiquete.Parametro].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(segredo))
+            return (null, null);
+
+        var servicos = http.RequestServices;
+        var log = servicos.GetRequiredService<ILogger<Usuario>>();
+        var autorizacao = await servicos.GetRequiredService<ITiquetesDeDownload>()
+            .Resgatar(segredo, DateTimeOffset.UtcNow, http.RequestAborted);
+        if (autorizacao is null)
+        {
+            log.Aviso("tíquete de download recusado", new { motivo = "inexistente ou vencido" });
+            return (null, null);
+        }
+
+        var usuario = await servicos.GetRequiredService<IRepositorioDeUsuario>()
+            .BuscarPorId(autorizacao.UsuarioId, http.RequestAborted);
+        if (usuario is null || !usuario.Ativo)
+        {
+            log.Aviso("tíquete de usuário ausente ou inativo",
+                new { usuario_id = autorizacao.UsuarioId });
+            return (null, null);
+        }
+        return (usuario, autorizacao);
+    }
 
     /// <summary>
     /// Exige uma CAPACIDADE do domínio, não um papel: enumerar papéis na rota

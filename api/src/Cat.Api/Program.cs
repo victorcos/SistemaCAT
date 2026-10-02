@@ -67,6 +67,9 @@ builder.Services.AddScoped<Execucoes>();
 builder.Services.AddScoped<IRepositorioDeDePara, DeParaRepositorio>();
 builder.Services.AddScoped<DeParaDoTrabalho>();
 builder.Services.AddScoped<IRepositorioDeCorrecoes, CorrecaoRepositorio>();
+// tíquetes de download no banco, e não em memória: haverá mais de uma instância
+// da API, e tíquete emitido numa tem de ser resgatável na outra
+builder.Services.AddScoped<ITiquetesDeDownload, TiqueteRepositorio>();
 builder.Services.AddScoped<CorrecoesDoTrabalho>();
 // canal interno com o motor: apagar pasta de trabalho grande leva tempo
 // sem prazo no cliente: cada chamada ao motor tem o seu, porque inspecionar

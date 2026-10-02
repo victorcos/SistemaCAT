@@ -24,6 +24,7 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
     public DbSet<ExecucaoLinha> Execucoes => Set<ExecucaoLinha>();
     public DbSet<DeParaLinha> DePara => Set<DeParaLinha>();
     public DbSet<CorrecaoLinha> Correcoes => Set<CorrecaoLinha>();
+    public DbSet<TiqueteLinha> Tiquetes => Set<TiqueteLinha>();
 
     protected override void OnModelCreating(ModelBuilder modelo)
     {
@@ -122,6 +123,24 @@ public sealed class CatDbContext(DbContextOptions<CatDbContext> opcoes) : DbCont
             e.Property(x => x.CriadoPor).HasColumnName("criado_por");
             e.Property(x => x.ResponsavelId).HasColumnName("responsavel_id");
             e.Property(x => x.VendaAConsumidor).HasColumnName("venda_a_consumidor");
+        });
+
+        modelo.Entity<TiqueteLinha>(e =>
+        {
+            e.ToTable("tiquete_de_download");
+            // o próprio segredo é a chave, e por isso nunca é gerado pelo banco
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(x => x.UsuarioId).HasColumnName("usuario_id");
+            e.Property(x => x.ExecucaoId).HasColumnName("execucao_id");
+            e.Property(x => x.Etapa).HasColumnName("etapa");
+            e.Property(x => x.Qual).HasColumnName("qual");
+            e.Property(x => x.Formato).HasColumnName("formato");
+            e.Property(x => x.Modelos).HasColumnName("modelos");
+            e.Property(x => x.Classificacoes).HasColumnName("classificacoes");
+            e.Property(x => x.CriadoEm).HasColumnName("criado_em");
+            e.Property(x => x.ExpiraEm).HasColumnName("expira_em");
+            e.Property(x => x.UsadoEm).HasColumnName("usado_em");
         });
 
         modelo.Entity<CorrecaoLinha>(e =>
@@ -335,6 +354,28 @@ public sealed class ProjetoLinha
 }
 
 /// <summary>Um par do de-para, da empresa. A tabela é do Alembic (<c>c5e1a9d4b7f2</c>).</summary>
+/// <summary>
+/// Autorização de um download, de vida curta. Ver <c>ITiquetesDeDownload</c>.
+///
+/// O esquema é declarado do lado do motor (<c>repositorios/modelos.py</c>) e
+/// migrado por Alembic, como todas as tabelas desta casa; aqui só se mapeia o
+/// que a API lê e escreve. Esta tabela é **só** da API: o motor não a usa.
+/// </summary>
+public sealed class TiqueteLinha
+{
+    public string Id { get; set; } = "";
+    public int UsuarioId { get; set; }
+    public int ExecucaoId { get; set; }
+    public string Etapa { get; set; } = "";
+    public string Qual { get; set; } = "";
+    public string Formato { get; set; } = "";
+    public string? Modelos { get; set; }
+    public string? Classificacoes { get; set; }
+    public DateTime CriadoEm { get; set; }
+    public DateTime ExpiraEm { get; set; }
+    public DateTime? UsadoEm { get; set; }
+}
+
 public sealed class CorrecaoLinha
 {
     public int Id { get; set; }

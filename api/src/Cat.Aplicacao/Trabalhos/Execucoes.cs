@@ -13,6 +13,9 @@ public sealed record ExecucaoLida(
 
 public sealed record PlanilhaPronta(string Caminho, string Nome, string Tipo);
 
+/// <summary>O que a tela precisa para disparar o download: o endereço e o prazo.</summary>
+public sealed record TiqueteEmitido(string Tiquete, int ValePorSegundos);
+
 /// <param name="Escopo">"documento" (uma linha por nota, com os itens) ou "item".</param>
 public sealed record PedidoDeLinhas(string Escopo, string? Fonte, string? Busca, int Pagina, int PorPagina);
 
@@ -126,6 +129,7 @@ public sealed class Execucoes(
     IRepositorioDeTrabalhos trabalhos,
     IRepositorioDeExecucoes execucoes,
     IMotor motor,
+    ITiquetesDeDownload tiquetes,
     TimeProvider relogio,
     ILogger<Execucoes> log)
 {
@@ -469,5 +473,37 @@ public sealed class Execucoes(
     {
         var e = await Detalhar(execucaoId, etapaExigida, usuario, cancelar);
         return await motor.GerarPlanilha(e.Id, etapaDaRota, qual, modelos, classificacoes, formato, cancelar);
+    }
+
+    /// <summary>
+    /// Autoriza um download **sem gerar nada** — é o tíquete que a navegação usa.
+    ///
+    /// **Gerar aqui seria desfazer o ganho.** Um xlsx de 2,93 milhões de linhas
+    /// leva uns dezesseis minutos para montar; se a emissão do tíquete esperasse
+    /// por isso, a espera voltaria para dentro da aba, com o botão travado — que
+    /// é exatamente o que baixar por navegação resolve. Aqui se confere o que é
+    /// barato (a execução existe, é do escopo de quem pede, é da etapa certa) e
+    /// o resto acontece no GET, com o gerenciador de download do navegador
+    /// segurando a espera e a pessoa livre para trabalhar.
+    ///
+    /// O que isso implica, dito claro: erro de escopo e de identificador aparece
+    /// **antes**, como aviso na tela. Arquivo que saiu do disco e lista que
+    /// aquela versão não tinha aparecem **no GET**, como download que falhou.
+    /// </summary>
+    public async Task<TiqueteEmitido> TiqueteDePlanilha(int execucaoId, string etapaDaRota,
+        string? etapaExigida, string qual, string? modelos, string? classificacoes, string formato,
+        Usuario usuario, CancellationToken cancelar)
+    {
+        var e = await Detalhar(execucaoId, etapaExigida, usuario, cancelar);
+        var segredo = await tiquetes.Emitir(
+            new AutorizacaoDeDownload(usuario.Id, e.Id, etapaDaRota, qual, formato,
+                modelos, classificacoes),
+            relogio.GetUtcNow(), cancelar);
+        log.Info("tíquete de download emitido", new
+        {
+            execucao_id = e.Id, etapa = etapaDaRota, qual, formato,
+            por_usuario_id = usuario.Id,
+        });
+        return new TiqueteEmitido(segredo, (int)Tiquete.Validade.TotalSeconds);
     }
 }

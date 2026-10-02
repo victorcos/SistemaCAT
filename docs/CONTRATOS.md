@@ -467,6 +467,7 @@ centavos. `valor` nulo quer dizer fonte externa (DCTF, e-CAC), e não zero;
 | `GET` | `/api/exclusoes/{execucaoId}/planilhas/icms-st` | quem vê o trabalho |
 | `GET` | `/api/exclusoes/{execucaoId}/planilhas/iss` | quem vê o trabalho |
 | `GET` | `/api/exclusoes/{execucaoId}/planilhas/pacote` | quem vê o trabalho |
+| `POST` | `/api/{segmento}/{execucaoId}/planilhas/{qual}/tiquete` | quem vê o trabalho |
 
 **Quatro teses numa rodada.** `exclusoes` é uma linha por grupo
 (estabelecimento, competência, registro, CST e CFOP), das quatro, separadas pela
@@ -491,6 +492,19 @@ porque quem confere põe tudo lado a lado com os arquivos do escritório anterio
 e cinco downloads em cinco cliques são cinco chances de misturar rodadas. Tese
 que não rodou não entra, e o LEIA-ME a nomeia: zip com quatro arquivos onde
 deveriam ser cinco é indistinguível de um zip completo.
+
+**Toda rota de planilha tem um tíquete ao lado**, e é por ele que o download
+acontece: `POST .../planilhas/{qual}/tiquete` devolve `{tiquete,
+vale_por_segundos}`, e o `GET` aceita `?t=<tiquete>` **no lugar** do cabeçalho
+`Authorization`. É o que permite baixar por navegação — o navegador grava em
+fluxo, sem o arquivo passar pela memória da aba, que não aguenta uma lista de
+milhões de linhas.
+
+O tíquete vale dois minutos, é amarrado a `(usuário, execução, etapa, qual,
+formato, recorte)`, e **o que ele descreve é o que a rota serve** — trocar
+`formato` na URL não muda o arquivo. Emitir **não gera** a planilha: o `POST` é
+barato e confere só escopo e identificador, e a espera fica no `GET`, no
+gerenciador de download do navegador. Ver a decisão de 02/10/2026.
 
 **Dentro do pacote, o formato de cada relatório é o do arquivo de referência do
 MA**: o 680 em **CSV** e os outros em xlsx. Medido no 680 da DMINAS (3.568.362

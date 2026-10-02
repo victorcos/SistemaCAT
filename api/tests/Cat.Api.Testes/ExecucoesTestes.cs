@@ -375,6 +375,136 @@ public sealed class ExecucoesTestes(BancoDeTeste banco, MotorDeExecucoesFalso mo
         Assert.DoesNotContain("CAT_", await r.Content.ReadAsStringAsync());
     }
 
+    // ------------------------------------------------- tíquete de download
+    //
+    // Baixar por navegação, para o arquivo não passar pela memória da aba. O
+    // `fetch` + `blob` do front punha a planilha inteira em memória antes de
+    // gravar, e num 037 de 2,93 milhões de linhas isso não passa. Navegação não
+    // manda cabeçalho `Authorization`, e é essa lacuna que o tíquete fecha.
+
+    /// <summary>Emite um tíquete e devolve o segredo.</summary>
+    private async Task<string> Tiquete(HttpClient c, string rota, string? query = null)
+    {
+        var r = await c.PostAsync($"{rota}/tiquete{query}", null);
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        return (await Json(r)).GetProperty("tiquete").GetString()!;
+    }
+
+    private async Task<(int Id, HttpClient Com, string Arquivo)> ParaBaixar(string etapa)
+    {
+        var (_, _, c) = await Pessoa("dev");
+        var (_, projeto) = await Trabalho(c);
+        var id = await Execucao(projeto, etapa);
+        var arquivo = Path.Combine(Trabalho_, $"execucao-{id}", "lista.csv");
+        Directory.CreateDirectory(Path.GetDirectoryName(arquivo)!);
+        await File.WriteAllBytesAsync(arquivo, "i;j"u8.ToArray());
+        motor.AoPedirPlanilha = _ => Results.Json(
+            new { caminho = arquivo, nome = "lista.csv", tipo = "text/csv; charset=utf-8" });
+        return (id, c, arquivo);
+    }
+
+    [Fact]
+    public async Task Tiquete_autoriza_o_download_sem_cabecalho_nenhum()
+    {
+        var (id, c, _) = await ParaBaixar("conferencia");
+        var rota = $"/api/conferencias/{id}/planilhas/a-cobrar";
+        var t = await Tiquete(c, rota, "?formato=csv");
+
+        // o navegador baixando por navegação: nenhum cabeçalho de autorização
+        var r = await Cliente().GetAsync($"{rota}?t={t}");
+
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal("i;j"u8.ToArray(), await r.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task Emitir_o_tiquete_nao_gera_a_planilha()
+    {
+        // é a propriedade que faz tudo isso valer a pena: gerar na emissão
+        // devolveria os dezesseis minutos para dentro da aba, com o botão travado
+        var (id, c, _) = await ParaBaixar("conferencia");
+
+        await Tiquete(c, $"/api/conferencias/{id}/planilhas/a-cobrar", "?formato=csv");
+
+        // a fila do motor falso é da classe, e os outros testes também pedem
+        // planilha: a pergunta é sobre ESTA execução, não sobre a fila inteira
+        Assert.DoesNotContain(motor.Pedidos, x => x.TryGetProperty("qual", out _)
+            && x.GetProperty("execucao_id").GetInt32() == id);
+    }
+
+    [Fact]
+    public async Task O_tiquete_manda_e_nao_a_URL()
+    {
+        // sem isto, um tíquete de um CSV pequeno serviria para pedir o xlsx
+        // inteiro trocando o parâmetro na barra de endereço
+        var (id, c, _) = await ParaBaixar("conferencia");
+        var rota = $"/api/conferencias/{id}/planilhas/a-cobrar";
+        var t = await Tiquete(c, rota, "?formato=csv&modelos=59");
+
+        await Cliente().GetAsync($"{rota}?formato=xlsx&modelos=55&qual=outra&t={t}");
+
+        var pedido = motor.Pedidos.Last(x => x.TryGetProperty("qual", out _));
+        Assert.Equal(("csv", "59", "a-cobrar"),
+            (pedido.GetProperty("formato").GetString(),
+             pedido.GetProperty("modelos").GetString(),
+             pedido.GetProperty("qual").GetString()));
+    }
+
+    [Fact]
+    public async Task Tiquete_serve_de_novo_dentro_da_validade()
+    {
+        // **escolha, e não descuido.** O gerenciador de download do navegador
+        // repete a requisição — queda de rede, redirecionamento, um HEAD antes
+        // do GET —, e recusar a repetição transformaria um soluço de rede em
+        // "o link morreu". Quem protege é o prazo de dois minutos
+        var (id, c, _) = await ParaBaixar("conferencia");
+        var rota = $"/api/conferencias/{id}/planilhas/a-cobrar";
+        var t = await Tiquete(c, rota, "?formato=csv");
+        var sem = Cliente();
+
+        Assert.Equal(HttpStatusCode.OK, (await sem.GetAsync($"{rota}?t={t}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await sem.GetAsync($"{rota}?t={t}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Sem_cabecalho_e_sem_tiquete_nao_baixa()
+    {
+        var (id, _, _) = await ParaBaixar("conferencia");
+
+        var r = await Cliente().GetAsync($"/api/conferencias/{id}/planilhas/a-cobrar");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode);
+    }
+
+    [Fact]
+    public async Task Tiquete_que_nao_existe_fala_de_link_e_nao_de_sessao()
+    {
+        // quem lê esta mensagem está no navegador, não na tela do sistema:
+        // "sessão expirada" o mandaria entrar de novo, que não é o problema
+        var (id, _, _) = await ParaBaixar("conferencia");
+
+        var r = await Cliente().GetAsync(
+            $"/api/conferencias/{id}/planilhas/a-cobrar?t=naoexiste");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode);
+        Assert.Contains("Link de download", await Detalhe(r));
+    }
+
+    [Fact]
+    public async Task Tiquete_de_execucao_de_outro_cliente_nao_e_emitido()
+    {
+        // o escopo é conferido na emissão, que é barata — e aí o erro aparece
+        // na tela, antes da espera, em vez de virar download que falhou
+        var (id, _, _) = await ParaBaixar("conferencia");
+        var (_, _, deFora) = await Pessoa("analista");
+
+        var r = await deFora.PostAsync(
+            $"/api/conferencias/{id}/planilhas/a-cobrar/tiquete", null);
+
+        Assert.True(r.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound,
+            $"esperava 403 ou 404, veio {(int)r.StatusCode}");
+    }
+
     // ------------------------------------------------------------------ cancelar
     [Fact]
     public async Task Cancelar_repassa_quem_pediu_e_devolve_a_execucao_como_ficou()
