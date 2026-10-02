@@ -198,6 +198,26 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       conferida sozinha e costura nunca exercitada. O `serializar` que faltava
       nos módulos novos passou por 60 testes de exclusão e caiu na tela do
       cliente — ver DECISOES de 01/10/2026
+- [x] **Levantamento do crédito de ICMS sobre combustível** (`docs/DOMINIO_COMBUSTIVEL.md`):
+      os dois regimes por produto e data, as duas camadas de regra, a cascata do
+      classificador (NCM manda, descrição confirma — ao contrário do crédito
+      outorgado), o percentual de confiança duplo, valor nominal sem SELIC e o
+      prazo de 5 anos da emissão. **O produto não é achar crédito, é auditar o
+      tomado**: a ETTORI já credita R$ 5 mi via ajuste `SP020799`, sem aplicar o
+      FCV e com a maioria dos meses curta (v0.128.0)
+- [ ] Construir o módulo de combustível. Antes: medir a **ATLAS** ou a **PRIME
+      PLUS** para saber se "o cliente já credita" é regra ou exceção — muda a
+      proposta comercial
+- [ ] Acrescentar o **CNPJ à chave** do `selecionar_por_competencia`: hoje ele
+      chaveia só por competência, e na ETTORI isso guardaria 62 arquivos de 411,
+      perdendo três estabelecimentos. Latente porque seus dois usuários leem
+      EFD-Contribuições, que a matriz entrega consolidada. Mexe em código das
+      exclusões, validadas em 100%: vai com teste
+- [ ] Acrescentar o grupo **`ICMS61`** ao leitor de XML (`vICMSMonoRet`,
+      `adRemICMSRet`): é a fase 2 do combustível. A era do ST já está coberta —
+      o leitor tem `vICMSSTRet`, `vICMSSubstituto` e `vICMSEfet`
+- [ ] Confirmar o **etanol hidratado** (dá crédito?) e decidir se o
+      **lubrificante** entra como tese separada — R$ ~1 mi medido na ETTORI
 - [ ] Decidir o **F100 `IND_OPER = 2`** ("outros documentos e operações"): o
       agregador da Gestão o conta como saída e o 680 o recusa. Na DMINAS não
       existe nenhum, então não há como medir qual está certo — fica para a
