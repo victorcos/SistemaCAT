@@ -1,7 +1,30 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+
+/**
+ * HTTPS quando houver certificado, HTTP quando nao houver.
+ *
+ * **Nao e firula: e o que decide se o download funciona de outra maquina.**
+ * `http://<ip>:5173` nao e contexto seguro, e fora de contexto seguro a
+ * `File System Access API` nao existe — o download cai no caminho antigo, que
+ * poe o arquivo inteiro na memoria da aba antes de gravar. Num 037 de 2,93
+ * milhoes de linhas isso nao passa (investigado em 02/10/2026).
+ *
+ * Opt-in pela existencia do arquivo, e nao por variavel de ambiente: quem nao
+ * gerou certificado continua em HTTP sem configurar nada, e quem gerou nao
+ * precisa lembrar de ligar. `npm run certificado` gera.
+ */
+function certificado() {
+  const pasta = join(dirname(fileURLToPath(import.meta.url)), "certificado");
+  const chave = join(pasta, "dev.key");
+  const cert = join(pasta, "dev.pem");
+  if (!existsSync(chave) || !existsSync(cert)) return undefined;
+  return { key: readFileSync(chave), cert: readFileSync(cert) };
+}
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -28,6 +51,7 @@ export default defineConfig({
 
   server: {
     port: 5173,
+    https: certificado(),
 
     // Escutar em todas as interfaces, e nao so em ::1.
     //

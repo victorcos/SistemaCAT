@@ -5,6 +5,53 @@
 
 ---
 
+## 2026-10-02 — HTTPS no dev server, porque contexto seguro não é firula
+
+**O problema, em uma frase:** os funcionários usam o dev server pela rede, e
+`http://<ip>:5173` não é contexto seguro — então a `File System Access API` não
+existe, o download cai no caminho antigo, e o caminho antigo põe o arquivo
+**inteiro na memória da aba** antes de gravar. Num 037 de 2,93 milhões de linhas
+isso não passa.
+
+O servidor já faz a parte dele certo: o C# serve do disco em fluxo. Todo o
+desperdício está no navegador, e só o contexto seguro permite contorná-lo com
+`pipeTo`.
+
+**A decisão: certificado autoassinado, opt-in pela existência do arquivo.**
+`npm run certificado` gera o par em `frontend/certificado/`, com
+`subjectAltName` cobrindo `localhost`, `127.0.0.1` e **todos os IPv4 da
+máquina** — sem o SAN do endereço que a pessoa digita, o navegador não oferece
+nem o "prosseguir". O `vite.config.ts` o encontra sozinho.
+
+**Opt-in por arquivo, e não por variável de ambiente**, pelos dois lados: quem
+não gerou continua em HTTP sem configurar nada, e quem gerou não precisa lembrar
+de ligar. Variável de ambiente seria uma terceira coisa para alguém esquecer.
+
+**A chave privada não é versionada** — o `.gitignore` da raiz já excluía `*.pem`
+e `*.key`, e cada máquina gera a sua. Conferido com `git check-ignore`.
+
+### O que isso não resolve, dito claro
+
+Autoassinado dá **aviso do navegador na primeira visita**. Quem prosseguir ganha
+contexto seguro de verdade (`isSecureContext === true`), que é tudo o que o
+download precisa — mas é um aviso, e aviso de certificado é exatamente o que se
+ensina a ninguém ignorar. Para não ter aviso: instalar a autoridade em cada
+máquina (`mkcert -install`) ou servir o build atrás da API com certificado
+próprio.
+
+E **só cobre quem usa Chromium**. Firefox e Safari não têm a API nem em contexto
+seguro, e continuam no caminho da memória. Por isso esta decisão é a ponte, não
+o destino: o conserto que serve a todo navegador é o **download por navegação**,
+em que o gerenciador do navegador baixa em fluxo e a aba não toca nos bytes.
+
+### Migração
+
+As marcações dos funcionários mudam de `http://` para `https://` — depois do
+reinício o dev server atende **só** TLS naquela porta, e um GET em HTTP falha.
+Vale avisar antes de reiniciar.
+
+---
+
 ## 2026-10-02 — O outro ramo do seletor também saía calado
 
 **O relato.** O 037 do MIX VALI pedido de outra máquina: "está carregando há um
