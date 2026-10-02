@@ -12,6 +12,7 @@ using Cat.Aplicacao.Log;
 using Cat.Infraestrutura.Log;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.Extensions.Logging.Console;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,7 +20,16 @@ var builder = WebApplication.CreateBuilder(args);
 // nível de log. O resto do programa usa a instância do contêiner, montada
 // depois que toda a configuração — inclusive a dos testes — já foi aplicada.
 var inicial = ConfigCat.Carregar(builder.Configuration);
-builder.WebHost.UseUrls($"http://0.0.0.0:{inicial.PortaApi}");
+
+// HTTPS quando houver par PEM configurado, HTTP quando não houver. **Uma porta,
+// um esquema**: dois esquemas na mesma porta não existem, e inventar uma segunda
+// porta para manter o endereço antigo vivo seria duas verdades sobre onde o
+// sistema está. Quem liga o TLS avisa o pessoal que o endereço passa a `https`.
+builder.WebHost.UseUrls(
+    $"{(inicial.TemTls ? "https" : "http")}://0.0.0.0:{inicial.PortaApi}");
+if (inicial.TemTls)
+    builder.WebHost.ConfigureKestrel(k => k.ConfigureHttpsDefaults(
+        o => o.ServerCertificate = Tls.Carregar(inicial)));
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole(o => o.FormatterName = FormatadorJson.Nome);
@@ -96,6 +106,8 @@ log.Info("API no ar", new
     api = "csharp",
     versao = config.Versao,
     porta = config.PortaApi,
+    esquema = config.TemTls ? "https" : "http",
+    front = config.ServeOFront ? config.PastaDoFront : "(servido pelo Vite)",
     motor = config.MotorUrl.ToString(),
     origens = config.Origens,
     banco = ConexaoPostgres.Mascarar(config.BancoUrl),
@@ -138,6 +150,55 @@ app.MapearCorrecoes();
 // vazio, e a tela mostraria só "erro".
 app.MapFallback("/api/{**resto}", () =>
     CorpoJson.Recusar("Esta rota não existe na API.", StatusCodes.Status404NotFound));
+
+// ---------- o front, na mesma origem ----------
+//
+// Serve o que o `npm run build` deixou em `frontend/dist`, quando configurado.
+// Na mesma origem não há proxy do Vite no caminho dos bytes — um salto menos num
+// download de centenas de megabytes —, não há CORS, não há `allowedHosts`, e o
+// contexto é seguro para todo mundo em vez de só para quem abre por `localhost`.
+//
+// **O desvio do `/api` vem antes de propósito.** O `MapFallbackToFile` atende
+// qualquer caminho, e sem o `MapFallback("/api/...")` acima uma rota de API
+// inexistente devolveria o `index.html` com 200 — a tela receberia HTML onde
+// esperava JSON e diria "erro" sem dizer qual. O ASP.NET resolve pela
+// especificidade do padrão: `/api/{**resto}` tem segmento literal e ganha.
+if (config.ServeOFront && Directory.Exists(config.PastaDoFront))
+{
+    var arquivos = new PhysicalFileProvider(config.PastaDoFront);
+
+    // **uma configuração, usada nos dois lugares.** O `MapFallbackToFile` tem
+    // opções próprias, e quando elas divergem das do `UseStaticFiles` o mesmo
+    // `index.html` sai com cabeçalho diferente conforme quem o serviu: pedido
+    // como `/index.html` vinha com `no-cache`, e como `/` ou `/projetos/1`
+    // vinha sem nada. Era o caso que o cabeçalho existe para cobrir
+    var estaticos = new StaticFileOptions
+    {
+        FileProvider = arquivos,
+        OnPrepareResponse = ctx =>
+        {
+            // o Vite põe o resumo do conteúdo no nome dos arquivos de `assets`:
+            // nome igual é conteúdo igual, e pode ficar em cache para sempre. O
+            // `index.html` é o oposto — tem nome fixo e aponta para os resumos
+            // novos, e em cache ele deixaria a pessoa numa versão que já não
+            // existe, pedindo arquivos que foram embora
+            var caminho = ctx.Context.Request.Path.Value ?? "";
+            ctx.Context.Response.Headers.CacheControl =
+                caminho.StartsWith("/assets/", StringComparison.Ordinal)
+                    ? "public, max-age=31536000, immutable"
+                    : "no-cache";
+        },
+    };
+    app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = arquivos });
+    app.UseStaticFiles(estaticos);
+    app.MapFallbackToFile("index.html", estaticos);
+    log.Info("front servido pela API", new { pasta = config.PastaDoFront });
+}
+else if (config.ServeOFront)
+{
+    log.Aviso("CAT_PASTA_DO_FRONT aponta para pasta que não existe; o front não será servido",
+        new { pasta = config.PastaDoFront, acao = "cd frontend && npm run build" });
+}
 
 app.Run();
 

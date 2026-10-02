@@ -213,3 +213,66 @@ execução exigem transação e concorrência real.
 Segurança em nível de linha nas tabelas de dado fiscal, com a política derivando
 da alocação do usuário ao projeto. Se uma consulta esquecer o filtro, o banco
 não devolve o que não deve.
+
+## 14. Como o sistema é servido
+
+Dois modos, e a diferença é quem entrega o front.
+
+**Desenvolvimento.** Vite na 5173, API na 8010, motor na 8020. O front fala com a
+API por caminho relativo e o Vite faz proxy — sem CORS. É o padrão, e nada
+precisa ser configurado.
+
+**Rede, para os outros usarem.** A API serve o front construído, na mesma
+origem, em HTTPS:
+
+```
+cd frontend && npm run certificado && npm run build
+```
+
+e no `backend/.env`:
+
+```
+CAT_PASTA_DO_FRONT=../frontend/dist
+CAT_TLS_CERTIFICADO=../frontend/certificado/dev.pem
+CAT_TLS_CHAVE=../frontend/certificado/dev.key
+```
+
+Os três são opt-in: sem eles a API sobe em HTTP e não serve front nenhum, que é
+o que o desenvolvimento quer — Vite rodando e a API servindo uma cópia velha por
+cima seria o pior dos dois mundos.
+
+### Por que na mesma origem
+
+Quatro razões, e a primeira foi o que motivou tudo:
+
+* **contexto seguro**. `http://<ip>:5173` não é, e fora dele o navegador não tem
+  seletor de pasta: o download antigo segurava o arquivo inteiro na memória da
+  aba, o que não passa numa lista de milhões de linhas (02/10/2026);
+* **um salto menos** no caminho dos bytes. Em desenvolvimento eles vão
+  disco → API → proxy do Vite → navegador; aqui o proxy sai;
+* **sem CORS e sem `allowedHosts`** — some a lista de máquinas autorizadas que
+  alguém tem de manter;
+* o front passa a ser **arquivo estático**, que é o que ele é.
+
+### A fronteira entre as duas coisas que a API serve
+
+O desvio do SPA atende **qualquer** caminho. Se ele ganhar de
+`/api/{**resto}`, uma rota de API inexistente devolve `index.html` com 200, e a
+tela recebe HTML onde esperava JSON — "erro" sem dizer qual. O ASP.NET resolve
+pela especificidade do padrão (segmento literal ganha de curinga), e
+`FrontTestes` guarda isso.
+
+**Cache**: `assets/` tem o resumo do conteúdo no nome, então nome igual é
+conteúdo igual e vale cache eterno. O `index.html` é o oposto — nome fixo
+apontando para os resumos novos —, e em cache deixaria a pessoa numa versão que
+já não existe, pedindo arquivos que foram embora. As duas regras vivem numa
+**única** `StaticFileOptions`, usada pelo `UseStaticFiles` e pelo
+`MapFallbackToFile`: quando eram duas, o mesmo arquivo saía com `no-cache`
+pedido como `/index.html` e sem cabeçalho nenhum pedido como `/`.
+
+### O que ainda não é
+
+Certificado **autoassinado**: avisa na primeira visita. Para produção de
+verdade, certificado de autoridade reconhecida — ou a autoridade local instalada
+em cada máquina (`mkcert -install`). E o processo ainda sobe à mão; não há
+serviço nem reinício automático.

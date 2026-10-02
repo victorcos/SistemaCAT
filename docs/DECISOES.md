@@ -5,6 +5,60 @@
 
 ---
 
+## 2026-10-02 — A API passa a servir o front, em HTTPS e na mesma origem
+
+**A causa de fundo, finalmente atacada.** Os funcionários usavam um **servidor de
+desenvolvimento** pela rede. Daí vinham o `allowedHosts`, o proxy do Node no
+caminho dos bytes, e principalmente a falta de contexto seguro — que foi o que
+derrubou o download do 037 e custou a investigação da manhã.
+
+**A decisão.** `CAT_PASTA_DO_FRONT` aponta para `frontend/dist` e a API o serve;
+`CAT_TLS_CERTIFICADO` e `CAT_TLS_CHAVE` põem o Kestrel em HTTPS. Os três são
+**opt-in**: sem eles a API sobe em HTTP e não serve front, que é o que o
+desenvolvimento quer — Vite rodando e API servindo uma cópia velha por cima
+seria o pior dos dois mundos. Receita completa na ARQUITETURA §14.
+
+**Uma porta, um esquema.** Dois esquemas na mesma porta não existem, e inventar
+uma segunda porta para manter o endereço antigo vivo seria duas verdades sobre
+onde o sistema está. Quem liga o TLS avisa o pessoal que o endereço passa a
+`https`. O esquema entra no log de subida, ao lado da porta: servidor antigo que
+sobrevive a um reinício só se denuncia pelo que diz ao subir.
+
+### Dois defeitos achados ao verificar, e nenhum dos dois apareceria sozinho
+
+**O PEM não serve ao Kestrel direto no Windows.** `CreateFromPemFile` carrega a
+chave num provedor que o SChannel não usa, e o handshake falha com um erro que
+não menciona nem PEM nem chave. Exportar para PKCS#12 e reimportar devolve o
+mesmo certificado num formato que o sistema sabe usar — e é por isso que
+`Tls.Carregar` dá esse passeio aparentemente supérfluo.
+
+**Duas configurações do mesmo arquivo, divergindo.** `MapFallbackToFile` tem
+`StaticFileOptions` próprias. Com o `OnPrepareResponse` só no `UseStaticFiles`, o
+mesmo `index.html` saía com `no-cache` pedido como `/index.html` e **sem
+cabeçalho nenhum** pedido como `/` ou `/projetos/1` — que são justamente os
+caminhos por onde as pessoas entram. Era exatamente o caso que o cabeçalho existe
+para cobrir. Agora é uma configuração só, usada nos dois lugares, e o teste
+cobre os quatro caminhos.
+
+### Verificado de ponta a ponta, não por leitura
+
+Instância temporária na 8099, servindo o `dist` de verdade em HTTPS: raiz e rotas
+do SPA devolvem o `index.html` com `no-cache`; `assets/` com resumo no nome vêm
+`immutable` por um ano; `/api/saude` responde JSON; **`/api/nao-existe` devolve
+JSON 404 e não o `index.html`** — o desvio do SPA não engoliu a API; e HTTP na
+porta do TLS é recusado.
+
+`FrontTestes` guarda os seis comportamentos, inclusive os dois que não são
+caminho feliz: pasta não configurada (a API não serve front) e pasta configurada
+que não existe (avisa no log e **não** morre na subida — quem esqueceu o
+`npm run build` tem de ver a API no ar, não um processo caído).
+
+200 testes na API, todos passando. O `Banco_sem_esquema...`, que havia falhado por
+timeout do Postgres ao derrubar um banco, voltou a passar: era transitório, como
+eu suspeitava e não tinha provado.
+
+---
+
 ## 2026-10-02 — Quem baixa é o navegador, não a aba
 
 **O problema que o HTTPS não resolve.** Com contexto seguro o seletor de pasta

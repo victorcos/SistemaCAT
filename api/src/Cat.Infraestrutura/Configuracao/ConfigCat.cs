@@ -22,6 +22,35 @@ public sealed partial class ConfigCat
     public required Uri MotorUrl { get; init; }
     public required string Versao { get; init; }
 
+    /// <summary>
+    /// Onde está o front já construído (<c>frontend/dist</c>), ou vazio.
+    ///
+    /// **Vazio é o padrão, e serve ao desenvolvimento:** quem roda o Vite não
+    /// quer a API servindo uma cópia velha do front por cima. Preenchido, a API
+    /// passa a servir o front na mesma origem — e aí não há proxy no caminho dos
+    /// bytes, não há CORS, não há `allowedHosts`, e o contexto é seguro para
+    /// todo mundo em vez de só para quem abre por `localhost`.
+    /// </summary>
+    public required string PastaDoFront { get; init; }
+
+    /// <summary>
+    /// O par PEM que põe a API em HTTPS, ou vazio nos dois.
+    ///
+    /// Contexto seguro não é firula: fora dele o navegador não tem seletor de
+    /// pasta, e o download antigo segurava o arquivo inteiro na memória da aba.
+    /// O tíquete resolveu isso por outro caminho (ver 02/10/2026), mas servir em
+    /// HTTPS é o que tira a questão de cima da mesa — e é requisito de qualquer
+    /// coisa que saia desta rede.
+    /// </summary>
+    public required string TlsCertificado { get; init; }
+    public required string TlsChave { get; init; }
+
+    /// <summary>A API serve o front quando sabe onde ele está.</summary>
+    public bool ServeOFront => PastaDoFront.Length > 0;
+
+    /// <summary>HTTPS só com as duas metades do par.</summary>
+    public bool TemTls => TlsCertificado.Length > 0 && TlsChave.Length > 0;
+
     // ---------- segredos: nunca vão para log nem para o /api/saude ----------
     public required string BancoUrl { get; init; }
     public required string JwtSegredo { get; init; }
@@ -79,6 +108,11 @@ public sealed partial class ConfigCat
             // tentativa frustrada antes de acertar.
             MotorUrl = new Uri(Valor("CAT_MOTOR_URL", "http://127.0.0.1:8020")),
             Versao = LerVersao(Path.Combine(raiz, "..", "VERSAO")),
+            // relativos ao backend, como a pasta de trabalho: o diretório de
+            // onde o processo subiu não é o mesmo nas duas máquinas
+            PastaDoFront = Caminho(Valor("CAT_PASTA_DO_FRONT", ""), raiz),
+            TlsCertificado = Caminho(Valor("CAT_TLS_CERTIFICADO", ""), raiz),
+            TlsChave = Caminho(Valor("CAT_TLS_CHAVE", ""), raiz),
             // os padrões são os do config.py: só existem para o dev subir
             BancoUrl = Valor("CAT_BANCO_URL", "postgresql+psycopg://cat:cat@localhost:55432/cat"),
             JwtSegredo = Valor("CAT_JWT_SEGREDO", SegredoPadrao),
@@ -88,6 +122,10 @@ public sealed partial class ConfigCat
             MotorSegredo = Valor("CAT_MOTOR_SEGREDO", ""),
         };
     }
+
+    /// <summary>Caminho absoluto, ou vazio quando não foi configurado.</summary>
+    private static string Caminho(string valor, string raiz) =>
+        valor.Length == 0 ? "" : Path.GetFullPath(valor, raiz);
 
     /// <summary>
     /// A versão vem do arquivo <c>VERSAO</c> na raiz do repositório, lido
