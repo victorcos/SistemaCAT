@@ -81,6 +81,13 @@ class TestOParQueSeConfronta:
         assert (resumo.contribuicoes, resumo.ecd, resumo.arquivos) == (1, 1, 2)
         assert resumo.estabelecimentos == ["11222333000181"]
         assert resumo.competencias == ["2021-06"]
+        # **a competência vem do cabeçalho, não da linha de entrada.** Arquivo
+        # sem entrada nenhuma — uma locadora cuja EFD só tem nota de serviço —
+        # sumia da contagem, e a tela dizia "4 competências" de uma base que
+        # cobre 44. E o CNPJ entra pelos catorze dígitos: o `str` do Cnpj sai
+        # com máscara, e misturar as duas formas listava o mesmo
+        # estabelecimento duas vezes
+        assert len(resumo.estabelecimentos) == 1, "o mesmo CNPJ em dois formatos"
         assert sum(resumo.por_ramo.values()) == 1
         assert sum(resumo.por_ramo_das_saidas.values()) == 1
         # o C400 é saída, existe no arquivo e a 047 ainda não o monta: tem de

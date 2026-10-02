@@ -35,6 +35,7 @@ from cat.infraestrutura.analitico.escrita import (
 from cat.infraestrutura.sped.ecd import EcdInvalida, indexar_ecd, razao
 from cat.infraestrutura.sped.entradas import colunas_da_entrada, entradas
 from cat.infraestrutura.sped.leitor import codificacao_de
+from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido, ler_cabecalho
 from cat.infraestrutura.sped.saidas import Contagem, colunas_da_saida, saidas
 from cat.log import obter_log
 
@@ -160,6 +161,30 @@ def _entradas_de(caminho: str, das_entradas: Escritor, resumo: Resumo,
     vistos: set[tuple[str, str]] = set()
     try:
         codificacao = codificacao_de(caminho)
+
+        # **a competência é do arquivo, não da linha de entrada.** Anotá-la só
+        # ao ver uma entrada faz o arquivo sem entrada nenhuma desaparecer da
+        # contagem — e aí a tela diz "4 competências" de uma base que cobre 44.
+        # Aconteceu com uma locadora de veículos, cuja EFD-Contribuições só tem
+        # nota de serviço: zero C100, 137 A100. O 037 em zero estava certo; o
+        # número de competências é que mentia, e mentir sobre o alcance da base é
+        # pior que mostrar zero, porque põe em dúvida o que está correto.
+        #
+        # Vale para este arquivo e não para o das saídas de propósito: as duas
+        # passadas leem o mesmo arquivo, e contar nas duas dobraria o resto.
+        with open(caminho, "rb") as f:
+            primeira = f.readline().decode(codificacao, errors="replace")
+        try:
+            cabecalho = ler_cabecalho(primeira)
+            # `.valor` e não `str()`: o `str` do Cnpj sai com máscara, e as
+            # linhas de entrada trazem os catorze dígitos crus — misturar os
+            # dois punha o mesmo estabelecimento duas vezes na lista
+            anotar_identificacao(resumo.estabelecimentos, resumo.competencias,
+                                 cabecalho.cnpj.valor if cabecalho.cnpj else "",
+                                 cabecalho.inicio.isoformat())
+        except ArquivoNaoReconhecido:
+            pass  # o 0000 ilegível já vira aviso adiante, na leitura
+
         for linha in entradas(caminho, codificacao):
             das_entradas.escrever(linha.como_dicionario())
             resumo.por_ramo[linha.registros] = resumo.por_ramo.get(linha.registros, 0) + 1
