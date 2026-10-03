@@ -524,18 +524,36 @@ regimes num relatório só.
    não pelo Conv. 26/2023. Saber que existe; não misturar no mesmo número.
    Confirmado que **nunca entrou no monofásico**, então a alíquota percentual
    vale até hoje; a do ES está em `A_CONFERIR` pelo mesmo motivo do GLP;
-7. **"Já credita" é regra ou exceção?** Medido só na empresa G. Medir a empresa L ou a
-   empresa K muda a proposta comercial do módulo;
-8. **O GLP do ES é 17% ou 12%?** A dúvida nasceu ao escrever
-   `tab_aliquota_combustivel` e é específica: o GLP **não é nomeado em nenhum
-   inciso do art. 20**, o que à primeira vista o joga na interna geral de 17%
-   (inciso I, "a"). Só que o inciso II, "m" (Lei 10.773/2017) põe a **12%** "as
-   mercadorias listadas nos **Anexos VII e VIII do Regulamento**" — e esses
-   anexos estão no Decreto 1.090-R, não na lei. São cinco pontos sobre toda a
-   base de GLP. É exatamente a divergência das fontes secundárias: o papel de
-   trabalho diz 17%, uma busca na internet diz 12%, e nenhum dos dois leu o
-   anexo. **O motor recusa GLP no ES até alguém ler.** O sítio da SEFAZ-ES
-   (`www2.sefaz.es.gov.br`, Infobase do Dec. 1.090-R) não respondeu em 03/10/2026.
+7. ~~**"Já credita" é regra ou exceção?**~~ — **resolvido em 03/10/2026: é
+   regra.** Varredura do `E111` nos clientes com CST 61:
+
+   | Cliente | Litros CST 61 | Credita? | Fundamento que o próprio ajuste cita |
+   |---|---|---|---|
+   | empresa Z | 7.231.083 | **sim**, 72 ajustes | LC 192/2022 e cláusula 7ª do Conv. 199/2022 |
+   | empresa G | 3.772.408 | **sim**, 111 linhas, R$ 5,08 mi em 32 competências | *(ajuste sem texto de fundamento)* |
+   | empresa K | 2.235.536 | **não** | — |
+   | empresa Y | 445.861 | **sim**, 13 ajustes | Conv. 26/2023 e 61/2023, "e a proporcionalidade das operações tributadas" |
+
+   **O achado não é o placar, são os fundamentos.** As três que creditam citam
+   bases legais **diferentes**: uma a cláusula da ad rem (que diz *quanto* é o
+   imposto), outra os convênios do **direito ao crédito** (que dizem *quem*
+   pode tomar). Não há prática assentada, e isso é argumento a favor do módulo:
+   o fundamento entra na linha da planilha justamente porque o cliente pergunta
+   "por que esse número?".
+
+   **E a empresa Y rateia.** O texto dela diz "a proporcionalidade das operações
+   tributadas" — ela credita só a parcela correspondente às saídas tributadas,
+   o que as outras duas aparentemente não fazem. É uma **terceira** variável de
+   divergência, ao lado do FCV que a empresa G não aplica e dos meses curtos.
+   Se o rateio é devido ou é conservadorismo do contador é questão aberta, e
+   decide se a empresa Y tem crédito **a mais** para pedir.
+
+   **Uma advertência de método.** A primeira varredura devolveu zero `E111` para
+   a empresa G — justamente a que se sabia creditar R$ 5 mi. O motivo era banal:
+   o script assumia uma subpasta que aquele cliente não usa. Os números acima da
+   empresa Y e da empresa Z vêm de **duas rodadas independentes** que
+   concordaram; o da empresa G vem de contagem direta de `SP020799`. Varredura
+   que devolve zero para um caso conhecido não prova nada sobre os outros zeros.
 
 **Resolvido no levantamento:** o **CST 090** era a maior dúvida, e não é "não sei o
 que é" — é **ICMS destacado a 12%** em 4.383 de 4.995 linhas, **já creditado pelo

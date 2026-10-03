@@ -26,6 +26,39 @@ dado para pedir**: todo o ressarcimento apurado é de lojas de MS, e as 234
 competências de São Paulo saem como prévia porque o relatório de saídas que
 chegou não tem as lojas paulistas (ver "Dados que faltam").
 
+
+## A prioridade mudou: combustível passa a ser a atividade principal
+
+**Decisão de 03/10/2026.** Levantar o crédito de ICMS sobre combustível deixa de
+ser uma frente entre outras e passa a ser **o que o sistema faz**. A CAT 42 e as
+exclusões de PIS/COFINS continuam no ar e continuam sendo mantidas, mas a ordem
+de construção passa a ser definida pelo combustível.
+
+Isso reordena o que vem abaixo, e muda o peso de três itens que pareciam
+laterais:
+
+* **o CNPJ na chave do `selecionar_por_competencia`** sai de "latente" para
+  bloqueante: na empresa G ele guardaria 62 arquivos de 411 e perderia três dos
+  quatro estabelecimentos. Quem lê EFD ICMS/IPI não recebe a matriz
+  consolidada, como quem lê Contribuições recebe;
+* **o leitor de EFD ICMS/IPI** passa a ser caminho crítico. O `registros.py` da
+  casa é de Contribuições: o `0000` tem outro leiaute e `0220`, `0206`, `C171` e
+  `1300`–`1370` não existem lá;
+* **o classificador de produto** idem — sem ele não há litro para multiplicar.
+
+**E o produto não é achar crédito: é auditar o tomado.** Medido em 03/10/2026,
+três dos quatro clientes com CST 61 **já creditam** — a empresa G por ajuste
+`SP020799`, e a **empresa Y** também, com a descrição do próprio ajuste citando
+os Convênios 26/2023 e 61/2023 e *"a proporcionalidade das operações
+tributadas"*, que é um elemento novo: ela rateia o crédito pela parcela de
+saídas tributadas. Só a empresa K não credita.
+
+Isso não enfraquece o módulo; define o que ele vende. O que se acha não é um
+crédito virgem, é a diferença: a empresa G credita `litros × ad rem` sem o FCV,
+0,24% a mais, sistemático; a maioria dos meses dela sai curta; e um mês de 2024
+sai 18% acima. Auditar isso exige a mesma conta que calcular do zero — mais a
+leitura do `E111`, que é como se descobre o que o cliente já tomou.
+
 ---
 
 ## O roteiro no sistema
@@ -205,9 +238,17 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       prazo de 5 anos da emissão. **O produto não é achar crédito, é auditar o
       tomado**: a empresa G já credita R$ 5 mi via ajuste `SP020799`, sem aplicar o
       FCV e com a maioria dos meses curta (v0.128.0)
-- [ ] Construir o módulo de combustível. Antes: medir a **empresa L** ou a **PRIME
-      PLUS** para saber se "o cliente já credita" é regra ou exceção — muda a
-      proposta comercial
+- [x] **As três tabelas de tributação do combustível** (v0.129.0 a v0.132.0):
+      `tab_ad_rem` (ad rem por competência, só o lido no convênio), `tab_fcv`
+      (as 27 UFs do Ato COTEPE 64/2019) e `tab_aliquota_combustivel` (a
+      percentual da era do ST, ES e SP). A última recusa de três jeitos
+      distintos: `ForaDoRegimePercentual` quando a era é ad rem, `MesPartido`
+      quando a alíquota muda no meio do mês (SP tem dois) e
+      `AliquotaDeCombustivelDesconhecida` quando ninguém leu o ato
+- [x] Medir se "o cliente já credita" é regra ou exceção: **é regra**. Três dos
+      quatro com CST 61 já creditam (empresa G e empresa Y por ajuste; só a
+      empresa K não). Confirma que o produto é auditar o tomado
+- [ ] Construir o módulo de combustível, agora como frente principal
 - [ ] Acrescentar o **CNPJ à chave** do `selecionar_por_competencia`: hoje ele
       chaveia só por competência, e na empresa G isso guardaria 62 arquivos de 411,
       perdendo três estabelecimentos. Latente porque seus dois usuários leem
@@ -216,8 +257,18 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [ ] Acrescentar o grupo **`ICMS61`** ao leitor de XML (`vICMSMonoRet`,
       `adRemICMSRet`): é a fase 2 do combustível. A era do ST já está coberta —
       o leitor tem `vICMSSTRet`, `vICMSSubstituto` e `vICMSEfet`
-- [ ] Confirmar o **etanol hidratado** (dá crédito?) e decidir se o
-      **lubrificante** entra como tese separada — R$ ~1 mi medido na empresa G
+- [x] Confirmar o **etanol hidratado**: o art. 3º-B da Lei 7.000/2001 põe no
+      monofásico o etanol **anidro** (EAC) e só ele, então o hidratado segue
+      percentual até hoje e **não tem ad rem** — pedir uma é erro de categoria.
+      No ES são 27%; em SP ele divide o inciso VI com o diesel mas tem dois
+      Informativos SFP próprios, e por isso ainda recusa
+- [ ] Decidir se o **lubrificante** entra como tese separada — R$ ~1 mi medido
+      na empresa G. Confirmado que nunca entrou no monofásico, então a alíquota
+      percentual vale até hoje
+- [ ] Ler os **Anexos VII e VIII do RICMS/ES** (Decreto 1.090-R) e o **Anexo II
+      do RICMS/SP** para resolver o **GLP**: nos dois estados ele não é nomeado
+      no artigo de alíquota, e no ES o inciso II, "m" põe a 12% o que está no
+      anexo — cinco pontos sobre toda a base de GLP. O motor recusa até lá
 - [ ] Decidir o **F100 `IND_OPER = 2`** ("outros documentos e operações"): o
       agregador da Gestão o conta como saída e o 680 o recusa. Na empresa F não
       existe nenhum, então não há como medir qual está certo — fica para a
