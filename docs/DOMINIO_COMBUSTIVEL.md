@@ -490,11 +490,21 @@ vigência; `planilhas/conferencia.py` e o pacote para a entrega.
 `0200` colidem entre os dois arquivos. 16 registros medidos em 40 EFD reais,
 com `tools/medir_leiaute_icms.py` para reconferir em cliente novo.
 
-**Falta:** o leitor que usa esse leiaute (ler em ordem, de-duplicar por
-`(CNPJ, competência)`, parquet); o classificador de produto; a apuração; a
-auditoria do `E111`; e a prescrição do ICMS. Do leiaute, faltam medir `0206`,
-`0220` e `C171` — e o `0220` já apareceu na empresa Z com dois tamanhos, então
-ele é o próximo.
+O **leitor das compras** também está feito (`sped/combustivel.py`, v0.138.0):
+uma linha por item de entrada, com documento e cadastro juntos, mais
+`itens_do_cadastro` com o `0200` e o `0205` para o classificador. Ele não sabe o
+que é combustível — entrega tudo, e quem filtra é quem classifica.
+
+**Dois achados do leitor que mudam o cálculo.** O campo `CST_ICMS` carrega
+**origem+CST ou CSOSN**, com cinco códigos ambíguos resolvidos por medição e
+marcados como tal; e o **`VL_ICMS` do C170 é esparso** (o CST `000` tem 610
+linhas e 24 com valor), então ICMS destacado confiável vem do `C190`, que é
+obrigatório.
+
+**Falta:** a rodada que chama o leitor em ordem e grava parquet; o classificador
+de produto; a apuração; a auditoria do `E111`; e a prescrição do ICMS. Do
+leiaute, faltam medir `0206`, `0220` e `C171` — e o `0220` já apareceu na
+empresa Z com dois tamanhos, então ele é o próximo.
 
 **Atenção ao reúso que não serve:** o `Total.somar` do `exclusoes_por_item` lê
 `linha.pis`, `linha.cofins`, `linha.diferenca_do_pis`, `linha.selic_sobre_o_pis`.

@@ -39,10 +39,10 @@ laterais:
 
 * ~~o CNPJ na chave da seleção~~ — **feito** (v0.137.0): era o mais urgente dos
   três, porque sem ele o leitor nasceria descartando três quartos da base;
-* **o leitor de EFD ICMS/IPI** passa a ser caminho crítico. O **leiaute** já
-  está feito e medido (`sped/registros_icms.py`, 16 registros em 40 arquivos
-  reais, v0.136.0); falta o leitor que o usa — ler em ordem, de-duplicar por
-  `(CNPJ, competência)` e gravar parquet;
+* ~~o leitor de EFD ICMS/IPI~~ — **feito**: o leiaute em v0.136.0
+  (`sped/registros_icms.py`, 16 registros medidos em 40 arquivos reais) e o
+  leitor das compras em v0.138.0 (`sped/combustivel.py`). Falta a **rodada** que
+  o chama em ordem e grava parquet;
 * **o classificador de produto** idem — sem ele não há litro para multiplicar.
 
 **E o produto não é achar crédito: é auditar o tomado.** Medido em 03/10/2026,

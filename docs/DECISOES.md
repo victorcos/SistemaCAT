@@ -5,6 +5,90 @@
 
 ---
 
+## 2026-10-03 — O leitor das compras, e o campo que carrega dois domínios
+
+Terceira peça do motor: `sped/combustivel.py` entrega uma linha por item de
+**entrada** da EFD ICMS/IPI, com o documento e o cadastro do item já juntos. É
+a matéria-prima que a apuração multiplica.
+
+**O módulo não sabe o que é combustível.** Ele entrega todas as compras; o
+classificador decide o que é diesel e a apuração decide quanto vale. Três
+relógios diferentes — classificação muda com cliente novo, tributação muda com
+convênio novo, extração não muda — e por isso três módulos.
+
+**Duas coisas são mais simples aqui que na EFD-Contribuições.** A ICMS/IPI traz
+o CNPJ no `0000` e não tem `0140` nem `C010`, então o cadastro é uma tabela por
+arquivo e não a `CadastroPorEstabelecimento` que a 037 precisa. E dos nove ramos
+de documento de entrada sobra um: `C100 > C170`.
+
+### O erro que eu cometi, e que o teste de fumaça pegou
+
+Escrevi a lista de CST de ICMS na versão clássica — 00, 10, 20, 30, 40, 41, 50,
+51, 60, 70, 90 — e com ela **o `061` não era reconhecido como nada**. O
+monofásico criou quatro CST que aquela lista não tem (`02`, `15`, `53` e `61`),
+e o `61` **é a tese inteira**: é ele que marca a compra de combustível de quem
+consome.
+
+O defeito não apareceria em teste de unidade escrito depois do código, porque eu
+teria escrito o teste com a mesma lista errada. Apareceu porque rodei a função
+contra a lista de códigos que a medição havia devolvido do arquivo real, e o
+`061` voltou vazio. Há um teste nomeado `TestOCstQueEuErrei` para que não volte.
+
+### O campo `CST_ICMS` tem dois domínios dentro
+
+Para fornecedor de regime normal são três dígitos de **origem + CST**; para o do
+Simples Nacional é o **CSOSN**, que é outro domínio no mesmo campo. Cinco
+códigos cabem nos dois — `102`, `202`, `300`, `400` e `500` — e as duas leituras
+dizem o oposto sobre haver imposto: `500` como origem 5 + CST 00 é tributada
+integralmente; como CSOSN 500 é ST cobrado anteriormente.
+
+**Resolvido por medição.** Das 3.245 linhas com `500` nos 40 arquivos, **uma só**
+traz ICMS destacado; tributada integralmente traria em quase todas. O `400` tem
+179 e nenhuma. O CSOSN vence — **e o resultado sai marcado `ambiguo`**, porque a
+estatística é de um cliente e a apuração pode querer recusar em vez de confiar
+nela. A lista de ambíguos é **calculada**, não digitada: acrescentar um CST novo
+recalcula a ambiguidade em vez de deixar a lista velha em silêncio.
+
+O `900` não é ambíguo, e não por estatística: a origem vai de 0 a 8, então
+origem 9 não existe.
+
+### Uma premissa do cálculo que caiu
+
+**O `VL_ICMS` do C170 é esparso.** O CST `000` — tributada integralmente — tem
+610 linhas de entrada e **só 24 com valor de ICMS**: o campo é facultativo por
+perfil e este cliente quase não o preenche. Quem for reconstruir ICMS destacado
+tem de ir ao **`C190`**, que é obrigatório e soma por CST/CFOP/alíquota. O
+leitor entrega o campo como veio, e `None` quando veio vazio.
+
+**Vazio não é zero** — a lição do 680 vale igual. Alíquota ausente e alíquota
+zero não erram o total, erram a pergunta "este fornecedor destacou imposto?",
+que é a que decide se a linha entra na tese.
+
+### A prova de ponta a ponta
+
+Rodado em quatro EFD de 2024 da empresa G: 1.279 itens de entrada, **334 de CST
+61**, com **236.070 litros** escritos em **três unidades diferentes pelo mesmo
+cliente** — `L` (183.086,72), `LT` (41.685,15) e `LTS` (11.298,55). Extrapolado
+para as 62 competências, bate com os 3,77 milhões de litros já medidos.
+
+Normalizar essas unidades é trabalho do classificador, com o `0190` e o `0220`.
+O leitor entrega a unidade como o arquivo a escreveu — inventar `L` para `LTS`
+dentro da extração esconderia o problema de quem tem de resolvê-lo.
+
+### Documento cancelado
+
+21 dos 7.210 documentos vieram com `COD_SIT` `02`. Pouco o bastante para passar
+despercebido num total, e o suficiente para um pedido conter nota cancelada. Os
+itens deles não saem, e o que ficou de fora vai contado no log, por motivo.
+
+60 testes, com as quatro guardas conferidas por mutação: tirar o `61` da lista,
+fazer vazio virar zero, ignorar o cancelamento e aceitar saída — as quatro
+falham. Nenhuma linha de cliente entrou como fixture: as EFD dos testes são
+montadas **pelo nome do campo** a partir de `registros_icms.CAMPOS`, o que faz o
+teste conferir também que o leitor e a tabela de leiaute concordam.
+
+---
+
 ## 2026-10-03 — O CNPJ entrou na chave da seleção, e a função trocou de nome
 
 Segundo pré-requisito do motor de combustível, e o que estava marcado como
