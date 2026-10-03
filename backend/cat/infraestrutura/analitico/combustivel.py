@@ -12,12 +12,26 @@ interrompido. **O que não vem é a soma.** O `Total` de lá lê `linha.pis`,
 SELIC, os dois vícios que esta tese não tem (ver `DOMINIO_COMBUSTIVEL.md`, §9:
 crédito escritural de ICMS não corrige, Súmula 411 do STJ).
 
-## Esta etapa ainda não sabe o que é combustível
+## Ela grava todas as compras, e o crédito de cada uma
 
-Ela grava **todas as compras**. Filtrar diesel exige o classificador, que não
-existe; gravar tudo agora é o que permite construí-lo depois contra dado real em
-vez de contra suposição. A agregação por CST é o que já dá a dimensão: na
-empresa G, 334 linhas de CST 61 em quatro competências de 2024.
+Cada linha passa pelo classificador (`sped/classificador_de_combustivel.py`) e
+pela apuração (`sped/credito_de_combustivel.py`), e o parquet sai com as três
+camadas: o que o arquivo trouxe, o que o classificador decidiu e o que a tabela
+calculou. **Gravar tudo é deliberado:** a compra que não é combustível também
+sai, com `produto = "fora"`, porque é assim que se confere que ela foi
+descartada por regra e não por omissão.
+
+### Três somas, três perguntas
+
+* `grupos` — **o que entrou**, por CST e unidade como o arquivo os escreveu;
+* `creditos` — **quanto vale**, por produto e regime, com a parte estimada à
+  parte;
+* `recusas` — **o que era da tese e não entrou**, por motivo.
+
+As chaves são diferentes de propósito. Misturar CST com produto somaria litro
+declarado com litro convertido, e um "balde de recusas" que recebesse tudo o que
+não gera crédito receberia a loja inteira — parafuso incluído. Só entra ali o
+que o classificador pôs na tese.
 
 ## A regra da retificadora não se reescreve
 
@@ -60,7 +74,12 @@ from decimal import Decimal
 from cat.infraestrutura.analitico.escrita import Escritor, parar_se_pedirem
 from cat.infraestrutura.gestao.modelos import ApuracaoEFD
 from cat.infraestrutura.gestao.montagem import selecionar_por_cnpj_e_competencia
+from cat.infraestrutura.sped.classificador_de_combustivel import (
+    Classificacao,
+    classificar,
+)
 from cat.infraestrutura.sped.combustivel import LinhaDeCompra, compras
+from cat.infraestrutura.sped.credito_de_combustivel import Credito, apurar
 from cat.infraestrutura.sped.leitor import (
     campos,
     codificacao_de,
@@ -122,6 +141,65 @@ class Total:
         self.valor += linha.valor_do_item or Decimal(0)
 
 
+@dataclass(frozen=True)
+class GrupoDeCredito:
+    """Onde o **crédito** soma: estabelecimento, mês, produto e regime.
+
+    Chave diferente da do `Grupo` de propósito. Aquele responde "o que entrou"
+    — e por isso guarda o CST e a unidade como o arquivo os escreveu. Este
+    responde "quanto vale", e aí o que importa é o produto que o classificador
+    decidiu e a era que a tabela aplicou.
+
+    Somar os dois na mesma chave misturaria litro declarado com litro
+    convertido, e CST com produto.
+    """
+
+    cnpj: str
+    competencia: str
+    produto: str
+    regime: str
+
+
+@dataclass
+class TotalDeCredito:
+    """Uma soma de crédito, com a parte estimada à parte.
+
+    `estimado` é quanto do `valor` veio da era do ST, onde a base é o valor do
+    item e não a base real. Separado, e não um sinalizador por grupo, porque um
+    mês pode ter as duas eras — a virada do diesel foi no meio de 2023.
+    """
+
+    linhas: int = 0
+    quantidade: Decimal = Decimal(0)   # já na unidade tributada
+    valor: Decimal = Decimal(0)
+    estimado: Decimal = Decimal(0)
+
+    def somar(self, c: Credito) -> None:
+        self.linhas += 1
+        self.quantidade += c.quantidade or Decimal(0)
+        self.valor += c.valor or Decimal(0)
+        if c.estimativa:
+            self.estimado += c.valor or Decimal(0)
+
+
+@dataclass
+class Recusa:
+    """Quantas linhas caíram por um motivo, e uma frase de exemplo.
+
+    A frase traz valores dentro — competência, alíquota, a suspeita de ad rem —
+    e por isso não serve de chave. Guardar **uma** delas é o que permite à tela
+    dizer "ad rem não conferida (9 linhas)" e abrir o porquê inteiro de uma.
+    """
+
+    linhas: int = 0
+    exemplo: str = ""
+
+    def somar(self, c: Credito) -> None:
+        self.linhas += 1
+        if not self.exemplo:
+            self.exemplo = c.porque
+
+
 @dataclass
 class Resumo:
     """O que a rodada devolve para a tela e para o log."""
@@ -134,11 +212,35 @@ class Resumo:
     estabelecimentos: list[str] = field(default_factory=list)
     competencias: list[str] = field(default_factory=list)
     grupos: dict[Grupo, Total] = field(default_factory=dict)
+    # o crédito, por estabelecimento, mês, produto e regime
+    creditos: dict[GrupoDeCredito, TotalDeCredito] = field(default_factory=dict)
+    # por que as linhas da tese não entraram no total, por motivo
+    recusas: dict[str, Recusa] = field(default_factory=dict)
+    # quantas linhas o classificador marcou para revisão humana
+    a_revisar: int = 0
     avisos: list[str] = field(default_factory=list)
     # o intervalo das emissões, que é o que diz se prescrição é assunto
     primeira_emissao: str = ""
     ultima_emissao: str = ""
     segundos: float = 0.0
+
+    @property
+    def credito(self) -> Decimal:
+        """O total que entra no pedido. **Só o que não foi recusado.**"""
+        return sum((t.valor for t in self.creditos.values()), Decimal(0))
+
+    @property
+    def credito_estimado(self) -> Decimal:
+        """Quanto do total veio da era do ST, onde a base é proxy.
+
+        Fica à vista no resumo, e não em nota de rodapé: um total com estimativa
+        dentro não se apresenta sem dizer quanto.
+        """
+        return sum((t.estimado for t in self.creditos.values()), Decimal(0))
+
+    @property
+    def linhas_recusadas(self) -> int:
+        return sum(r.linhas for r in self.recusas.values())
 
     @property
     def linhas_de_monofasico(self) -> int:
@@ -164,10 +266,17 @@ def colunas() -> list[str]:
         "base_do_icms", "aliquota_do_icms", "valor_do_icms",
         "base_do_st", "aliquota_do_st", "valor_do_st",
         "descricao_do_item", "ncm", "unidade_de_inventario", "cest",
+        # o que o classificador decidiu
+        "produto", "confianca", "revisar", "por_que_classificou",
+        # o que a apuração calculou
+        "regime", "quantidade_tributada", "fator", "ad_rem", "fcv",
+        "base_do_credito", "aliquota_do_credito", "credito",
+        "cobertura", "estimativa", "motivo_da_recusa", "por_que_apurou",
     ]
 
 
-def _como_dicionario(linha: LinhaDeCompra) -> dict[str, str]:
+def _como_dicionario(linha: LinhaDeCompra, classificacao: Classificacao,
+                     credito: Credito) -> dict[str, str]:
     """A linha no formato do parquet, com vazio onde o campo veio vazio.
 
     `None` vira string vazia e não `"0"`: **vazio não é zero** continua valendo
@@ -212,6 +321,25 @@ def _como_dicionario(linha: LinhaDeCompra) -> dict[str, str]:
         "ncm": linha.ncm,
         "unidade_de_inventario": linha.unidade_de_inventario,
         "cest": linha.cest,
+        "produto": classificacao.produto,
+        "confianca": classificacao.confianca,
+        "revisar": "1" if classificacao.revisar else "",
+        "por_que_classificou": classificacao.porque,
+        "regime": credito.regime,
+        "quantidade_tributada": texto(credito.quantidade),
+        "fator": texto(credito.fator),
+        "ad_rem": texto(credito.ad_rem),
+        "fcv": texto(credito.fcv),
+        "base_do_credito": texto(credito.base),
+        "aliquota_do_credito": texto(credito.aliquota),
+        # vazio, e não "0,00", quando a linha foi recusada: zero soma, e quem
+        # abrir o parquet precisa distinguir "não gerou crédito" de "ninguém
+        # calculou"
+        "credito": texto(credito.valor),
+        "cobertura": credito.cobertura,
+        "estimativa": "1" if credito.estimativa else "",
+        "motivo_da_recusa": credito.motivo,
+        "por_que_apurou": credito.porque,
     }
 
 
@@ -346,12 +474,16 @@ def _de_um_arquivo(apuracao: ApuracaoEFD, escritor: Escritor, resumo: Resumo,
     try:
         codificacao = codificacao_de(apuracao.arquivo)
         for linha in compras(apuracao.arquivo, codificacao):
-            escritor.escrever(_como_dicionario(linha))
+            classificacao = classificar(
+                linha.descricao_do_item, linha.ncm, linha.unidade,
+                linha.descricao_no_documento)
+            credito = apurar(linha, classificacao)
+            escritor.escrever(_como_dicionario(linha, classificacao, credito))
             estabelecimentos.add(linha.cnpj_do_estabelecimento)
             competencias.add(linha.competencia)
             if linha.data_de_emissao:
                 emissoes.append(linha.data_de_emissao)
-            _somar(resumo.grupos, linha)
+            _somar(resumo, linha, classificacao, credito)
     # só o arquivo ilegível vira aviso e segue; o cancelamento sobe
     except (OSError, ValueError) as erro:
         log.warning("não deu para ler as compras da EFD ICMS/IPI",
@@ -365,12 +497,31 @@ def _de_um_arquivo(apuracao: ApuracaoEFD, escritor: Escritor, resumo: Resumo,
     andamento.linhas = escritor.gravadas
 
 
-def _somar(grupos: dict[Grupo, Total], linha: LinhaDeCompra) -> None:
-    grupo = Grupo(cnpj=linha.cnpj_do_estabelecimento,
-                  competencia=linha.competencia,
-                  cst=linha.tributacao.bruto,
-                  unidade=linha.unidade)
-    grupos.setdefault(grupo, Total()).somar(linha)
+def _somar(resumo: Resumo, linha: LinhaDeCompra, classificacao: Classificacao,
+           credito: Credito) -> None:
+    """A linha entra em até três somas, e cada uma responde outra pergunta.
+
+    A das **compras** (`grupos`) responde "o que entrou", e conta tudo. A do
+    **crédito** conta só o que entra no total. A das **recusas** conta o que era
+    da tese e não entrou — e nunca o que nem era da tese, senão o balde de
+    recusas viraria a loja inteira.
+    """
+    resumo.grupos.setdefault(
+        Grupo(cnpj=linha.cnpj_do_estabelecimento, competencia=linha.competencia,
+              cst=linha.tributacao.bruto, unidade=linha.unidade),
+        Total()).somar(linha)
+
+    if classificacao.revisar:
+        resumo.a_revisar += 1
+
+    if credito.entra_no_total:
+        resumo.creditos.setdefault(
+            GrupoDeCredito(cnpj=linha.cnpj_do_estabelecimento,
+                           competencia=linha.competencia,
+                           produto=credito.produto, regime=credito.regime),
+            TotalDeCredito()).somar(credito)
+    elif classificacao.entra_na_tese:
+        resumo.recusas.setdefault(credito.motivo, Recusa()).somar(credito)
 
 
 def serializar(resumo: Resumo) -> dict:
@@ -390,6 +541,13 @@ def serializar(resumo: Resumo) -> dict:
         "estabelecimentos": len(resumo.estabelecimentos),
         "competencias": len(resumo.competencias),
         "grupos": len(resumo.grupos),
+        "credito": str(resumo.credito),
+        "credito_estimado": str(resumo.credito_estimado),
+        "linhas_recusadas": resumo.linhas_recusadas,
+        # o motivo e a contagem, sem a frase: ela é longa e vai para a tela,
+        # não para o log
+        "recusas": {m: r.linhas for m, r in sorted(resumo.recusas.items())},
+        "a_revisar": resumo.a_revisar,
         "primeira_emissao": resumo.primeira_emissao,
         "ultima_emissao": resumo.ultima_emissao,
         "avisos": len(resumo.avisos),

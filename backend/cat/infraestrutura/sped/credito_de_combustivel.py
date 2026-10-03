@@ -91,6 +91,26 @@ RECUSADO = "recusado"
 CENTAVO = Decimal("0.01")
 CEM = Decimal(100)
 
+# Por que a linha não entrou no total, em código curto.
+#
+# **A frase não serve de chave.** Ela traz valores dentro — a competência, a
+# alíquota, a suspeita de ad rem — e agrupar por ela daria um grupo por linha.
+# O código agrupa; a frase explica. A tela mostra "ad rem não conferida (9
+# linhas)" e abre uma delas para ler o porquê inteiro.
+SEM_CLASSIFICACAO = "sem_classificacao"
+FORA_DA_TESE = "fora_da_tese"
+SEM_COMPETENCIA = "sem_competencia"
+SEM_QUANTIDADE = "sem_quantidade"
+SEM_FATOR = "sem_fator"
+SEM_VALOR_DO_ITEM = "sem_valor_do_item"
+AD_REM_NAO_CONFERIDA = "ad_rem_nao_conferida"
+FCV_DESCONHECIDO = "fcv_desconhecido"
+ALIQUOTA_NAO_CONFERIDA = "aliquota_nao_conferida"
+MES_PARTIDO = "mes_partido"
+REGIME_INCOERENTE = "regime_incoerente"
+CST_NAO_E_DO_REGIME = "cst_nao_e_do_regime"
+ICMS_JA_DESTACADO = "icms_ja_destacado"
+
 
 @dataclass(frozen=True)
 class Credito:
@@ -114,6 +134,8 @@ class Credito:
     aliquota: Decimal | None = None
     valor: Decimal | None = None
     cobertura: str = RECUSADO
+    # o código curto de por que não entrou; vazio quando entrou
+    motivo: str = ""
     porque: str = ""
     estimativa: bool = False
 
@@ -128,9 +150,10 @@ class Credito:
         return self.valor is not None and self.cobertura != RECUSADO
 
 
-def _recusa(porque: str, produto: str = "", regime: str = "") -> Credito:
+def _recusa(motivo: str, porque: str, produto: str = "",
+            regime: str = "") -> Credito:
     return Credito(produto=produto, regime=regime, cobertura=RECUSADO,
-                   porque=porque)
+                   motivo=motivo, porque=porque)
 
 
 def apurar(linha: LinhaDeCompra, classificacao: Classificacao) -> Credito:
@@ -142,41 +165,113 @@ def apurar(linha: LinhaDeCompra, classificacao: Classificacao) -> Credito:
     """
     produto = classificacao.produto
     if not produto:
-        return _recusa("a linha não foi classificada: " + classificacao.porque)
+        return _recusa(SEM_CLASSIFICACAO,
+                       "a linha não foi classificada: " + classificacao.porque)
     if not classificacao.entra_na_tese:
-        return _recusa(f"{produto} não entra nesta tese: {classificacao.porque}",
+        return _recusa(FORA_DA_TESE,
+                       f"{produto} não entra nesta tese: {classificacao.porque}",
                        produto=produto)
 
     competencia = linha.competencia
     if not competencia:
-        return _recusa("o arquivo não trouxe competência no registro 0000",
+        return _recusa(SEM_COMPETENCIA,
+                       "o arquivo não trouxe competência no registro 0000",
                        produto=produto)
 
-    if tab_aliquota_combustivel.no_monofasico(produto, competencia):
+    monofasico = tab_aliquota_combustivel.no_monofasico(produto, competencia)
+    if (recusa := _o_cst_nao_casa(linha, produto, monofasico)) is not None:
+        return recusa
+
+    if monofasico:
         return _no_monofasico(linha, classificacao, produto, competencia)
     return _na_era_do_st(linha, produto, competencia)
+
+
+def _o_cst_nao_casa(linha: LinhaDeCompra, produto: str,
+                    monofasico: bool) -> Credito | None:
+    """A recusa quando a compra não pode gerar este crédito. `None` quando pode.
+
+    **O teste que importa é o destaque, não o rótulo.** O produto diz *o que é*
+    e o regime vem da lei; o CST diz como o fornecedor escriturou, e ele erra.
+    Uma compra de diesel com **ICMS destacado** já deu crédito pelo caminho
+    normal — somar a ad rem em cima creditaria o mesmo litro duas vezes. Esse é
+    o risco real, e é ele que esta porta fecha.
+
+    ### A medição que corrigiu a primeira versão desta função
+
+    Ela recusava tudo que não fosse CST 61 na era do monofásico, e isso jogava
+    fora **1.026 linhas, R$ 3 milhões**. Olhando o que eram: diesel e gasolina
+    comprados em posto — `Rodoposto Bandeirantes`, `Auto Posto Viaduto` —, 914
+    de diesel e 112 de gasolina, concentradas em 2025, **todas sem uma gota de
+    ICMS destacado**. Compra de combustível de verdade, escriturada pelo
+    fornecedor com 60 em vez de 61.
+
+    O regime é da lei. Em 2025 o diesel é monofásico, tenha o posto escrito 60
+    ou 61, e o imposto foi cobrado lá atrás nos dois casos. O que separa essas
+    linhas das do CST 90 é o destaque: **CST 60 tem zero linhas com ICMS
+    destacado; CST 90 tem 792 de 1.080**.
+
+    Então a ordem é: destaque primeiro, rótulo depois — e o rótulo só recusa o
+    que não é nem monofásico nem retido, que é o caso que pede olho humano.
+
+    ### Quanto esta porta vale, medido
+
+    Rodada a cadeia nas 25 competências da empresa G com e sem ela: o devido cai
+    de R$ 1.567.603,81 para **R$ 1.566.349,35**. São **R$ 1.254,46** de crédito
+    que seriam pedidos duas vezes.
+
+    Pouco neste cliente, e vale dizer por quê: ele compra quase tudo em posto,
+    sem destaque. Num cliente que compre de distribuidor com ICMS destacado a
+    porta pesa muito mais — e o número a registrar é o medido, não a proporção
+    que se estima olhando a contagem de linhas.
+    """
+    t = linha.tributacao
+    regime = MONOFASICO if monofasico else ST
+
+    if (linha.valor_do_icms or Decimal(0)) > 0:
+        return _recusa(
+            ICMS_JA_DESTACADO,
+            f"a compra veio com ICMS destacado de R$ {linha.valor_do_icms} "
+            f"(CST {t.bruto or '(vazio)'}): o documento já deu esse crédito "
+            f"pelo caminho normal, e somar o do combustível em cima creditaria "
+            f"o mesmo litro duas vezes",
+            produto, regime)
+
+    # sem destaque, o imposto foi cobrado antes — por monofásico ou por
+    # substituição. Nos dois casos o crédito desta tese é o que resta
+    if t.cst == "61" or t.e_substituicao:
+        return None
+
+    return _recusa(
+        CST_NAO_E_DO_REGIME,
+        f"a compra veio com CST {t.bruto or '(vazio)'} e sem ICMS destacado: "
+        f"não é monofásico (61) nem imposto retido antes (60 ou CSOSN 500), "
+        f"então não se sabe por qual via o {produto} foi tributado em "
+        f"{linha.competencia}. A linha precisa de olho humano",
+        produto, regime)
 
 
 def _no_monofasico(linha: LinhaDeCompra, classificacao: Classificacao,
                    produto: str, competencia: str) -> Credito:
     """`quantidade × ad rem × FCV` — os três de tabela, nenhum de palpite."""
     if linha.quantidade is None:
-        return _recusa("o C170 não trouxe quantidade, e sem ela não há litro "
+        return _recusa(SEM_QUANTIDADE,
+                       "o C170 não trouxe quantidade, e sem ela não há litro "
                        "para multiplicar", produto, MONOFASICO)
     if classificacao.fator is None:
         return _recusa(
-            f"falta o fator de conversão: {classificacao.porque}",
+            SEM_FATOR, f"falta o fator de conversão: {classificacao.porque}",
             produto, MONOFASICO)
 
     try:
         ad_rem = tab_ad_rem.da_competencia(produto, competencia)
     except tab_ad_rem.AdRemDesconhecida as erro:
-        return _recusa(str(erro), produto, MONOFASICO)
+        return _recusa(AD_REM_NAO_CONFERIDA, str(erro), produto, MONOFASICO)
 
     try:
         fcv = tab_fcv.fator(linha.uf, produto, competencia)
     except tab_fcv.FcvDesconhecido as erro:
-        return _recusa(str(erro), produto, MONOFASICO)
+        return _recusa(FCV_DESCONHECIDO, str(erro), produto, MONOFASICO)
 
     quantidade = linha.quantidade * classificacao.fator
     valor = (quantidade * ad_rem * fcv).quantize(CENTAVO, ROUND_HALF_UP)
@@ -198,17 +293,19 @@ def _na_era_do_st(linha: LinhaDeCompra, produto: str,
     try:
         aliquota = tab_aliquota_combustivel.interna(linha.uf, produto, competencia)
     except tab_aliquota_combustivel.MesPartido as erro:
-        return _recusa(str(erro), produto, ST)
+        return _recusa(MES_PARTIDO, str(erro), produto, ST)
     except tab_aliquota_combustivel.ForaDoRegimePercentual as erro:
         # não deveria chegar aqui: `no_monofasico` já desviou. Se chegou, a
         # tabela e o desvio discordam, e isso é defeito a aparecer
-        return _recusa(f"incoerência entre o regime e a tabela — {erro}",
+        return _recusa(REGIME_INCOERENTE,
+                       f"incoerência entre o regime e a tabela — {erro}",
                        produto, ST)
     except tab_aliquota_combustivel.AliquotaDeCombustivelDesconhecida as erro:
-        return _recusa(str(erro), produto, ST)
+        return _recusa(ALIQUOTA_NAO_CONFERIDA, str(erro), produto, ST)
 
     if linha.valor_do_item is None:
-        return _recusa("o C170 não trouxe valor do item, que é a base da "
+        return _recusa(SEM_VALOR_DO_ITEM,
+                       "o C170 não trouxe valor do item, que é a base da "
                        "estimativa", produto, ST)
 
     base = linha.valor_do_item

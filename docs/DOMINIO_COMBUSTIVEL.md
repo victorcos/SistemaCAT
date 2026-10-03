@@ -530,10 +530,15 @@ contra R$ 1.328.691,14 creditados, **R$ 238.912,67 a menos**. E três meses bate
 ao centavo com `litros × ad rem`, confirmando a ad rem e revelando que o cliente
 não aplica o FCV.
 
-**Falta:** a auditoria do `E111` dentro do sistema (o cruzamento acima foi feito
-por script); a prescrição do ICMS; a tabela de UF que internalizaram o Conv.
-26/2023, sem a qual a cobertura não passa de média; a ad rem de 05/2023 a
-01/2024, que recusa nove competências; e medir `0206` e `C171`.
+A **rodada já apura** (v0.143.0): classifica e calcula cada linha, grava as três
+camadas no parquet e soma em três chaves — compras, crédito e recusas por
+motivo. E tem a porta que evita creditar duas vezes: **compra com ICMS destacado
+não ganha a ad rem em cima**, porque o documento já deu aquele crédito.
+
+**Falta:** o caso de uso da etapa e a rota (para o botão aparecer); a tela; a
+auditoria do `E111` dentro do sistema; a prescrição do ICMS; a tabela de UF que
+internalizaram o Conv. 26/2023; a ad rem de 05/2023 a 01/2024; e medir `0206` e
+`C171`.
 
 **Atenção ao reúso que não serve:** o `Total.somar` do `exclusoes_por_item` lê
 `linha.pis`, `linha.cofins`, `linha.diferenca_do_pis`, `linha.selic_sobre_o_pis`.

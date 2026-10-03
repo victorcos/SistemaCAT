@@ -29,6 +29,7 @@ from cat.infraestrutura.analitico.combustivel import (
     serializar,
 )
 from cat.infraestrutura.analitico.escrita import LeituraCancelada
+from cat.infraestrutura.sped import credito_de_combustivel as credito
 from cat.infraestrutura.sped.registros_icms import CAMPOS
 
 CNPJ = "44000003000109"
@@ -48,7 +49,7 @@ def _linha(registro: str, **valores: str) -> str:
 
 def _efd(tmp_path, nome: str, *, cnpj: str = CNPJ, competencia: str = "062022",
          cod_fin: str = "0", litros: str = "100,50",
-         cst: str = "061") -> str:
+         cst: str = "061", ncm: str = "27101921") -> str:
     """Uma EFD ICMS/IPI com uma compra de combustível."""
     linhas = [
         _linha("0000", COD_VER="017", COD_FIN=cod_fin,
@@ -57,7 +58,7 @@ def _efd(tmp_path, nome: str, *, cnpj: str = CNPJ, competencia: str = "062022",
                IND_PERFIL="A", IND_ATIV="1"),
         _linha("0150", COD_PART="F1", NOME="POSTO DO TESTE", CNPJ="11222333000181"),
         _linha("0200", COD_ITEM="I-DIESEL", DESCR_ITEM="OLEO DIESEL B S-10",
-               UNID_INV="L", COD_NCM="27101921"),
+               UNID_INV="L", COD_NCM=ncm),
         _linha("C100", IND_OPER="0", COD_PART="F1", COD_MOD="55", COD_SIT="00",
                NUM_DOC="1", CHV_NFE="3" * 44, DT_DOC=f"15{competencia}"),
         _linha("C170", NUM_ITEM="1", COD_ITEM="I-DIESEL", DESCR_COMPL="DIESEL",
@@ -294,6 +295,125 @@ class TestOResumoParaOLog:
                       "linhas_de_monofasico", "ignorados_por_duplicidade",
                       "primeira_emissao", "ultima_emissao", "segundos"):
             assert chave in d, chave
+
+
+class TestOCreditoApurado:
+    """A rodada não grava só o que entrou: grava quanto vale.
+
+    Cada linha passa pelo classificador e pela apuração, e o parquet sai com as
+    três camadas — o que o arquivo trouxe, o que o classificador decidiu, e o
+    que a tabela calculou.
+    """
+
+    def test_o_credito_do_monofasico_entra_no_total(self, tmp_path):
+        """1.000 litros de diesel em 06/2024: 1.000 × 1,0635 × 0,9976."""
+        resumo = extrair([_efd(tmp_path, "a.txt", competencia="062024",
+                               litros="1000")],
+                         str(tmp_path / "saida"))
+
+        assert resumo.credito == Decimal("1060.95")
+        assert resumo.credito_estimado == Decimal(0)
+
+    def test_o_credito_da_era_do_st_sai_marcado_como_estimado(self, tmp_path):
+        """A base ali é o valor do item, não a base real — e o resumo diz
+        quanto do total veio daí, em vez de escondê-lo numa nota."""
+        resumo = extrair([_efd(tmp_path, "a.txt", competencia="062022",
+                               cst="060")],
+                         str(tmp_path / "saida"))
+
+        assert resumo.credito > 0
+        assert resumo.credito_estimado == resumo.credito
+
+    def test_as_duas_eras_convivem_no_mesmo_resumo(self, tmp_path):
+        """A virada do diesel foi no meio de 2023: um pedido de cinco anos tem
+        competências dos dois lados, e o estimado é parte do total, não ele."""
+        resumo = extrair([_efd(tmp_path, "st.txt", competencia="062022", cst="060"),
+                          _efd(tmp_path, "mono.txt", competencia="062024")],
+                         str(tmp_path / "saida"))
+
+        assert resumo.credito_estimado > 0
+        assert resumo.credito > resumo.credito_estimado
+
+    def test_o_grupo_do_credito_e_por_produto_e_regime(self, tmp_path):
+        """Chave diferente da das compras: lá é CST e unidade como o arquivo
+        escreveu, aqui é o produto que o classificador decidiu."""
+        resumo = extrair([_efd(tmp_path, "a.txt", competencia="062024")],
+                         str(tmp_path / "saida"))
+
+        grupo = next(iter(resumo.creditos))
+        assert (grupo.produto, grupo.regime) == ("diesel", credito.MONOFASICO)
+        assert grupo.competencia == "2024-06"
+
+    def test_o_parquet_traz_as_tres_camadas(self, tmp_path):
+        destino = str(tmp_path / "saida")
+        extrair([_efd(tmp_path, "a.txt", competencia="062024")], destino)
+        linha = pq.read_table(os.path.join(destino, ARQUIVO)).to_pylist()[0]
+
+        assert linha["quantidade"] == "100.50"          # do arquivo
+        assert linha["produto"] == "diesel"             # do classificador
+        assert linha["ad_rem"] == "1.0635"              # da tabela
+        assert linha["credito"] != ""
+        assert linha["por_que_apurou"]
+
+
+class TestAsRecusas:
+    def test_a_linha_recusada_aparece_no_parquet_sem_credito(self, tmp_path):
+        """**Zero soma; vazio aparece.** Gravar "0,00" faria a etapa seguinte
+        somar um crédito que ninguém calculou."""
+        destino = str(tmp_path / "saida")
+        extrair([_efd(tmp_path, "a.txt", competencia="092023")], destino)
+        linha = pq.read_table(os.path.join(destino, ARQUIVO)).to_pylist()[0]
+
+        assert linha["credito"] == ""
+        assert linha["cobertura"] == credito.RECUSADO
+        assert linha["motivo_da_recusa"] == credito.AD_REM_NAO_CONFERIDA
+
+    def test_as_recusas_somam_por_motivo_com_um_exemplo(self, tmp_path):
+        """A frase traz a competência dentro e não serve de chave; guardar uma
+        delas é o que deixa a tela dizer "ad rem não conferida (2 linhas)" e
+        abrir o porquê inteiro de uma."""
+        resumo = extrair([_efd(tmp_path, "a.txt", competencia="092023"),
+                          _efd(tmp_path, "b.txt", competencia="102023")],
+                         str(tmp_path / "saida"))
+
+        recusa = resumo.recusas[credito.AD_REM_NAO_CONFERIDA]
+        assert (recusa.linhas, resumo.linhas_recusadas) == (2, 2)
+        assert "não está conferida" in recusa.exemplo
+
+    def test_o_que_nem_era_da_tese_nao_entra_nas_recusas(self, tmp_path):
+        """**O balde de recusas não é a loja inteira.** Um parafuso não entra
+        no crédito, e dizer isso como "recusa" afogaria o que importa.
+
+        A primeira versão deste teste dava ao parafuso o NCM do diesel, e ele
+        gerava crédito — o que estava certo, porque **quem decide o produto é a
+        NCM**, não o CST. Foi esse engano que revelou a porta que faltava: a
+        apuração ignorava o CST e creditava compra com ICMS já destacado.
+        """
+        resumo = extrair([_efd(tmp_path, "parafuso.txt", competencia="062024",
+                               cst="000", ncm="73181500")],
+                         str(tmp_path / "saida"))
+
+        assert resumo.linhas == 1
+        assert resumo.recusas == {}
+        assert resumo.credito == Decimal(0)
+
+    def test_conta_as_linhas_que_o_classificador_mandou_revisar(self, tmp_path):
+        """Sem NCM, a descrição decide — e a linha vai para revisão humana."""
+        resumo = extrair([_efd(tmp_path, "a.txt", competencia="062024",
+                               ncm="")],
+                         str(tmp_path / "saida"))
+
+        assert resumo.a_revisar == 1
+
+    def test_o_resumo_do_log_traz_o_credito_e_os_motivos(self, tmp_path):
+        resumo = extrair([_efd(tmp_path, "a.txt", competencia="062024"),
+                          _efd(tmp_path, "b.txt", competencia="092023")],
+                         str(tmp_path / "saida"))
+        d = serializar(resumo)
+
+        assert d["credito"] == str(resumo.credito)
+        assert d["recusas"] == {credito.AD_REM_NAO_CONFERIDA: 1}
+        assert "a_revisar" in d
 
 
 class TestOQueEstaEtapaNaoFaz:

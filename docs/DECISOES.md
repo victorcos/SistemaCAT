@@ -5,6 +5,85 @@
 
 ---
 
+## 2026-10-03 — A rodada apura, e a porta que evita creditar duas vezes
+
+`analitico/combustivel.py` deixou de gravar só as compras: cada linha passa pelo
+classificador e pela apuração, e o parquet sai com as três camadas — o que o
+arquivo trouxe, o que o classificador decidiu, o que a tabela calculou.
+
+**Três somas, três perguntas, três chaves.** `grupos` responde "o que entrou",
+por CST e unidade como o arquivo os escreveu; `creditos` responde "quanto vale",
+por produto e regime, com a parte estimada à parte; `recusas` responde "o que era
+da tese e não entrou", por motivo. Misturá-las somaria litro declarado com litro
+convertido — e um balde de recusas que recebesse tudo o que não gera crédito
+receberia a loja inteira, parafuso incluído.
+
+**O motivo virou código curto.** As frases de recusa trazem a competência e a
+alíquota dentro, então agrupar por elas daria um grupo por linha. Agora cada
+recusa tem um código (`ad_rem_nao_conferida`, `mes_partido`, …) e a rodada guarda
+**uma** frase de exemplo por código: a tela diz "ad rem não conferida (9 linhas)"
+e abre o porquê inteiro de uma. Há teste que percorre os caminhos de recusa e
+exige que nenhum saia sem código.
+
+### A porta que faltava, e como ela apareceu
+
+Escrevi um teste chamando um parafuso de parafuso — e dei a ele o NCM do diesel.
+Ele gerou crédito. Isso estava **certo**: quem decide o produto é a NCM. Mas
+revelou o que faltava: **a apuração ignorava o CST por completo**, então uma
+compra com ICMS já destacado ganhava a ad rem em cima. Contagem dupla.
+
+A doc já dizia que o CST 090 é ICMS destacado já creditado pelo documento e fica
+fora da tese; o que faltava era o código fazer isso.
+
+### E a primeira versão da porta estava errada
+
+Ela exigia CST 61 na era do monofásico. Rodando contra o acervo real, o devido
+caiu de R$ 1,57 milhão para R$ 1,04 milhão e **meses inteiros sumiram** — meses
+em que o cliente creditou.
+
+Fui ver o que eram as 1.026 linhas recusadas, R$ 3 milhões: diesel e gasolina
+comprados em posto — `Rodoposto Bandeirantes`, `Auto Posto Viaduto` —, 914 e 112
+linhas, concentradas em 2025, **todas sem uma gota de ICMS destacado**. Compra de
+combustível de verdade, escriturada pelo fornecedor com 60 em vez de 61.
+
+**O regime é da lei, não do rótulo que o posto digitou.** Em 2025 o diesel é
+monofásico tenha o fornecedor escrito 60 ou 61, e nos dois casos o imposto foi
+cobrado lá atrás. O que separa essas linhas das de CST 90 é o **destaque**: CST
+60 tem **zero** linhas com ICMS destacado; CST 90 tem **792 de 1.080**.
+
+A regra passou a ser: **destaque primeiro, rótulo depois**. Com destaque,
+recusa por `icms_ja_destacado`. Sem destaque e com CST 61, 60 ou CSOSN 500,
+apura. Sem destaque e com outro CST, recusa para olho humano — não se sabe por
+qual via o produto foi tributado, e adivinhar ali é inventar crédito.
+
+### Quanto a porta vale, medido
+
+Com e sem ela, nas 25 competências: o devido vai de R$ 1.567.603,81 para
+**R$ 1.566.349,35**. São **R$ 1.254,46** que seriam pedidos duas vezes.
+
+Pouco neste cliente, e vale dizer por quê: ele compra quase tudo em posto, sem
+destaque. Num cliente que compre de distribuidor com ICMS destacado a porta pesa
+muito mais.
+
+**E eu tinha estimado "uns R$ 290 mil"** — uma regra de três sobre a contagem de
+linhas, dita como se fosse medição. O número certo é 230 vezes menor. Estimativa
+apresentada como medida é o mesmo defeito das outras cinco deste dia, só que
+disfarçado de ordem de grandeza.
+
+### O resultado, com a porta no lugar
+
+| | |
+|---|---|
+| devido | R$ 1.566.349,35 |
+| creditado pelo cliente | R$ 1.328.691,14 |
+| **diferença** | **−R$ 237.658,21** |
+
+E os três meses que batem **ao centavo** com `litros × ad rem` continuam batendo:
+2024-02 (−0,07), 2024-05 (+0,03), 2024-06 (−0,03). A porta não os tocou, que é
+como se sabe que ela recusou o que devia.
+
+---
+
 ## 2026-10-03 — O card do combustível no hub de ICMS, antes de a tela existir
 
 Primeiro pedaço de frente, e ele é **uma edição de dado**: a trilha `CMB` entrou

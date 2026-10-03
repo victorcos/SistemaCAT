@@ -21,6 +21,7 @@ import pytest
 
 from cat.infraestrutura.sped.classificador_de_combustivel import classificar
 from cat.infraestrutura.sped.combustivel import LinhaDeCompra, codigo_de_tributacao
+from cat.infraestrutura.sped import credito_de_combustivel as credito
 from cat.infraestrutura.sped.credito_de_combustivel import (
     MEDIA,
     MONOFASICO,
@@ -246,6 +247,51 @@ class TestORecusadoApareceENaoSoma:
         assert c.valor is None
         assert "0000" in c.porque
 
+    def test_toda_recusa_traz_motivo_curto_e_conhecido(self):
+        """**A frase não serve de chave.** Ela traz a competência e a alíquota
+        dentro, então agrupar por ela daria um grupo por linha. O código agrupa;
+        a frase explica.
+
+        Este teste percorre os caminhos de recusa e exige que nenhum saia sem
+        código — é o que impede uma recusa nova de cair num balde anônimo na
+        tela.
+        """
+        conhecidos = {
+            credito.SEM_CLASSIFICACAO, credito.FORA_DA_TESE,
+            credito.SEM_COMPETENCIA, credito.SEM_QUANTIDADE, credito.SEM_FATOR,
+            credito.SEM_VALOR_DO_ITEM, credito.AD_REM_NAO_CONFERIDA,
+            credito.FCV_DESCONHECIDO, credito.ALIQUOTA_NAO_CONFERIDA,
+            credito.MES_PARTIDO, credito.REGIME_INCOERENTE,
+        }
+        casos = [
+            (_linha(), "LANTERNA", ""),                       # sem classificação
+            (_linha(), "OLEO MOTOR SAE", NCM_LUBRIFICANTE),   # fora da tese
+            (_linha(competencia=""), "OLEO DIESEL B S10", NCM_DIESEL),
+            (_linha(quantidade=None), "OLEO DIESEL B S10", NCM_DIESEL),
+            (_linha(quantidade="10", unidade="UN"), "GLP BOTIJAO", NCM_GLP),
+            (_linha(competencia="2023-09"), "OLEO DIESEL B S10", NCM_DIESEL),
+            (_linha(uf="ZZ"), "OLEO DIESEL B S10", NCM_DIESEL),
+            (_linha(competencia="2021-01", cst="060"), "OLEO DIESEL B S10", NCM_DIESEL),
+            (_linha(competencia="2022-06", uf="MG", cst="060"), "OLEO DIESEL B S10", NCM_DIESEL),
+            (_linha(competencia="2022-06", valor=None, cst="060"), "OLEO DIESEL B S10", NCM_DIESEL),
+        ]
+        vistos = set()
+        for linha, descricao, ncm in casos:
+            c = _apurar(linha, descricao, ncm)
+            assert c.cobertura == RECUSADO, (descricao, ncm)
+            assert c.motivo in conhecidos, (descricao, c.motivo)
+            vistos.add(c.motivo)
+
+        assert len(vistos) >= 9, f"os casos cobrem poucos motivos: {vistos}"
+
+    def test_o_que_entra_no_total_nao_tem_motivo(self):
+        """Motivo preenchido numa linha que soma confundiria a tela: ela
+        mostraria a linha nos dois lugares."""
+        c = _apurar(_linha())
+
+        assert c.entra_no_total
+        assert c.motivo == ""
+
     def test_toda_recusa_traz_porque(self):
         """Recusa sem motivo é linha que ninguém sabe como resolver."""
         casos = [
@@ -259,6 +305,65 @@ class TestORecusadoApareceENaoSoma:
             c = _apurar(linha)
             assert c.cobertura == RECUSADO
             assert len(c.porque) > 20, c
+
+
+class TestOIcmsDestacadoFechaAPorta:
+    """**A porta que evita creditar o mesmo litro duas vezes.**
+
+    O produto diz *o que é* e o regime vem da lei; o CST diz como o fornecedor
+    escriturou, e ele erra. O que decide é o **destaque**: compra com ICMS
+    destacado já deu crédito pelo caminho normal.
+
+    Medido na empresa G: 1.080 linhas da tese com CST 90, **792 delas com ICMS
+    destacado** — e **zero** das 1.026 linhas de CST 60.
+
+    ### A primeira versão desta porta estava errada, e a medição mostrou
+
+    Ela exigia CST 61 na era do monofásico, e isso recusava 1.026 linhas,
+    R$ 3 milhões. Olhando o que eram: diesel e gasolina comprados em posto, 914
+    e 112 linhas, concentradas em 2025, todas sem uma gota de ICMS destacado —
+    compra de verdade, escriturada com 60 em vez de 61. O regime é da lei, não
+    do rótulo que o posto digitou.
+    """
+
+    def test_diesel_com_icms_destacado_nao_ganha_ad_rem(self):
+        linha = LinhaDeCompra(**{**_linha(competencia="2024-06", cst="090").__dict__,
+                                 "valor_do_icms": Decimal("72.00")})
+
+        c = _apurar(linha)
+
+        assert c.valor is None
+        assert c.motivo == credito.ICMS_JA_DESTACADO
+        assert "duas vezes" in c.porque
+
+    def test_o_destaque_fecha_a_porta_ate_no_cst_61(self):
+        """São 2 linhas em 2.226 na empresa G, e as duas estariam duplicadas."""
+        linha = LinhaDeCompra(**{**_linha(competencia="2024-06", cst="061").__dict__,
+                                 "valor_do_icms": Decimal("50.00")})
+
+        assert _apurar(linha).motivo == credito.ICMS_JA_DESTACADO
+
+    @pytest.mark.parametrize("cst", ["061", "060", "260", "500"])
+    def test_sem_destaque_o_imposto_veio_antes_e_a_linha_passa(self, cst):
+        """Monofásico ou substituição, sem destaque o imposto foi cobrado lá
+        atrás — e o crédito desta tese é o que resta."""
+        assert _apurar(_linha(competencia="2024-06", cst=cst)).valor is not None
+
+    def test_cst_que_nao_e_nem_um_nem_outro_vai_para_olho_humano(self):
+        """CST 90 sem destaque: "Outras", sem imposto à vista. Não se sabe por
+        qual via o produto foi tributado — e adivinhar aqui é inventar crédito."""
+        c = _apurar(_linha(competencia="2024-06", cst="090"))
+
+        assert c.valor is None
+        assert c.motivo == credito.CST_NAO_E_DO_REGIME
+        assert "olho humano" in c.porque
+
+    def test_o_produto_continua_sendo_decidido_pela_ncm(self):
+        """A porta recusa o crédito, não a classificação: a linha sai sabendo
+        que é diesel, para o relatório poder dizer o que ela era."""
+        c = _apurar(_linha(competencia="2024-06", cst="090"))
+
+        assert c.produto == DIESEL
 
 
 class TestOQueNaoEDaTese:
