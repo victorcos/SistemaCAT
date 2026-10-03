@@ -24,7 +24,7 @@ from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import Base, DeParaDB, ExecucaoDB, ProjetoDB
 from tests.integracao.cadastro import SEGREDO, criar_empresa, criar_projeto, criar_usuario
 
-CNPJ = "43112531000421"
+CNPJ = "44000001000454"
 D = Decimal
 
 
@@ -62,7 +62,7 @@ def projeto_id(cliente, tmp_path_factory):
                          ("cfop", pa.string()), ("quantidade", pa.decimal128(20, 5)), ("descricao", pa.string()),
                          ("ncm", pa.string()), ("codigo_barras", pa.string()), ("gtin_xml", pa.string())])
     pq.write_table(pa.Table.from_pylist(linhas, schema=esquema), str(pasta / ARQUIVO_MOVIMENTOS))
-    empresa = criar_empresa(raiz="43112531", cnpj=CNPJ, razao="DISTRIBUIDORA DO DE-PARA", por="depara.ana")
+    empresa = criar_empresa(raiz="44000001", cnpj=CNPJ, razao="DISTRIBUIDORA DO DE-PARA", por="depara.ana")
     projeto = criar_projeto(empresa_id=empresa, nome="De-para de teste", por="depara.ana")
     with Sessao() as s:
         s.add(ExecucaoDB(projeto_id=projeto, etapa="movimentos", situacao="concluida", passo="Concluída",
@@ -103,7 +103,7 @@ class TestCandidatos:
     def test_sem_movimentacao_e_recusado(self, cliente):
         with Sessao() as s:
             p = s.get(ProjetoDB, criar_projeto(empresa_id=criar_empresa(
-                raiz="43112531", cnpj=CNPJ, razao="DISTRIBUIDORA DO DE-PARA", por="depara.ana"),
+                raiz="44000001", cnpj=CNPJ, razao="DISTRIBUIDORA DO DE-PARA", por="depara.ana"),
                 nome="Sem movimentos", por="depara.ana"))
             vazio = p.id
         r = cliente.post("/interno/depara/candidatos", headers=SEGREDO, json={"projeto_id": vazio})

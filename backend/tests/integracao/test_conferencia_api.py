@@ -26,10 +26,10 @@ RAIZ = "88991122"
 
 CABECALHO = (
     f"|0000|015|0|01052021|31052021|EMPRESA DA CONFERENCIA|{CNPJ}||SP"
-    "|9030138187|3550308||||"
+    "|9000000000|3550308||||"
 )
-CHAVE_A = "41210511517841000278550010000446231411953289"
-CHAVE_B = "35210711517841005407590003535520625376456954"
+CHAVE_A = "41210544000002000237550010000446231411953286"
+CHAVE_B = "35210744000002005468590003535520625376456957"
 
 C100_A = (
     f"|C100|0|0|F001|55|00|001|44623|{CHAVE_A}"
@@ -76,7 +76,7 @@ def base(tmp_path_factory):
 @pytest.fixture(scope="module")
 def projeto_id(cliente, base):
     empresa = criar_empresa(raiz=RAIZ, cnpj=CNPJ, razao="EMPRESA DA CONFERENCIA",
-                            ie="9030138187", por="conf_analista")
+                            ie="9000000000", por="conf_analista")
     return criar_projeto(empresa_id=empresa, nome="Conferência de teste",
                          por="conf_analista")
 

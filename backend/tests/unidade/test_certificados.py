@@ -44,7 +44,7 @@ class TestNoLote:
         monkeypatch.setattr(inspecionar_lote, "classificar",
                             lambda caminho, tamanho=None: abertos.append(caminho) or original(caminho, tamanho))
 
-        resumo = inspecionar_pasta(str(pasta_do_cliente), "50948371")
+        resumo = inspecionar_pasta(str(pasta_do_cliente), "44000003")
 
         assert not [c for c in abertos if SENHA in c or "CERTIFICADO\\" in c.upper() or "CERTIFICADOS\\" in c.upper()]
         assert any(c.endswith("efd.txt") for c in abertos)  # "Certificadora Parceira" não é certificado
@@ -56,7 +56,7 @@ class TestNoLote:
 
     def test_pasta_escolhida_dentro_do_certificado_e_recusada(self, pasta_do_cliente):
         with pytest.raises(PastaInvalida, match="certificado digital"):
-            inspecionar_pasta(str(pasta_do_cliente / "10 - RETIFICACAO SPEDS" / "CERTIFICADOS"), "50948371")
+            inspecionar_pasta(str(pasta_do_cliente / "10 - RETIFICACAO SPEDS" / "CERTIFICADOS"), "44000003")
 
 
 class TestNosZips:
@@ -80,7 +80,7 @@ class TestNosZips:
         caminho = tmp_path / "entrega.zip"
         with zipfile.ZipFile(caminho, "w") as z:
             z.writestr(f"05 - CERTIFICADO/{SENHA}.txt", b"0000|")
-            z.writestr("CAT5_SP_43112531000421_1_2024.txt", b"0000|")
+            z.writestr("CAT5_SP_44000001000454_1_2024.txt", b"0000|")
         resumo = ResumoDaPreValidacao()
         achados = [c.nome for c in candidatos([str(caminho)], resumo, str(tmp_path))]
-        assert achados == ["CAT5_SP_43112531000421_1_2024.txt"]
+        assert achados == ["CAT5_SP_44000001000454_1_2024.txt"]

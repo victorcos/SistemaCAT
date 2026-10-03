@@ -12,17 +12,17 @@ from cat.infraestrutura.arquivos.remessa import ArquivoDaRemessa
 # as mesmas linhas reais usadas em test_sped_cabecalho.py
 CONTRIBUICOES = (
     "|0000|006|0|||01062021|30062021|CENTER BOX SUPERMERCADOS LTDA"
-    "|11497712000184|CE|2304400||00|2|"
+    "|44000004000145|CE|2304400||00|2|"
 )
 ICMS_IPI = (
-    "|0000|018|0|01012025|31012025|EMPRESA T LTDA|50948371000178||SP"
+    "|0000|018|0|01012025|31012025|EMPRESA T LTDA|44000003000109||SP"
     "|407048962113|3550308|||A|0|"
 )
 # a ECD de test_sped_cabecalho.py traz CNPJ fictício, que a análise recusa por
 # dígito verificador — aqui ela repete o CNPJ real da linha de Contribuições
 ECD = (
     "|0000|LECD|0||01012025|31012025|CENTER BOX SUPERMERCADOS LTDA"
-    "|11497712000184|CE|2304400||||"
+    "|44000004000145|CE|2304400||||"
 )
 
 

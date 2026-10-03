@@ -8,8 +8,8 @@ public class DeParaTestes
     [Fact]
     public void Decisao_valida_sai_limpa()
     {
-        var d = DePara.Validar(" 43112531000421 ", " 1111K308 ", "1111", "3", "kit", "aprovado", "alta", "  kit de 3  ");
-        Assert.Equal(new DecisaoDeDePara("43112531000421", "1111K308", "1111", 3m, "kit", "aprovado", "alta", "kit de 3"), d);
+        var d = DePara.Validar(" 44000001000454 ", " 1111K308 ", "1111", "3", "kit", "aprovado", "alta", "  kit de 3  ");
+        Assert.Equal(new DecisaoDeDePara("44000001000454", "1111K308", "1111", 3m, "kit", "aprovado", "alta", "kit de 3"), d);
         // sem CNPJ vale para a empresa inteira; sem fator é 1
         Assert.Equal("", DePara.Validar(null, "A", "B", null, "cliente", "recusado", null, null).Cnpj);
         Assert.Equal(1m, DePara.Validar(null, "A", "B", null, "cliente", "recusado", null, null).Fator);

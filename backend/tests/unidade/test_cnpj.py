@@ -15,9 +15,9 @@ from cat.dominio.comum.cnpj import (
 )
 
 # CNPJs reais de arquivos desta casa
-EMPRESA_T = "50948371000178"
-EMPRESA_U = "44358067000178"
-EMPRESA_M = "11497712000184"
+EMPRESA_T = "44000003000109"
+EMPRESA_U = "44000009000178"
+EMPRESA_M = "44000004000145"
 
 
 class TestNumerico:
@@ -26,15 +26,15 @@ class TestNumerico:
         assert Cnpj(valor).valor == valor
 
     def test_aceita_com_pontuacao(self):
-        assert Cnpj("50.948.371/0001-78").valor == EMPRESA_T
+        assert Cnpj("44.000.003/0001-09").valor == EMPRESA_T
 
     def test_recusa_digito_errado(self):
         with pytest.raises(CnpjInvalido, match="dígito verificador"):
-            Cnpj("50948371000179")
+            Cnpj("44000003000100")
 
     def test_recusa_tamanho_errado(self):
         with pytest.raises(CnpjInvalido, match="14 caracteres"):
-            Cnpj("5094837100017")
+            Cnpj("4400000300017")
 
     def test_recusa_sequencia_repetida(self):
         """Passa no módulo 11 mas não existe."""
@@ -67,24 +67,24 @@ class TestAlfanumerico:
 class TestPartes:
     def test_raiz_ordem_e_dv(self):
         c = Cnpj(EMPRESA_T)
-        assert c.raiz == "50948371"
+        assert c.raiz == "44000003"
         assert c.ordem == "0001"
-        assert c.dv == "78"
+        assert c.dv == "09"
 
     def test_matriz(self):
         assert Cnpj(EMPRESA_T).e_matriz
 
     def test_filial_nao_e_matriz(self):
-        # 50948371000259 é filial do mesmo grupo
-        assert not Cnpj("50948371000259").e_matriz
+        # 44000003000281 é filial do mesmo grupo
+        assert not Cnpj("44000003000281").e_matriz
 
     def test_mesma_raiz(self):
-        assert Cnpj(EMPRESA_T).mesma_raiz(Cnpj("50948371000259"))
+        assert Cnpj(EMPRESA_T).mesma_raiz(Cnpj("44000003000281"))
         assert not Cnpj(EMPRESA_T).mesma_raiz(Cnpj(EMPRESA_U))
 
     def test_derivar_a_matriz_de_uma_filial(self):
         """Trocar a ordem muda o dígito, então tem de recalcular."""
-        filial = Cnpj("50948371000259")
+        filial = Cnpj("44000003000281")
         assert filial.matriz().valor == EMPRESA_T
 
     def test_matriz_de_matriz_e_ela_mesma(self):
@@ -94,13 +94,13 @@ class TestPartes:
 
 class TestApresentacao:
     def test_formatado(self):
-        assert Cnpj(EMPRESA_T).formatado == "50.948.371/0001-78"
+        assert Cnpj(EMPRESA_T).formatado == "44.000.003/0001-09"
 
     def test_str_usa_o_formatado(self):
-        assert str(Cnpj(EMPRESA_T)) == "50.948.371/0001-78"
+        assert str(Cnpj(EMPRESA_T)) == "44.000.003/0001-09"
 
     def test_limpar_nao_valida(self):
-        assert limpar(" 50.948.371/0001-78 ") == EMPRESA_T
+        assert limpar(" 44.000.003/0001-09 ") == EMPRESA_T
 
 
 class TestTentar:

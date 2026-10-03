@@ -31,7 +31,7 @@ const pedirContas = vi.mocked(servicos.contasDoRazaoContabil);
 const pedirEstabelecimentos = vi.mocked(servicos.estabelecimentosDoRazaoContabil);
 const baixar = vi.mocked(servicos.baixarPlanilhaDaApuracao);
 
-const CNPJ = "03083231002148";
+const CNPJ = "44000007002122";
 
 function conta(codigo: string, descricao: string, referencial = "1.01.01.01"): ContaContabil {
   return {
@@ -150,11 +150,11 @@ describe("a marcação atravessa os filtros", () => {
     pedirEstabelecimentos.mockResolvedValue({
       linhas: [
         { cnpj: CNPJ, contas: 2, lancamentos: 20, de: "2025-01-01", ate: "2025-12-31" },
-        { cnpj: "03083231000107", contas: 1, lancamentos: 10, de: "2025-01-01", ate: "2025-12-31" },
+        { cnpj: "44000007000189", contas: 1, lancamentos: 10, de: "2025-01-01", ate: "2025-12-31" },
       ],
     });
     pedirContas.mockImplementation(async (_execucao, filtro) =>
-      filtro.cnpj === "03083231000107"
+      filtro.cnpj === "44000007000189"
         ? pagina([conta("21010500001", "Fornecedores", "2.01.01.03.01")])
         : pagina([conta("11010100001", "Caixa")]),
     );
@@ -164,7 +164,7 @@ describe("a marcação atravessa os filtros", () => {
     fireEvent.click(caixaDa("11010100001"));
 
     fireEvent.change(await screen.findByLabelText("Estabelecimento"), {
-      target: { value: "03083231000107" },
+      target: { value: "44000007000189" },
     });
     await screen.findByText("Fornecedores");
     fireEvent.click(caixaDa("21010500001"));
@@ -244,7 +244,7 @@ describe("a marcação atravessa a árvore", () => {
 
 describe("a mesma conta em dois estabelecimentos", () => {
   it("marca nos dois, porque é a mesma conta do plano", async () => {
-    const naFilial = { ...conta("11010100001", "Caixa"), cnpj: "03083231000107" };
+    const naFilial = { ...conta("11010100001", "Caixa"), cnpj: "44000007000189" };
     pedirContas.mockResolvedValue(pagina([conta("11010100001", "Caixa"), naFilial]));
 
     render(<SeletorDeConta execucaoId={115} />);

@@ -14,7 +14,7 @@ public class CorrecaoTestes
     public void Correcao_de_mercadoria_sai_limpa()
     {
         var c = Correcao.Validar("aliquota", " 25 ", "  Sem 0200; NCM 3305.90.00, art. 55, IV  ",
-            " 43112531000421 ", " 4002 ", null, null, "18");
+            " 44000001000454 ", " 4002 ", null, null, "18");
         Assert.Equal("aliquota", c.Campo);
         Assert.Equal("25.0000", c.Valor);
         Assert.Equal("4002", c.Codigo);

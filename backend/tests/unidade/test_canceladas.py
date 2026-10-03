@@ -32,7 +32,7 @@ from tests.unidade.test_movimentos import (
     CNPJ, CONV_A_FD, ITEM_A_V2, ITEM_B, escrever,
 )
 
-CHAVE_OUTRA = "35220743112531000421550010000123451000000011"
+CHAVE_OUTRA = "35220744000001000454550010000123451000000018"
 
 
 def evento(chave: str, tipo: str = "110111") -> bytes:
@@ -68,7 +68,7 @@ class TestLeitura:
             ["OBSERVACAO", "CHAVE NFE", "RETORNO SEFAZ"],
             ["", CHAVE_OUTRA, "Cancelamento autorizado"],
             ["inutilizada", None, "Inutilização de número homologado"],
-            ["", 3.5220743112531e43, "Cancelamento autorizado"],
+            ["", 3.5220744000001e43, "Cancelamento autorizado"],
         ])
         assert chaves_de_planilha(caminho) == [CHAVE_OUTRA]
 
@@ -122,7 +122,7 @@ class TestClassificacao:
         (tmp_path / "canc.xml").write_bytes(evento(CHAVE_OUTRA))
         a = classificar(str(tmp_path / "canc.xml"))
         assert a.tipo is TipoDeArquivo.XML_CANCELAMENTO
-        assert (a.cnpj, a.competencia, a.alimenta_a_cat) == ("43112531000421", date(2022, 7, 1), True)
+        assert (a.cnpj, a.competencia, a.alimenta_a_cat) == ("44000001000454", date(2022, 7, 1), True)
 
     def test_carta_de_correcao_continua_de_fora(self, tmp_path):
         (tmp_path / "cce.xml").write_bytes(evento(CHAVE_OUTRA, "110110"))

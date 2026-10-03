@@ -42,7 +42,7 @@ CHAVE_C = "35210600000000000000550010000000031000000033"
 
 def cabecalho(cod_fin: str, ini: str, fim: str) -> str:
     return (f"|0000|018|{cod_fin}|{ini}|{fim}|EMPRESA RETIF|{CNPJ}||SP"
-            "|9030138187|3550308||||")
+            "|9000000000|3550308||||")
 
 
 def c100(chave: str, numero: str, data: str) -> str:
@@ -91,7 +91,7 @@ def base(tmp_path_factory):
 @pytest.fixture(scope="module")
 def projeto_id(cliente):
     empresa = criar_empresa(raiz=RAIZ, cnpj=CNPJ, razao="EMPRESA RETIF",
-                            ie="9030138187", por="retif_analista")
+                            ie="9000000000", por="retif_analista")
     return criar_projeto(empresa_id=empresa, nome="Retificadora de teste",
                          fim="2021-06-01", por="retif_analista")
 

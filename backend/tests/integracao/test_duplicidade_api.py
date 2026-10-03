@@ -34,7 +34,7 @@ RAIZ = "55667788"
 CNPJ = _cnpj_valido(RAIZ)
 
 SPED = (
-    f"|0000|018|0|01052021|31052021|EMPRESA DA COPIA|{CNPJ}||SP|9030138187|3550308||||\r\n"
+    f"|0000|018|0|01052021|31052021|EMPRESA DA COPIA|{CNPJ}||SP|9000000000|3550308||||\r\n"
     "|C100|0|0|F001|55|00|001|1|35210500000000000000550010000000011000000015"
     "|05052021|05052021|100,00|2|0|0|100,00|9|0|0|0|0|0|0|0|0|0|0|0|0|\r\n"
 )
@@ -69,7 +69,7 @@ def pastas(tmp_path_factory):
 @pytest.fixture(scope="module")
 def projeto_id(cliente):
     empresa = criar_empresa(raiz=RAIZ, cnpj=CNPJ, razao="EMPRESA DA COPIA",
-                            ie="9030138187", por="copia_analista")
+                            ie="9000000000", por="copia_analista")
     return criar_projeto(empresa_id=empresa, nome="Cópia de teste",
                          fim="2021-06-01", por="copia_analista")
 

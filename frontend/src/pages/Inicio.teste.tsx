@@ -61,7 +61,7 @@ const CATALOGO = [
 function abrirEm(modulo: string) {
   listarProjetos.mockResolvedValue([] as never);
   listarEmpresas.mockResolvedValue([
-    { id: 7, cnpj_raiz: "03083231", cnpj_matriz: null, cnpj_matriz_formatado: null,
+    { id: 7, cnpj_raiz: "44000007", cnpj_matriz: null, cnpj_matriz_formatado: null,
       razao_social: "empresa S", uf: "MG", inscricao_estadual: null, pre_cadastro: false, projetos: 0 },
   ] as never);
   meusSegmentos.mockResolvedValue(CATALOGO as never);

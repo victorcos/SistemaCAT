@@ -9,7 +9,7 @@ from cat.dominio.icms.cat42.apuracao import CompetenciaApurada, MotivoDeBloqueio
 
 
 def competencia(**kw) -> CompetenciaApurada:
-    base = {"cnpj": "11517841000278", "uf": "SP", "competencia": "2021-05",
+    base = {"cnpj": "44000002000237", "uf": "SP", "competencia": "2021-05",
             "inventarios_conferidos": 10}
     return CompetenciaApurada(**{**base, **kw})
 

@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-10-03 — A raiz do CNPJ de cliente também saiu, e os dois dígitos da chave
+
+Segunda metade da anonimização. Os nomes saíram no commit anterior; o CNPJ
+identifica igual, e ficar só com metade não anonimiza nada.
+
+**Dez raízes trocadas por fictícias** (`440000NN`), preservando o número da
+filial para que os casos de múltiplos estabelecimentos continuem fazendo
+sentido. Cinco delas se confirmaram reais cruzando com as pastas de cliente do
+`Z:`, que trazem o CNPJ no nome — isso é verificável, diferente de palpite.
+
+**A primeira tentativa estava errada de quatro jeitos, e cada um ensinou algo.**
+
+1. **Trocar o CNPJ de 14 dígitos não bastava.** A mesma raiz aparece solta
+   (`raiz="43112531"`), como base de 12 (`"509483710013" +
+   digitos_verificadores(...)`), truncada em 13 (teste de tamanho errado),
+   dentro de chave de 44, dentro de uma string de 33 e dentro de um **float**
+   (`3.5220743112531e43` — uma chave que o Excel converteu para número, e que o
+   teste usa justamente para provar que chave-como-número não é lida). A troca
+   passou a ser da **raiz**, em qualquer contexto, com os DV refeitos depois.
+2. **A raiz pontuada não casa com a corrida.** `11.517.841/0034-55` tem pontos
+   no meio de `11517841`. O valor esperado do teste mudava e a entrada não —
+   5 testes quebraram só por isso.
+3. **A chave tem dois dígitos verificadores, não um.** Eu refiz o DV da chave
+   (posição 43) e esqueci o do **CNPJ que ela carrega** (posições 6 a 19).
+   Resultado: o CNPJ solto virou `...000237` e o de dentro da chave ficou
+   `...000278`. O confronto por chave parou de casar e 12 testes caíram —
+   inclusive um que conta documentos escriturados, que passou a ver 3 onde havia
+   4. **O DV da chave é validado em `pre_validacao.py:205`**, então não era
+   opcional.
+4. **Um DV literal que nenhum script adivinha.** `assert c.dv == "78"` — os
+   dois dígitos escritos à mão, sem o CNPJ ao lado. Corrigido na unha.
+
+**O que tinha de continuar errado continuou.** `50948371000179` é o CNPJ de
+dígito verificador errado de `test_recusa_digito_errado`. Trocar a raiz e
+recalcular o DV o tornaria **válido**, e o teste perderia o sentido calado. O
+script o protege com um selo antes da troca e devolve, no lugar, um DV
+deliberadamente errado para a raiz nova.
+
+**Dois números que parecem CNPJ e não são.** `07891024183007` e `07891653...`
+começam com 789 — é prefixo de **EAN brasileiro**, e o campo se chama
+`codigo_barras`. Ficaram. Confundir os dois teria estragado fixtures de produto
+sem necessidade.
+
+**Conferência, e não só "os testes passam":** 24 CNPJ de raiz fictícia e 12
+chaves de 44 varridos do repo e validados pelo `Cnpj` do próprio domínio e pelo
+módulo 11 da chave; o CNPJ que devia seguir inválido conferido à parte. 1430
+unitários, 154 de integração, 171 do domínio C# e 42 do front.
+
+**O que não rodou:** `Cat.Api.Testes`. O build não acontece com a API de pé —
+o `dotnet watch` segura as DLL — e redirecionar a saída quebra o grafo de
+dependências. As mudanças ali são quatro literais de CNPJ, iguais nos dois lados
+de cada asserção, com a chave reconstruída e validada. Fica para rodar quando a
+API estiver parada.
+
+---
+
 ## 2026-10-03 — Nenhum nome de cliente no repositório, e nem CNPJ
 
 **A regra já estava escrita, e o repositório a contrariava.** O
@@ -32,7 +88,7 @@ positivos por causa dela. **I** e **O** se confundem com 1 e 0.
 porque foram procuradas:**
 
 1. **nome de cliente como identificador de código.** `test_cnpj.py` tinha
-   `BOA = "50948371000178"`, e a troca cega produziu `empresa T = "..."` —
+   `BOA = "44000003000109"`, e a troca cega produziu `empresa T = "..."` —
    `SyntaxError`. Passou a haver uma regra separada, só para arquivos de código,
    que gera `EMPRESA_T`. Peguei com `py_compile` em todos os `.py`, não com o
    pytest: arquivo que não compila nem chega a ser coletado;
@@ -4059,7 +4115,7 @@ o ressarcimento de R$ 274.950,74 para R$ 274.878,90.
 ## 2026-09-16 — O que a CAT 42 da empresa D ensinou: XML, de-para, art. 271 e X.949
 
 **De onde veio.** A CAT 42 que a RVZ entregou para a empresa D
-(43.112.531/0004-21, 08/2022 a 06/2024, R$ 406.362,34) foi comparada com o que
+(44.000.001/0004-54, 08/2022 a 06/2024, R$ 406.362,34) foi comparada com o que
 o sistema faria. **Decisões do Victor:** corrigir tudo, nesta ordem — itens do
 XML, de-para automático com revisão na tela, enquadramento 4 com o art. 271,
 X.949 fora da ficha — e validar rodando a base deles.
@@ -4657,7 +4713,7 @@ colunas novas no leitor: `Unidade` e `Descrição Tipo Dcto`. A venda de PDV
 tipo do documento** — a mesma regra do modelo 65 e 59, não suposição sobre
 quem comprou. O CNPJ da unidade sai de duas pistas que se confirmaram na
 amostra real: a chave da nota emitida pela loja e a coluna CNPJ/CPF da venda de
-PDV, que traz a própria loja ("005" → 11.517.841/0034-55 pelas duas). Linha que
+PDV, que traz a própria loja ("005" → 44.000.002/0034-14 pelas duas). Linha que
 nenhuma pista alcança fica contada, não suposta.
 
 **O cálculo é o do domínio, linha a linha.** O mesmo `RazaoDoItem` conferido
@@ -6361,8 +6417,8 @@ compartilhado que tenha nome fixo: disco, porta, fila, arquivo temporário.
 estabelecimentos dos dois lados e, se não houver interseção, avisa que são
 filiais diferentes.
 
-**Por quê.** Num uso real: EFD do estabelecimento `43112531000189` contra XML
-do `43112531000421` — mesma empresa, filiais diferentes. Resultado: 10.605
+**Por quê.** Num uso real: EFD do estabelecimento `44000001000101` contra XML
+do `44000001000454` — mesma empresa, filiais diferentes. Resultado: 10.605
 pendências e nenhum documento conferido. Sem o aviso, aquilo parece falta
 gigantesca de documento e vira cobrança indevida ao cliente; com o aviso, é o
 que é — importaram a EFD de uma filial e os XML de outra.

@@ -83,7 +83,7 @@ class TestCorrecaoDeMercadoria:
 class TestCorrecaoDeLinha:
     def test_enquadramento(self):
         c = validar("enquadramento", "1", "Venda a consumidor confirmada pelo cliente",
-                    cnpj="43112531000421", documento="3" * 44, numero_item="2", codigo="1012")
+                    cnpj="44000001000454", documento="3" * 44, numero_item="2", codigo="1012")
         assert (c.campo, c.valor, c.numero_item) == (Campo.ENQUADRAMENTO, 1, 2)
         assert c.alvo is Alvo.LINHA and c.valor_gravado == "1"
 

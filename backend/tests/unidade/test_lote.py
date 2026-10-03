@@ -19,18 +19,18 @@ from cat.aplicacao.casos_de_uso.inspecionar_lote import (
 from cat.dominio.lote import Grupo, TipoDeArquivo
 from cat.infraestrutura.arquivos.classificador import classificar
 
-# raiz 50948371 — Irmãos Boa
+# raiz 44000003 — Irmãos Boa
 ICMS_IPI = (
-    "|0000|018|0|01012025|31012025|EMPRESA T LTDA|50948371000178||SP"
+    "|0000|018|0|01012025|31012025|EMPRESA T LTDA|44000003000109||SP"
     "|407048962113|3550308|||A|0|"
 )
 CONTRIBUICOES = (
     "|0000|006|0|||01062021|30062021|EMPRESA T LTDA"
-    "|50948371000178|SP|3550308||00|2|"
+    "|44000003000109|SP|3550308||00|2|"
 )
 # a ECF põe o CNPJ antes das datas — é o quarto leiaute do registro 0000
 ECF = (
-    "|0000|LECF|0009|50948371000178|EMPRESA T LTDA|0||||01012024|31122024|0|||||"
+    "|0000|LECF|0009|44000003000109|EMPRESA T LTDA|0||||01012024|31122024|0|||||"
 )
 # outra empresa, para provar que a separação por CNPJ funciona
 DE_OUTRA_EMPRESA = (
@@ -49,9 +49,9 @@ INVENTARIO = (
 
 NFE = (
     '<?xml version="1.0" encoding="UTF-8"?>'
-    '<nfeProc versao="4.00"><NFe><infNFe Id="NFe5020011151784100345555001">'
+    '<nfeProc versao="4.00"><NFe><infNFe Id="NFe5020014400000200345555001">'
     "<ide><dhEmi>2025-03-14T10:22:00-03:00</dhEmi></ide>"
-    "<emit><CNPJ>50948371000178</CNPJ></emit></infNFe></NFe></nfeProc>"
+    "<emit><CNPJ>44000003000109</CNPJ></emit></infNFe></NFe></nfeProc>"
 )
 
 # o texto exato que o OneDrive deixa no lugar do arquivo que não desceu
@@ -74,7 +74,7 @@ class TestClassificar:
         assert a.tipo is TipoDeArquivo.SPED_ICMS_IPI
         assert a.tipo.grupo is Grupo.SPED
         assert a.alimenta_a_cat
-        assert a.cnpj == "50948371000178"
+        assert a.cnpj == "44000003000109"
         assert a.competencia == date(2025, 1, 1)
         assert a.uf == "SP"
 
@@ -91,7 +91,7 @@ class TestClassificar:
         importador diria que a base está completa sem a contabilidade fiscal.
         """
         ecf = "\n".join([
-            "|0000|LECF|0009|50948371000178|EMPRESA DO TESTE LTDA|0||||01012024|31122024|0|||||",
+            "|0000|LECF|0009|44000003000109|EMPRESA DO TESTE LTDA|0||||01012024|31122024|0|||||",
             "|0010|||1|A||",
         ]) + "\n"
         a = classificar(escrever(tmp_path, "ecf2024.txt", ecf))
@@ -100,23 +100,23 @@ class TestClassificar:
         assert a.tipo.grupo is Grupo.SPED
         assert a.tipo.rotulo == "ECF"
         assert not a.alimenta_a_cat
-        assert a.cnpj == "50948371000178"
+        assert a.cnpj == "44000003000109"
         assert a.competencia == date(2024, 1, 1)
 
     def test_xml_de_nfe(self, tmp_path):
         a = classificar(escrever(tmp_path, "nota.xml", NFE, "utf-8"))
         assert a.tipo is TipoDeArquivo.XML_NFE
         assert a.alimenta_a_cat
-        assert a.cnpj == "50948371000178"
+        assert a.cnpj == "44000003000109"
         assert a.competencia == date(2025, 3, 1)   # a competência é o mês
 
     def test_cupom_sat_e_documento(self, tmp_path):
-        cupom = ('<?xml version="1.0"?><CFe><infCFe Id="CFe35210611517841003455590009876540012345678901">'
-                 "<ide><mod>59</mod><dEmi>20210615</dEmi></ide><emit><CNPJ>11517841003455</CNPJ></emit>"
+        cupom = ('<?xml version="1.0"?><CFe><infCFe Id="CFe35210644000002003414590009876540012345678900">'
+                 "<ide><mod>59</mod><dEmi>20210615</dEmi></ide><emit><CNPJ>44000002003414</CNPJ></emit>"
                  "</infCFe></CFe>")
         a = classificar(escrever(tmp_path, "cupom.xml", cupom, "utf-8"))
         assert a.tipo is TipoDeArquivo.XML_NFE
-        assert (a.cnpj, a.competencia) == ("11517841003455", date(2021, 6, 1))
+        assert (a.cnpj, a.competencia) == ("44000002003414", date(2021, 6, 1))
 
     def test_xml_que_nao_e_nota_nao_serve(self, tmp_path):
         outro = '<?xml version="1.0"?><procEventoNFe><evento/></procEventoNFe>'
@@ -151,12 +151,12 @@ class TestClassificar:
 
     def test_arquivo_digital_da_cat42_e_reconhecido_e_nao_alimenta_a_apuracao(self, tmp_path):
         # sem | no começo: é o que o separa da EFD
-        a = classificar(escrever(tmp_path, "CAT5_SP_50948371001301_1_2024.txt",
-                                 "0000|012024|LOJA|50948371001301|798092322114|3552205|01|00\r\n"
-                                 "0150|1|LOJA|1058|50948371001301||798092322114|3552205\r\n"))
+        a = classificar(escrever(tmp_path, "CAT5_SP_44000003001334_1_2024.txt",
+                                 "0000|012024|LOJA|44000003001334|798092322114|3552205|01|00\r\n"
+                                 "0150|1|LOJA|1058|44000003001334||798092322114|3552205\r\n"))
         assert a.tipo is TipoDeArquivo.CAT42_ARQUIVO_DIGITAL
         assert not a.alimenta_a_cat
-        assert (a.cnpj, a.competencia, a.detalhe) == ("50948371001301", date(2024, 1, 1), "LOJA")
+        assert (a.cnpj, a.competencia, a.detalhe) == ("44000003001334", date(2024, 1, 1), "LOJA")
 
     def test_compactado_nao_e_aberto(self, tmp_path):
         a = classificar(escrever(tmp_path, "base.rar", "Rar!\x1a\x07"))
@@ -180,7 +180,7 @@ class TestInspecionarPasta:
         escrever(tmp_path, "nota.xml", NFE, "utf-8")
         escrever(tmp_path, "base.rar", "Rar!")
 
-        r = inspecionar_pasta(str(tmp_path), "50948371")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
         assert r.total == 4
         assert len(r.uteis) == 2          # o SPED ICMS/IPI e o XML
         assert r.serve
@@ -190,7 +190,7 @@ class TestInspecionarPasta:
         escrever(tmp_path, "boa.txt", ICMS_IPI)
         escrever(tmp_path, "intruso.txt", DE_OUTRA_EMPRESA)
 
-        r = inspecionar_pasta(str(tmp_path), "50948371")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
         assert r.total == 1
         assert len(r.de_outra_empresa) == 1
         assert r.de_outra_empresa[0].cnpj == "11222333000181"
@@ -200,14 +200,14 @@ class TestInspecionarPasta:
         # o ERP não se identifica no relatório; chutar deixaria de fora
         # justamente a fonte de quem não libera XML
         escrever(tmp_path, "entradas.txt", GERENCIAL + "\n1|I|02/01/20|1|1.102|0|0|0\n")
-        r = inspecionar_pasta(str(tmp_path), "50948371")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
         assert r.total == 1
         assert not r.de_outra_empresa
 
     def test_avisa_quando_nada_serve(self, tmp_path):
         """Pasta só de Contribuições não serve a um trabalho de ICMS."""
         escrever(tmp_path, "contrib.txt", CONTRIBUICOES)
-        r = inspecionar_pasta(str(tmp_path), "50948371")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
         assert not r.serve
         assert any("alimenta o trabalho de ICMS" in a for a in r.avisos)
 
@@ -215,7 +215,7 @@ class TestInspecionarPasta:
         """Útil é em relação ao trabalho: a EFD-Contribuições é o arquivo do
         PIS/COFINS, e a importação era recusada por medir tudo pela CAT 42."""
         escrever(tmp_path, "contrib.txt", CONTRIBUICOES)
-        r = inspecionar_pasta(str(tmp_path), "50948371", modulo="piscofins")
+        r = inspecionar_pasta(str(tmp_path), "44000003", modulo="piscofins")
         assert r.serve
         assert len(r.uteis) == 1
         assert not any("alimenta o trabalho" in a for a in r.avisos)
@@ -224,7 +224,7 @@ class TestInspecionarPasta:
         """É a base da CAT 42 e é dela que sai a exclusão do ICMS da base."""
         escrever(tmp_path, "boa.txt", ICMS_IPI)
         for modulo in ("icms", "piscofins"):
-            assert inspecionar_pasta(str(tmp_path), "50948371", modulo=modulo).serve
+            assert inspecionar_pasta(str(tmp_path), "44000003", modulo=modulo).serve
 
     def test_xml_serve_aos_dois_trabalhos(self, tmp_path):
         """O XML entrou no PIS/COFINS com a trilha de quebra de XML: é nele que
@@ -232,47 +232,47 @@ class TestInspecionarPasta:
         pasta de notas era recusada com "nada aqui alimenta o trabalho"."""
         escrever(tmp_path, "nota.xml", NFE, "utf-8")
         for modulo in ("icms", "piscofins"):
-            r = inspecionar_pasta(str(tmp_path), "50948371", modulo=modulo)
+            r = inspecionar_pasta(str(tmp_path), "44000003", modulo=modulo)
             assert r.serve and len(r.uteis) == 1
         # o evento de cancelamento é da conferência da CAT 42, e só dela
         assert TipoDeArquivo.XML_CANCELAMENTO.modulos == ("icms",)
 
     def test_pasta_de_ecf_so_serve_ao_irpj_csll(self, tmp_path):
         escrever(tmp_path, "ecf.txt", ECF)
-        assert not inspecionar_pasta(str(tmp_path), "50948371").serve
-        assert inspecionar_pasta(str(tmp_path), "50948371", modulo="irpj_csll").serve
+        assert not inspecionar_pasta(str(tmp_path), "44000003").serve
+        assert inspecionar_pasta(str(tmp_path), "44000003", modulo="irpj_csll").serve
 
     def test_competencias_sao_as_do_que_o_trabalho_le(self, tmp_path):
         """Num trabalho de PIS/COFINS, o período vem da Contribuições — a mesma
         pasta num trabalho de ICMS anunciaria período nenhum."""
         escrever(tmp_path, "contrib.txt", CONTRIBUICOES)
-        assert inspecionar_pasta(str(tmp_path), "50948371").competencias == []
-        assert inspecionar_pasta(str(tmp_path), "50948371", modulo="piscofins").competencias
+        assert inspecionar_pasta(str(tmp_path), "44000003").competencias == []
+        assert inspecionar_pasta(str(tmp_path), "44000003", modulo="piscofins").competencias
 
     def test_avisa_o_que_nao_baixou(self, tmp_path):
         escrever(tmp_path, "boa.txt", ICMS_IPI)
         escrever(tmp_path, "2023.02.txt_Error.txt", STUB)
-        r = inspecionar_pasta(str(tmp_path), "50948371")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
         assert any("sincronização" in a for a in r.avisos)
 
     def test_entra_em_subpasta(self, tmp_path):
         sub = tmp_path / "2025" / "01"
         sub.mkdir(parents=True)
         escrever(sub, "boa.txt", ICMS_IPI)
-        assert inspecionar_pasta(str(tmp_path), "50948371").total == 1
+        assert inspecionar_pasta(str(tmp_path), "44000003").total == 1
 
     def test_pasta_que_nao_existe_avisa_com_jeito(self, tmp_path):
         with pytest.raises(PastaInvalida, match="não existe"):
-            inspecionar_pasta(str(tmp_path / "nada"), "50948371")
+            inspecionar_pasta(str(tmp_path / "nada"), "44000003")
 
     def test_caminho_de_arquivo_nao_serve_como_pasta(self, tmp_path):
         caminho = escrever(tmp_path, "boa.txt", ICMS_IPI)
         with pytest.raises(PastaInvalida, match="é um arquivo"):
-            inspecionar_pasta(caminho, "50948371")
+            inspecionar_pasta(caminho, "44000003")
 
     def test_pasta_vazia_no_texto_avisa(self):
         with pytest.raises(PastaInvalida, match="Informe a pasta"):
-            inspecionar_pasta("   ", "50948371")
+            inspecionar_pasta("   ", "44000003")
 
 
 class TestOrigensPermitidas:
@@ -293,7 +293,7 @@ class TestOrigensPermitidas:
     def test_vazia_libera(self, tmp_path, monkeypatch):
         monkeypatch.delenv("CAT_PASTAS_PERMITIDAS", raising=False)
         escrever(tmp_path, "boa.txt", ICMS_IPI)
-        assert inspecionar_pasta(str(tmp_path), "50948371").total == 1
+        assert inspecionar_pasta(str(tmp_path), "44000003").total == 1
 
     def test_fora_da_lista_e_recusada(self, tmp_path, monkeypatch):
         permitida = tmp_path / "permitida"
@@ -304,7 +304,7 @@ class TestOrigensPermitidas:
         monkeypatch.setenv("CAT_PASTAS_PERMITIDAS", str(permitida))
 
         with pytest.raises(PastaInvalida, match="origens permitidas"):
-            inspecionar_pasta(str(outra), "50948371")
+            inspecionar_pasta(str(outra), "44000003")
 
     def test_subpasta_da_permitida_passa(self, tmp_path, monkeypatch):
         dentro = tmp_path / "2025"
@@ -312,27 +312,27 @@ class TestOrigensPermitidas:
         escrever(dentro, "boa.txt", ICMS_IPI)
         monkeypatch.setenv("CAT_PASTAS_PERMITIDAS", str(tmp_path))
 
-        assert inspecionar_pasta(str(dentro), "50948371").total == 1
+        assert inspecionar_pasta(str(dentro), "44000003").total == 1
 
 
 # NF-e de FORNECEDOR: emitente é outra raiz, destinatário é a empresa do
-# projeto (raiz 50948371). É a nota de compra — o insumo principal da CAT 42.
+# projeto (raiz 44000003). É a nota de compra — o insumo principal da CAT 42.
 NFE_DE_FORNECEDOR = (
     '<?xml version="1.0" encoding="UTF-8"?>'
-    '<nfeProc versao="4.00"><NFe><infNFe Id="NFe4125031151784100027855001000044623141195329">'
+    '<nfeProc versao="4.00"><NFe><infNFe Id="NFe4125034400000200027855001000044623141195329">'
     "<ide><dhEmi>2025-03-14T10:22:00-03:00</dhEmi></ide>"
-    "<emit><CNPJ>11517841000278</CNPJ><xNome>FORNECEDOR LTDA</xNome></emit>"
-    "<dest><CNPJ>50948371000178</CNPJ><xNome>empresa T</xNome></dest>"
+    "<emit><CNPJ>44000002000237</CNPJ><xNome>FORNECEDOR LTDA</xNome></emit>"
+    "<dest><CNPJ>44000003000109</CNPJ><xNome>empresa T</xNome></dest>"
     "</infNFe></NFe></nfeProc>"
 )
 # nem emitente nem destinatário são da empresa: essa sim é de outra
-NFE_ALHEIA = NFE_DE_FORNECEDOR.replace("50948371000178", "99999999000191")
+NFE_ALHEIA = NFE_DE_FORNECEDOR.replace("44000003000109", "99999999000191")
 # venda a consumidor: <dest> tem CPF, não CNPJ — só o emitente identifica
 NFE_A_CONSUMIDOR = (
     '<?xml version="1.0" encoding="UTF-8"?>'
-    '<nfeProc versao="4.00"><NFe><infNFe Id="NFe3525035094837100017865001000000010000000015">'
+    '<nfeProc versao="4.00"><NFe><infNFe Id="NFe3525034400000300017865001000000010000000015">'
     "<ide><dhEmi>2025-03-14T10:22:00-03:00</dhEmi></ide>"
-    "<emit><CNPJ>50948371000178</CNPJ></emit>"
+    "<emit><CNPJ>44000003000109</CNPJ></emit>"
     "<dest><CPF>00176231110</CPF></dest>"
     "</infNFe></NFe></nfeProc>"
 )
@@ -349,30 +349,30 @@ class TestXmlDeFornecedor:
 
     def test_classificador_extrai_as_duas_pontas(self, tmp_path):
         a = classificar(escrever(tmp_path, "compra.xml", NFE_DE_FORNECEDOR, "utf-8"))
-        assert a.cnpj == "11517841000278"              # emitente: o fornecedor
-        assert a.cnpj_destinatario == "50948371000178"  # destinatário: a empresa
+        assert a.cnpj == "44000002000237"              # emitente: o fornecedor
+        assert a.cnpj_destinatario == "44000003000109"  # destinatário: a empresa
 
     def test_nota_de_compra_entra_no_lote(self, tmp_path):
         escrever(tmp_path, "compra.xml", NFE_DE_FORNECEDOR, "utf-8")
-        r = inspecionar_pasta(str(tmp_path), "50948371")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
         assert r.total == 1
         assert not r.de_outra_empresa
 
     def test_nota_de_emissao_propria_continua_entrando(self, tmp_path):
         escrever(tmp_path, "venda.xml", NFE, "utf-8")
-        r = inspecionar_pasta(str(tmp_path), "50948371")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
         assert r.total == 1 and not r.de_outra_empresa
 
     def test_venda_a_consumidor_sem_cnpj_no_destinatario(self, tmp_path):
         a = classificar(escrever(tmp_path, "cupom.xml", NFE_A_CONSUMIDOR, "utf-8"))
-        assert a.cnpj == "50948371000178"
+        assert a.cnpj == "44000003000109"
         assert a.cnpj_destinatario is None
-        r = inspecionar_pasta(str(tmp_path), "50948371")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
         assert r.total == 1 and not r.de_outra_empresa
 
     def test_nota_sem_nenhuma_ponta_da_empresa_fica_de_fora(self, tmp_path):
         escrever(tmp_path, "alheia.xml", NFE_ALHEIA, "utf-8")
-        r = inspecionar_pasta(str(tmp_path), "50948371")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
         assert r.total == 0
         assert len(r.de_outra_empresa) == 1
 
@@ -391,7 +391,7 @@ class TestLeituraCompartilhadaEntreTrabalhos:
         caminho = str(tmp_path / "boa.txt")
 
         resumo = inspecionar_pasta(
-            str(tmp_path), "50948371",
+            str(tmp_path), "44000003",
             ja_lidos=JaLidos(por_caminho={caminho: "ICMS 2025"}))
 
         assert resumo.copias == []
@@ -404,9 +404,9 @@ class TestLeituraCompartilhadaEntreTrabalhos:
         tamanho = os.path.getsize(caminho)
 
         resumo = inspecionar_pasta(
-            str(tmp_path), "50948371",
+            str(tmp_path), "44000003",
             ja_lidos=JaLidos(por_assinatura={
-                (tamanho, TipoDeArquivo.SPED_ICMS_IPI.value, "50948371000178",
+                (tamanho, TipoDeArquivo.SPED_ICMS_IPI.value, "44000003000109",
                  date(2025, 1, 1), False): "ICMS 2025"}))
 
         assert resumo.arquivos[0].ja_lido_em == "ICMS 2025"
@@ -414,7 +414,7 @@ class TestLeituraCompartilhadaEntreTrabalhos:
     def test_sem_nada_lido_antes_nada_fica_marcado(self, tmp_path):
         escrever(tmp_path, "boa.txt", ICMS_IPI)
 
-        resumo = inspecionar_pasta(str(tmp_path), "50948371")
+        resumo = inspecionar_pasta(str(tmp_path), "44000003")
 
         assert resumo.reaproveitados == []
         assert resumo.arquivos[0].ja_lido_em == ""

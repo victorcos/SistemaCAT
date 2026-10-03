@@ -12,7 +12,7 @@ Uso:
 
     log = obter_log(__name__)
 
-    with contexto(execucao_id="e-42", empresa="50948371000178", etapa="leitura"):
+    with contexto(execucao_id="e-42", empresa="44000003000109", etapa="leitura"):
         log.info("arquivo aberto", extra={"arquivo": nome, "bytes": tamanho})
 """
 

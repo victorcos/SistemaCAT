@@ -96,7 +96,7 @@ public sealed class CorrecoesTestes(BancoDeTeste banco) : IDisposable
                 new { campo = "aliquota", valor = "25", motivo = "Sem 0200; NCM 3305.90.00, art. 55, IV",
                       codigo = "4002", valor_anterior = "18" },
                 new { campo = "enquadramento", valor = "1", motivo = "Venda a consumidor confirmada pelo cliente",
-                      documento = "35240643112531000421550030000717821739478490", numero_item = 2,
+                      documento = "35240644000001000454550030000717821739478499", numero_item = 2,
                       valor_anterior = "indefinido" },
             },
         });

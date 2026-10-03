@@ -12,7 +12,7 @@ from __future__ import annotations
 from cat.infraestrutura.gestao.agregados import gravar, ler
 from cat.infraestrutura.gestao.modelos import ApuracaoEFD
 
-CNPJ = "03083231002148"
+CNPJ = "44000007002122"
 
 
 def _apuracao(**campos) -> ApuracaoEFD:

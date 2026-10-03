@@ -20,7 +20,7 @@ from tests.integracao.cadastro import (
 )
 
 # Raiz própria deste módulo. A bateria de integração compartilha um banco
-# só, e a raiz 50948371 já é usada por test_auth_api — cadastrar de novo
+# só, e a raiz 44000003 já é usada por test_auth_api — cadastrar de novo
 # daria 409 no setup.
 ICMS_IPI = (
     "|0000|018|0|01012025|31012025|EMPRESA DO LOTE LTDA|77665544000105||SP"

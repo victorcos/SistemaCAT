@@ -27,7 +27,7 @@ from cat.infraestrutura.analitico.suportado import (
     quebras,
 )
 
-CNPJ = "11517841000278"
+CNPJ = "44000002000237"
 CHAVE_A = "4" * 44
 CHAVE_B = "5" * 44
 CHAVE_C = "6" * 44

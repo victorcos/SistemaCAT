@@ -20,7 +20,7 @@ from cat.dominio.sped.cabecalho import (
 # real, do Center Box (EFD Contribuições)
 CONTRIBUICOES = (
     "|0000|006|0|||01062021|30062021|CENTER BOX SUPERMERCADOS LTDA"
-    "|11497712000184|CE|2304400||00|2|"
+    "|44000004000145|CE|2304400||00|2|"
 )
 
 # real, arquivo de ECD desta casa — note que traz dois campos a mais antes das
@@ -33,13 +33,13 @@ ECD = (
 
 # montada pelo leiaute oficial da EFD ICMS/IPI, com dados dos Irmãos Boa
 ICMS_IPI = (
-    "|0000|018|0|01012025|31012025|EMPRESA T LTDA|50948371000178||SP"
+    "|0000|018|0|01012025|31012025|EMPRESA T LTDA|44000003000109||SP"
     "|407048962113|3550308|||A|0|"
 )
 
 # filial, para provar que matriz não é chute
 ICMS_IPI_FILIAL = (
-    "|0000|018|0|01012025|31012025|EMPRESA T LTDA|50948371000259||SP"
+    "|0000|018|0|01012025|31012025|EMPRESA T LTDA|44000003000281||SP"
     "|407048962114|3550308|||A|0|"
 )
 
@@ -64,7 +64,7 @@ class TestIcmsIpi:
     def test_le_a_empresa(self):
         c = ler_cabecalho(ICMS_IPI)
         assert c.nome == "EMPRESA T LTDA"
-        assert c.cnpj.valor == "50948371000178"
+        assert c.cnpj.valor == "44000003000109"
         assert c.e_matriz
         assert c.uf == "SP"
         assert c.inscricao_estadual == "407048962113"
@@ -80,14 +80,14 @@ class TestIcmsIpi:
     def test_reconhece_filial(self):
         c = ler_cabecalho(ICMS_IPI_FILIAL)
         assert not c.e_matriz
-        assert c.cnpj.matriz().valor == "50948371000178"
+        assert c.cnpj.matriz().valor == "44000003000109"
 
 
 class TestContribuicoes:
     def test_le_arquivo_real(self):
         c = ler_cabecalho(CONTRIBUICOES)
         assert c.nome == "CENTER BOX SUPERMERCADOS LTDA"
-        assert c.cnpj.valor == "11497712000184"
+        assert c.cnpj.valor == "44000004000145"
         assert c.e_matriz
         assert c.uf == "CE"
         assert c.competencia == "06/2021"
@@ -128,20 +128,20 @@ class TestEntradaRuim:
         """A detecção de tipo pega isto antes da âncora, e tudo bem: o que
         importa é falhar alto dizendo que faltou a data."""
         with pytest.raises(ArquivoNaoReconhecido, match="data"):
-            ler_cabecalho("|0000|018|0|xx|yy|NOME|50948371000178||SP|1|2|||A|0|")
+            ler_cabecalho("|0000|018|0|xx|yy|NOME|44000003000109||SP|1|2|||A|0|")
 
     def test_ancora_falha_quando_o_tipo_e_reconhecido_mas_faltam_datas(self):
         with pytest.raises(ArquivoNaoReconhecido, match="par de datas"):
-            ler_cabecalho("|0000|LECD|0||xx|yy|NOME|50948371000178|SP|3550308||||")
+            ler_cabecalho("|0000|LECD|0||xx|yy|NOME|44000003000109|SP|3550308||||")
 
     def test_sem_razao_social(self):
         with pytest.raises(ArquivoNaoReconhecido, match="razão social"):
-            ler_cabecalho("|0000|018|0|01012025|31012025||50948371000178||SP|1|2|||A|0|")
+            ler_cabecalho("|0000|018|0|01012025|31012025||44000003000109||SP|1|2|||A|0|")
 
     def test_data_inexistente(self):
         with pytest.raises(ArquivoNaoReconhecido):
             ler_cabecalho(
-                "|0000|018|0|32012025|31012025|NOME|50948371000178||SP|1|2|||A|0|"
+                "|0000|018|0|32012025|31012025|NOME|44000003000109||SP|1|2|||A|0|"
             )
 
 
@@ -150,7 +150,7 @@ class TestPeriodo:
         """Escrituração fora do padrão merece atenção antes de virar
         competência no sistema."""
         linha = (
-            "|0000|018|0|15012025|14022025|EMPRESA T LTDA|50948371000178||SP"
+            "|0000|018|0|15012025|14022025|EMPRESA T LTDA|44000003000109||SP"
             "|407048962113|3550308|||A|0|"
         )
         assert not ler_cabecalho(linha).periodo_fechado_no_mes

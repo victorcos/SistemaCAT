@@ -37,9 +37,9 @@ from cat.infraestrutura.analitico.razao import ARQUIVO_FICHA3, ESQUEMA_FICHA3
 from cat.infraestrutura.analitico.suportado import ApuracaoCancelada
 
 D = Decimal
-SP = "509483710013" + digitos_verificadores("509483710013")
-PR = "509483710020" + digitos_verificadores("509483710020")
-FORNECEDOR = "001586350001" + digitos_verificadores("001586350001")
+SP = "440000030013" + digitos_verificadores("440000030013")
+PR = "440000030020" + digitos_verificadores("440000030020")
+FORNECEDOR = "440000100001" + digitos_verificadores("440000100001")
 IE_SP = "798092322114"
 
 

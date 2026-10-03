@@ -14,8 +14,8 @@ import pytest
 from cat.dominio.notafiscal.xml import XmlIlegivel, ler_documento_xml
 
 D = Decimal
-CHAVE_NFE = "35240643112531000421550030000714581149028312"
-CHAVE_CFE = "35210611517841003455590009876540012345678901"
+CHAVE_NFE = "35240644000001000454550030000714581149028310"
+CHAVE_CFE = "35210644000002003414590009876540012345678900"
 
 
 def nfe(itens: str, mod: str = "55", tp: str = "1", dest: str = "<CPF>12345678909</CPF>",
@@ -26,7 +26,7 @@ def nfe(itens: str, mod: str = "55", tp: str = "1", dest: str = "<CPF>1234567890
   <infNFe Id="NFe{CHAVE_NFE}" versao="4.00">
    <ide><cUF>35</cUF><mod>{mod}</mod><serie>3</serie><nNF>71458</nNF>
         <dhEmi>2024-06-26T10:15:00-03:00</dhEmi><tpNF>{tp}</tpNF><indFinal>{ind_final}</indFinal></ide>
-   <emit><CNPJ>43112531000421</CNPJ><xNome>LOJA</xNome></emit>
+   <emit><CNPJ>44000001000454</CNPJ><xNome>LOJA</xNome></emit>
    <dest>{dest}</dest>
    {itens}
   </infNFe>
@@ -58,7 +58,7 @@ class TestNFe:
     def test_documento_e_itens(self):
         doc = ler_documento_xml(nfe(ITEM_CST00 + ITEM_CST60))
         assert (doc.chave, doc.modelo, doc.tipo, doc.emitente, doc.destinatario) == (
-            CHAVE_NFE, "55", "1", "43112531000421", "12345678909")
+            CHAVE_NFE, "55", "1", "44000001000454", "12345678909")
         assert (doc.numero, doc.serie, doc.emissao) == ("71458", "3", date(2024, 6, 26))
         assert [i.numero for i in doc.itens] == [1, 2]
 
@@ -101,7 +101,7 @@ class TestNFe:
             <imposto><ICMS><ICMS10><orig>0</orig><CST>10</CST><vBC>28430.25</vBC><pICMS>9.0000</pICMS>
             <vICMS>2559.51</vICMS><vBCST>35537.81</vBCST><pICMSST>25.0000</pICMSST><vICMSST>6324.94</vICMSST>
             <vFCPST>12.00</vFCPST></ICMS10></ICMS></imposto></det>"""
-        i = ler_documento_xml(nfe(item, tp="1", dest="<CNPJ>43112531000421</CNPJ>")).itens[0]
+        i = ler_documento_xml(nfe(item, tp="1", dest="<CNPJ>44000001000454</CNPJ>")).itens[0]
         assert (i.cst_icms, i.valor_icms, i.bc_st, i.aliq_st, i.valor_st, i.fcp_st) == (
             "010", D("2559.51"), D("35537.81"), D("25.0000"), D("6324.94"), D("12.00"))
 
@@ -168,7 +168,7 @@ class TestCFeSat:
         conteudo = f"""<?xml version="1.0"?>
 <CFe><infCFe Id="CFe{CHAVE_CFE}" versao="0.07">
  <ide><cUF>35</cUF><mod>59</mod><nserieSAT>900001234</nserieSAT><nCFe>987654</nCFe><dEmi>20210615</dEmi></ide>
- <emit><CNPJ>11517841003455</CNPJ></emit><dest/>
+ <emit><CNPJ>44000002003414</CNPJ></emit><dest/>
  <det nItem="1"><prod><cProd>000123</cProd><cEAN>7891000100103</cEAN><xProd>IOGURTE</xProd><NCM>04032000</NCM>
    <CFOP>5405</CFOP><uCom>UN</uCom><qCom>3.0000</qCom><vUnCom>2.50</vUnCom><vProd>7.50</vProd></prod>
    <imposto><ICMS><ICMS40><Orig>0</Orig><CST>60</CST></ICMS40></ICMS></imposto>
@@ -176,7 +176,7 @@ class TestCFeSat:
  </det>
 </infCFe></CFe>""".encode()
         doc = ler_documento_xml(conteudo)
-        assert (doc.chave, doc.modelo, doc.tipo, doc.emitente, doc.destinatario) == (CHAVE_CFE, "59", "1", "11517841003455", "")
+        assert (doc.chave, doc.modelo, doc.tipo, doc.emitente, doc.destinatario) == (CHAVE_CFE, "59", "1", "44000002003414", "")
         assert doc.consumidor_final is True
         assert (doc.numero, doc.serie, doc.emissao) == ("987654", "900001234", date(2021, 6, 15))
         item = doc.itens[0]
@@ -198,13 +198,13 @@ class TestQuemComprou:
 class TestOQueNaoEDocumento:
     def test_cte_cita_notas_mas_nao_e_nota(self):
         cte = b"""<cteProc xmlns="http://www.portalfiscal.inf.br/cte"><CTe><infCte Id="CTe3524...">
-            <infCTeNorm><infDoc><infNFe><chave>35240643112531000421550030000714581149028312</chave></infNFe>
+            <infCTeNorm><infDoc><infNFe><chave>35240644000001000454550030000714581149028310</chave></infNFe>
             </infDoc></infCTeNorm></infCte></CTe></cteProc>"""
         assert ler_documento_xml(cte) is None
 
     def test_evento_de_cancelamento(self):
         evento = b"""<procEventoNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00"><evento>
-            <infEvento Id="ID1101113524..."><chNFe>35240643112531000421550030000714581149028312</chNFe>
+            <infEvento Id="ID1101113524..."><chNFe>35240644000001000454550030000714581149028310</chNFe>
             <tpEvento>110111</tpEvento></infEvento></evento></procEventoNFe>"""
         assert ler_documento_xml(evento) is None
 

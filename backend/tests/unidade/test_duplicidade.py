@@ -14,9 +14,9 @@ from cat.aplicacao.casos_de_uso.inspecionar_lote import (
 )
 from cat.infraestrutura.arquivos.classificador import hash_de
 
-# raiz 50948371 — Irmãos Boa
+# raiz 44000003 — Irmãos Boa
 CABECALHO = (
-    "|0000|018|0|01052025|31052025|EMPRESA T LTDA|50948371000178||SP"
+    "|0000|018|0|01052025|31052025|EMPRESA T LTDA|44000003000109||SP"
     "|407048962113|3550308|||A|0|"
 )
 C100_A = ("|C100|0|0|F001|55|00|001|00001|35250500000000000000550010000000011000000015"
@@ -55,7 +55,7 @@ class TestNaMesmaPasta:
         (tmp_path / "backup").mkdir()
         escrever(tmp_path / "backup", "maio (2).txt", SPED)
 
-        r = inspecionar_pasta(str(tmp_path), "50948371")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
         assert r.total == 1
         assert len(r.copias) == 1
         copia, de_quem = r.copias[0]
@@ -67,7 +67,7 @@ class TestNaMesmaPasta:
     def test_mesma_assinatura_conteudo_diferente_entram_os_dois(self, tmp_path):
         escrever(tmp_path, "a.txt", SPED)
         escrever(tmp_path, "b.txt", SPED_MESMO_TAMANHO)
-        r = inspecionar_pasta(str(tmp_path), "50948371")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
         assert r.total == 2 and not r.copias
         # foram candidatos, então foram hashados — e os hashes diferem
         hashes = {a.hash_conteudo for a in r.arquivos}
@@ -77,7 +77,7 @@ class TestNaMesmaPasta:
         # tamanhos diferentes: assinatura diferente, nada a hashar
         escrever(tmp_path, "a.txt", SPED)
         escrever(tmp_path, "b.txt", SPED_MAIOR)
-        r = inspecionar_pasta(str(tmp_path), "50948371")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
         assert r.total == 2
         assert all(a.hash_conteudo is None for a in r.arquivos)
 
@@ -86,7 +86,7 @@ class TestContraOQueJaEstaNoTrabalho:
     def _existente(self, caminho, conteudo, com_hash=True):
         return ArquivoExistente(
             caminho=caminho, tamanho=len(conteudo.encode("latin-1")),
-            tipo="sped_icms_ipi", cnpj="50948371000178",
+            tipo="sped_icms_ipi", cnpj="44000003000109",
             competencia=date(2025, 5, 1), retificadora=False,
             hash_conteudo=hash_de(caminho) if com_hash else None,
         )
@@ -96,7 +96,7 @@ class TestContraOQueJaEstaNoTrabalho:
         (tmp_path / "lote2").mkdir()
         escrever(tmp_path / "lote2", "maio_de_novo.txt", SPED)
 
-        r = inspecionar_pasta(str(tmp_path / "lote2"), "50948371",
+        r = inspecionar_pasta(str(tmp_path / "lote2"), "44000003",
                               existentes=(self._existente(antigo, SPED),))
         assert r.total == 0
         assert len(r.copias) == 1
@@ -110,7 +110,7 @@ class TestContraOQueJaEstaNoTrabalho:
         (tmp_path / "lote2").mkdir()
         escrever(tmp_path / "lote2", "copia.txt", SPED)
 
-        r = inspecionar_pasta(str(tmp_path / "lote2"), "50948371",
+        r = inspecionar_pasta(str(tmp_path / "lote2"), "44000003",
                               existentes=(self._existente(antigo, SPED, com_hash=False),))
         assert r.total == 0 and len(r.copias) == 1
 
@@ -120,6 +120,6 @@ class TestContraOQueJaEstaNoTrabalho:
         (tmp_path / "lote2").mkdir()
         escrever(tmp_path / "lote2", "outro.txt", SPED_MESMO_TAMANHO)
 
-        r = inspecionar_pasta(str(tmp_path / "lote2"), "50948371",
+        r = inspecionar_pasta(str(tmp_path / "lote2"), "44000003",
                               existentes=(self._existente(antigo, SPED),))
         assert r.total == 1 and not r.copias

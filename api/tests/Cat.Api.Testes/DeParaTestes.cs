@@ -120,7 +120,7 @@ public sealed class DeParaTestes(BancoDeTeste banco, MotorDeDeParaFalso motor) :
         motor.AoPedirCandidatos = p => Results.Json(new
         {
             resumo = new { pares = 1, pendentes = 1 },
-            pares = new[] { new { cnpj = "43112531000421", origem = "101208", destino = "1012", fator = "1", situacao = "pendente" } },
+            pares = new[] { new { cnpj = "44000001000454", origem = "101208", destino = "1012", fator = "1", situacao = "pendente" } },
         });
 
         var r = await c.GetAsync($"/api/projetos/{projeto}/depara");
@@ -157,9 +157,9 @@ public sealed class DeParaTestes(BancoDeTeste banco, MotorDeDeParaFalso motor) :
         {
             decisoes = new object[]
             {
-                new { cnpj = "43112531000421", origem = "1111K308", destino = "1111", fator = "3", motivo = "kit", situacao = "aprovado", confianca = "alta", explicacao = "kit de 3 unidades" },
+                new { cnpj = "44000001000454", origem = "1111K308", destino = "1111", fator = "3", motivo = "kit", situacao = "aprovado", confianca = "alta", explicacao = "kit de 3 unidades" },
                 new { cnpj = "", origem = "X0046E1FBP", destino = "3130", fator = "1", motivo = "cliente", situacao = "aprovado" },
-                new { cnpj = "43112531000421", origem = "400108", destino = "4001", motivo = "sufixo", situacao = "recusado" },
+                new { cnpj = "44000001000454", origem = "400108", destino = "4001", motivo = "sufixo", situacao = "recusado" },
             },
         });
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
@@ -171,7 +171,7 @@ public sealed class DeParaTestes(BancoDeTeste banco, MotorDeDeParaFalso motor) :
         // decidir de novo a mesma origem atualiza, não duplica
         r = await c.PostAsJsonAsync($"/api/projetos/{projeto}/depara", new
         {
-            decisoes = new[] { new { cnpj = "43112531000421", origem = "400108", destino = "4001", fator = "1", motivo = "sufixo", situacao = "aprovado" } },
+            decisoes = new[] { new { cnpj = "44000001000454", origem = "400108", destino = "4001", fator = "1", motivo = "sufixo", situacao = "aprovado" } },
         });
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         Assert.Equal(3L, await banco.Escalar<long>($"SELECT count(*) FROM depara_item WHERE empresa_id = {empresa}"));

@@ -15,7 +15,7 @@ from cat.infraestrutura.exclusoes.piscofins_na_propria_base import (
 )
 from cat.infraestrutura.gestao.modelos import ApuracaoEFD
 
-CNPJ = "03083231002148"
+CNPJ = "44000007002122"
 PERIODO = "2025-09"
 
 # posições do vetor de somas: [vl_item, vl_bc, vl_trib, quant, linhas]

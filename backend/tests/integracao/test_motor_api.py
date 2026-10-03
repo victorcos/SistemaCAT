@@ -93,7 +93,7 @@ class TestSaude:
 class TestRemessaPeloCanal:
     SEGREDO = {"X-Cat-Motor-Segredo": "segredo-do-canal-so-de-teste"}
     SPED = ("|0000|018|0|01052021|31052021|EMPRESA DA REMESSA|11222333000181||SP"
-            "|9030138187|3550308||||\r\n").encode("latin-1")
+            "|9000000000|3550308||||\r\n").encode("latin-1")
 
     def test_analisa_e_devolve_a_matriz_sem_dizer_se_esta_cadastrada(self, cliente):
         r = cliente.post("/interno/remessas/analisar", headers=self.SEGREDO,

@@ -28,28 +28,28 @@ from cat.infraestrutura.planilhas.conferencia import (
 # real: estabelecimento do Paraná, competência 05/2021
 C100 = (
     "|C100|0|0|C10252525|55|00|001|44623"
-    "|41210511517841000278550010000446231411953289"
+    "|41210544000002000237550010000446231411953286"
     "|01052021|01052021|8,49|2|0,49|0|8,98|9|0|0|0|0|0|0|0|0|0|0|0|0|"
 )
 # real: CF-e-SAT de um estabelecimento de São Paulo
 C800 = (
     "|C800|59|00|62537|01072021|2,59|0|0||353552"
-    "|35210711517841005407590003535520625376456954|0|2,59|0|0|0|0|"
+    "|35210744000002005468590003535520625376456957|0|2,59|0|0|0|0|"
 )
 CABECALHO = (
     "|0000|015|0|01052021|31052021|Empresa N Distribuicao Ltda"
-    "|11517841000278||PR|9030138187|4106407||||"
+    "|44000002000237||PR|9000000000|4106407||||"
 )
 
-CHAVE_C100 = "41210511517841000278550010000446231411953289"
-CHAVE_C800 = "35210711517841005407590003535520625376456954"
+CHAVE_C100 = "41210544000002000237550010000446231411953286"
+CHAVE_C800 = "35210744000002005468590003535520625376456957"
 
 NFE = (
     '<?xml version="1.0" encoding="UTF-8"?>'
     '<nfeProc versao="4.00"><NFe><infNFe Id="NFe'
     + CHAVE_C100
     + '"><ide><dhEmi>2021-05-01T10:00:00-03:00</dhEmi></ide>'
-    "<emit><CNPJ>11517841000278</CNPJ></emit></infNFe></NFe></nfeProc>"
+    "<emit><CNPJ>44000002000237</CNPJ></emit></infNFe></NFe></nfeProc>"
 )
 
 
@@ -117,7 +117,7 @@ class TestOutrasLinhas:
     @pytest.mark.parametrize("linha", [
         "|C190|000|1102|18,00|100,00|18,00|0|0|0|0|0||",
         "|C170|1|116785|Laranja|200|KG|417,58|",
-        "|0000|015|0|01052021|31052021|Empresa|11517841000278||PR|1|1||||",
+        "|0000|015|0|01052021|31052021|Empresa|44000002000237||PR|1|1||||",
     ])
     def test_nao_sao_documento(self, linha):
         assert ler_documento(linha) is None
@@ -159,7 +159,7 @@ class TestExtrair:
             "ORDER BY modelo", [destino]).fetchall()
         con.close()
         # o CNPJ e a competência vêm do registro 0000 do próprio arquivo
-        assert all(l[2] == "11517841000278" for l in linhas)
+        assert all(l[2] == "44000002000237" for l in linhas)
         assert all(l[3] == date(2021, 5, 1) for l in linhas)
         assert {l[1] for l in linhas} == {"55", "59"}
 
@@ -612,18 +612,18 @@ class TestFiliaisTrocadas:
     def test_avisa_quando_os_estabelecimentos_nao_se_cruzam(self):
         r = ResumoDaConferencia(
             escriturados=10605, conferidos=0, documentos_na_pasta=882,
-            estabelecimentos_da_efd=["43112531000189"],
-            emitentes_na_pasta=["43112531000421"],
+            estabelecimentos_da_efd=["44000001000101"],
+            emitentes_na_pasta=["44000001000454"],
         )
         aviso = next(a for a in r.avisos if "filiais diferentes" in a)
-        assert "43112531000189" in aviso
-        assert "43112531000421" in aviso
+        assert "44000001000101" in aviso
+        assert "44000001000454" in aviso
 
     def test_nao_avisa_quando_ha_intersecao(self):
         r = ResumoDaConferencia(
             escriturados=10, conferidos=0, documentos_na_pasta=5,
-            estabelecimentos_da_efd=["43112531000189"],
-            emitentes_na_pasta=["43112531000189", "99999999000191"],
+            estabelecimentos_da_efd=["44000001000101"],
+            emitentes_na_pasta=["44000001000101", "99999999000191"],
         )
         assert not any("filiais diferentes" in a for a in r.avisos)
 
@@ -631,8 +631,8 @@ class TestFiliaisTrocadas:
         # com pelo menos um casamento, a causa não é filial trocada
         r = ResumoDaConferencia(
             escriturados=10, conferidos=1, documentos_na_pasta=5,
-            estabelecimentos_da_efd=["43112531000189"],
-            emitentes_na_pasta=["43112531000421"],
+            estabelecimentos_da_efd=["44000001000101"],
+            emitentes_na_pasta=["44000001000454"],
         )
         assert not any("filiais diferentes" in a for a in r.avisos)
 

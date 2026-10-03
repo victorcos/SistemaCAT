@@ -120,7 +120,7 @@ class TestCfop:
 
 class TestDocumento:
     def test_catorze_digitos_e_cnpj(self):
-        assert v.documento("11.517.841/0034-55") == ("11517841003455", None)
+        assert v.documento("44.000.002/0034-14") == ("44000002003414", None)
 
     def test_onze_digitos_e_cpf(self):
         # produtor rural entrega nota como pessoa física
@@ -342,7 +342,7 @@ class TestLeitura:
         c = escrever(tmp_path, "mov.txt", [
             MOVIMENTO,
             "117110|Alface|789|0705|02/01/20|73383|1|160|280|280|0|0|0|0|"
-            "00176231110|MS|1.102|040|0|0|0|502001115178410034555500100007338",
+            "00176231110|MS|1.102|040|0|0|0|502001440000020034555500100007338",
         ])
         lt = Leitura(c)
         assert lt.especie is Especie.MOVIMENTO
@@ -371,7 +371,7 @@ class TestLeitura:
             cfop = "  .      " if i % 2 else "1.102"
             dados.append(
                 f"1171{i:02d}|Item|789|0705|02/01/20|1|1|1|1|1|0|0|0|0|"
-                f"11517841003455|MS|{cfop}|040|0|0|0|x")
+                f"44000002003414|MS|{cfop}|040|0|0|0|x")
         lt = Leitura(escrever(tmp_path, "mov.txt", [MOVIMENTO, *dados]))
         assert len(list(lt.movimentos())) == 100
         assert lt.total_incompletos == 100
@@ -381,7 +381,7 @@ class TestLeitura:
         # data onde deveria haver quantidade: o mapeamento é que está errado
         dados = [
             f"1171{i:02d}|Item|789|0705|não é data|1|1|1|1|1|0|0|0|0|"
-            f"11517841003455|MS|1.102|040|0|0|0|x"
+            f"44000002003414|MS|1.102|040|0|0|0|x"
             for i in range(600)
         ]
         lt = Leitura(escrever(tmp_path, "mov.txt", [MOVIMENTO, *dados]))

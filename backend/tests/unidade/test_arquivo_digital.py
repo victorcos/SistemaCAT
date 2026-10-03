@@ -36,9 +36,9 @@ from cat.dominio.icms.cat42.pre_validacao import (
 from cat.dominio.comum.cnpj import digitos_verificadores
 
 D = Decimal
-CNPJ = "50948371001301"  # formato real; o dígito é recalculado abaixo
+CNPJ = "44000003001334"  # formato real; o dígito é recalculado abaixo
 CNPJ = CNPJ[:12] + digitos_verificadores(CNPJ[:12])
-FORNECEDOR = "00158635000111"
+FORNECEDOR = "44000010000100"
 FORNECEDOR = FORNECEDOR[:12] + digitos_verificadores(FORNECEDOR[:12])
 IE_SP = "798092322114"          # IE real de SP, com os dois verificadores certos
 
