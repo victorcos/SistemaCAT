@@ -41,9 +41,10 @@ laterais:
   bloqueante: na empresa G ele guardaria 62 arquivos de 411 e perderia três dos
   quatro estabelecimentos. Quem lê EFD ICMS/IPI não recebe a matriz
   consolidada, como quem lê Contribuições recebe;
-* **o leitor de EFD ICMS/IPI** passa a ser caminho crítico. O `registros.py` da
-  casa é de Contribuições: o `0000` tem outro leiaute e `0220`, `0206`, `C171` e
-  `1300`–`1370` não existem lá;
+* **o leitor de EFD ICMS/IPI** passa a ser caminho crítico. O **leiaute** já
+  está feito e medido (`sped/registros_icms.py`, 16 registros em 40 arquivos
+  reais, v0.136.0); falta o leitor que o usa — ler em ordem, de-duplicar por
+  `(CNPJ, competência)` e gravar parquet;
 * **o classificador de produto** idem — sem ele não há litro para multiplicar.
 
 **E o produto não é achar crédito: é auditar o tomado.** Medido em 03/10/2026,

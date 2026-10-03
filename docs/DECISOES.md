@@ -5,6 +5,68 @@
 
 ---
 
+## 2026-10-03 — O leiaute da EFD ICMS/IPI, medido em vez de lido
+
+Primeira peça do motor de combustível: sem leitor não há litro para multiplicar.
+O `registros.py` da casa é de **EFD-Contribuições**, e os dois arquivos
+**colidem** em dois registros — o `0000` e o `0200` existem nos dois com
+leiautes diferentes. Uma tabela só teria de escolher um, lendo o outro com os
+nomes errados e calada. Por isso `registros_icms.py` é módulo irmão, não uma
+extensão.
+
+**Nenhuma linha saiu do Guia Prático.** As 16 entradas foram contadas em 40 EFD
+ICMS/IPI reais da empresa G (02/2023 a 03/2026), e a contagem vai escrita em
+cada registro — é ela que torna a tabela conferível por quem desconfiar. O
+motivo de não ler o Guia tem precedente nesta casa: no `0140` da Contribuições
+ele trazia um `IND_SIT_INI_PER` que o arquivo não tem, e o campo empurrado não
+quebrava nada, porque o vizinho também era texto.
+
+A medição confirmou dos dois lados o que só estava anotado: o `0200` da ICMS/IPI
+tem mesmo 13 campos, com o `CEST` que o da Contribuições não tem.
+
+**`tools/medir_leiaute_icms.py` é a outra metade.** Ele conta os campos de cada
+registro numa pasta de cliente e compara com a tabela, reportando divergência,
+registro não medido e confirmado. Rodado na empresa G: 16 registros, zero
+divergência. **Rodado na empresa Z, achou o `0220`** — o registro que converte
+fardo, caixa e tambor em litro, e que a tese depende — **com dois tamanhos no
+mesmo acervo**, 3 campos em 38.577 linhas e 4 em 18.302. É a variante por versão
+de PVA que o `CAMPOS_ANTIGOS` do módulo irmão existe para tratar, e foi a
+ferramenta que a encontrou, não a leitura.
+
+**Três registros ficaram de fora de propósito:** `0206` (código ANP), `0220` e
+`C171`. Nomeá-los com leiaute tirado do Guia e nunca exercitado seria pior que
+faltar — quem visse o nome assumiria conferência. `posicao_do_campo` levanta
+`RegistroNaoMedido` com o motivo escrito, que é erro **diferente** de "campo
+desconhecido": um é engano de digitação, o outro é trabalho a fazer.
+
+**Uma premissa que eu quase inverti, e a medição salvou.** O `C110` traz
+observação em texto livre, e nela aparece a base do ST que o CST 60 não destaca:
+`"BC-ICMS-ST GASOLINA: R$ 2.350,34 VALOR-ICMS-ST: R$ 423,06"`. Pareceu
+substituir a dependência do XML. Medido: **33 de 6.905 linhas**, em pelo menos
+três formatos de três fornecedores diferentes. Meio por cento, sem formato
+garantido e sem obrigação de existir — serve de conferência, não de fonte. A
+fonte do ST retido continua sendo o XML.
+
+**E um erro meu de método, que vale registrar.** A primeira medição do `C110`
+devolveu zero ocorrências, e eu quase concluí que o texto não existia. A causa
+era `heredoc` sem aspas: o shell comeu o `\$` da expressão regular e `R\$` virou
+`R$`, um ancoramento de fim de linha que nunca casa. Medição que devolve zero
+pede desconfiança antes de virar conclusão — é a segunda vez hoje (a primeira
+foi a varredura de `E111` que devolveu zero para quem se sabia creditar).
+
+**O que o teste afirma, e o que ele não afirma.** Afirma a **contagem** de cada
+registro contra o que se mediu; não afirma que os nomes estão na ordem certa,
+que só o arquivo diz. É a guarda que importa: um nome a mais no meio empurra
+todos os seguintes uma casa, e o valor na coluna errada continua parecendo certo
+— alíquota e valor do ICMS são os dois número com duas casas. Há também um teste
+que lê a mesma linha com a tabela errada e exige que ela **levante**, em vez de
+devolver outra coisa.
+
+Nenhuma linha de cliente entrou como fixture: as amostras dos testes são
+sintéticas, com a mesma forma e a mesma contagem das reais.
+
+---
+
 ## 2026-10-03 — A raiz do CNPJ de cliente também saiu, e os dois dígitos da chave
 
 Segunda metade da anonimização. Os nomes saíram no commit anterior; o CNPJ

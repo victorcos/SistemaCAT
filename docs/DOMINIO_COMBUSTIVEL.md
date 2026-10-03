@@ -479,10 +479,18 @@ andamento, cancelamento, apagar parquet pela metade); `credito_outorgado.py` tem
 classificação por descrição e NCM; `tab_aliquota_icms` é o molde da tabela com
 vigência; `planilhas/conferencia.py` e o pacote para a entrega.
 
-**Falta:** o `registros.py` da casa é de **EFD-Contribuições** — o `0000` do
-ICMS/IPI tem outro leiaute, e `0220`, `0206`, `C171`, `1300`–`1370` não existem lá.
-A prescrição do ICMS continua faltando; as tabelas de ad rem (`tab_ad_rem`), de FCV
-(`tab_fcv`) e de alíquota por produto (`tab_aliquota_combustivel`, só o ES) já existem.
+**Já feito desde o levantamento:** as três tabelas de tributação — ad rem
+(`tab_ad_rem`), FCV (`tab_fcv`) e alíquota percentual da era do ST
+(`tab_aliquota_combustivel`, ES e SP) — e o **leiaute da EFD ICMS/IPI**
+(`sped/registros_icms.py`), módulo irmão do `registros.py` porque o `0000` e o
+`0200` colidem entre os dois arquivos. 16 registros medidos em 40 EFD reais,
+com `tools/medir_leiaute_icms.py` para reconferir em cliente novo.
+
+**Falta:** o leitor que usa esse leiaute (ler em ordem, de-duplicar por
+`(CNPJ, competência)`, parquet); o classificador de produto; a apuração; a
+auditoria do `E111`; e a prescrição do ICMS. Do leiaute, faltam medir `0206`,
+`0220` e `C171` — e o `0220` já apareceu na empresa Z com dois tamanhos, então
+ele é o próximo.
 
 **Atenção ao reúso que não serve:** o `Total.somar` do `exclusoes_por_item` lê
 `linha.pis`, `linha.cofins`, `linha.diferenca_do_pis`, `linha.selic_sobre_o_pis`.
