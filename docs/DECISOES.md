@@ -5,6 +5,57 @@
 
 ---
 
+## 2026-10-03 — Nenhum nome de cliente no repositório, e nem CNPJ
+
+**A regra já estava escrita, e o repositório a contrariava.** O
+`tabelas/__init__.py` dizia desde setembro que *"o nome delas não é versionado,
+aqui nem em lugar nenhum do repositório"* — e ao mesmo tempo 389 ocorrências de
+nome de cliente estavam versionadas, inclusive em código que eu mesmo escrevi
+hoje (`tab_ad_rem.py` nomeava a empresa G quatro vezes).
+
+**O escopo cresceu no meio, e por um motivo que vale escrever.** A pergunta era
+sobre nomes. Mas os mockups de tela em `frontend/claude/design/screens` traziam
+**razão social, CNPJ, inscrição estadual e caminho de pasta do cliente**, juntos,
+numa só linha. Anonimizar o nome e deixar o CNPJ ao lado não anonimiza nada: os
+dois identificam o cliente igual. Então entraram os dois, e o registro passou a
+dizer isso explicitamente.
+
+**O registro vive fora do repositório.** `docs/REGISTRO_EMPRESAS.local.md`, com
+`*.local.md` no `.gitignore`. Fica onde as pessoas procuram e não é enviado. É o
+único lugar onde as duas colunas aparecem juntas.
+
+**As letras pulam E, I e O.** "empresa e" se confunde com a conjunção num
+`grep` — e eu ia usar E até perceber que a varredura devolvia 34 falsos
+positivos por causa dela. **I** e **O** se confundem com 1 e 0.
+
+**Três armadilhas que a substituição automática criou, e que só apareceram
+porque foram procuradas:**
+
+1. **nome de cliente como identificador de código.** `test_cnpj.py` tinha
+   `BOA = "50948371000178"`, e a troca cega produziu `empresa T = "..."` —
+   `SyntaxError`. Passou a haver uma regra separada, só para arquivos de código,
+   que gera `EMPRESA_T`. Peguei com `py_compile` em todos os `.py`, não com o
+   pytest: arquivo que não compila nem chega a ser coletado;
+2. **concordância de gênero.** "o Amigão" virou "o empresa V", "do Superpão"
+   virou "do empresa J" — 89 casos. "Amigão" é masculino, "empresa" não;
+3. **nome quebrado em duas linhas.** "da Casa\nAvenida" virou "da Casa\nempresa
+   X", porque a expressão não cruza o fim de linha.
+
+**Uma coisa ficou deliberadamente feia:** `empresa U` e `empresa X` têm nomes
+parecidos e CNPJ diferente, e não se confirmou se são a mesma empresa. Ficaram
+com tags separadas. Juntar o que não se sabe igual é pior que ter duas tags.
+
+**O que isto não alcança, e não deve ser feito sozinho.** As **mensagens de
+commit antigas** continuam com os nomes. Reescrevê-las exige reescrever o
+histórico de um repositório já enviado — destrutivo, e quebra o clone de quem já
+baixou. Fica registrado como pendência de decisão de quem tem alçada.
+
+**O que fica no repositório é o que dá peso à nota:** quantas linhas foram
+conferidas, de que competência, contra qual relatório. Isso se confere sem saber
+de quem é — e era o argumento da regra desde o começo.
+
+---
+
 ## 2026-10-03 — São Paulo: o complemento de 1,3 ponto, e os dois meses partidos
 
 **Por que SP depois do ES no mesmo dia.** O ES entrou primeiro porque tinha
@@ -506,7 +557,7 @@ Excel não é opção.
 
 ## 2026-10-01 — O formato dentro do pacote é o do arquivo de referência
 
-**O que se mediu, no 680 da DMINAS — 3.568.362 linhas, 35 colunas:**
+**O que se mediu, no 680 da empresa F — 3.568.362 linhas, 35 colunas:**
 
 ```
 csv      33 s     862 MB
@@ -553,7 +604,7 @@ passou a cobrar essa igualdade de base.
 
 **O relatório.** 680 — Metodologia 01 — Todos Registros — Por Documento e Itens:
 as próprias contribuições fora da própria base, **item a item**, 35 colunas,
-3.568.362 linhas no arquivo de referência da DMINAS. Fecha **100,0000%**, sem
+3.568.362 linhas no arquivo de referência da empresa F. Fecha **100,0000%**, sem
 linha a mais nem a menos, nas 57 competências.
 
 **Quatro frentes agora, e duas delas são da mesma tese.** O consolidado soma por
@@ -606,7 +657,7 @@ outros documentos); 1 no A100 é serviço prestado (0 é contratado). O erro opo
 
 **O que fica em aberto, dito em voz alta.** O agregador da Gestão trata o F100
 `IND_OPER = 2` como saída (`gestao/agregador.py`), e o 680 só aceita o 1. **Na
-DMINAS não existe nenhum F100 com `IND_OPER = 2`** — 281 de aquisição e 558 de
+empresa F não existe nenhum F100 com `IND_OPER = 2`** — 281 de aquisição e 558 de
 receita —, então as duas frentes concordam nesta base e não há como medir qual
 está certa. Fica anotado para a primeira base que tiver: é divergência latente
 entre o número que se pede e o detalhe que o acompanha.
@@ -907,7 +958,7 @@ legal escrito, e `da_regra` recebe a competência. Acrescentar vigência é um a
 comum; esquecê-la deixou de ser possível.
 
 **Só entra na tabela o que foi medido.** `INTERNA` tem hoje **uma** UF: MG a
-18%, conferida na EFD ICMS/IPI da DMINAS — 201 arquivos, 2021 a 2025, em que as
+18%, conferida na EFD ICMS/IPI da empresa F — 201 arquivos, 2021 a 2025, em que as
 saídas internas tributadas integralmente mostram 18% em 56% a 59% das linhas
 todos os anos, sem degrau. As outras 26 saíram para `A_CONFERIR`, que o motor
 **recusa**, com um recado que diz como conferir e avisa que o relatório do
@@ -945,7 +996,7 @@ A exclusão do ISS da base do PIS/COFINS fecha **100% contra o gabarito do MA**:
 33 linhas, 32 colunas. Com ela, os três motores da família de exclusões estão
 medidos — 903 (ICMS), 839 (ICMS-ST) e 933 (ISS).
 
-**É o menor e o mais instrutivo.** Das 33 notas de serviço da DMINAS, **uma**
+**É o menor e o mais instrutivo.** Das 33 notas de serviço da empresa F, **uma**
 tem ISS preenchido: R$ 5.586,51, que rendem R$ 646,71 corrigidos. O campo
 `VL_ISS` do registro A100 é facultativo, e quando vem vazio o valor não se
 perde — ele está na NFS-e, que este motor ainda não lê. Até lá a linha sai com a
@@ -994,7 +1045,7 @@ dito no módulo.
 
 A exclusão do ICMS-ST da base do PIS/COFINS — a tese do contribuinte
 **substituído** — fecha **100% contra o gabarito do MA**: 463.212 linhas, 46
-colunas. Vale R$ 2.668.059,20 para a DMINAS.
+colunas. Vale R$ 2.668.059,20 para a empresa F.
 
 **A pergunta que a medição respondeu antes de haver código.** A cadeia pedida
 cobre só a EFD-Contribuições, e ali o ICMS-ST simplesmente não existe: a revenda
@@ -1115,7 +1166,7 @@ uma. O total a recuperar bate ao centavo: R$ 625.871,38.
 **A decisão de 22/09 foi revista, e o motivo é medição.** Aquela nota decidiu
 cruzar sempre a EFD-Contribuições com a EFD ICMS/IPI, porque `VL_ICMS` no C170
 da Contribuições não é de preenchimento obrigatório e um arquivo em branco seria
-"o caso normal de metade dos clientes". Nos 57 arquivos da DMINAS — cinco anos,
+"o caso normal de metade dos clientes". Nos 57 arquivos da empresa F — cinco anos,
 três estabelecimentos, 138.358 itens com ICMS destacado — **não há um caso**. E o
 relatório do MA, que é o padrão que o cliente confere, sai do mesmo campo: se
 ele cruzasse com a EFD ICMS/IPI, nossos números não bateriam com os dele, e
@@ -1178,7 +1229,7 @@ e do ICMS de cada item, e é assim que se sabe quais notas já excluíram o ICMS
 Agregado não tem item; tem soma de item. São 57 arquivos em 53 segundos — barato
 perto de pedir restituição em duplicidade.
 
-**O que prescreveu aparece e não soma.** Sete competências da DMINAS estão fora
+**O que prescreveu aparece e não soma.** Sete competências da empresa F estão fora
 dos cinco anos: R$ 72.445,95, que o relatório mostra em vermelho e o total não
 inclui. O relatório do MA soma as duas coisas num número só.
 
@@ -1224,7 +1275,7 @@ dado por outro sem avisar.
 
 ## 2026-09-30 — O gabarito do 037 derruba cinco deduções, e a 037 passa a bater inteira
 
-**O que entrou.** O gabarito do 037 da DMINAS — 458.792 linhas, 57
+**O que entrou.** O gabarito do 037 da empresa F — 458.792 linhas, 57
 competências, em xlsx. Conferido linha a linha pelo `tools/validar_037.py`:
 **458.792 de 458.792, zero divergência.**
 
@@ -1292,7 +1343,7 @@ Participante**, que é acréscimo nosso da v0.76.0 e não tem par no gabarito.
 de fora por não haver ocorrência; o gabarito tem 2 linhas, e foi com elas na mão
 que o ramo entrou. A natureza do crédito dele é **lida** do `A170_NAT_BC_CRED` —
 nota de serviço não tem CFOP de onde deduzir. Dos outros dois ausentes,
-C395/C396 e F150, a DMINAS não tem nenhuma ocorrência.
+C395/C396 e F150, a empresa F não tem nenhuma ocorrência.
 
 ### O que o gabarito erra, e nós não
 
@@ -1598,7 +1649,7 @@ lá fica de fora, e os dois resultados precisam poder ser comparados.
 NF-e, CT-e e evento de cancelamento reconhecidos e ignorados, nota denegada fora
 da conta, XML declarado UTF-8 e gravado em Latin-1 relido em vez de perdido, e o
 zip aberto sem extrair para o disco. E **uma cópia por chave** — a mesma nota vem
-no zip do mês e no do trimestre (28.407 chaves repetidas na Advertising), e
+no zip do mês e no do trimestre (28.407 chaves repetidas na empresa D), e
 contar duas vezes inflaria justamente o número que interessa.
 
 **O filtro é do trabalho, e fica no banco.** Na origem era um JSON global, um
@@ -1706,7 +1757,7 @@ dela é anterior a `data do pedido − 5 anos`.
 
 **O corte é por dia, não por mês.** A competência de 08/2021 venceu em
 25/09/2021: um pedido de 24/09/2026 ainda a alcança — por um dia. Arredondar
-para o mês jogaria fora R$ 567 mil na base da CEMA, e é o tipo de decisão que
+para o mês jogaria fora R$ 567 mil na base da empresa S, e é o tipo de decisão que
 ninguém quer descobrir depois.
 
 **Mostrar em vermelho, não somar** — foi o pedido, e é o certo. Competência
@@ -1722,7 +1773,7 @@ anterior ou exigibilidade suspensa deslocam a contagem, e nada disso está no
 SPED. O sistema separa pela regra geral, diz qual data usou, e quem assina
 ajusta.
 
-**Na CEMA:** o crédito passou de R$ 48.861.132,72 para **R$ 45.551.660,38**,
+**Na empresa S:** o crédito passou de R$ 48.861.132,72 para **R$ 45.551.660,38**,
 com R$ 3.309.472,34 em 2021-01 a 2021-07 marcados como prescritos.
 
 ---
@@ -1957,7 +2008,7 @@ dois arquivos que se dizem a mesma retificadora é pergunta para quem transmitiu
 
 ## 2026-09-24 — Os agregados ficam em disco, e a segunda conta sai em segundos
 
-**O gargalo.** Ler os 65 SPED da CEMA custa 1h18. Até aqui esse trabalho era
+**O gargalo.** Ler os 65 SPED da empresa S custa 1h18. Até aqui esse trabalho era
 jogado fora ao fim da rodada da Gestão: a Exclusão, que precisa exatamente dos
 mesmos números, começaria do zero — e a tese seguinte também, e a próxima.
 
@@ -2029,7 +2080,7 @@ A170, C170, C175, C181/C185, C381/C385, C481/C485, C491/C495, C870/C880,
 D201/D205, D601/D605, F100, F500, F550 —, e é ela que alimenta a exclusão: uma
 passada no arquivo serve às duas contas.
 
-**Medido na base real** (CEMA, dois meses de um estabelecimento): base de
+**Medido na base real** (empresa S, dois meses de um estabelecimento): base de
 R$ 123.602.140,38, excluídos R$ 10.446.337,02, e voltam R$ 932.622,22 —
 R$ 160.268,51 de PIS e R$ 772.353,71 de COFINS. Nenhuma chave com contribuição
 apurada ficou de fora; o que sobrou no contador foram aquisições (fora por
@@ -3021,7 +3072,7 @@ trabalho de PIS/COFINS teria de reimportar a base que o de ICMS já tem.
 
 > **Revisto em 30/09/2026.** A previsão de que o campo viria em branco "em
 > metade dos clientes" não se sustentou na medição: 138.358 itens com ICMS
-> destacado nos 57 arquivos da DMINAS, nenhum em branco — e o relatório do MA,
+> destacado nos 57 arquivos da empresa F, nenhum em branco — e o relatório do MA,
 > que é o padrão conferido pelo cliente, sai do mesmo campo. A tese passou a
 > sair da EFD-Contribuições sozinha. Ver a decisão de 30/09/2026.
 
@@ -3229,7 +3280,7 @@ vive **dentro** da posição 3304, que de resto é 25%. Um protetor solar
 3304.99.90 é 18% e um creme facial 3304.99.90 é 25% — mesmo NCM. Só a descrição
 separa, e uma tabela por NCM erraria os dois.
 
-**2. No período da Advertising (08/2022 a 06/2024) a alíquota não se move.** Nos
+**2. No período da empresa D (08/2022 a 06/2024) a alíquota não se move.** Nos
 23 meses, só 25% (a regra) e 18% (as exceções), sem uma única transição.
 
 **3. E, pela lei, está certo para esse período.** O art. 55, IV não sofreu
@@ -3255,7 +3306,7 @@ de 31/03/2026 entra no levantamento da **Portaria CAT 28/2020**. Antes disso a
 base do Anexo XI valeu até 31/12/2024, e de 01/01/2025 a 31/03/2026 valeu o
 IVA-ST da Portaria SRE 48/2025 (também revogada).
 
-**O que fica em aberto, e é dívida nossa.** O trabalho da Advertising termina
+**O que fica em aberto, e é dívida nossa.** O trabalho da empresa D termina
 em 06/2024 e nada disso o alcança. Mas um trabalho cuja competência cruze
 **31/03/2026** monta hoje a ficha como se a ST continuasse: as saídas de 04/2026
 em diante deixam de ser CST 60, não baixam estoque da Ficha 3, e o **ICMS
@@ -3472,7 +3523,7 @@ do confronto foi para o bloco do confronto, ao lado da redução de base.
 **No CST 60 não há destaque**, e é aí que a RVZ mostra 25 ou 18: é a alíquota
 que o próprio emitente informa como efetiva no grupo do ICMS60 (`pICMSEfet`, da
 NT 2020.005), que a v0.60.0 passou a ler. Mas nem todo emitente preenche esse
-campo — na Advertising, 35.448 dos 81.157 itens de CST 60. Nas outras, a ficha
+campo — na empresa D, 35.448 dos 81.157 itens de CST 60. Nas outras, a ficha
 mostra a **alíquota interna da mercadoria**, que é o que a operação teria.
 
 A coluna fica então, nesta ordem: alíquota destacada no documento; a efetiva
@@ -3532,7 +3583,7 @@ como manda o artigo 37, § 1º, 1 do RICMS/SP.
 3. sem as duas, a soma: mercadoria mais frete, seguro e outras despesas, menos
    o desconto.
 
-Medido na Advertising: 47.048 saídas passam a bater exatamente com a base que a
+Medido na empresa D: 47.048 saídas passam a bater exatamente com a base que a
 RVZ usou, e as 15.920 de CST 60 ganham o frete. No enquadramento 1 são
 R$ 132.079,41 a mais de base.
 
@@ -3570,7 +3621,7 @@ essas colunas vazias, em vez de a etapa recusar o download.
 
 ## 2026-09-18 — O artigo 34 não alcança a saída a consumidor: premissa em aberto
 
-**O que a pesquisa achou.** O benefício que o fornecedor da Advertising aplica é
+**O que a pesquisa achou.** O benefício que o fornecedor da empresa D aplica é
 o **artigo 34 do Anexo II do RICMS/SP** (perfumes, cosméticos e produtos de
 higiene pessoal): reduz a base na saída interna de fabricante ou atacadista de
 forma que a carga fique em 12%. Os NCM batem um a um com o que as notas mostram:
@@ -3588,7 +3639,7 @@ a lei e os dados fecham sozinhos.
 
 **Vigência.** Decreto 48.959/2004, sem prazo desde o Decreto 58.761/2012. O
 Decreto 65.255/2020 pôs um complemento de 1,3% — carga de **13,3%** — por 24
-meses a partir de 15/01/2021, ou seja até 14/01/2023; o trabalho da Advertising
+meses a partir de 15/01/2021, ou seja até 14/01/2023; o trabalho da empresa D
 (08/2022 a 06/2024) pega essa faixa até 14/01/2023, mas as notas do fornecedor
 mostram 12% também ali. Prorrogações: Dec. 67.524/2023 (31/12/2024), 69.292/2025
 (31/12/2025), 70.293/2025 (31/12/2026).
@@ -3597,7 +3648,7 @@ mostram 12% também ali. Prorrogações: Dec. 67.524/2023 (31/12/2024), 69.292/2
 saída destinada a consumidor final**, e a **RC 23455/2021** é expressa: *"o
 benefício fiscal de redução da base de cálculo do artigo 34 não poderá ser
 aplicado no cálculo do valor do imposto a ser recolhido a título de substituição
-tributária"*. A venda da Advertising a consumidor final é exatamente o
+tributária"*. A venda da empresa D a consumidor final é exatamente o
 enquadramento 1 — logo, pela letra da lei, o ICMS efetivo dela seria a alíquota
 cheia, e não a base reduzida que a v0.57 passou a usar.
 
@@ -3620,7 +3671,7 @@ Fontes: art. 34 do Anexo II do RICMS/SP, RC 23455/2021, RC 28913/2023, Decreto
 ## 2026-09-17 — Só a entrada interna empresta alíquota e redução
 
 **O que se via.** Na primeira rodada com a alíquota da entrada, 3.160 saídas da
-Advertising confrontaram a 4%, 7%, 8%, 9,5% e 12% — alíquotas de **compra
+empresa D confrontaram a 4%, 7%, 8%, 9,5% e 12% — alíquotas de **compra
 interestadual**, e uma delas (9,5%) nem existe: era a mediana de um dia com uma
 entrada a 7% e outra a 12%. Essas linhas sozinhas respondiam por R$ 21,9 mil dos
 R$ 24,3 mil de ressarcimento do enquadramento 1.
@@ -3634,7 +3685,7 @@ que só entrou de fora fica sem alíquota, contada, como já era antes.
 
 ## 2026-09-17 — Sem 0200, a alíquota vem da nota de entrada
 
-**O que se via.** 13.909 saídas da Advertising ficavam sem valor de confronto —
+**O que se via.** 13.909 saídas da empresa D ficavam sem valor de confronto —
 os códigos 4002, 4009, 4008 e 4007, que **não têm registro 0200 em arquivo
 nenhum**, nem no próprio CNPJ nem em outro. Sem alíquota não há ICMS efetivo, e
 sem efetivo não há ressarcimento nem complemento nessas linhas; a RVZ apurou
@@ -3649,14 +3700,14 @@ destino do de-para e, por último, a nota de entrada.
 
 **Como fica marcado.** A Ficha 3 grava a `aliquota` que fez o confronto em cada
 linha, e o resumo do razão traz `aliquota_da_entrada` com quantas saídas
-precisaram desse último recurso. Os quatro códigos da Advertising têm NCM no
+precisaram desse último recurso. Os quatro códigos da empresa D têm NCM no
 XML da saída (3305.90.00, 3304.99.90 e 3401.20.10), então todos são alcançados.
 
 ---
 
 ## 2026-09-17 — A redução de base da entrada entra no ICMS efetivo da saída
 
-**O que se via.** O complemento do enquadramento 1 da Advertising dava
+**O que se via.** O complemento do enquadramento 1 da empresa D dava
 R$ 380 mil contra R$ 148,7 mil da RVZ, e a diferença inteira era a alíquota: o
 sistema confrontava valor × 25% (Grecin) e × 18% (Vagisil), a RVZ usava 13% e
 6%. Nenhum dos dois números tinha fundamento escrito no papel de trabalho dela.
@@ -3690,7 +3741,7 @@ mediana. A Ficha 3 grava `reducao_base` em cada linha, a ficha conta
 `saidas_com_reducao` e o resumo traz `reducao_de_base` com quanto a redução
 tirou do confronto.
 
-**O que muda na Advertising.** Nas 44.469 linhas de saída de enquadramento 1 e
+**O que muda na empresa D.** Nas 44.469 linhas de saída de enquadramento 1 e
 3, o ICMS efetivo cai de R$ 950,2 mil (alíquota cheia) para R$ 463,7 mil, e o
 complemento de R$ 623,1 mil para R$ 139,1 mil — a RVZ apurou R$ 148,8 mil com
 os 13%/6% dela.
@@ -3702,7 +3753,7 @@ por NCM: hoje o sistema só sabe o que a nota de entrada declara.
 
 ## 2026-09-17 — Estoque negativo abre a ficha, em vez de tirá-la do total
 
-**O que se via.** Na Advertising, 6 mercadorias ficavam com saldo negativo em
+**O que se via.** Na empresa D, 6 mercadorias ficavam com saldo negativo em
 algum ponto, e o sistema tirava a ficha inteira do total: R$ 100,7 mil que a RVZ
 apurou ficavam de fora. Em três delas o negativo era de 1 a 3 unidades.
 
@@ -3751,7 +3802,7 @@ cliente tinha 6 linhas cujo retorno da SEFAZ dizia o contrário do nome:
   não conta;
 * o que ficou de fora vai ao log, com a contagem.
 
-**Na Advertising:** a planilha "Canceladas-Devoluções" passa de 425 para 180
+**Na empresa D:** a planilha "Canceladas-Devoluções" passa de 425 para 180
 chaves, e a do cliente de 890 para 885. As devoluções escrituradas voltam à
 movimentação.
 
@@ -3759,7 +3810,7 @@ movimentação.
 
 ## 2026-09-17 — A base da multa sem valor no XML vem da nota vizinha
 
-**A pergunta que estava aberta.** Na Advertising, a saída não escriturada é
+**A pergunta que estava aberta.** Na empresa D, a saída não escriturada é
 quase toda CST x60 em 5.949/6.949, sem ICMS destacado: com a base do XML, a
 multa de 75% dava R$ 32,57. A RVZ aplicou 18% sobre o valor.
 
@@ -3778,7 +3829,7 @@ calcula-se a base da nota apurada. Como ficou:
   mostra de onde veio cada número;
 * sem nota nenhuma do produto com a base, o item fica com base zero, contado.
 
-**Na Advertising:** 2.238 itens de saída sem ICMS, todos com referência — venda
+**Na empresa D:** 2.238 itens de saída sem ICMS, todos com referência — venda
 6.108 do mesmo código, mediana de 0 dia de distância e máximo de 7. ICMS das
 saídas R$ 50.643,67, multa R$ 37.985,16 (a RVZ: ICMS R$ 69.962,86 a 18% sobre o
 valor, multa R$ 52.472,14 antes da SELIC). Entradas: todas com valor no XML,
@@ -3786,9 +3837,9 @@ multa R$ 89.463,60.
 
 ---
 
-## 2026-09-17 — O de-para da Advertising pelo sistema, contra o da RVZ
+## 2026-09-17 — O de-para da empresa D pelo sistema, contra o da RVZ
 
-**Como se testou.** A Advertising entrou no sistema como um trabalho de verdade
+**Como se testou.** A empresa D entrou no sistema como um trabalho de verdade
 (trabalho 5, 0004-21, 08/2022 a 06/2024), pela API: EFD de
 `10 - RETIFICAÇÃO SPEDS/SPEDS` (decisão do Victor; os 24 arquivos são os de
 `01 - SPEDS` com a retificadora de 08/2022 — 23 deles dizem "original" no 0000,
@@ -3818,14 +3869,14 @@ e não propunha nada a mais. Faltavam 9:
 
 **Depois:** os 44 pares da RVZ iguais, os 10 do cliente como "sem par" (códigos
 de marketplace sem GTIN nem parentesco de código — é o que o cliente preenche)
-e nenhuma proposta a mais. No Amigão, as propostas não mudaram (2 antes e depois).
+e nenhuma proposta a mais. Na empresa V, as propostas não mudaram (2 antes e depois).
 
 ---
 
 ## 2026-09-17 — Certificado digital não se abre nem se lista
 
 **O risco.** A inspeção do lote lê o começo de todo arquivo da pasta e grava o
-nome de cada um. A pasta da Advertising tem `05 - CERTIFICADO` e
+nome de cada um. A pasta da empresa D tem `05 - CERTIFICADO` e
 `10 - RETIFICAÇÃO SPEDS/CERTIFICADOS`, com o A1 do cliente em .pfx — e o nome
 do arquivo carrega a senha. Apontar a raiz da pasta levaria o certificado para
 a leitura e o nome para o banco. Nenhum lote gravou certificado até aqui
@@ -3843,7 +3894,7 @@ a leitura e o nome para o banco. Nenhum lote gravou certificado até aqui
 * a pasta escolhida que é de certificado, ou está dentro de uma, é recusada;
 * fica só a contagem, num aviso da inspeção, e no log sem nome.
 
-**Medido na Advertising:** inspecionar a raiz inteira classificou 1.098
+**Medido na empresa D:** inspecionar a raiz inteira classificou 1.098
 arquivos em 18 s, nenhum de caminho de certificado, e avisou das 2 pastas.
 
 ---
@@ -3851,7 +3902,7 @@ arquivos em 18 s, nenhum de caminho de certificado, e avisou das 2 pastas.
 ## 2026-09-16 — A mesma nota em vários XML, a nota denegada e o lote que muda de tipo
 
 **A pergunta do Victor:** como a v0.54 trata a duplicidade de XML, no caso de
-reimportar a pasta de um lote antigo. Medido na Advertising, três coisas.
+reimportar a pasta de um lote antigo. Medido na empresa D, três coisas.
 
 **1. Reimportar não reclassificava.** Arquivo com o caminho já no trabalho era
 "já importado" e ficava com o tipo de quando entrou: o zip de 2026-09-15
@@ -3861,12 +3912,12 @@ onde está o arquivo cujo tipo mudou — sem lote novo, sem remover o lote antig
 Remover e importar de novo continua possível, mas não é mais o caminho.
 
 **2. Nota denegada.** O sistema não olhava o `cStat` do protocolo. Na
-Advertising, 16 notas com uso denegado (301/302); 15 entraram na contingência
+empresa D, 16 notas com uso denegado (301/302); 15 entraram na contingência
 (R$ 130,83 de multa) e contavam como documento entregue na conferência. Agora
 só 100 e 150 autorizam; a denegada sai das etapas 2 e 3 com todas as cópias,
 contada e avisada. O XML sem protocolo (do ERP) e o CF-e continuam valendo.
 
-**3. Cópias da mesma chave.** Das 179.417 XML que o lote da Advertising deixa
+**3. Cópias da mesma chave.** Das 179.417 XML que o lote da empresa D deixa
 entrar (os 12 zips idênticos já ficam de fora pelo hash), 28.407 chaves estão em
 mais de um arquivo: 29.306 arquivos a mais. Em 22.726 os bytes diferem — só a
 declaração `<?xml ...?>` — e nenhuma cópia diverge no que se lê. Mesmo assim, a
@@ -3876,7 +3927,7 @@ fluxo, então a cópia melhor que chega depois é gravada também, com `leitura`
 maior, e uma passada no fim deixa uma por chave — só quando houve troca ou nota
 denegada. A etapa 2, que descartava a repetida sem dizer, agora conta.
 
-**Na Advertising, depois da regra:** etapa 2 em 19,7 s, 119.714 chaves (as 16
+**Na empresa D, depois da regra:** etapa 2 em 19,7 s, 119.714 chaves (as 16
 denegadas fora), 29.306 repetidos; etapa 3 em 96 s, 119.713 notas e 132.446
 itens, nenhuma cópia trocada (todas tinham protocolo).
 
@@ -3884,7 +3935,7 @@ itens, nenhuma cópia trocada (todas tinham protocolo).
 
 ## 2026-09-16 — XML dentro de zip, sem extrair
 
-**O caso.** A Advertising entregou 357.948 XML em 26 zips — e 290 mil deles em
+**O caso.** A empresa D entregou 357.948 XML em 26 zips — e 290 mil deles em
 60 zips dentro dos zips, gravados sem compressão, de até 201 MB. Até aqui o lote
 marcava tudo como `compactado` e nenhuma etapa lia. Extrair para ler foi medido
 na validação e custou mais que ler: o antivírus examina cada arquivo que nasce.
@@ -3903,7 +3954,7 @@ e CNPJ por nota na tela do lote, mas multiplicaria as linhas do banco pelo
 número de notas (357 mil numa empresa) para uma informação que a conferência já
 dá.
 
-**Medido na Advertising:** classificar os 26 zips, 7,6 s; contar os XML, 3,2 s;
+**Medido na empresa D:** classificar os 26 zips, 7,6 s; contar os XML, 3,2 s;
 a leitura da etapa 2, 33 s, com 119.730 chaves — as mesmas 119.729 da leitura
 completa feita antes, mais uma nota sem item. Dois zips cuja amostra caiu num
 evento ficaram sem CNPJ na primeira versão; agora a amostra prefere nota, e o
@@ -3915,7 +3966,7 @@ evento de cancelamento de CT-e (também 110111, mas com `<chCTe>`) não conta.
 
 **O que é.** Nota não escriturada não entra na ficha, mas o fisco que a achar
 fora da EFD cobra multa, e o cliente precisa do número para decidir se
-retifica. A RVZ calculou na Advertising; aqui sai na etapa 3, que é onde o XML
+retifica. A RVZ calculou na empresa D; aqui sai na etapa 3, que é onde o XML
 é lido por inteiro, em `contingencia.parquet` (um item por linha), no resumo e
 numa planilha.
 
@@ -3931,7 +3982,7 @@ colegas do Victor). Infração do art. 215 do RICMS/SP:
 * entrada — art. 527, V, "a": 10% do valor do item;
 * saída — art. 527, I, "b": 75% do ICMS **destacado no XML**.
 
-**Na Advertising.** Entradas: 19.432 notas, R$ 908.908,64, multa
+**Na empresa D.** Entradas: 19.432 notas, R$ 908.908,64, multa
 R$ 90.893,31 — a RVZ chegou a R$ 902.270,47 de valor e R$ 90.227,05 de multa
 antes da SELIC. Saídas: 1.740 notas, R$ 388.760,93 de valor, mas só R$ 43,40 de
 ICMS destacado (quase tudo CST x60 em CFOP 5.949/6.949), multa R$ 32,57. A RVZ
@@ -3968,7 +4019,7 @@ documentos que a EFD trazia e movimentos que saíram, com aviso de que a EFD ped
 retificação. O documento fica em `documentos.parquet` — é a escrituração como
 veio.
 
-**Na Advertising.** As duas listas da pasta (a extraída pela RVZ e a do cliente)
+**Na empresa D.** As duas listas da pasta (a extraída pela RVZ e a do cliente)
 dão 1.011 chaves; 911 estão na EFD, 814 já como canceladas e **97 como
 regulares** — 101 movimentos de saída, R$ 9.968,61, que agora saem.
 
@@ -3979,7 +4030,7 @@ pasta precisa ser inspecionada de novo para virar `xml_cancelamento`.
 
 ## 2026-09-16 — O motor abre processos de verdade
 
-**O que se viu.** A primeira rodada da v0.53 no Amigão (#57) correu dentro do
+**O que se viu.** A primeira rodada da v0.53 na empresa V (#57) correu dentro do
 servidor do motor, sem processo filho. A checagem `_processos_viaveis()` exigia
 que o `__main__` tivesse arquivo ou nome de módulo — e o servidor do uvicorn nasce
 de um `spawn`, com um `__main__` que não tem nenhum dos dois. O motor caía no
@@ -3996,26 +4047,26 @@ de `spawn`, um pool — que é exatamente o que o motor faz.
 
 ## 2026-09-16 — Sufixo só entre descrições compatíveis
 
-Na primeira chamada do de-para sobre o Amigão (97 s, 72 estabelecimentos), o sufixo
+Na primeira chamada do de-para sobre a empresa V (97 s, 72 estabelecimentos), o sufixo
 propôs `1024078 → 102407` com "sufixo 8, repetido em 4 pares": num catálogo
 numérico grande, código + um dígito coincide por acaso. O sufixo passa a valer
 só entre pares de descrição compatível, e a repetição conta só esses pares. Na
-Advertising, 41 pares em vez de 46 — os kits seguem ligados pela regra do kit — e
+empresa D, 41 pares em vez de 46 — os kits seguem ligados pela regra do kit — e
 o ressarcimento de R$ 274.950,74 para R$ 274.878,90.
 
 ---
 
-## 2026-09-16 — O que a CAT 42 da Advertising ensinou: XML, de-para, art. 271 e X.949
+## 2026-09-16 — O que a CAT 42 da empresa D ensinou: XML, de-para, art. 271 e X.949
 
-**De onde veio.** A CAT 42 que a RVZ entregou para a Advertising Operations
+**De onde veio.** A CAT 42 que a RVZ entregou para a empresa D
 (43.112.531/0004-21, 08/2022 a 06/2024, R$ 406.362,34) foi comparada com o que
 o sistema faria. **Decisões do Victor:** corrigir tudo, nesta ordem — itens do
 XML, de-para automático com revisão na tela, enquadramento 4 com o art. 271,
 X.949 fora da ficha — e validar rodando a base deles.
 
 **1. O item do XML.** A EFD deles tem 92.928 NF-e de saída sem C170: sem ler o
-XML, o sistema não teria saída nenhuma — o mesmo buraco das lojas de SP do
-Amigão. A etapa 3 passou a ler o item de NF-e, NFC-e e CF-e: completa o
+XML, o sistema não teria saída nenhuma — o mesmo buraco das lojas de SP da
+empresa V. A etapa 3 passou a ler o item de NF-e, NFC-e e CF-e: completa o
 documento escriturado sem item e fica ao lado do C170 que existe, com os
 valores do XML vencendo na etapa 4. O que a base real mostrou, e virou regra:
 
@@ -4026,7 +4077,7 @@ valores do XML vencendo na etapa 4. O que a base real mostrou, e virou regra:
 | C170 com o custo (ST e IPI embutidos) e XML com a mercadoria: nenhum item casava pelo valor | casa pelo número do item com quantidade ou valor; contagem só em nota de um item |
 | 44.781 NF-e de venda a pessoa física sem enquadramento | `indFinal` do XML diz consumidor final (1) ou não (0) |
 
-Resultado na Advertising: 92.723 das 93.599 saídas completadas; 211 de 215 C170
+Resultado na empresa D: 92.723 das 93.599 saídas completadas; 211 de 215 C170
 com o XML ao lado; ICMS suportado das entradas de R$ 0 para R$ 1.248.698,47,
 tudo destacado no documento; 2 XML ilegíveis de 357.950 arquivos.
 
@@ -4040,7 +4091,7 @@ tinha no `1114` o GTIN do `1050`, e o GTIN sozinho juntava seis produtos); fator
 em conflito derruba a confiança. O par é da empresa (`depara_item`), gravado
 pela API; o razão aplica só os aprovados e guarda `codigo_original`. O que não
 casa vai numa planilha para o cliente — como a RVZ fez com os 10 códigos de
-marketplace. Na Advertising: 46 pares propostos, todos de confiança alta; 10
+marketplace. Na empresa D: 46 pares propostos, todos de confiança alta; 10
 códigos sem par, os mesmos que o cliente preencheu para a RVZ.
 
 **3. Enquadramentos 2 e 4 e o art. 271.** A coluna 21 é o ICMS próprio das
@@ -4049,7 +4100,7 @@ abertura). Ressarcimento = suportado baixado − coluna 21; no enquadramento 4, 
 coluna 21 é também o crédito do art. 271 (coluna 27), que a apuração soma e o
 arquivo digital leva no VL_CONFR. Conferido com a Ficha 3 da RVZ: 2,15 de
 suportado, 0,63 da entrada, 1,52 de ressarcimento e 0,63 de crédito. Na
-Advertising, 57.440 saídas confrontadas e nenhuma pendente.
+empresa D, 57.440 saídas confrontadas e nenhuma pendente.
 
 **4. X.949 fora da ficha.** Remessa e retorno (armazém, depósito) não são compra
 nem venda: saem da ficha e ficam contados, como o uso e consumo.
@@ -4060,7 +4111,7 @@ contra R$ 160.557,57; complemento: R$ 178.109,69 contra R$ 148.770,53. A
 diferença está nas 6 fichas que ficaram negativas e fora do total: a RVZ incluiu
 na CAT notas de entrada não escrituradas ("PRESENTES NA CAT 42" na planilha
 dela), e o sistema as deixa de fora. **Decisão do Victor (16/09/2026): continua
-de fora.** Incluí-las foi pedido particular da Advertising na época, não regra do
+de fora.** Incluí-las foi pedido particular da empresa D na época, não regra do
 trabalho; nota não escriturada segue na lista da conferência, para cobrar.
 
 **Sem SELIC (decisão do Victor, 16/09/2026).** A RVZ atualizou a contingência das
@@ -4078,7 +4129,7 @@ certificado de cliente no sistema.
 
 ## 2026-09-16 — A rodada num processo próprio, e o índice sem `mode()`
 
-**O que caiu.** A etapa 4 do Amigão falhou duas vezes por falta de memória
+**O que caiu.** A etapa 4 da empresa V falhou duas vezes por falta de memória
 (#55 e #56), com o motor chegando a 16 GB. Medido fase a fase, com trava de 8 GB:
 ler 20 GB de relatórios chega a 2,8 GB e devolve; percorrer 8,7 milhões de
 itens, 3,9 GB (o teto do DuckDB); o agrupamento por documento passava de 8 GB
@@ -4095,15 +4146,15 @@ vez de derrubar o motor. `CAT_RODADAS_EM_PROCESSO=false` volta ao que era.
 
 ## 2026-09-16 — Base grande: CSV pelo DuckDB e arquivos digitais em paralelo
 
-**CSV.** A Ficha 3 de uma loja do Amigão (1,17 milhão de linhas) levava 60 s
+**CSV.** A Ficha 3 de uma loja da empresa V (1,17 milhão de linhas) levava 60 s
 para virar CSV, escrita linha a linha pelo módulo `csv`; o dossiê de uma base
-do tamanho da BOA faz uma por filial. Agora o DuckDB escreve o corpo e o Python
+do tamanho da empresa T faz uma por filial. Agora o DuckDB escreve o corpo e o Python
 só o cabeçalho com o BOM. Os bytes são os mesmos — `;`, aspas só onde precisa,
 CRLF, vírgula decimal, `Sim`/`Não` —, e um teste compara as duas escritas para
 que não divirjam.
 
 **Arquivos digitais.** Escrever e pré-validar um arquivo é Python puro e não
-depende dos outros: num perfil de 12 arquivos do Amigão, 48% do tempo era
+depende dos outros: num perfil de 12 arquivos da empresa V, 48% do tempo era
 pré-validação e 40% escrita. A etapa 7 passa a separar em disco, por
 estabelecimento e mês, o que cada arquivo lê, e cada processo filho monta o
 seu; os 12 arquivos caíram de 15,8 s para 7,9 s com o mesmo SHA-256. A
@@ -4111,13 +4162,13 @@ pré-validação dos arquivos do cliente segue a mesma ideia: o processo princip
 lê só a primeira linha de cada arquivo e decide ali o que é repetido,
 substituição e nome; a leitura inteira vai a um filho, e os totais são somados
 no fim, só com os arquivos que valem. O zip aninhado fica no disco até o fim,
-porque um filho pode estar lendo dele. Sessenta prévias do Amigão, metade soltas e metade
+porque um filho pode estar lendo dele. Sessenta prévias da empresa V, metade soltas e metade
 num zip: 41,2 s com um processo, 10,0 s com seis, o mesmo resumo e as mesmas
 linhas.
 
 Quantos processos: `CAT_PROCESSOS_DO_ARQUIVO_DIGITAL`, e 0 escolhe núcleos
 menos 4, entre 1 e 4, para deixar folga à API e ao Postgres — o teto é pela
-memória: cada filho pode passar de 1 GB, e a apuração do suportado do Amigão
+memória: cada filho pode passar de 1 GB, e a apuração do suportado da empresa V
 (#55) falhou por falta de memória com a máquina em 4 GB livres. Com 1 nada muda do
 que era. Os testes rodam as duas formas e exigem o mesmo resultado. Quando o
 módulo principal não se reimporta num processo novo (script lido da entrada
@@ -4142,9 +4193,9 @@ que vem depois é só repetido. Entre dois iguais, segue valendo o primeiro.
 
 ---
 
-## 2026-09-16 — Abertura pelas entradas anteriores, uso e consumo fora da ficha, 5929 como a BOA
+## 2026-09-16 — Abertura pelas entradas anteriores, uso e consumo fora da ficha, 5929 como a empresa T
 
-**Abertura sem imposto.** O inventário do Amigão veio sem ICMS em 842 mil
+**Abertura sem imposto.** O inventário da empresa V veio sem ICMS em 842 mil
 linhas, e a abertura entrava com valor zero em 400.984 fichas — o complemento
 saía inflado e a devolução de compra deixava ICMS negativo. O manual não diz
 como valorar a abertura; diz, no item 3.3.8, como achar o valor quando não se
@@ -4158,23 +4209,23 @@ entradas até o dia do inventário.
 - Quando as entradas não alcançam a quantidade, o resto vai pela média delas, e a
   ficha fica marcada `abertura_parcial`. Sem entrada nenhuma, zero e marcada.
 - O período do razão passou a ser o do **cadastro do trabalho**. O que a base tem
-  antes dele não entra na ficha: serve para valorar a abertura. Para valer no
-  Amigão, é preciso importar as EFD de antes de 01/2021.
+  antes dele não entra na ficha: serve para valorar a abertura. Para valer na
+  empresa V, é preciso importar as EFD de antes de 01/2021.
 - A etapa 6 abre o 1050 do primeiro mês com esse ICMS, e não mais com zero.
 
 **Uso e consumo.** 1.407, 1.556, 1.557, os 2.xxx e as saídas 5/6.556 e 5/6.557
 não são estoque de comercialização. **Decisão do Victor:** saem da ficha e ficam
-contadas (`fora_da_ficha.uso_e_consumo`). No Amigão eram 366 entradas.
+contadas (`fora_da_ficha.uso_e_consumo`). Na empresa V eram 366 entradas.
 
 **CFOP 5.929** (NF-e de venda já registrada em cupom). **Decisão do Victor:** fica
-como a BOA transmitiu e a SEFAZ aceitou — saída comum, enquadramento 0. Só
-documentado; no Amigão não há nenhuma linha.
+como a empresa T transmitiu e a SEFAZ aceitou — saída comum, enquadramento 0. Só
+documentado; na empresa V não há nenhuma linha.
 
 ---
 
 ## 2026-09-16 — Uma pendência por problema, com a medida de cada etapa
 
-**O que a entrega do Amigão mostrou.** 26 pendências, e várias eram o mesmo
+**O que a entrega da empresa V mostrou.** 26 pendências, e várias eram o mesmo
 problema contado de novo: o confronto pendente dos enquadramentos 2 e 4 aparecia
 como linhas no razão, competências na apuração, arquivos na etapa 7 e
 ocorrências de VL_CONFR na pré-validação. O revisor lia quatro problemas onde
@@ -4192,7 +4243,7 @@ unidade somam. O relatório ganhou a coluna «Como cada etapa viu». No piloto,
 
 ## 2026-09-16 — O cadastro do trabalho muda, e a base fora do período aparece
 
-**O que o piloto mostrou.** O trabalho do Amigão nasceu como "Ressarcimento ST
+**O que o piloto mostrou.** O trabalho da empresa V nasceu como "Ressarcimento ST
 2025", de 01/2025 a 12/2025, e as 884 EFD importadas eram todas de 2021. Nada
 avisava: a importação aceita a base, e não havia como corrigir o cadastro sem
 ir ao banco.
@@ -4204,7 +4255,7 @@ Nada mudando é recusa, não evento vazio.
 
 **E a divergência passa a aparecer.** O detalhe do trabalho diz de quando é a
 base e quantas EFD caem fora do período (comparando o mês, não o dia gravado).
-A tela avisa e oferece a edição. No Amigão, antes do recadastro: 884 de 884
+A tela avisa e oferece a edição. Na empresa V, antes do recadastro: 884 de 884
 fora; depois: nenhuma.
 
 ---
@@ -4247,7 +4298,7 @@ depois dela, trabalho parado.
 **Recusa antes da fila** a entrega de um arquivo digital feito sobre apuração
 velha: o pacote levaria números que a etapa 6 já não mostra.
 
-**Piloto (execução 52, Amigão).** 0,9 s. 775 competências no relatório — 234
+**Piloto (execução 52, empresa V).** 0,9 s. 775 competências no relatório — 234
 prévias de SP e 541 fora de SP —, nenhum estabelecimento no dossiê, 26
 pendências (16 travam, 7 pedem atenção, 3 informam). O pacote leva o relatório
 e o manifesto. Dois acertos que o piloto mostrou: o relatório passou a dizer o
@@ -4258,32 +4309,32 @@ R$ 66.681,15 somando as competências).
 
 **O que fica para a lapidação.** O Victor, como dev, não aprova — a entrega do
 piloto espera um gestor; a Ficha 3 do dossiê em CSV pode levar minutos numa
-base do tamanho da BOA; e o `PLANEJAMENTO.md` ainda descreve o roteiro antigo.
+base do tamanho da empresa T; e o `PLANEJAMENTO.md` ainda descreve o roteiro antigo.
 
 ---
 
 ## 2026-09-16 — Revisão da etapa 7: o que se conferiu e o que se corrigiu
 
-**Como se conferiu.** Sete arquivos CAT 42 que a SEFAZ aceitou da IRMAOS BOA
+**Como se conferiu.** Sete arquivos CAT 42 que a SEFAZ aceitou da empresa T
 (2021 a 2024) medidos registro a registro contra o gerador, e a Ficha 3, os
-saldos e as 234 prévias do piloto do Amigão (execuções 48 a 50) lidos de volta.
-O gerador já fazia igual à BOA no que decide o arquivo: CRLF e Latin-1; 1050
+saldos e as 234 prévias do piloto da empresa V (execuções 48 a 50) lidos de volta.
+O gerador já fazia igual à empresa T no que decide o arquivo: CRLF e Latin-1; 1050
 só de item movimentado no mês (nos sete arquivos, nenhum 1050 sem 1100); 0150
 com os fornecedores das NF-e e o próprio estabelecimento; todos os CFOPs de
 devolução que aparecem lá (1202, 1411, 5202, 5411, 6411) no conjunto de
-devoluções; na Ficha 3 do Amigão de SP, nenhuma quantidade com mais de 3 casas,
+devoluções; na Ficha 3 da empresa V de SP, nenhuma quantidade com mais de 3 casas,
 nenhum nº de item acima de 999 e nenhuma linha repetida.
 
 **O que se corrigiu.**
 
 | Defeito | Onde pesava | Correção |
 |---|---|---|
-| A alíquota do confronto (enq. 1 e 3) era a do cadastro do **fim do período** | 23.065 itens do Amigão mudam de alíquota em 2021 (12% → 13,3% em fevereiro): a venda de janeiro confrontava com a de dezembro, e o VL_CONFR ia errado para o arquivo | razão usa a alíquota do 0200 do **mês da saída**; a mais recente só onde o mês não traz. Resumo conta `saidas_com_aliquota_do_mes` |
+| A alíquota do confronto (enq. 1 e 3) era a do cadastro do **fim do período** | 23.065 itens da empresa V mudam de alíquota em 2021 (12% → 13,3% em fevereiro): a venda de janeiro confrontava com a de dezembro, e o VL_CONFR ia errado para o arquivo | razão usa a alíquota do 0200 do **mês da saída**; a mais recente só onde o mês não traz. Resumo conta `saidas_com_aliquota_do_mes` |
 | O 0200 do arquivo de janeiro saía com descrição e alíquota de dezembro | o manual pede a última ocorrência **do período**, que é o mês | 0200 do `itens_da_efd` do mês, campo a campo; a **unidade** fica a mais recente, que é a da ficha convertida (mudar de unidade no meio quebraria o saldo) |
-| A data do movimento era a **emissão** (DT_DOC) | 5,55% das entradas do Amigão entraram em mês diferente do emitido: custo médio deslocado e DATA do 1100 fora do mês | a movimentação usa a data de entrada/saída (DT_E_S); a emissão só quando a EFD não a informa. A conferência com o XML continua pela emissão |
+| A data do movimento era a **emissão** (DT_DOC) | 5,55% das entradas da empresa V entraram em mês diferente do emitido: custo médio deslocado e DATA do 1100 fora do mês | a movimentação usa a data de entrada/saída (DT_E_S); a emissão só quando a EFD não a informa. A conferência com o XML continua pela emissão |
 | O 0150 só olhava a EFD do mês | 127 das 234 prévias travavam: a nota escriturada em outro mês cita participante que só está no 0150 de outro mês | procura na EFD do mês e, sem ele, na mais recente do estabelecimento |
-| ICMS negativo com estoque positivo caía na trava "saldo negativo", com texto de ficha retirada | 813 saldos de fichas válidas do Amigão: devolução de compra sobre abertura sem ICMS (item 3.3.8) | trava própria, `valor_negativo`, com o que fazer certo |
-| Entrada sem ICMS suportado ia como `0,00` sem ninguém saber | 95.904 entradas de SP do Amigão (7%) | contada por arquivo e no resumo (`entradas_sem_icms`), com aviso no log e na tela. Não trava: zero pode ser verdade |
+| ICMS negativo com estoque positivo caía na trava "saldo negativo", com texto de ficha retirada | 813 saldos de fichas válidas da empresa V: devolução de compra sobre abertura sem ICMS (item 3.3.8) | trava própria, `valor_negativo`, com o que fazer certo |
+| Entrada sem ICMS suportado ia como `0,00` sem ninguém saber | 95.904 entradas de SP da empresa V (7%) | contada por arquivo e no resumo (`entradas_sem_icms`), com aviso no log e na tela. Não trava: zero pode ser verdade |
 | Falha no meio de um arquivo deixava `.corpo`/`.cabeca` na pasta | — | rascunhos apagados, com log |
 | O recorte por trava usava `LIKE`, em que `_` casa qualquer letra | — | código inteiro |
 | Pré-validação do cliente: dois arquivos com o mesmo nome misturavam as ocorrências | outra ferramenta pode chamar todo mês de `CAT42.txt` | o segundo ganha `(<CNPJ> <aaaa-mm>)` no nome |
@@ -4300,13 +4351,13 @@ das lojas do PR e do MS. Seguem as 234 prévias, todas por `nao_apta` da etapa
 6; 12 com `confronto_pendente` (as 393 transferências 6409, enquadramento 4) e
 10 com `saldo_negativo`.
 
-**Para valer por inteiro no Amigão**, as etapas 3 a 6 rodam de novo: a data de
+**Para valer por inteiro na empresa V**, as etapas 3 a 6 rodam de novo: a data de
 entrada muda a movimentação, e a alíquota do mês muda o razão.
 
 **O que continua aberto.** O 1200 sai sem SER (a série é lida no C100 e não
 chega à movimentação); ECF_FAB, 0205 e o fato gerador sem documento (CHV 0,
 item 999); entre dois arquivos do cliente do mesmo mês, vale o primeiro lido, e
-não a substituição (COD_FIN 02); na Ficha 3 do Amigão entram entradas de uso e
+não a substituição (COD_FIN 02); na Ficha 3 da empresa V entram entradas de uso e
 consumo (1407, 1556, 2556, 2557 — 91 linhas) e o 5929 (lançamento de cupom
 também registrado em ECF) não é tratado como duplicidade; a abertura sem ICMS
 (item 3.3.8) segue sendo a causa do complemento inflado e do ICMS negativo.
@@ -4316,8 +4367,8 @@ também registrado em ECF) não é tratado como duplicidade; a abertura sem ICMS
 ## 2026-09-16 — Pré-validar o que o cliente já transmitiu
 
 **Decisão do Victor.** A pré-validação da etapa 7 vale **também para o arquivo
-que o cliente gerou com outra ferramenta** — a auditoria da BOA e da Casa
-Avenida, que já entregam a CAT 42.
+que o cliente gerou com outra ferramenta** — a auditoria da empresa T e da empresa X,
+que já entregam a CAT 42.
 
 **Fora do roteiro.** Não depende de etapa nenhuma e não entra na conta de
 etapas concluídas: trabalho de auditoria pode nem ter EFD, só os TXT. A tela do
@@ -4332,7 +4383,7 @@ da execução, que é apagado no fim.
 
 **O que só se vê com o conjunto.** Arquivo de outra raiz de CNPJ fica de fora e
 contado. O mesmo estabelecimento e mês visto duas vezes (o zip que é cópia de
-outro, na BOA) fica listado como repetido, sem ler de novo. E o saldo inicial
+outro, na empresa T) fica listado como repetido, sem ler de novo. E o saldo inicial
 de cada item tem de ser o final da **última competência em que o item
 apareceu** — não do mês anterior, porque o 1050 só traz item com movimento. Se
 não é, falta arquivo no meio ou o estoque foi ajustado por fora: aviso, com as
@@ -4347,17 +4398,17 @@ prévia** (PREVIA no nome, zip separado), em vez de não gerar nada; e a
 pré-validação vale **também para arquivo que o cliente já transmitiu** (vem na
 próxima entrega).
 
-**O formato foi medido antes de escrito.** Três arquivos reais da BOA (24, 33 e
+**O formato foi medido antes de escrito.** Três arquivos reais da empresa T (24, 33 e
 77 MB) confirmaram o leiaute e resolveram o que o manual deixa em aberto: a
 linha não começa com `|` e só termina com `|` quando o último campo é vazio;
 CRLF; quantidade com 3 casas e valor com 2, sempre; nº do item com 3 dígitos;
 país `1058`; todo item do 0200 tem 1050. O nome dos arquivos
-(`CAT5_SP_<CNPJ>_<M>_<AAAA>.txt`, mês sem zero) é o que a BOA usou.
+(`CAT5_SP_<CNPJ>_<M>_<AAAA>.txt`, mês sem zero) é o que a empresa T usou.
 
 **A pré-validação recompõe a Ficha 3 a partir do próprio arquivo** — é o que o
 Pós-Validador faz. Lendo só o 1050 inicial e o 1100, o mesmo `RazaoDoItem` do
 sistema chegou ao 1050 final em **100% das quantidades** e em 99,99% dos
-valores a até 5 centavos, nos arquivos da BOA. Daí as severidades: quantidade
+valores a até 5 centavos, nos arquivos da empresa T. Daí as severidades: quantidade
 que não fecha é **erro**; valor fora de 5 centavos é **aviso**, com a
 diferença dita.
 
@@ -4365,7 +4416,7 @@ diferença dita.
 pré-validação não acusa erro nenhum (875.789 linhas em 25 s o maior). Duas
 coisas viraram aviso por isso: item de nota com **dois códigos** (3 casos num
 arquivo aceito — kit desmembrado, provavelmente) e saldo em valor de item
-zerado em que a BOA guardou resíduo (R$ 6,27 e R$ 29,60).
+zerado em que a empresa T guardou resíduo (R$ 6,27 e R$ 29,60).
 
 **Envio só com tudo limpo.** Vai para `envio/` a competência apta na etapa 6,
 sem trava de escrita e sem erro lendo o arquivo de volta do disco. As travas
@@ -4401,7 +4452,7 @@ escritura EFD) e o fato gerador presumido sem documento (CHV 0, item 999).
 ## 2026-09-16 — A venda a consumidor final é escolha do trabalho
 
 **O que o arquivo real mostrou.** Antes de escrever o gerador da etapa 7, três
-arquivos CAT 42 que a IRMAOS BOA transmitiu (2022 a 2024, de 24 a 77 MB) foram
+arquivos CAT 42 que a empresa T transmitiu (2022 a 2024, de 24 a 77 MB) foram
 medidos registro a registro. O formato bate com o leiaute. O enquadramento,
 não: a venda de cupom (CF-e SAT, CFOP 5.405) vai com **COD_LEGAL 0**, no
 arquivo e na Ficha 3 (coluna `ENQ0_DEMAIS_SAIDAS`). Só a perda (5.927) entra
@@ -4414,12 +4465,12 @@ no enquadramento 2, com valor de confronto. Não há complemento.
 | 1.411 devolução de venda | 0 | vazio |
 
 O sistema punha o cupom no **1**, pelo modelo do documento (decisão de
-14/09/2026), que é o que o manual diz. No piloto do Amigão, o R$ 1,53 milhão de
+14/09/2026), que é o que o manual diz. No piloto da empresa V, o R$ 1,53 milhão de
 complemento vem inteiro desse enquadramento.
 
 **Decisão do Victor.** A escolha é **por trabalho**: `projeto.venda_a_consumidor`
 vale `enquadramento_1` (o manual: ressarcimento e complemento) ou
-`demais_saidas` (como a BOA: só a perda e a interestadual geram ressarcimento).
+`demais_saidas` (como a empresa T: só a perda e a interestadual geram ressarcimento).
 Todo trabalho existente ficou no enquadramento 1, que é como o razão já vinha
 montando.
 
@@ -4468,7 +4519,7 @@ R$ 1.534.323,19 de complemento — e **nenhuma competência apta**.
 | **SP** | **22** | **234** | **R$ 0,00** |
 | MS | 2 | 24 | R$ 66.681,15 |
 
-O que o quadro diz, e que nenhuma tela dizia antes: **o Amigão tem 22
+O que o quadro diz, e que nenhuma tela dizia antes: **a empresa V tem 22
 estabelecimentos em São Paulo, e todo o valor apurado é de lojas do Mato Grosso
 do Sul**, que não entram na CAT 42. As 234 competências paulistas têm entrada e
 não têm saída — o relatório de saídas que o download entregou é das lojas MS e
@@ -4489,7 +4540,7 @@ Nada é recalculado: vem da coluna de saldo da própria Ficha 3.
 
 ## 2026-09-15 — Ficha com estoque negativo sai do total até os dados chegarem
 
-**O que o piloto mostrou.** Primeira montagem do razão sobre o Amigão
+**O que o piloto mostrou.** Primeira montagem do razão sobre a empresa V
 (execução 45: lojas MS e CD 003 PR, saídas de jan–mar/2021): R$ 584,7 milhões
 de "ressarcimento" — mais que todo o ICMS suportado das entradas do ano. **99,99%
 vinham de 4.037 fichas cujo estoque ficou negativo.** Com saldo perto de zero
@@ -4503,7 +4554,7 @@ subestimado, porque a abertura entra sem ICMS.
 **Por que acontece.** Estoque negativo é movimento que falta: perdas do CFOP
 5.927 (relatório à parte), meses e lojas do relatório de saídas que falharam
 no download, produção e desmontagem. A regra do domínio foi conferida contra
-dados completos (BOA) e não tem o que fazer com saída que o estoque não
+dados completos (empresa T) e não tem o que fazer com saída que o estoque não
 explica.
 
 **Decisão do Victor.** Entre usar o custo das entradas mais recentes (item
@@ -4552,7 +4603,7 @@ repete), e o razão converte entrada, saída da EFD e inventário.
 e não há 0220, a quantidade fica como veio e a linha é marcada
 (`unidade_sem_fator`). É pendência visível, não conversão inventada.
 
-**O que o Amigão mostrou, e por que isso importa.**
+**O que a empresa V mostrou, e por que isso importa.**
 
 | Medida | Resultado |
 |---|---|
@@ -4560,7 +4611,7 @@ e não há 0220, a quantidade fica como veio e a linha é marcada
 | Entradas com rótulo diferente do cadastro | 56.986 de 8.761.002 (0,65%); UN→CX 31.799, CX→FD 14.446 |
 | Quantidade da EFD = "Qtde;Unitária" do relatório, 05/2021 | **100%**, em todos os pares de unidade — inclusive rótulo CX com 2.500 unidades |
 
-Ou seja: no Amigão a quantidade da EFD **já vem na unidade básica**, e o rótulo
+Ou seja: na empresa V a quantidade da EFD **já vem na unidade básica**, e o rótulo
 CX/FD é o nome da embalagem no ERP. Converter pelo rótulo teria multiplicado
 errado. A regra "sem 0220 fica como veio" é, aqui, também a certa.
 
@@ -4583,7 +4634,7 @@ conversão. A conferência passa a mostrar isso ficha a ficha.
 ## 2026-09-15 — Etapa 5: o razão dos itens, e de onde vem a saída
 
 **O obstáculo que decidiu o desenho.** O razão baixa da ficha cada saída de
-cada mercadoria. No Amigão, 36,5 milhões de documentos de saída (R$ 5,8
+cada mercadoria. Na empresa V, 36,5 milhões de documentos de saída (R$ 5,8
 bilhões) **não têm item na EFD**: NFC-e e CF-e SAT vão à escrituração só com o
 analítico por CST e CFOP. Com item, a EFD traz R$ 6 milhões de saída. Sem outra
 fonte não há ficha.
@@ -4610,7 +4661,7 @@ PDV, que traz a própria loja ("005" → 11.517.841/0034-55 pelas duas). Linha q
 nenhuma pista alcança fica contada, não suposta.
 
 **O cálculo é o do domínio, linha a linha.** O mesmo `RazaoDoItem` conferido
-contra a Ficha 3 da BOA. O SQL junta, filtra e ordena; não calcula.
+contra a Ficha 3 da empresa T. O SQL junta, filtra e ordena; não calcula.
 
 | Parte | De onde | Estado no piloto |
 |---|---|---|
@@ -4643,7 +4694,7 @@ etapas canceláveis mora ali.
 
 ## 2026-09-15 — A primeira rodada real da etapa 4, e o que ela mostrou
 
-**Rodou pela tela sobre o Amigão inteiro** (execução 11): 94 relatórios do
+**Rodou pela tela sobre a empresa V inteiro** (execução 11): 94 relatórios do
 cliente, 20 GB, e os 8.761.002 itens de entrada de 2021, em 32 min 50 s. Os
 números batem com a medição feita por script: cobertura de 68,79%, R$
 337.688.895,48 apurados, fração documental de 100%, e CST 40 com 75,6% dos
@@ -4722,7 +4773,7 @@ que vai parar uma rodada que vai até o fim. Motor que reinicia com uma rodada
 de antes da lista por fonte, e a tela diz "rode de novo" em vez de mostrar
 cartão zerado como se zero fosse o resultado.
 
-**Medido na base real (Amigão, 2021, movimentação da execução 9, com os três
+**Medido na base real (empresa V, 2021, movimentação da execução 9, com os três
 relatórios de entradas de 05/2021).**
 
 | | |
@@ -4754,7 +4805,7 @@ fiscal que não foi tomada aqui.
 ## 2026-09-14 — O razão foi confrontado com a Ficha 3 de um cliente, e fecha
 
 **O que se fez.** O razão da Ficha 3 foi rodado contra a Ficha 3 **já
-calculada** da IRMAOS BOA, uma filial e um mês, reconstruindo cada ficha a
+calculada** da empresa T, uma filial e um mês, reconstruindo cada ficha a
 partir dos mesmos movimentos e comparando linha a linha.
 
 | | |
@@ -4771,14 +4822,14 @@ partir dos mesmos movimentos e comparando linha a linha.
 É a primeira vez que o cálculo deste sistema é medido contra um resultado
 produzido por outra ferramenta, sobre dado real, sem nenhum ajuste.
 
-**Onde estão as referências.** `Z:\GRUPO PLURIX\Implementação
+**Onde estão as referências.** `Z:\CLIENTE\Implementação
 . Baixa de
-Estoque\Trabalho ST (RVC)` tem quatro empresas. A **BOA** traz a Ficha 3
+Estoque\Trabalho ST (RVC)` tem quatro empresas. A **empresa T** traz a Ficha 3
 completa, 35 colunas, de janeiro de 2021 a dezembro de 2025, com todos os
-enquadramentos. O **SUPERPAO** traz um book consolidado de 1.255.373 linhas,
+enquadramentos. O **EMPRESA J** traz um book consolidado de 1.255.373 linhas,
 mas só de CFOP 5.927, isto é, só o enquadramento 2.
 
-**O book do Superpão confirmou a fórmula do suportado.** Em 100% de 1.242.621
+**O book da empresa J confirmou a fórmula do suportado.** Em 100% de 1.242.621
 linhas, `ENT_VLR_SUPORTADO` é igual a ICMS mais ST mais FECOP, que é
 exatamente o que `cat42/suportado.py` calcula. E o ressarcimento é igual ao
 unitário da entrada vezes a quantidade saída, em 100% das 782.693 linhas com
@@ -5563,7 +5614,7 @@ pelo que a linha de fato tem, e o que não é erro saiu do bloco de erro.
 **Por quê.** A mensagem antiga chutava uma causa só para os três casos, e
 chutava a mais rara: "costuma ser chave que o Excel converteu em número".
 
-Medido nos relatórios do Amigão, três arquivos de 2020.01, 670.156 linhas:
+Medido nos relatórios da empresa V, três arquivos de 2020.01, 670.156 linhas:
 
 | | |
 |---|---|
@@ -5714,7 +5765,7 @@ enquadramento errado com aparência de fundamentado.
 normalizada, depois por descrição, e só então similaridade textual. O modelo
 recebe candidatas, nunca a pergunta em aberto.
 
-**Por quê.** Medição na BOA: 24.730 itens distintos, 98,1% com código de barras,
+**Por quê.** Medição na empresa T: 24.730 itens distintos, 98,1% com código de barras,
 100% com NCM e CEST, e **zero** códigos com barras divergente entre as 21
 filiais. Onde existe chave exata, usar similaridade é trocar certeza por
 probabilidade.
@@ -5967,7 +6018,7 @@ trabalho pararia sempre que o ERP mudasse uma coluna de lugar. O que não muda
 é **o que o trabalho precisa** — data, item, quantidade, CFOP, ICMS, ST. Então
 o que é fixo é a lista de campos, e o que é flexível é onde encontrá-los.
 
-**Medido.** 135 relatórios reais do Amigão: 133 lidos (99 de movimento, 20 de
+**Medido.** 135 relatórios reais da empresa V: 133 lidos (99 de movimento, 20 de
 resumo, 14 de inventário). Os 2 que sobraram não são relatório — um é de-para
 de fornecedor, outro é log de erro, e o sistema recusa os dois dizendo o que
 faltou. Um arquivo de 194 MB e 191.691 linhas lê em 6 segundos.
@@ -6005,7 +6056,7 @@ no log e segue. Linha cujo valor não converte é **inválida**, e passar de 5%
 delas aborta a leitura do arquivo.
 
 **Por quê.** As duas coisas parecem a mesma e não são. Relatório de ERP vem
-cheio de linha sem CFOP — no Amigão o campo vem escrito `'  .      '`, e são
+cheio de linha sem CFOP — na empresa V o campo vem escrito `'  .      '`, e são
 milhares. Isso é dado incompleto, normal. Já valor que não converte é sintoma
 de coluna mapeada errada, e seguir em frente aí produz uma apuração inteira em
 cima de coluna trocada — número plausível e errado, que é o pior defeito
@@ -6046,13 +6097,13 @@ conteúdo não é copiado para dentro do sistema: guarda-se onde cada arquivo
 está e o que ele é.
 
 **Por quê.** Medido nas bases desta casa: a pasta de EFD ICMS/IPI da
-Sulamericana tem **7.036 arquivos e 100 GB**; a de relatórios do Amigão tem
+empresa N tem **7.036 arquivos e 100 GB**; a de relatórios da empresa V tem
 **53,9 GB**. Subir isso pelo navegador não é lento, é inviável. E o dado já
 vive no servidor de arquivos, com a política de guarda da casa — duplicá-lo
 dentro do sistema só multiplicaria material sigiloso.
 
 **Consequência 1.** A varredura é paralela: identificar arquivo em disco de
-rede é espera, não cálculo. Na pasta do Amigão, 325 arquivos caíram de **49 s
+rede é espera, não cálculo. Na pasta da empresa V, 325 arquivos caíram de **49 s
 para 1,2 s**. O tamanho vem da própria listagem do diretório, o que poupa uma
 ida à rede por arquivo.
 
@@ -6133,7 +6184,7 @@ interessa. Numa amostra real, 92 de 64.268 pendências.
 **Decisão.** A planilha de cobrança aceita filtro por modelo de documento, e a
 tela mostra a contagem por modelo ao lado do botão.
 
-**Por quê.** Medido em 20 arquivos reais da Sulamericana: **307.319 dos 321.337
+**Por quê.** Medido em 20 arquivos reais da empresa N: **307.319 dos 321.337
 documentos eram NFC-e** e apenas 14.018 eram NF-e. Uma cobrança sem filtro sai
 dominada por cupom de consumidor — que ninguém vai atrás de XML por XML — e a
 lista inteira perde serventia pelo volume. O sistema não decide por quem
@@ -6421,7 +6472,7 @@ mas fora da leitura.
 inteiro. Ler as duas dobrava os documentos do período e, pior, o confronto
 fazia `max(valor)` e `min(situacao)` entre as duas versões — misturava a nota
 de antes e a de depois numa linha só. Não é ruído; é número errado. E as duas
-na mesma pasta é o caso comum (pasta `10 - RETIFICAÇÃO SPEDS` do Advertising).
+na mesma pasta é o caso comum (pasta `10 - RETIFICAÇÃO SPEDS` da empresa D).
 
 **Limite conhecido.** Mais de uma retificadora para o mesmo período entram
 todas: o registro 0000 não traz a data de recepção, e sem ela não há como
@@ -6453,7 +6504,7 @@ byte a byte — de outro arquivo da mesma pasta ou de um já importado no
 trabalho. A cópia fica de fora com aviso dizendo de quem ela é cópia.
 
 **Por quê.** A deduplicação era só por caminho. O mesmo SPED copiado em duas
-pastas (a Sulamericana tem `EFD Fiscal - EFD ICMS IPI`, `Sped FISCAL
+pastas (a empresa N tem `EFD Fiscal - EFD ICMS IPI`, `Sped FISCAL
 segregado` e `Prescritos`) entrava duas vezes e dobrava os documentos do
 período. O confronto absorvia em silêncio.
 
@@ -6629,7 +6680,7 @@ chave" no arquivo certo, e as sem chave e canceladas marcadas.
 do que foi encontrado — a etapa 3."
 
 **O que os SPED reais mostraram antes de qualquer código.** Em duas empresas
-(Sulamericana, 884 EFD; Advertising, 68 EFD), o C170 só existe nas
+(empresa N, 884 EFD; empresa D, 68 EFD), o C170 só existe nas
 **entradas**: 27.448 registros de item e nenhum com CFOP de saída. Para NF-e
 de emissão própria a EFD dispensa o item. E o cupom SAT não traz C810 — em
 171.652 cupons reais de São Paulo, nenhum; o SAT vai para a EFD só com o
@@ -6667,7 +6718,7 @@ de analíticos contra 38 milhões de documentos.
 C170 (37, chave do pai vem da ordem do arquivo), C190 (11), C850 (7, sem ST),
 H005 (3), H010 (10). O C810 segue o manual, porque não apareceu.
 
-**Rodada real, logo depois (Sulamericana, 884 EFD, 44 min).** 37.930.719
+**Rodada real, logo depois (empresa N, 884 EFD, 44 min).** 37.930.719
 documentos; 8.769.348 movimentos de item, todos de entrada; 92.936.619
 analíticos; 1.017.100 linhas de cadastro (72 estabelecimentos); 784
 inventários com 7.757.063 itens. **36.542.970 saídas sem item** — NFC-e 24,0 M,

@@ -28,7 +28,7 @@ uma hora.
 
 **O agrupamento é o do MA**, e não por linha: registro, CST e CFOP dentro da
 competência. Arredondar a diferença linha a linha inflaria o total — numa base
-de milhões de itens, meio por cento (é o que o Gross UP do Superpão ensinou).
+de milhões de itens, meio por cento (é o que o Gross UP da empresa J ensinou).
 Aqui o arredondamento acontece uma vez por grupo, com a alíquota **efetiva**
 do próprio grupo (valor ÷ base), que é imune a alíquota fora do padrão e a
 arredondamento do ERP.
@@ -90,7 +90,7 @@ REGISTROS_DE_FORA = (
 # Registros que trazem PIS e COFINS em **linhas separadas**: a consolidação
 # escreve um registro para cada tributo, sobre a mesma receita. Sem juntá-los,
 # a base entra duas vezes e cada grupo exclui só a própria contribuição — que é
-# a tese conservadora, não a que se escolheu. Foi o que fez a apuração da CEMA
+# a tese conservadora, não a que se escolheu. Foi o que fez a apuração da empresa S
 # errar 29% nos meses de C180 e acertar nos de C175, que traz os dois na mesma
 # linha. O nome da família é o do MA, para os dois relatórios se compararem.
 FAMILIA_DO_REGISTRO = {
@@ -284,7 +284,7 @@ def _natureza(cfop: str, operacao: str) -> str:
 
     **O A170 e o F100 não têm CFOP** — a nota de serviço e os demais documentos
     geradores de contribuição não o pedem no leiaute. Perguntar o CFOP deles
-    devolveria vazio e os derrubaria: são R$ 10,28 milhões de base na DMINAS, e
+    devolveria vazio e os derrubaria: são R$ 10,28 milhões de base na empresa F, e
     foi exatamente o que aconteceu na primeira versão desta regra.
 
     O MA resolve do mesmo jeito, e deixa à vista: na coluna "CFOP" dessas

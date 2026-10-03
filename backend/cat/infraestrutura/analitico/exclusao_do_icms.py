@@ -3,7 +3,7 @@
 O que sai daqui é o relatório 903: uma linha por **item de nota fiscal**, com a
 base como foi escriturada, a base sem o ICMS, a diferença de cada contribuição,
 a Selic acumulada e o total a recuperar corrigido. Quarenta colunas, medidas
-contra o relatório do MA e batendo 100% nas 138.358 linhas da DMINAS.
+contra o relatório do MA e batendo 100% nas 138.358 linhas da empresa F.
 
 A mecânica da rodada — ler, gravar, somar, separar o que prescreveu — mora em
 `exclusoes_por_item.py`, compartilhada com o 839 e o 933. Aqui fica só o que é

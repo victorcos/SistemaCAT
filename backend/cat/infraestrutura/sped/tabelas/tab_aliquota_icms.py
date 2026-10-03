@@ -38,7 +38,7 @@ sem esta coluna existir. Foi sorte, não acerto, e sorte não é método.
 
 `INTERNA` guarda **só o que foi medido contra dado real**. Hoje é uma UF:
 
-* **MG, 18%** — conferido na EFD ICMS/IPI da DMINAS, 201 arquivos de 2021 a
+* **MG, 18%** — conferido na EFD ICMS/IPI da empresa F, 201 arquivos de 2021 a
   2025: das saídas internas tributadas integralmente (CFOP 5xxx, CST 00), 18%
   responde por 56% a 59% das linhas em todos os anos, sem degrau em nenhum.
 
@@ -89,7 +89,7 @@ INTERNA: dict[str, tuple[Vigencia, ...]] = {
     "MG": (
         Vigencia(Decimal(18), "2018-01",
                  "Lei 6.763/1975, art. 12, I, e; conferido na EFD ICMS/IPI da "
-                 "DMINAS, 2021 a 2025, sem degrau"),
+                 "empresa F, 2021 a 2025, sem degrau"),
     ),
 }
 

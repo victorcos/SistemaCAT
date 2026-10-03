@@ -308,10 +308,10 @@
 class Component extends DCLogic {
   state = {
     works: [
-      { id: 1, company: "ADVERTISING OPERATIONS AS.PL. PROPAG LTD", cnpj: "43.112.531/0001-89", uf: "SP", regime: "CAT 42 — ressarcimento de ICMS-ST", title: "Ressarcimento ST 2022", from: "01/2022", to: "09/2026", done: 2, of: 3, status: "andamento", stage: "Pré-cadastro", nextStep: "Próxima: validação de arquivos", updated: "há 2 dias" },
-      { id: 2, company: "Companhia Sulamericana De Distribuicao", cnpj: "11.517.841/0001-97", uf: "PR", regime: "CAT 42 — ressarcimento de ICMS-ST", title: "Ressarcimento ST 2025", from: "01/2025", to: "12/2025", done: 3, of: 3, status: "concluido", stage: "Apuração concluída", nextStep: "Arquivo final gerado", updated: "há 6 h" },
-      { id: 3, company: "Distribuidora Norte Alimentos S.A.", cnpj: "09.442.118/0001-04", uf: "BA", regime: "CAT 42 — ressarcimento de ICMS-ST", title: "Ressarcimento ST 2024", from: "01/2024", to: "12/2024", done: 1, of: 3, status: "pausado", stage: "Importação", nextStep: "Aguardando XML do cliente", updated: "há 3 dias" },
-      { id: 4, company: "Comercial Vale Verde Ltda", cnpj: "21.884.907/0001-55", uf: "SP", regime: "Reenquadramento de NCM", title: "Reenquadramento 2023", from: "01/2023", to: "06/2023", done: 0, of: 3, status: "cancelado", stage: "Encerrado", nextStep: "Cancelado pelo gestor", updated: "há 12 dias" }
+      { id: 1, company: "EMPRESA D COMERCIO LTDA", cnpj: "43.112.531/0001-89", uf: "SP", regime: "CAT 42 — ressarcimento de ICMS-ST", title: "Ressarcimento ST 2022", from: "01/2022", to: "09/2026", done: 2, of: 3, status: "andamento", stage: "Pré-cadastro", nextStep: "Próxima: validação de arquivos", updated: "há 2 dias" },
+      { id: 2, company: "Empresa N Distribuicao Ltda", cnpj: "11.517.841/0001-97", uf: "PR", regime: "CAT 42 — ressarcimento de ICMS-ST", title: "Ressarcimento ST 2025", from: "01/2025", to: "12/2025", done: 3, of: 3, status: "concluido", stage: "Apuração concluída", nextStep: "Arquivo final gerado", updated: "há 6 h" },
+      { id: 3, company: "Empresa P Alimentos S.A.", cnpj: "09.442.118/0001-04", uf: "BA", regime: "CAT 42 — ressarcimento de ICMS-ST", title: "Ressarcimento ST 2024", from: "01/2024", to: "12/2024", done: 1, of: 3, status: "pausado", stage: "Importação", nextStep: "Aguardando XML do cliente", updated: "há 3 dias" },
+      { id: 4, company: "Empresa R Comercio Ltda", cnpj: "21.884.907/0001-55", uf: "SP", regime: "Reenquadramento de NCM", title: "Reenquadramento 2023", from: "01/2023", to: "06/2023", done: 0, of: 3, status: "cancelado", stage: "Encerrado", nextStep: "Cancelado pelo gestor", updated: "há 12 dias" }
     ],
     query: "", filter: "Todos", uf: "Todas",
     showNew: false,
@@ -360,7 +360,7 @@ class Component extends DCLogic {
     if (f.company.indexOf("Selecione") === 0) return this.setState({ formError: "Selecione a empresa." });
     if (!f.title.trim()) return this.setState({ formError: "Informe o título do trabalho." });
     if (!/^\d{2}\/\d{4}$/.test(f.from) || !/^\d{2}\/\d{4}$/.test(f.to)) return this.setState({ formError: "Competências devem estar no formato MM/AAAA." });
-    const meta = { "ADVERTISING OPERATIONS AS.PL. PROPAG LTD": ["43.112.531/0001-89", "SP"], "Companhia Sulamericana De Distribuicao": ["11.517.841/0001-97", "PR"], "Distribuidora Norte Alimentos S.A.": ["09.442.118/0001-04", "BA"] }[f.company] || ["00.000.000/0001-00", "SP"];
+    const meta = { "EMPRESA D COMERCIO LTDA": ["43.112.531/0001-89", "SP"], "Empresa N Distribuicao Ltda": ["11.517.841/0001-97", "PR"], "Empresa P Alimentos S.A.": ["09.442.118/0001-04", "BA"] }[f.company] || ["00.000.000/0001-00", "SP"];
     this.setState(s => ({
       works: s.works.concat([{ id: s.nextId, company: f.company, cnpj: meta[0], uf: meta[1], regime: f.tipo, title: f.title, from: f.from, to: f.to, done: 0, of: 3, status: "andamento", stage: "Pré-cadastro", nextStep: "Próxima: envio de arquivos", updated: "agora" }]),
       nextId: s.nextId + 1, showNew: false, formError: "",
@@ -371,7 +371,7 @@ class Component extends DCLogic {
   renderVals() {
     const s = this.state;
     const q = s.query.trim().toLowerCase();
-    const EMPRESAS = ["ADVERTISING OPERATIONS AS.PL. PROPAG LTD", "Companhia Sulamericana De Distribuicao", "Distribuidora Norte Alimentos S.A."];
+    const EMPRESAS = ["EMPRESA D COMERCIO LTDA", "Empresa N Distribuicao Ltda", "Empresa P Alimentos S.A."];
     const TIPOS = ["CAT 42 — ressarcimento de ICMS-ST", "CAT 207 — complemento de ICMS-ST", "Apuração de créditos de PIS/COFINS", "Reenquadramento de NCM"];
     const ufs = ["Todas"].concat(s.works.map(w => w.uf).filter((v, i, a) => a.indexOf(v) === i));
 

@@ -82,7 +82,7 @@ class TestOArredondamento:
         não devolve nada: 9,60 x 1% = 0,096, que arredonda de volta para 0,10.
         Somadas as três, a conta é 28,80 x 1% = 0,288 -> 0,29, e volta um
         centavo. Arredondar linha a linha esconde a diferença; é o mesmo
-        efeito, com o sinal trocado, que inflou o Gross UP do Superpão.
+        efeito, com o sinal trocado, que inflou o Gross UP da empresa J.
         """
         linha = _venda(base=1_000, pis=10, cofins=30)
 
@@ -129,7 +129,7 @@ class TestOQueEReceita:
         """É estorno de uma venda tributada, não uma aquisição.
 
         Ficava de fora pelo filtro antigo, e são R$ 723.198,32 de base na
-        DMINAS — CFOP 1411, 1202 e 2411.
+        empresa F — CFOP 1411, 1202 e 2411.
         """
         r = calcular([_apuracao(_venda(operacao="E", cfop="1411", cst="50"))])
 
@@ -258,7 +258,7 @@ class TestOParDeRegistrosDaMesmaReceita:
     """C181 traz o PIS e C185 a COFINS da mesma consolidação.
 
     Separados, a base entrava duas vezes e cada grupo excluía só a própria
-    contribuição — a tese conservadora, não a escolhida. Na CEMA isso custou
+    contribuição — a tese conservadora, não a escolhida. Na empresa S isso custou
     29% nos meses em que o cliente escritura por C180.
     """
 
@@ -296,7 +296,7 @@ class TestORegistroSemCfop:
     """A nota de serviço e os demais documentos não têm CFOP no leiaute.
 
     Perguntar o CFOP deles devolve vazio, e a primeira versão do filtro por
-    CFOP os derrubou: R$ 10,28 milhões de base na DMINAS, que é o A170 mais o
+    CFOP os derrubou: R$ 10,28 milhões de base na empresa F, que é o A170 mais o
     F100. O MA deixa a solução à vista — escreve "S" na coluna do CFOP dessas
     linhas e classifica como faturamento.
     """

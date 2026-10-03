@@ -1,6 +1,6 @@
 """O arquivo digital da CAT 42: a escrita e a pré-validação.
 
-O formato foi conferido em arquivos que a IRMAOS BOA transmitiu antes de virar
+O formato foi conferido em arquivos que a empresa T transmitiu antes de virar
 teste: sem `|` no início, `|` no fim só com o último campo vazio, CRLF,
 quantidade com 3 casas e valor com 2.
 """
@@ -242,7 +242,7 @@ class TestPreValidacao:
         assert v.por_regra[Regra.DATA] == 1 and v.por_regra[Regra.VALOR_NEGATIVO] == 1
 
     def test_item_de_nota_com_dois_codigos_e_aviso_e_linha_repetida_e_erro(self):
-        """Num arquivo que a BOA transmitiu, 3 itens de nota têm dois códigos: aceito, é aviso."""
+        """Num arquivo que a empresa T transmitiu, 3 itens de nota têm dois códigos: aceito, é aviso."""
         linhas = bytes_de(arquivo_que_fecha())
         outro_codigo = linhas[5].replace(b"|1002140|", b"|1002141|")
         repetida = linhas[5]

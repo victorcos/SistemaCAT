@@ -2,7 +2,7 @@
 
 Como o trabalho enquadra a venda a consumidor final: no enquadramento 1, como
 diz o manual (ressarcimento e complemento), ou nas demais saidas, como a IRMAOS
-BOA transmitiu o cupom (so a perda e a interestadual geram ressarcimento).
+empresa T transmitiu o cupom (so a perda e a interestadual geram ressarcimento).
 Decisao do Victor, 16/09/2026: e escolha de cada trabalho. Todo trabalho que
 ja existe fica no enquadramento 1, que e como o razao ja vinha montando.
 

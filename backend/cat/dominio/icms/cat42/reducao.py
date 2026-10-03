@@ -12,7 +12,7 @@ o efetivo fica maior do que o imposto que a operação de fato comportaria.
 Quem diz que há redução é a **entrada**: o fornecedor emite com CST 20 (redução
 de base) ou 70 (redução de base com ST) e informa a base que usou.
 
-## O que a Advertising mostrou (agosto/2022 a junho/2024)
+## O que a empresa D mostrou (agosto/2022 a junho/2024)
 
 Um único fornecedor, 139 notas, 210 itens, 100% consistentes:
 
@@ -35,7 +35,7 @@ o percentual de redução da base, e a saída aplica esse mesmo percentual. Nos
 NCM do Grecin, 48% sobre a alíquota de 25% deixa a carga em 13%; nos do
 Vagisil, 66,67% sobre 18% deixa em 6%.
 
-Há uma incoerência conhecida no arquivo do fornecedor da Advertising, e ela
+Há uma incoerência conhecida no arquivo do fornecedor da empresa D, e ela
 está registrada aqui para não ser redescoberta: o `vBC` que ele usa **não**
 corresponde ao `pRedBC` que declara. Na nota 51462, item 1012‑N:
 

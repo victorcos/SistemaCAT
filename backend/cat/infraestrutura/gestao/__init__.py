@@ -46,6 +46,8 @@ o arquivo de referência é de outra empresa e a comparação ficou pendente tam
 no projeto de origem. `tools/validar_gestao.py` já aceita os dois, e há uma
 suspeita anotada esperando essa rodada (`quadros_irpj_csll.py::_compensacoes`).
 
-As notas de procedência falam em **empresa A, B e C**. O nome delas não é
-versionado; o que dá peso à nota é quantas competências foram conferidas.
+As notas de procedência falam em **empresa A, B e C**. Nenhum nome de cliente
+é versionado, e nem o CNPJ — ver `tabelas/__init__.py` e o registro em
+`docs/REGISTRO_EMPRESAS.local.md`, fora do repositório. O que dá peso à nota é
+quantas competências foram conferidas.
 """

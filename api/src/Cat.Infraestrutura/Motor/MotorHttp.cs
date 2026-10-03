@@ -29,7 +29,7 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
     public static readonly TimeSpan PrazoPlanilha = TimeSpan.FromMinutes(60);
     // agrupar milhões de itens por documento a cada página leva segundos, não minutos
     public static readonly TimeSpan PrazoLinhas = TimeSpan.FromMinutes(2);
-    // as propostas agrupam a movimentação inteira: numa base do tamanho do Amigão, dezenas de segundos
+    // as propostas agrupam a movimentação inteira: numa base do tamanho da empresa V, dezenas de segundos
     public static readonly TimeSpan PrazoDePara = TimeSpan.FromMinutes(5);
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };

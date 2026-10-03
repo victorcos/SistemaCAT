@@ -1,8 +1,8 @@
 """Classificação dos arquivos de um lote.
 
 As amostras abaixo são reduções de arquivos reais desta casa: o registro 0000
-de um EFD ICMS/IPI e de um EFD Contribuições, o cabeçalho do relatório do
-Amigão, e a marca de erro do OneDrive que ocupava 149 dos 284 arquivos de uma
+de um EFD ICMS/IPI e de um EFD Contribuições, o cabeçalho do relatório da
+empresa V, e a marca de erro do OneDrive que ocupava 149 dos 284 arquivos de uma
 pasta de trabalho — o defeito que motivou reconhecê-la como tipo próprio.
 """
 
@@ -21,16 +21,16 @@ from cat.infraestrutura.arquivos.classificador import classificar
 
 # raiz 50948371 — Irmãos Boa
 ICMS_IPI = (
-    "|0000|018|0|01012025|31012025|IRMAOS BOA LTDA|50948371000178||SP"
+    "|0000|018|0|01012025|31012025|EMPRESA T LTDA|50948371000178||SP"
     "|407048962113|3550308|||A|0|"
 )
 CONTRIBUICOES = (
-    "|0000|006|0|||01062021|30062021|IRMAOS BOA LTDA"
+    "|0000|006|0|||01062021|30062021|EMPRESA T LTDA"
     "|50948371000178|SP|3550308||00|2|"
 )
 # a ECF põe o CNPJ antes das datas — é o quarto leiaute do registro 0000
 ECF = (
-    "|0000|LECF|0009|50948371000178|IRMAOS BOA LTDA|0||||01012024|31122024|0|||||"
+    "|0000|LECF|0009|50948371000178|EMPRESA T LTDA|0||||01012024|31122024|0|||||"
 )
 # outra empresa, para provar que a separação por CNPJ funciona
 DE_OUTRA_EMPRESA = (
@@ -322,7 +322,7 @@ NFE_DE_FORNECEDOR = (
     '<nfeProc versao="4.00"><NFe><infNFe Id="NFe4125031151784100027855001000044623141195329">'
     "<ide><dhEmi>2025-03-14T10:22:00-03:00</dhEmi></ide>"
     "<emit><CNPJ>11517841000278</CNPJ><xNome>FORNECEDOR LTDA</xNome></emit>"
-    "<dest><CNPJ>50948371000178</CNPJ><xNome>IRMAOS BOA</xNome></dest>"
+    "<dest><CNPJ>50948371000178</CNPJ><xNome>empresa T</xNome></dest>"
     "</infNFe></NFe></nfeProc>"
 )
 # nem emitente nem destinatário são da empresa: essa sim é de outra

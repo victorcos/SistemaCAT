@@ -1,6 +1,6 @@
 """Certificado digital na pasta do cliente: não se abre, não se lista.
 
-A pasta da Advertising tem `05 - CERTIFICADO` e `10 - RETIFICAÇÃO SPEDS/CERTIFICADOS`,
+A pasta da empresa D tem `05 - CERTIFICADO` e `10 - RETIFICAÇÃO SPEDS/CERTIFICADOS`,
 com arquivos .pfx cujo nome carrega a senha. O lote, os zips das etapas 2 e 3 e a
 pré-validação passam por eles sem abrir e sem guardar o nome.
 """

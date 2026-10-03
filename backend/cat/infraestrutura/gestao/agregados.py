@@ -1,7 +1,7 @@
 """Os agregados da EFD-Contribuições, gravados em disco.
 
 Ler os SPED de um cliente grande custa uma hora — foi o que a Gestão de 65
-arquivos levou na base da CEMA. Até aqui esse trabalho era jogado fora ao fim
+arquivos levou na base da empresa S. Até aqui esse trabalho era jogado fora ao fim
 da rodada: a tese seguinte que precisasse dos mesmos números começaria do zero.
 
 O que fica em disco é o resumo por chave — tributo, registro, operação, CST,

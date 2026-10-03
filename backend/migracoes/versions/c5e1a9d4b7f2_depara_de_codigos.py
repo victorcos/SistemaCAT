@@ -3,7 +3,7 @@
 O mesmo produto escriturado com codigos diferentes (compra com o codigo do
 fornecedor ou com sufixo, kit, marketplace) vira um par aprovado pelo analista,
 que o razao aplica. O par e da empresa, nao do trabalho. Decisao do Victor,
-16/09/2026, a partir da CAT 42 da Advertising Operations.
+16/09/2026, a partir da CAT 42 da empresa D.
 
 Revision ID: c5e1a9d4b7f2
 Revises: b8d3e61f2a47

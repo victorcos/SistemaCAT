@@ -75,7 +75,7 @@ class TestOQueElaRecusa:
         """**O palpite entra na mensagem, nunca na conta.**
 
         O diesel de 0,9456 é o caso mais forte que existe: aparece no exemplo da
-        própria SEFAZ-SP e bate exato com a escrituração da ETTORI em 2024-01.
+        própria SEFAZ-SP e bate exato com a escrituração da empresa G em 2024-01.
         Mesmo assim recusa, porque ninguém leu a redação original da cláusula
         sétima — e exemplo em resposta de consulta não é o ato legal.
         """
@@ -96,7 +96,7 @@ class TestOQueElaRecusa:
 class TestContraOLivroDoCliente:
     """A prova que vale mais que a leitura do convênio: o número do cliente.
 
-    A ETTORI credita o monofásico por ajuste `SP020799` na apuração. O crédito
+    A empresa G credita o monofásico por ajuste `SP020799` na apuração. O crédito
     dela dividido pelos litros do mês dá a ad rem que ela usou — e ela usou a da
     lei. Lei e livro concordando é o padrão desta casa (ver `tab_aliquota_icms`).
 

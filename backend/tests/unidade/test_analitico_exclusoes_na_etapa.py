@@ -243,7 +243,7 @@ class TestOPacote:
     def test_o_680_vai_em_csv_e_os_outros_em_xlsx(self):
         """O formato é o do arquivo de referência, e a razão foi medida.
 
-        O 680 da DMINAS tem 3.568.362 linhas: em xlsx leva 1.181 segundos e sai
+        O 680 da empresa F tem 3.568.362 linhas: em xlsx leva 1.181 segundos e sai
         com 512 MB em quatro abas, que nem abre no Excel; em CSV leva 33. E é
         assim que o MA o exporta — o arquivo de referência veio em CSV de 1,17
         GB, enquanto o do 839 e o do 933 vieram em xlsx.

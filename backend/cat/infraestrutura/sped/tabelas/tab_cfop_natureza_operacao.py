@@ -12,7 +12,7 @@ e sai como "01 - Aquisição de bens para revenda". Esta classifica a
 
 ## De onde veio
 
-Do gabarito do 047 da DMINAS — 7.784.121 linhas, 57 competências, conferido em
+Do gabarito do 047 da empresa F — 7.784.121 linhas, 57 competências, conferido em
 29/09/2026. Aquela base usa 21 CFOP, e todos os 21 estão em `CONFIRMADAS`.
 
 ## Por que a tabela existe, se a descrição quase basta

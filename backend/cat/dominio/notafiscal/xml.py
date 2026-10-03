@@ -2,8 +2,8 @@
 dados saem.
 
 A EFD não traz o item de quase nenhuma saída: NF-e de emissão própria, NFC-e e
-CF-e SAT vão à escrituração só com o analítico. Na IRMAOS BOA e no Amigão, o
-item de saída não existe na EFD; na Advertising Operations, 92.928 NF-e de
+CF-e SAT vão à escrituração só com o analítico. Na empresa T e na empresa V, o
+item de saída não existe na EFD; na empresa D, 92.928 NF-e de
 saída própria em 24 meses, nenhum C170. O item está no XML, e é daqui que ele
 passa a vir.
 
@@ -16,7 +16,7 @@ passa a vir.
 * **o que não é documento de mercadoria** — evento de cancelamento, carta de
   correção, inutilização, CT-e — devolve `None`: não tem item, e não é erro. O
   CT-e cita as notas que transporta num `infNFe` próprio; por isso a NF-e só é
-  reconhecida com o `infNFe` dentro de `NFe` (na Advertising, 72 mil CT-e eram
+  reconhecida com o `infNFe` dentro de `NFe` (na empresa D, 72 mil CT-e eram
   lidos como nota sem chave antes desta regra).
 
 ## Quem comprou
@@ -49,7 +49,7 @@ desmente o que a descrição diz.
 
 O `nfeProc` traz, depois da nota, o `protNFe` com o `cStat` da SEFAZ. Só 100
 (autorizado) e 150 (autorizado fora de prazo) são operação que existe; 301, 302
-e 303 são uso denegado — na Advertising, 16 notas, 15 delas contadas como não
+e 303 são uso denegado — na empresa D, 16 notas, 15 delas contadas como não
 escrituradas antes desta regra. A NF-e sem protocolo (o XML que o ERP gera antes
 de transmitir) e o CF-e não têm `cStat`: valem, mas perdem para a cópia
 autorizada da mesma chave.
@@ -258,7 +258,7 @@ def ler_documento_xml(conteudo: bytes) -> DocumentoXml | None:
 def _raiz(conteudo: bytes) -> ET.Element:
     """O XML aberto. Declarado UTF-8 e gravado em Latin-1 é relido como Latin-1.
 
-    Na Advertising, 13.676 NF-e diziam `encoding="UTF-8"` e traziam o `º` de
+    Na empresa D, 13.676 NF-e diziam `encoding="UTF-8"` e traziam o `º` de
     "nº" num byte só (0xBA), escrito pelo ERP no `infAdProd`. O documento está
     inteiro; só a declaração mente.
     """

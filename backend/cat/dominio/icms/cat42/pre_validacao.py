@@ -9,7 +9,7 @@ O que existe são duas coisas, e as duas estão aqui:
    arquivo. Se o saldo que ele chega a não for o 1050 informado, o arquivo
    não se sustenta.
 
-O segundo foi medido antes de virar regra. Dois arquivos que a IRMAOS BOA
+O segundo foi medido antes de virar regra. Dois arquivos que a empresa T
 transmitiu (8.062 e 6.924 itens), recompostos pelo mesmo `RazaoDoItem` do
 sistema a partir do 1050 inicial e do 1100: **100% das quantidades fecham** e
 99,99% dos valores ficam a até 5 centavos do ICMS_TOT_FIM — o resto é
@@ -99,7 +99,7 @@ class Regra(Enum):
     DATA = (Severidade.ERRO, "Data inválida ou fora do período", "ddmmaaaa, dentro do mês do 0000.")
     ITEM_DO_DOCUMENTO = (Severidade.ERRO, "Nº do item fora de 1 a 999", "O nº sequencial do item no documento.")
     ITEM_DO_DOCUMENTO_REPETIDO = (Severidade.ERRO, "Linha repetida: mesmo documento, nº do item e código", "A mesma operação lançada duas vezes.")
-    # num arquivo que a BOA transmitiu, 3 itens de nota aparecem com dois códigos
+    # num arquivo que a empresa T transmitiu, 3 itens de nota aparecem com dois códigos
     # (kit desmembrado, provavelmente): aceito pela SEFAZ, então é aviso
     ITEM_DO_DOCUMENTO_COM_DOIS_CODIGOS = (Severidade.AVISO, "Mesmo documento e nº do item com dois códigos", "Conferir se o item foi desmembrado de propósito.")
     INDICADOR = (Severidade.ERRO, "IND_OPER diferente de 0 e 1", "0 entrada, 1 saída.")

@@ -58,12 +58,12 @@ class VendaAConsumidor(str, Enum):
     o suportado com a alíquota vezes o preço de venda: dá ressarcimento quando
     se vendeu abaixo da base presumida e **complemento** quando se vendeu acima.
 
-    Os arquivos que a IRMAOS BOA transmitiu fazem outra coisa: o cupom (CF-e
+    Os arquivos que a empresa T transmitiu fazem outra coisa: o cupom (CF-e
     SAT, CFOP 5.405) vai com COD_LEGAL **0**, na Ficha 3 e no arquivo, e só a
     perda (5.927) entra no enquadramento 2. Não há complemento. Medido em três
     arquivos reais, 2022 a 2024.
 
-    As duas leituras mudam o valor do pedido — no piloto do Amigão, o
+    As duas leituras mudam o valor do pedido — no piloto da empresa V, o
     complemento inteiro vem do enquadramento 1 —, e por isso o razão guarda
     qual delas usou.
     """
@@ -109,14 +109,14 @@ CFOP_DEVOLUCAO = frozenset({
 
 # Uso e consumo. Não entra no estoque de comercialização que a Ficha 3 controla:
 # a compra para consumo (1.407, 1.556), a transferência de material de consumo
-# (1.557) e as devoluções e saídas correspondentes. No Amigão eram 366 linhas
+# (1.557) e as devoluções e saídas correspondentes. Na empresa V eram 366 linhas
 # de entrada na ficha (decisão do Victor, 16/09/2026: excluir e contar).
 CFOP_USO_E_CONSUMO = frozenset({
     "1407", "1556", "1557", "2407", "2556", "2557",
     "5556", "5557", "6556", "6557",
 })
 
-# Outras entradas e saídas (X.949). Na Advertising eram remessa e retorno de
+# Outras entradas e saídas (X.949). Na empresa D eram remessa e retorno de
 # armazém e depósito: a mercadoria sai e volta, e a venda de verdade já está na
 # ficha. Deixá-las dentro dava saída e entrada pelo preço de custo — um falso
 # ressarcimento (decisão do Victor, 16/09/2026: excluir e contar, como a RVZ).

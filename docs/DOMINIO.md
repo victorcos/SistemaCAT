@@ -166,13 +166,13 @@ O resumo não tem data nem CFOP por linha, e por isso não posiciona movimento
 no razão nem alimenta a média ponderada móvel.
 
 **O relatório pode substituir o XML.** Alguns ERPs já extraem os valores do
-documento e os trazem em colunas próprias — no Amigão são `BC ICMS ST;XML`,
+documento e os trazem em colunas próprias — na empresa V são `BC ICMS ST;XML`,
 `VR. ICMS ST;XML` e `Chave DFe`. Quando existem, valem sobre os valores do
 próprio ERP, pela regra de que o XML vence. Quando não existem, o sistema
 avisa que o relatório não substitui o XML.
 
 **O inventário nem sempre traz o imposto.** As colunas de ICMS e ST médios por
-unidade podem existir no cabeçalho e vir vazias — é o caso do Amigão, nas
+unidade podem existir no cabeçalho e vir vazias — é o caso da empresa V, nas
 842.785 linhas do arquivo. Coluna existir não é coluna preenchida. Quando o
 imposto não vem, o estoque de abertura ainda precisa da derivação do item
 3.3.8, e o sistema tem de dizer isso em vez de somar zero calado.

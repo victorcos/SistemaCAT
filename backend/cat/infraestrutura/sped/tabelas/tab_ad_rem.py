@@ -26,7 +26,7 @@ começou em **1º de janeiro**. Quem assumir "sempre fevereiro" erra janeiro de
 `AdRemDesconhecida`, até alguém abrir o convênio e mover a linha.
 
 Duas das vigências conferidas têm uma segunda prova, independente da lei: a
-escrituração da ETTORI, que credita o monofásico por ajuste `SP020799`. O
+escrituração da empresa G, que credita o monofásico por ajuste `SP020799`. O
 crédito dela dividido pelos litros dá **exatamente** `0,9456` em 2024-01 e
 `1,0635` em 2024-02, 2024-05 e 2024-06. Lei e livro do cliente concordando é o
 padrão que esta casa exige — o mesmo de `tab_aliquota_icms`.
@@ -83,7 +83,7 @@ AD_REM: dict[str, tuple[Vigencia, ...]] = {
         Vigencia(Decimal("1.0635"), "2024-02",
                  "Convênio ICMS 172/2023, incisos I e II da cláusula sétima do "
                  "Conv. 199/2022; vigência de 1º/02/2024. Conferido também na "
-                 "escrituração da ETTORI: o ajuste SP020799 dividido pelos "
+                 "escrituração da empresa G: o ajuste SP020799 dividido pelos "
                  "litros dá 1,0635 exato em 2024-02, 2024-05 e 2024-06"),
     ),
     GASOLINA: (
@@ -113,14 +113,14 @@ AD_REM: dict[str, tuple[Vigencia, ...]] = {
 # for conferir saiba por onde começar, e não para serem usadas.
 #
 # O diesel de 0,9456 é o caso mais forte: aparece no exemplo da própria SEFAZ-SP
-# (RC 28013/2023) e bate exato com a escrituração da ETTORI em 2024-01. Mesmo
+# (RC 28013/2023) e bate exato com a escrituração da empresa G em 2024-01. Mesmo
 # assim fica aqui, porque ninguém leu a redação original da cláusula sétima — e
 # a regra desta casa é que exemplo em resposta de consulta não é o ato legal.
 A_CONFERIR: dict[tuple[str, str], tuple[Decimal, str]] = {
     (DIESEL, "2023-05"): (Decimal("0.9456"),
                           "redação original da cláusula sétima do Conv. ICMS "
                           "199/2022; exemplo da RC 28013/2023 e escrituração da "
-                          "ETTORI em 2024-01 batem, mas o texto não foi lido"),
+                          "empresa G em 2024-01 batem, mas o texto não foi lido"),
     (GLP, "2023-05"): (Decimal("1.2571"),
                        "redação original do Conv. ICMS 199/2022, por quilo"),
     (GASOLINA, "2023-06"): (Decimal("1.22"),

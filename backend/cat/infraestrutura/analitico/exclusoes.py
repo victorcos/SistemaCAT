@@ -473,7 +473,7 @@ def _ler_os_sped(contribuicoes: list[str], destino: str, resumo: Resumo,
     # um arquivo por competência, como a Gestão faz: a retificadora vence, e o
     # mesmo arquivo entregue duas vezes conta uma. Sem isto, um lote com a
     # original e a retificadora do mesmo mês somaria as duas e a tese sairia
-    # inflada — aconteceu na base da CEMA, com R$ 203.600,56 a mais
+    # inflada — aconteceu na base da empresa S, com R$ 203.600,56 a mais
     lidos, avisos = selecionar_por_competencia(lidos)
     resumo.avisos.extend(avisos)
 

@@ -62,7 +62,7 @@ function abrirEm(modulo: string) {
   listarProjetos.mockResolvedValue([] as never);
   listarEmpresas.mockResolvedValue([
     { id: 7, cnpj_raiz: "03083231", cnpj_matriz: null, cnpj_matriz_formatado: null,
-      razao_social: "CEMA", uf: "MG", inscricao_estadual: null, pre_cadastro: false, projetos: 0 },
+      razao_social: "empresa S", uf: "MG", inscricao_estadual: null, pre_cadastro: false, projetos: 0 },
   ] as never);
   meusSegmentos.mockResolvedValue(CATALOGO as never);
   criarProjeto.mockResolvedValue({ id: 99 } as never);
@@ -119,7 +119,7 @@ describe("numa tela de um tributo só", () => {
     fireEvent.change(screen.getByPlaceholderText("12/2025"), { target: { value: "12/2025" } });
     // a empresa é o único combobox que sobrou no formulário
     fireEvent.click(screen.getAllByRole("combobox")[0]);
-    fireEvent.click(await screen.findByRole("option", { name: /CEMA/ }));
+    fireEvent.click(await screen.findByRole("option", { name: /empresa S/ }));
     fireEvent.click(screen.getByRole("button", { name: "Criar trabalho" }));
 
     await waitFor(() => expect(criarProjeto).toHaveBeenCalled());

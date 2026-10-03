@@ -26,7 +26,7 @@
 | Campos | todos presentes, na ordem do leiaute, mesmo vazios (vazio = `||`) |
 
 > ⚠ **Diferente da EFD.** A EFD começa e termina a linha com `|`; o arquivo
-> da CAT 42 não. **Conferido em 16/09/2026** contra três CAT5 reais da BOA
+> da CAT 42 não. **Conferido em 16/09/2026** contra três CAT5 reais da empresa T
 > (`CAT5_SP_<CNPJ>_<M>_<AAAA>.txt`, 24 a 77 MB): nenhuma linha começa com `|`, e
 > só terminam com `|` as que têm o último campo vazio (o 1100 de entrada, sem
 > COD_LEGAL). Quantidade sempre com 3 casas, valor com 2, NUM_ITEM com 3
@@ -183,7 +183,7 @@ Consequência: **um arquivo por estabelecimento (CNPJ + IE) e por período mensa
 | 03 | COD_ANT_ITEM | código anterior | C | - | - | O |
 | 04 | DESCR_ANT_ITEM | descrição anterior | C | - | - | OC |
 
-Contribuinte que escritura EFD (o caso do Amigão e da BOA) **não usa o 0205**.
+Contribuinte que escritura EFD (o caso da empresa V e da empresa T) **não usa o 0205**.
 
 ### 1050 — saldos
 
@@ -289,7 +289,7 @@ COD_ITEM (11)**. ECF_FAB só em documento emitido por ECF.
 |---|---|---|
 | 1050, 1100, 1200 — REG | tipo N, tamanho 002 | o texto fixo tem 4 caracteres (`1050`); tratar como os outros REG (C 004) |
 | 1050 campo 06, tabela | "ICMS_TOT_FIM … no início do primeiro dia" | a observação diz "no final do último dia do período" — vale a observação |
-| 1100, observações dos campos 3, 7 e 8 | campo 3 DATA "informe o número do item"; campo 7 = QTD; campo 8 = CFOP | a **tabela** (07 CFOP, 08 QTD) é o que os arquivos reais da BOA seguem |
+| 1100, observações dos campos 3, 7 e 8 | campo 3 DATA "informe o número do item"; campo 7 = QTD; campo 8 = CFOP | a **tabela** (07 CFOP, 08 QTD) é o que os arquivos reais da empresa T seguem |
 | 1200, observação do campo 9 | DATA "informe o número do item" | é a data da entrada ou da saída |
 | 1200, observação do campo 5 | "série do Documento Fiscal Eletrônico" | o 1200 é de documento **não** eletrônico |
 | Exemplo de valor | `$ 1.129.998,99 → |1129989,99|` | erro de digitação; é `1129998,99` |
@@ -302,7 +302,7 @@ COD_ITEM (11)**. ECF_FAB só em documento emitido por ECF.
 Cruzado com o estado das etapas 1 a 5 em 15/09/2026.
 
 1. **Um arquivo por estabelecimento de SP e por mês.** O 0000 leva CNPJ, IE
-   com DV e PERIODO `mmaaaa`. As fichas de loja fora de SP (o piloto do Amigão
+   com DV e PERIODO `mmaaaa`. As fichas de loja fora de SP (o piloto da empresa V
    é PR e MS) não geram arquivo.
 2. **O 1100 exige chave e número do item de cada documento.** A venda de PDV
    do relatório do cliente vem **consolidada por item e dia, sem chave** — não
@@ -327,10 +327,10 @@ Cruzado com o estado das etapas 1 a 5 em 15/09/2026.
 9. **0150** com o próprio estabelecimento e só participantes com movimento,
    **sem** os de documentos 02, 2D, 59, 60 e 65. O relatório do cliente dá
    código de participante, não 0150 completo — o 0150 da EFD serve.
-10. ~~Conferir o pipe no início da linha contra um CAT5 real da BOA~~ —
+10. ~~Conferir o pipe no início da linha contra um CAT5 real da empresa T~~ —
     conferido em 16/09/2026 (seção 1).
 
 **Como a etapa 7 ficou** (16/09/2026, ver `DECISOES.md`): o gerador está em
 `cat/dominio/cat42/arquivo_digital.py` e a pré-validação em
-`cat/dominio/cat42/pre_validacao.py`. Na BOA real, o cupom vai com COD_LEGAL
+`cat/dominio/cat42/pre_validacao.py`. Na empresa T real, o cupom vai com COD_LEGAL
 0 — o que virou a escolha de venda a consumidor por trabalho.

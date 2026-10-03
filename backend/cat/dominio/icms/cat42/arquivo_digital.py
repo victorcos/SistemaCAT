@@ -7,7 +7,7 @@ em `docs/LEIAUTE_ARQUIVO_DIGITAL.md`.
 
 ## O que foi conferido contra arquivo real, antes de escrever
 
-Três arquivos que a IRMAOS BOA transmitiu (2022 a 2024, até 77 MB) confirmam o
+Três arquivos que a empresa T transmitiu (2022 a 2024, até 77 MB) confirmam o
 que o manual diz e resolvem o que ele deixa ambíguo:
 
 * a linha **não começa com `|`**, ao contrário da EFD; e só termina com `|`
@@ -386,7 +386,7 @@ class ArquivoDigital:
 
 
 def nome_do_arquivo(cnpj: str, ano: int, mes: int, previa: bool = False) -> str:
-    """`CAT5_SP_<CNPJ>_<M>_<AAAA>.txt`, o nome dos arquivos que a BOA transmitiu
+    """`CAT5_SP_<CNPJ>_<M>_<AAAA>.txt`, o nome dos arquivos que a empresa T transmitiu
     (mês sem zero à esquerda). A prévia leva PREVIA no nome, para nunca ser
     confundida com o que vai à SEFAZ."""
     sufixo = "_PREVIA" if previa else ""
@@ -411,7 +411,7 @@ class TravaDoArquivo(Enum):
                           "Enquadramentos 2 e 4 dependem do ICMS da operação própria da entrada.")
     SALDO_NEGATIVO = ("Estoque negativo no 1050", "Ficha retirada por estoque negativo: falta movimento.")
     # quantidade positiva e ICMS negativo: a devolução de compra tirou mais
-    # imposto do que o estoque guardava. No Amigão, 813 saldos — quase sempre
+    # imposto do que o estoque guardava. Na empresa V, 813 saldos — quase sempre
     # abertura sem ICMS suportado (item 3.3.8 do manual do sistema)
     VALOR_NEGATIVO = ("ICMS negativo no 1050 com estoque positivo",
                       "Devolução de compra maior que o ICMS em estoque: em geral a abertura veio sem imposto.")

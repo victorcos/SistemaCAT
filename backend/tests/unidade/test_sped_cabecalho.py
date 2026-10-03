@@ -33,13 +33,13 @@ ECD = (
 
 # montada pelo leiaute oficial da EFD ICMS/IPI, com dados dos Irmãos Boa
 ICMS_IPI = (
-    "|0000|018|0|01012025|31012025|IRMAOS BOA LTDA|50948371000178||SP"
+    "|0000|018|0|01012025|31012025|EMPRESA T LTDA|50948371000178||SP"
     "|407048962113|3550308|||A|0|"
 )
 
 # filial, para provar que matriz não é chute
 ICMS_IPI_FILIAL = (
-    "|0000|018|0|01012025|31012025|IRMAOS BOA LTDA|50948371000259||SP"
+    "|0000|018|0|01012025|31012025|EMPRESA T LTDA|50948371000259||SP"
     "|407048962114|3550308|||A|0|"
 )
 
@@ -63,7 +63,7 @@ class TestDeteccaoDeTipo:
 class TestIcmsIpi:
     def test_le_a_empresa(self):
         c = ler_cabecalho(ICMS_IPI)
-        assert c.nome == "IRMAOS BOA LTDA"
+        assert c.nome == "EMPRESA T LTDA"
         assert c.cnpj.valor == "50948371000178"
         assert c.e_matriz
         assert c.uf == "SP"
@@ -150,7 +150,7 @@ class TestPeriodo:
         """Escrituração fora do padrão merece atenção antes de virar
         competência no sistema."""
         linha = (
-            "|0000|018|0|15012025|14022025|IRMAOS BOA LTDA|50948371000178||SP"
+            "|0000|018|0|15012025|14022025|EMPRESA T LTDA|50948371000178||SP"
             "|407048962113|3550308|||A|0|"
         )
         assert not ler_cabecalho(linha).periodo_fechado_no_mes

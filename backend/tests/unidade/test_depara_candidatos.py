@@ -1,4 +1,4 @@
-"""Os pares do de-para, no desenho da Advertising Operations.
+"""Os pares do de-para, no desenho da empresa D.
 
 Venda com o código do produto (`1012`), compra com o mesmo código mais espaços
 e "08" (`1012           08`, e às vezes `101208`), kit de três com `K3`, e
@@ -84,7 +84,7 @@ class TestPares:
         assert {Motivo.SUFIXO, Motivo.KIT} <= set(compra.motivos)
 
     def test_kit_de_compra_acha_a_unidade_que_tem_dois_codigos(self):
-        """Na Advertising: `3133K3         08` entra, e a unidade é `3133` e `3133           08`."""
+        """Na empresa D: `3133K3         08` entra, e a unidade é `3133` e `3133           08`."""
         itens = BASE + [
             item("3133           08", entradas=22668, descricao="GRECIN 5 PG PRETO"),
             item("3133K3         08", entradas=1268, descricao="GRECIN 5 PG PRETO KIT 3X", gtins={"7891653040238"}),
@@ -179,7 +179,7 @@ class TestPares:
         assert any("conflito" in p.explicacao for p in pares.values())
 
     def test_gtin_com_descricao_de_outro_produto_nao_liga(self):
-        """O 0200 da Advertising tinha o GTIN do 1050 no 1114."""
+        """O 0200 da empresa D tinha o GTIN do 1050 no 1114."""
         assert propor([
             item("1050", saidas=5, descricao="GRECIN TONS DE GRISALHO", gtins=["7891653010507"]),
             item("1114", entradas=9, descricao="GRECIN 5 PRETO", gtins=["7891653010507"]),

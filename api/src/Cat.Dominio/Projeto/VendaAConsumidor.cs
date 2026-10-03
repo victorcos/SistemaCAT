@@ -10,7 +10,7 @@ public sealed record DefinicaoDeVendaAConsumidor(string Valor, string Rotulo, st
 /// cada trabalho (decisão do Victor, 16/09/2026), porque muda o valor do pedido.
 ///
 /// O manual põe a venda a consumidor no enquadramento 1: ressarcimento quando se
-/// vendeu abaixo da base presumida, complemento quando acima. A IRMAOS BOA
+/// vendeu abaixo da base presumida, complemento quando acima. A empresa T
 /// transmitiu o cupom no 0, e só a perda (5.927) gerou ressarcimento.
 /// </summary>
 public static class VendaAConsumidor

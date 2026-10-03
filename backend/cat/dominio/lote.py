@@ -73,7 +73,7 @@ def caminho_de_certificado(caminho: str) -> bool:
 def abas_de_canceladas(titulos: list[str]) -> list[str]:
     """As abas de uma planilha de canceladas que listam, de fato, notas canceladas.
 
-    O relatório "NF-e Canceladas-Devoluções" da Advertising tem duas abas: as
+    O relatório "NF-e Canceladas-Devoluções" da empresa D tem duas abas: as
     canceladas e as devoluções. Ler as duas tirava da movimentação 245
     devoluções que nunca foram canceladas. Vale a aba com "cancel" no nome;
     sem nenhuma assim, todas, menos a que diz "devol".

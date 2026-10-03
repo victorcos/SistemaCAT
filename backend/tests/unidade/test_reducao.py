@@ -1,6 +1,6 @@
 """A redução de base que a entrada declara e que alcança o efetivo da saída.
 
-Os números são os do fornecedor da Advertising, nota a nota: ele reduz a base
+Os números são os do fornecedor da empresa D, nota a nota: ele reduz a base
 e informa em `pRedBC` o percentual que **sobra**, não o que reduziu. Por isso a
 conta sai do `vBC`, e não da tag — ver `cat.dominio.icms.cat42.reducao`.
 """
@@ -69,7 +69,7 @@ class TestOQueAEntradaDeclara:
 class TestOQuePrevalece:
     """Vale o `pRedBC` do documento (decisão do Victor, 18/09/2026).
 
-    O arquivo do fornecedor da Advertising é incoerente — declara 48% e usa
+    O arquivo do fornecedor da empresa D é incoerente — declara 48% e usa
     base de 48,84% —, e a decisão foi seguir a tag, que é o campo que a
     legislação define como percentual de redução.
     """

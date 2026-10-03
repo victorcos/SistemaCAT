@@ -156,7 +156,7 @@ def _valor(resumo: dict, caminho: str) -> int:
 
 
 # O mesmo problema visto por etapas diferentes, cada uma na sua unidade. Na
-# entrega do Amigão (16/09/2026) o confronto pendente aparecia quatro vezes —
+# entrega da empresa V (16/09/2026) o confronto pendente aparecia quatro vezes —
 # linhas, competências, arquivos e ocorrências da pré-validação — e o revisor
 # lia quatro problemas onde havia um. Assunto -> (rótulo, o que fazer).
 _ASSUNTOS: dict[str, tuple[str, str]] = {

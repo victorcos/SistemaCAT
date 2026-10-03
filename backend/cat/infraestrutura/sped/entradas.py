@@ -64,7 +64,7 @@ milhares de linhas. É por ramo, e está medido: das 458.792 linhas do gabarito,
 as 457.896 com ICMS preenchido são todas C100/C170.
 
 **O bloco A entrou em 30/09/2026**, com o gabarito na mão: são 2 linhas no 037
-da DMINAS, e a 047 já montava o mesmo ramo do lado das saídas. Tem abridor
+da empresa F, e a 047 já montava o mesmo ramo do lado das saídas. Tem abridor
 próprio — o A010 —, como o D, e o quarto CNPJ corrente convive aqui.
 
 **O que ficou de fora**: C395/C396 e F150. Nenhuma empresa validada teve
@@ -269,7 +269,7 @@ def _natureza_deduzida(cfop: str) -> str:
     **A dedução é pelo CFOP, e só por ele.** A natureza descreve a *operação*, e
     é o CFOP que codifica a operação. A regra foi conferida contra 43.497 linhas
     de um relatório de referência, reconfirmada contra outras 81.150, e agora
-    contra as 458.792 do gabarito do 037 da DMINAS.
+    contra as 458.792 do gabarito do 037 da empresa F.
 
     **O CFOP que a tabela não conhece deixa a coluna vazia.** Havia aqui uma
     segunda tentativa pelo `TIPO_ITEM = "00"`, e o gabarito a derrubou: nas 107
@@ -289,7 +289,7 @@ def _debito_ou_credito(cst_pis: str, base_do_pis: str, cnpj_do_participante: str
     """"C" quando a entrada gera crédito; vazio no resto.
 
     **Três condições, e as três foram medidas.** Contra as 458.792 linhas do
-    gabarito do 037 da DMINAS, esta regra acerta as 458.792 — sem uma exceção:
+    gabarito do 037 da empresa F, esta regra acerta as 458.792 — sem uma exceção:
 
     1. o **CST dá direito a crédito** (50 a 56 e 60 a 66, ver
        `tab_cst_piscofins.gera_credito`). Não só o 50: há CST 53 no gabarito, e
@@ -598,7 +598,7 @@ class _Contexto:
         """Serviço tomado. O CNPJ é o do A010, e não há modelo nem CFOP.
 
         Entrou em 30/09/2026, com o gabarito na mão: são 2 linhas no 037 da
-        DMINAS, e a 047 já trazia o ramo do lado das saídas. O que ele ensinou e
+        empresa F, e a 047 já trazia o ramo do lado das saídas. O que ele ensinou e
         o leiaute não diria: a **natureza do crédito é lida**, do
         `A170_NAT_BC_CRED`, e não deduzida do CFOP — a nota de serviço não tem
         CFOP nenhum. E o rótulo do ramo é o mesmo texto das duas consultas.

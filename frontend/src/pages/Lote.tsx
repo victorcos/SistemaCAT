@@ -197,7 +197,7 @@ export default function Lote() {
                   mono
                   value={pasta}
                   onChange={(e) => setPasta(e.target.value)}
-                  placeholder="Z:\GRUPO PLURIX\...\EFD Fiscal - EFD ICMS IPI"
+                  placeholder="Z:\CLIENTE\...\EFD Fiscal - EFD ICMS IPI"
                   spellCheck={false}
                   autoComplete="off"
                   required

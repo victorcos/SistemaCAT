@@ -8,7 +8,7 @@ public sealed record BaseDoTrabalho(int Efds, DateOnly? Primeira, DateOnly? Ulti
 public sealed class CadastroSemMudanca() : RecusaDeRegra("Nada mudou no cadastro do trabalho.");
 
 /// <summary>
-/// Nome e período do trabalho. Mudam — o trabalho do Amigão nasceu como 2025 e
+/// Nome e período do trabalho. Mudam — o trabalho da empresa V nasceu como 2025 e
 /// a base que existia era de 2021 (16/09/2026) —, mas nunca calados: toda
 /// mudança vira evento com o de e o para.
 /// </summary>

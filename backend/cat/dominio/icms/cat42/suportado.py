@@ -63,8 +63,8 @@ CST_JA_RETIDO = frozenset({"60"})
 # CST em que o remetente é o substituto e destaca a retenção no documento.
 CST_COM_RETENCAO = frozenset({"10", "30", "70"})
 
-# CST 90, "outras", não diz se há substituição. Medido em 2021-05 na base do
-# Amigão: metade dos itens de CST 90 que casaram com o relatório do cliente
+# CST 90, "outras", não diz se há substituição. Medido em 2021-05 na base da
+# empresa V: metade dos itens de CST 90 que casaram com o relatório do cliente
 # tinham imposto informado. Então CST 90 sem valor é dado que falta, não item
 # sem imposto — tratá-lo como "sem o que apurar" esconderia pendência real.
 CST_PODE_TER_ST = frozenset({"90"})

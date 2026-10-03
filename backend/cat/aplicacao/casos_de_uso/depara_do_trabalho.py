@@ -7,7 +7,7 @@ na tabela `depara_item`, por empresa — quem grava é a API em C#.
 Além dos pares, a resposta lista os **códigos sem par**: com saída e sem
 entrada nem estoque, que nenhuma proposta nem decisão resolve. São os que ficam
 negativos no razão, e os que vão para o cliente dizer de onde vieram — como a
-RVZ fez na Advertising com os códigos de marketplace.
+RVZ fez na empresa D com os códigos de marketplace.
 """
 
 from __future__ import annotations

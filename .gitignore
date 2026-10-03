@@ -61,3 +61,6 @@ desktop.ini
 bin/
 obj/
 *.user
+
+# registro de empresas: decodifica as notas do repo, e por isso nao entra nele
+*.local.md

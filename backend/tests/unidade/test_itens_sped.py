@@ -1,7 +1,7 @@
 """Os leitores de item da EFD, contra linhas reais.
 
-Cada linha aqui foi copiada de um arquivo verdadeiro desta casa (Sulamericana
-e Advertising), com a contagem de campos conferida. Se um leiaute mudar de
+Cada linha aqui foi copiada de um arquivo verdadeiro desta casa (empresa N
+e empresa D), com a contagem de campos conferida. Se um leiaute mudar de
 versão, é aqui que aparece — antes de deslocar quantidade para valor em
 milhões de linhas.
 """

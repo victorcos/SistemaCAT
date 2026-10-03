@@ -53,7 +53,7 @@ TABELA: dict[str, str] = {
 # esta é a grafia de quem compara relatório com relatório. Mesmo arranjo de
 # `tab_cfop`, e pelo mesmo motivo.
 #
-# Das 10 naturezas do gabarito do 037 da DMINAS (458.792 linhas, 30/09/2026),
+# Das 10 naturezas do gabarito do 037 da empresa F (458.792 linhas, 30/09/2026),
 # 6 batem com a oficial e estas 4 não:
 COMO_O_MA_ESCREVE: dict[str, str] = {
     "04": "Energia elétrica e térmica",

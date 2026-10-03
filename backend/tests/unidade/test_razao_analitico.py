@@ -174,7 +174,7 @@ class TestAConta:
         assert venda["valor_item"] == d(20)               # a venda de PDV do relatório
 
     def test_sem_0200_a_descricao_vem_do_xml_da_propria_saida(self, fontes, tmp_path):
-        """Quatro códigos da Advertising não têm 0200 em arquivo nenhum: a
+        """Quatro códigos da empresa D não têm 0200 em arquivo nenhum: a
         descrição vem do xProd da nota que o próprio estabelecimento emitiu."""
         mov = tmp_path / "movimentacao"
         gravar(mov / ARQUIVO_ITENS, [
@@ -250,7 +250,7 @@ class TestAsFontes:
 
 
 class TestVendaAConsumidor:
-    """A escolha do trabalho: o cupom no enquadramento 1 (o manual) ou no 0 (a BOA)."""
+    """A escolha do trabalho: o cupom no enquadramento 1 (o manual) ou no 0 (a empresa T)."""
 
     def test_o_padrao_e_o_enquadramento_1(self, montado):
         destino, r = montado
@@ -739,7 +739,7 @@ class TestReducaoDeBase:
             ("aliq_icms", pa.decimal128(9, 4)), ("cfop", pa.string()),
             ("reducao_declarada", pa.decimal128(9, 4)),
         ], [
-            # a entrada de 05/01, como o fornecedor da Advertising emite: declara
+            # a entrada de 05/01, como o fornecedor da empresa D emite: declara
             # pRedBC de 48% e usa base de 48% do valor
             {"chave": "4" * 44, "numero_item": 1, "emitente": "99999999000191", "destinatario": A,
              "emissao": date(2021, 1, 5), "ncm": "33059000", "cst_icms": "570",

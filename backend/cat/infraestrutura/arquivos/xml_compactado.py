@@ -1,13 +1,13 @@
 """XML dentro de zip, lido sem extrair para o disco.
 
-A Advertising entregou as notas assim: 357.950 XML em zips baixados do portal.
+A empresa D entregou as notas assim: 357.950 XML em zips baixados do portal.
 Extrair para ler custou mais que ler — o antivírus examina cada arquivo que
 nasce, e o disco de rede perde gravação. O zip entra no lote como um arquivo só
 (`xml_compactado`), e as etapas leem os membros direto do zip, na memória, um
 por vez.
 
 Só `.zip`: é o que o portal e o Windows geram. **Um nível de zip dentro de zip é
-aberto** — na Advertising, 290 mil das notas estavam em 60 zips dentro dos
+aberto** — na empresa D, 290 mil das notas estavam em 60 zips dentro dos
 zips. O zip de dentro gravado sem compressão (o caso medido) é lido direto do
 de fora, por posição; o comprimido vai para a memória, até 256 MB.
 

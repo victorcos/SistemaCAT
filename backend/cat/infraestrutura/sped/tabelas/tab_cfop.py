@@ -604,7 +604,7 @@ def descricao(codigo: str) -> str:
 # são todos os CFOP que aquela base tem. Para o que não está aqui, a grafia
 # abreviada serve: descrição curta é melhor que coluna vazia.
 POR_EXTENSO: dict[str, str] = {
-    # ── Entrada (1xxx/2xxx) — do gabarito do 037 da DMINAS, 458.792 linhas,
+    # ── Entrada (1xxx/2xxx) — do gabarito do 037 da empresa F, 458.792 linhas,
     # conferido em 30/09/2026. São todos os CFOP de entrada daquela base
     "1101": "Compra para Industrialização ou prod rural",
     "1102": "Compra para comercialização",

@@ -5,7 +5,7 @@ um código e a saída com outro, o razão monta duas fichas — uma só com
 entradas, que não pede nada, e outra só com saídas, que fica negativa e sai do
 total. O ressarcimento daquele produto some sem aviso de que era o mesmo.
 
-Na Advertising Operations (RVZ, 2022 a 2024) o mesmo produto tinha até quatro
+Na empresa D (RVZ, 2022 a 2024) o mesmo produto tinha até quatro
 códigos: `1111` na venda, `1111K3` no kit de três, `1111K3         08` na compra
 (o código de venda mais espaços e "08") e `X00450IETL` na venda por
 marketplace. Nada disso é exceção: é o ERP de um distribuidor.
@@ -26,7 +26,7 @@ Os códigos que são o mesmo produto formam um **grupo**, ligados por:
 Só se propõe grupo que **conserta alguma ficha**: com pelo menos um código sem
 entrada ou sem saída. Dois códigos com entrada e saída cada um são, até prova
 em contrário, produtos diferentes que se parecem. Devolução conta como
-movimento aqui — o `4004` da Advertising só tinha devolução de compra (5.411),
+movimento aqui — o `4004` da empresa D só tinha devolução de compra (5.411),
 e a ficha dele, só com a devolução, é a que juntar conserta —, mas não escolhe
 o destino, que é onde se vende.
 
@@ -42,14 +42,14 @@ vende); os outros viram pares `origem → destino` com o fator acumulado.
   fica o que é o começo do código do kit (`3133K3         08`). Quando a
   descrição do kit abrevia a da unidade ("CAST. ESC" e "CAST. ESCURO"), vale o
   código mais longo que começa o do kit, com o mesmo NCM e descrição compatível.
-  Na Advertising eram 8 kits de compra que ficavam sem par;
+  Na empresa D eram 8 kits de compra que ficavam sem par;
 * GTIN não liga kit a unidade — são embalagens diferentes do mesmo produto, e
   o fator não sai do GTIN;
 * sufixo também só liga descrições compatíveis: num catálogo numérico grande,
-  "código + um dígito" coincide por acaso (no Amigão, `1024078` e `102407`,
+  "código + um dígito" coincide por acaso (na empresa V, `1024078` e `102407`,
   "repetido em 4 pares"). O mesmo código com e sem espaços liga sempre;
 * GTIN só liga descrições compatíveis (metade das palavras em comum): o 0200
-  da Advertising trazia no `1114` ("GRECIN 5 PRETO") o GTIN do `1050` ("GRECIN
+  da empresa D trazia no `1114` ("GRECIN 5 PRETO") o GTIN do `1050` ("GRECIN
   TONS DE GRISALHO"), e o GTIN sozinho juntava seis produtos num;
 * quando dois caminhos do grupo dão fatores diferentes para o mesmo código, o
   grupo inteiro cai para confiança média, com o conflito escrito.
@@ -166,7 +166,7 @@ _NAO_ALFANUMERICO = re.compile(r"[^A-Z0-9 ]+")
 
 
 def normalizar_codigo(codigo: str) -> str:
-    """Sem espaços: o ERP da Advertising grava `1012           08` e `101208`."""
+    """Sem espaços: o ERP da empresa D grava `1012           08` e `101208`."""
     return _ESPACOS.sub("", codigo or "").upper()
 
 

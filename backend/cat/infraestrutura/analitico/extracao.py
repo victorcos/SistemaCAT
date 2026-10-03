@@ -258,7 +258,7 @@ class SemChave(str, Enum):
 
     A mensagem antiga chutava uma única causa para as três, e chutava a mais
     rara: dizia "costuma ser chave que o Excel converteu em número". Nos
-    relatórios do Amigão isso era 0% dos casos — as 1.270 linhas tinham a
+    relatórios da empresa V isso era 0% dos casos — as 1.270 linhas tinham a
     coluna vazia, e 1.205 delas nem número de documento tinham.
     """
 

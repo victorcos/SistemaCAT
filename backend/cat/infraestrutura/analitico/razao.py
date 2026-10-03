@@ -16,7 +16,7 @@ cada um é, e percorrer.
 | Saída sem item em lugar nenhum | relatório de saídas do cliente | cupom e NFC-e vão à EFD só com o analítico |
 | Abertura | bloco H da EFD | o inventário do dia anterior ao período |
 
-No Amigão, 36,5 milhões de documentos de saída não têm item na EFD, e a venda
+Na empresa V, 36,5 milhões de documentos de saída não têm item na EFD, e a venda
 com item é R$ 6 milhões contra R$ 5,8 bilhões. Sem o relatório não há saída a
 lançar. O XML, quando vem, entra pela etapa 3 e vence o relatório (v0.53).
 
@@ -33,7 +33,7 @@ de fora — decisão de 15/09/2026, depois de medir que ela respondia por 54% do
 A Ficha 3 é escriturada na unidade do 0200 (UNID_INV). O item de nota vem na
 unidade dela, e quando o rótulo difere o fator sai do 0220 da própria EFD.
 Sem 0220, a quantidade fica como veio e a linha é marcada — não se adivinha
-fator. No Amigão, que não entrega 0220, a quantidade da EFD já vem na unidade
+fator. Na empresa V, que não entrega 0220, a quantidade da EFD já vem na unidade
 básica mesmo com rótulo CX ou FD: bateu com a "Qtde;Unitária" do relatório em
 100% dos itens de 05/2021. Converter pelo rótulo ali multiplicaria errado.
 
@@ -49,14 +49,14 @@ até a data da saída, suficientes para a quantidade, com média ponderada — a
 mesma regra que valora a abertura (`valor_da_abertura`). Sem entrada com esse
 valor antes da saída, o confronto fica pendente, contado. No enquadramento 4, a
 coluna 21 também é o crédito do art. 271 (coluna 27). Conferido contra a Ficha 3
-da RVZ na Advertising: 2,15 suportado, 0,63 da entrada, 1,52 de ressarcimento e
+da RVZ na empresa D: 2,15 suportado, 0,63 da entrada, 1,52 de ressarcimento e
 0,63 de crédito.
 
 ## Ficha com estoque negativo sai do total
 
 Estoque negativo é movimento que falta — perda que não veio, mês de relatório
 que falhou, produção. E nele o custo médio perde o sentido: com saldo perto de
-zero o unitário explode (R$ 1,8 milhão por unidade num item do CD do Amigão),
+zero o unitário explode (R$ 1,8 milhão por unidade num item do CD da empresa V),
 e uma única baixa vira centenas de milhões. No piloto de 15/09/2026, 99,99% do
 ressarcimento vinha de 4.037 fichas assim.
 
@@ -160,7 +160,7 @@ POR_PAGINA_MAXIMO = 200
 
 # quantas linhas de um relatório se olham antes de concluir que ele é só de
 # entradas. Ler inteiro um relatório de entradas para achar zero saídas custa,
-# no Amigão, 26 minutos sobre 20 GB
+# na empresa V, 26 minutos sobre 20 GB
 AMOSTRA_PARA_ACHAR_SAIDA = 5_000
 
 # devolução de venda chega como entrada; devolução de compra, como saída
@@ -629,7 +629,7 @@ def _completar_ficha3(con, ficha3: str, itens: str, xml_itens: str = "") -> None
     segundo arquivo para saber que mercadoria é aquela.
 
     Primeiro o 0200. Sem cadastro, vale o **xProd do XML da própria saída**: na
-    Advertising, quatro códigos não têm 0200 em arquivo nenhum e respondem por
+    empresa D, quatro códigos não têm 0200 em arquivo nenhum e respondem por
     34.672 linhas — a mesma lacuna que obrigou a buscar a alíquota na nota de
     entrada (v0.58.0).
     """
@@ -937,8 +937,8 @@ def _preparar(con, fontes: Fontes) -> dict:
     else:
         con.execute("CREATE OR REPLACE TABLE unid (cnpj VARCHAR, codigo VARCHAR, unidade VARCHAR, "
                     "aliq_icms DECIMAL(9, 4), ncm VARCHAR)")
-    # A alíquota do confronto é a do mês da saída, não a do fim do período: no
-    # Amigão, 23 mil itens mudaram de alíquota dentro de 2021 (12% para 13,3% em
+    # A alíquota do confronto é a do mês da saída, não a do fim do período: na
+    # empresa V, 23 mil itens mudaram de alíquota dentro de 2021 (12% para 13,3% em
     # fevereiro). A unidade continua a mais recente — é nela que a ficha inteira
     # é contada, e mudar de unidade no meio da ficha quebraria o saldo.
     itens_do_mes = os.path.join(fontes.movimentacao, ARQUIVO_ITENS_DA_EFD)
@@ -1161,7 +1161,7 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
 
     Quem declara a redução é a entrada, com CST 20 ou 70. O percentual sai da
     base que a nota de fato usou, e não do `pRedBC` — que o fornecedor da
-    Advertising preenche ao contrário (ver `cat.dominio.icms.cat42.reducao`). O
+    empresa D preenche ao contrário (ver `cat.dominio.icms.cat42.reducao`). O
     benefício é da mercadoria, então a chave é o NCM, e cada saída herda a
     redução da entrada mais recente até a data dela; antes da primeira entrada,
     a primeira que houver.
@@ -1183,7 +1183,7 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
     interna_xml = "left(replace(coalesce(x.cfop, ''), '.', ''), 1) = '5'"
     interna_efd = "left(replace(coalesce(m.cfop, ''), '.', ''), 1) = '1'"
     if de_fora | {"cst_icms", "bc_icms", "valor", "desconto"} <= colunas_xml:  # noqa: SIM300
-        # o XML vence: na Advertising, a EFD escritura a entrada com CST 70 e
+        # o XML vence: na empresa D, a EFD escritura a entrada com CST 70 e
         # zera base e imposto, e só o XML do fornecedor tem a base reduzida
         fontes_sql.append(f"""
             SELECT nullif(x.ncm, '') AS ncm, x.emissao AS data, x.cst_icms,
@@ -1250,7 +1250,7 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
              extra={"mercadorias": len({n for n, _ in por_dia}), "dias": len(por_dia)})
 
     # A alíquota interna sai do 0200. Sem cadastro — 13.909 saídas da
-    # Advertising, de quatro códigos que não têm 0200 em arquivo nenhum —, ela
+    # empresa D, de quatro códigos que não têm 0200 em arquivo nenhum —, ela
     # vem da **nota de entrada** da mesma mercadoria (decisão do Victor,
     # 17/09/2026): é a alíquota que o fornecedor usou na operação própria, pelo
     # mesmo NCM e pela mesma regra de data da redução.
@@ -1279,7 +1279,7 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
                  extra={"sem_cadastro": faltando, "resolvidas": pegou})
 
     # o documento nem sempre diz a alíquota: o CST 60 não destaca nada, e nem
-    # todo emitente preenche o pICMSEfet (na Advertising, 35.448 dos 81.157
+    # todo emitente preenche o pICMSEfet (na empresa D, 35.448 dos 81.157
     # itens). Nessas linhas a Ficha 3 mostra a alíquota interna da mercadoria,
     # que é o que a operação teria — é o que o papel de trabalho faz
     con.execute("""UPDATE lancamentos SET aliquota_documento = aliquota
@@ -1353,7 +1353,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         linhas = razao.apurar()
         # Estoque negativo não tira mais a ficha do total (decisão do Victor,
         # 17/09/2026): ela abre com a quantidade que faltaria, sem ICMS
-        # suportado, e fica marcada. É o que a RVZ fez na Advertising — a ficha
+        # suportado, e fica marcada. É o que a RVZ fez na empresa D — a ficha
         # dela nunca fica negativa porque começa com o déficit —, e mantém no
         # total o ressarcimento das unidades que têm imposto pago.
         negativo = any(ln.saldo_quantidade < 0 for ln in linhas)

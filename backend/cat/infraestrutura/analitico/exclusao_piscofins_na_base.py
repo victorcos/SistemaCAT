@@ -10,7 +10,7 @@ frentes**:
   detalhe que acompanha o pedido e permite conferir linha a linha contra o
   relatório do escritório anterior.
 
-A soma dos dois difere, e **é de propósito**: 0,06% na DMINAS, cerca de R$ 1,6
+A soma dos dois difere, e **é de propósito**: 0,06% na empresa F, cerca de R$ 1,6
 mil em R$ 2,7 milhões. Ver a decisão de 24/09/2026 e o topo de
 `sped/exclusao_piscofins_na_base.py`.
 

@@ -1,7 +1,7 @@
 """Conferência de documentos: leitura do C100/C800, confronto e planilhas.
 
 As duas linhas de registro abaixo foram **copiadas de arquivos reais** da
-Companhia Sulamericana. Foi assim que os leiautes deste projeto se confirmaram,
+empresa N. Foi assim que os leiautes deste projeto se confirmaram,
 e não pelo manual: já aconteceu de arquivo real não bater com o leiaute
 publicado, e um campo deslocado aqui trocaria chave de nota por número de nota
 em milhões de linhas.
@@ -37,7 +37,7 @@ C800 = (
     "|35210711517841005407590003535520625376456954|0|2,59|0|0|0|0|"
 )
 CABECALHO = (
-    "|0000|015|0|01052021|31052021|Companhia Sulamericana De Distribuicao"
+    "|0000|015|0|01052021|31052021|Empresa N Distribuicao Ltda"
     "|11517841000278||PR|9030138187|4106407||||"
 )
 

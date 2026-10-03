@@ -290,7 +290,7 @@ class ValorDaAbertura:
 def valor_da_abertura(quantidade: Decimal, entradas) -> ValorDaAbertura:
     """O ICMS suportado do estoque de abertura, pelas entradas mais recentes.
 
-    O inventário do cliente pode vir sem o imposto (o do Amigão veio vazio em
+    O inventário do cliente pode vir sem o imposto (o da empresa V veio vazio em
     842 mil linhas). O manual não diz como valorar a abertura, mas diz, no
     item 3.3.8, como se acha o valor quando não se identifica a entrada: as
     entradas mais recentes, suficientes para comportar a quantidade, com média
