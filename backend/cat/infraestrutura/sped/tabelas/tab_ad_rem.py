@@ -25,11 +25,16 @@ começou em **1º de janeiro**. Quem assumir "sempre fevereiro" erra janeiro de
 `A_CONFERIR` guarda o que se suspeita — e o motor **recusa**, levantando
 `AdRemDesconhecida`, até alguém abrir o convênio e mover a linha.
 
-Duas das vigências conferidas têm uma segunda prova, independente da lei: a
-escrituração da empresa G, que credita o monofásico por ajuste `SP020799`. O
-crédito dela dividido pelos litros dá **exatamente** `0,9456` em 2024-01 e
-`1,0635` em 2024-02, 2024-05 e 2024-06. Lei e livro do cliente concordando é o
-padrão que esta casa exige — o mesmo de `tab_aliquota_icms`.
+**Uma corroboração que eu afirmei e que não se sustentou.** Até 03/10/2026 este
+módulo dizia que a escrituração da empresa G era uma segunda prova da ad rem:
+que o crédito dela dividido pelos litros daria "exatamente 1,0635". Com o leitor
+de pé (`sped/combustivel.py`), a razão foi **medida** em nove competências e
+varia de **0,58 a 59,79** — 1,0388 em 2024-02, 1,2193 em 2024-03, 0,9808 em
+2024-04.
+
+O livro do cliente **não confirma a ad rem**: ele é o *objeto* da auditoria, não
+prova dela. A base destes números é só uma, e basta — o texto do convênio no
+sítio do CONFAZ. Ver `DECISOES.md` de 03/10/2026 para a medição.
 
 ## O que esta tabela não é
 
@@ -82,9 +87,11 @@ AD_REM: dict[str, tuple[Vigencia, ...]] = {
                  "Conv. 199/2022; vigência de 1º/02/2025"),
         Vigencia(Decimal("1.0635"), "2024-02",
                  "Convênio ICMS 172/2023, incisos I e II da cláusula sétima do "
-                 "Conv. 199/2022; vigência de 1º/02/2024. Conferido também na "
-                 "escrituração da empresa G: o ajuste SP020799 dividido pelos "
-                 "litros dá 1,0635 exato em 2024-02, 2024-05 e 2024-06"),
+                 "Conv. 199/2022; vigência de 1º/02/2024. **A base é só o "
+                 "convênio.** Este fundamento citava a escrituração de um "
+                 "cliente como segunda prova, e a medição de 03/10/2026 "
+                 "derrubou: a razão crédito÷litros dele varia de 0,58 a 59,79 "
+                 "entre competências"),
     ),
     GASOLINA: (
         Vigencia(Decimal("1.57"), "2026-01",
@@ -119,8 +126,10 @@ AD_REM: dict[str, tuple[Vigencia, ...]] = {
 A_CONFERIR: dict[tuple[str, str], tuple[Decimal, str]] = {
     (DIESEL, "2023-05"): (Decimal("0.9456"),
                           "redação original da cláusula sétima do Conv. ICMS "
-                          "199/2022; exemplo da RC 28013/2023 e escrituração da "
-                          "empresa G em 2024-01 batem, mas o texto não foi lido"),
+                          "199/2022; aparece no exemplo da RC 28013/2023, mas o "
+                          "texto do convênio não foi lido — e a escrituração do "
+                          "cliente, que antes se citava como segunda prova, não "
+                          "reproduz ad rem nenhuma (ver o topo do módulo)"),
     (GLP, "2023-05"): (Decimal("1.2571"),
                        "redação original do Conv. ICMS 199/2022, por quilo"),
     (GASOLINA, "2023-06"): (Decimal("1.22"),

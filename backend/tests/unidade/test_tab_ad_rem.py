@@ -93,33 +93,26 @@ class TestOQueElaRecusa:
         assert "monofásico" in str(erro.value)
 
 
-class TestContraOLivroDoCliente:
-    """A prova que vale mais que a leitura do convênio: o número do cliente.
+class TestOLivroDoClienteNaoCorroboraAAdRem:
+    """A corroboração que eu afirmei em 03/10/2026 e que a medição derrubou.
 
-    A empresa G credita o monofásico por ajuste `SP020799` na apuração. O crédito
-    dela dividido pelos litros do mês dá a ad rem que ela usou — e ela usou a da
-    lei. Lei e livro concordando é o padrão desta casa (ver `tab_aliquota_icms`).
+    O módulo dizia que a escrituração da empresa G era uma segunda prova da ad
+    rem — "o crédito dela dividido pelos litros dá exatamente 1,0635". E havia
+    um teste aqui que parecia confirmar isso.
 
-    **E a diferença que sobra tem nome:** ela não aplica o FCV. Credita
-    `litros × ad rem`, quando o devido é `litros × ad rem × 0,9976`. São 0,24% a
-    mais, sistemáticos — e é por isso que o módulo audita o crédito tomado em
-    vez de só procurar crédito novo.
+    **O teste era vazio.** Ele comparava `creditado × FCV` com
+    `litros × ad_rem × FCV`, usando um par (litros, creditado) escrito à mão na
+    própria parametrização. Qualquer par cuja razão fosse a ad rem passaria,
+    inclusive um inventado — e era o caso: o par dizia R$ 207.403,35 em 2024-02,
+    e o `E111` real daquele mês traz **R$ 69.134,45**.
+
+    Com o leitor de pé (`sped/combustivel.py`) a razão foi medida em nove
+    competências e varia de **0,58 a 59,79**. O livro do cliente é o objeto da
+    auditoria, não prova da alíquota.
+
+    O que sobra aqui é o que sempre foi aritmética e não medição: o tamanho do
+    desvio de quem pula o FCV.
     """
-
-    @pytest.mark.parametrize("competencia, litros, creditado", [
-        ("2024-02", "195020", "207403.35"),
-        ("2024-06", "211963", "225422.70"),
-    ])
-    def test_a_conta_reproduz_o_credito_do_cliente_menos_o_fcv(
-            self, competencia, litros, creditado):
-        ad_rem = da_competencia(DIESEL, competencia)
-
-        devido = Decimal(litros) * ad_rem * FCV_SP_DIESEL
-        tomado = Decimal(creditado)
-
-        # o que o cliente creditou é o devido dividido pelo FCV — isto é, ele
-        # pulou o fator. A conta fecha em menos de um real em R$ 200 mil
-        assert abs(tomado * FCV_SP_DIESEL - devido) < 1
 
     def test_pular_o_fcv_credita_024_por_cento_a_mais(self):
         """O tamanho do desvio, para ninguém o confundir com arredondamento."""
@@ -131,6 +124,18 @@ class TestContraOLivroDoCliente:
 
         a_mais = (sem_fcv - com_fcv) / com_fcv * 100
         assert Decimal("0.23") < a_mais < Decimal("0.25")
+
+    def test_o_desvio_do_fcv_nao_depende_do_volume(self):
+        """É proporcional, e por isso o número de litros do exemplo é
+        arbitrário — ao contrário do que a versão anterior sugeria ao usar um
+        volume que dizia ser do cliente."""
+        ad_rem = da_competencia(DIESEL, "2024-02")
+
+        def a_mais(litros: str) -> Decimal:
+            com = Decimal(litros) * ad_rem * FCV_SP_DIESEL
+            return (Decimal(litros) * ad_rem - com) / com
+
+        assert a_mais("1") == a_mais("195020") == a_mais("7231083")
 
 
 class TestAFormaDaTabela:

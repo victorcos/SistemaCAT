@@ -501,10 +501,16 @@ marcados como tal; e o **`VL_ICMS` do C170 é esparso** (o CST `000` tem 610
 linhas e 24 com valor), então ICMS destacado confiável vem do `C190`, que é
 obrigatório.
 
-**Falta:** a rodada que chama o leitor em ordem e grava parquet; o classificador
-de produto; a apuração; a auditoria do `E111`; e a prescrição do ICMS. Do
-leiaute, faltam medir `0206`, `0220` e `C171` — e o `0220` já apareceu na
-empresa Z com dois tamanhos, então ele é o próximo.
+A **rodada** está feita (`analitico/combustivel.py`, v0.139.0): escolhe um
+arquivo por `(CNPJ, competência)` chamando a regra da Gestão em vez de copiá-la,
+grava o parquet das compras, conta por `(CNPJ, competência, CST, unidade)` e
+apaga parquet pela metade quando alguém cancela. Ela **não** aplica prescrição —
+a do ICMS conta cinco anos da emissão, regra diferente da do PIS/COFINS — e em
+vez disso devolve a primeira e a última emissão encontradas.
+
+**Falta:** o classificador de produto; a apuração; a auditoria do `E111`; e a
+prescrição do ICMS. Do leiaute, faltam medir `0206`, `0220` e `C171` — e o
+`0220` já apareceu na empresa Z com dois tamanhos, então ele é o próximo.
 
 **Atenção ao reúso que não serve:** o `Total.somar` do `exclusoes_por_item` lê
 `linha.pis`, `linha.cofins`, `linha.diferenca_do_pis`, `linha.selic_sobre_o_pis`.

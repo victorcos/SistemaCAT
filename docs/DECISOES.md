@@ -5,6 +5,87 @@
 
 ---
 
+## 2026-10-03 — A rodada do combustível, e a corroboração que ela derrubou
+
+Quarta peça do motor: `analitico/combustivel.py` escolhe os arquivos do lote,
+chama o leitor em ordem, grava o parquet e devolve o resumo. A mecânica vem de
+`exclusoes_por_item.py` — `Escritor`, `parar_se_pedirem` e o `try/finally` que
+apaga parquet interrompido. **A soma não vem:** o `Total` de lá lê `linha.pis`,
+`linha.cofins` e `linha.selic_sobre_o_pis`, e esta tese não tem nenhum dos três.
+
+**A regra da retificadora é chamada, não copiada.** `escolher` monta um
+`ApuracaoEFD` com os cinco campos que `selecionar_por_cnpj_e_competencia` usa e
+delega. O `tipo_escrit` vem do `COD_FIN` da ICMS/IPI, que tem outro nome e a
+mesma convenção — conferido em 40 arquivos, 17 com `0` e 23 com `1`.
+
+**A unidade entra na chave do grupo.** Somar `L`, `LT` e `LTS` numa coluna só
+daria número sem grandeza. Separadas, a soma é conferível e o tamanho do
+problema fica visível para quem vai normalizá-lo — e a primeira rodada mostrou
+até `l` minúsculo.
+
+**Não aplica prescrição, e diz por quê.** O ICMS prescreve em cinco anos da
+**emissão** (LC 87/96, art. 23), regra diferente da do PIS/COFINS que
+`dominio/piscofins/prescricao.py` implementa. Em vez de inventar a regra no
+lugar errado, o resumo traz a **primeira e a última emissão** encontradas: quem
+roda vê o intervalo e sabe se o assunto existe.
+
+### O primeiro resultado real, e ele corrige o que eu escrevi hoje
+
+Cruzando os litros de CST 61 que o leitor acha com o `E111` `SP020799` do mesmo
+arquivo, em nove competências da matriz da empresa G:
+
+| comp | litros CST 61 | creditado | devido | diferença |
+|---|---|---|---|---|
+| 2024-02 | 66.555,39 | 69.134,45 | 70.611,79 | −1.477,34 |
+| 2024-03 | 70.134,66 | 85.516,82 | 74.409,20 | **+11.107,62** |
+| 2024-04 | 60.396,36 | 59.234,73 | 64.077,38 | −4.842,65 |
+| 2024-05 | 85.080,88 | 88.182,47 | 90.266,35 | −2.083,88 |
+| 2024-06 | 72.540,30 | 75.140,90 | 76.961,45 | −1.820,55 |
+| 2024-07 | 68.877,94 | 67.660,47 | 73.075,89 | −5.415,42 |
+| 2025-02 | 1.051,67 | 62.874,28 | 1.175,04 | **+61.699,24** |
+| 2025-06 | 70.645,79 | 77.473,59 | 78.933,39 | −1.459,80 |
+| 2026-01 | 36.462,19 | 21.141,68 | 42.558,38 | −21.416,70 |
+
+**Sete dos nove meses saem curtos**, o que confirma o que o levantamento já
+dizia. Dois saem acima, e o de 2025-02 é absurdo: 1.051 litros contra R$ 62.874
+de crédito, razão de 59,79 por litro. Absurdo não é resultado — é sinal de que
+o crédito daquele mês cobre combustível comprado em outro estabelecimento, ou é
+correção retroativa. **A auditoria aponta; não conclui.**
+
+Ressalva que precisa ficar escrita: estes números são de **um** estabelecimento
+(a pasta da matriz). Em 2024-02 conferi que os outros três não têm CST 61; nos
+demais meses, não conferi. Serve de demonstração da cadeia, não de laudo.
+
+### A corroboração que eu afirmei e que isto derrubou
+
+Até hoje o `tab_ad_rem` dizia que a escrituração daquele cliente era uma segunda
+prova da ad rem — "o crédito dela dividido pelos litros dá **exatamente**
+1,0635". A razão medida varia de **0,58 a 59,79**: 1,0388 em 2024-02, 1,2193 em
+2024-03, 0,9808 em 2024-04. **O livro do cliente não confirma a ad rem; ele é o
+objeto da auditoria.** A base daqueles números é só uma, e basta: o texto do
+convênio.
+
+**E o teste que sustentava a afirmação era vazio.** Ele comparava
+`creditado × FCV` com `litros × ad_rem × FCV`, com o par (litros, creditado)
+escrito à mão na parametrização — qualquer par cuja razão fosse a ad rem
+passaria. E o par estava errado: dizia R$ 207.403,35 em 2024-02, e o `E111` real
+traz R$ 69.134,45. Três vezes mais.
+
+É a terceira vez hoje que um teste ou medição meu passa por certo sem prová-lo
+nada (as outras: a mutação que quebrava o código em vez de reproduzir o
+comportamento antigo, e a varredura de `E111` que devolveu zero por caminho
+assumido). O padrão é o mesmo — **a verificação tem de poder falhar**, e a única
+forma de saber é fazê-la falhar de propósito.
+
+O que sobrou no lugar é aritmética, não medição: o desvio de quem pula o FCV é
+0,24% e **não depende do volume**, com teste que o afirma em três ordens de
+grandeza.
+
+25 testes na rodada, inclusive o cancelamento que apaga o parquet pela metade e
+o par ambíguo que sai marcado no parquet.
+
+---
+
 ## 2026-10-03 — O leitor das compras, e o campo que carrega dois domínios
 
 Terceira peça do motor: `sped/combustivel.py` entrega uma linha por item de
