@@ -25,6 +25,7 @@ from cat.infraestrutura.sped.tabelas.tab_aliquota_combustivel import (
     LUBRIFICANTE,
     AliquotaDeCombustivelDesconhecida,
     ForaDoRegimePercentual,
+    MesPartido,
     interna,
     no_monofasico,
 )
@@ -159,10 +160,106 @@ class TestOQueElaRecusa:
 
     def test_o_marco_de_2006_do_hidratado_e_mes_partido_e_por_isso_recusa(self):
         """A alínea do álcool valeu de 29/03/2006 — março é meio e meio."""
-        with pytest.raises(AliquotaDeCombustivelDesconhecida):
+        with pytest.raises(MesPartido):
             interna("ES", ETANOL_HIDRATADO, "2006-03")
 
         assert interna("ES", ETANOL_HIDRATADO, "2006-04") == Decimal(27)
+
+
+class TestSaoPauloOndeEstaOVolume:
+    """Os quatro clientes com CST 61 são de SP, então é aqui que o número sai.
+
+    E SP é mais difícil que o ES por uma razão só: o complemento de alíquota da
+    Lei 17.293/2020, que levou o diesel de 12% a 13,3% por dois anos e começou
+    e terminou **no dia 15**.
+    """
+
+    @pytest.mark.parametrize("competencia, esperado", [
+        ("2020-10", "12"),      # antes do complemento
+        ("2020-12", "12"),
+        ("2021-02", "13.3"),    # complemento em vigor
+        ("2022-06", "13.3"),
+        ("2022-12", "13.3"),
+        ("2023-02", "12"),      # complemento revogado
+        ("2023-04", "12"),
+    ])
+    def test_o_diesel_e_12_fora_da_janela_do_complemento_e_13_3_dentro(
+            self, competencia, esperado):
+        assert interna("SP", DIESEL, competencia) == Decimal(esperado)
+
+    def test_a_gasolina_nao_levou_complemento_nenhum(self):
+        """O complemento é dos arts. 53-A (7%) e 54 (12%); o art. 55 não tem
+        parágrafo equivalente. A gasolina ficou 25% a era inteira."""
+        for competencia in ("2020-10", "2021-06", "2022-12", "2023-05"):
+            assert interna("SP", GASOLINA, competencia) == Decimal(25)
+
+    def test_ignorar_o_complemento_perde_11_por_cento_do_credito_do_diesel(self):
+        """Dois anos de compras a 12% quando a lei dava 13,3%."""
+        com, sem = interna("SP", DIESEL, "2022-06"), Decimal(12)
+
+        a_menos = (com - sem) / com * 100
+        assert Decimal(9) < a_menos < Decimal(11)
+
+    def test_sp_e_es_divergem_no_diesel_e_na_gasolina(self):
+        """Prova que o eixo UF importa: mesma era, mesmos produtos, outro número."""
+        assert interna("SP", DIESEL, "2022-06") != interna("ES", DIESEL, "2022-06")
+        assert interna("SP", GASOLINA, "2022-06") != interna("ES", GASOLINA, "2022-06")
+
+    def test_o_etanol_hidratado_de_sp_nao_esta_conferido(self):
+        """Ele divide o inciso VI com o diesel, mas tem dois Informativos SFP só
+        para ele — indício de regime próprio que ninguém leu ainda."""
+        with pytest.raises(AliquotaDeCombustivelDesconhecida) as erro:
+            interna("SP", ETANOL_HIDRATADO, "2022-10")
+
+        assert "SFP" in str(erro.value)
+
+
+class TestOMesPartido:
+    """A recusa que nasceu de São Paulo, e que é erro próprio por uma razão.
+
+    Aqui não falta ler lei nenhuma e a era está certa: o mês simplesmente tem
+    **duas** alíquotas. A saída não é conferir nada, é separar as entradas pela
+    data do documento — e por isso não pode cair no mesmo `except` de
+    "não conferido".
+    """
+
+    @pytest.mark.parametrize("competencia", ["2021-01", "2023-01"])
+    def test_os_dois_meses_de_virada_do_complemento_recusam(self, competencia):
+        with pytest.raises(MesPartido):
+            interna("SP", DIESEL, competencia)
+
+    def test_a_mensagem_diz_as_duas_aliquotas_e_o_dia(self):
+        """Mensagem que não dá os dois lados não serve para separar nada."""
+        with pytest.raises(MesPartido) as erro:
+            interna("SP", DIESEL, "2021-01")
+
+        texto = str(erro.value)
+        assert "15" in texto, "o dia da virada"
+        assert "12" in texto and "13.3" in texto, "as duas alíquotas"
+        assert "data do documento" in texto, "o que fazer"
+
+    def test_nao_e_a_mesma_familia_de_nao_conferido(self):
+        """Se fosse, um `except AliquotaDeCombustivelDesconhecida` no motor
+        engoliria o mês partido e completaria com qualquer coisa."""
+        assert not issubclass(MesPartido, AliquotaDeCombustivelDesconhecida)
+        assert not issubclass(MesPartido, ForaDoRegimePercentual)
+
+    def test_os_meses_vizinhos_respondem_normalmente(self):
+        """A recusa é do mês da virada, não da vizinhança dela."""
+        assert interna("SP", DIESEL, "2020-12") == Decimal(12)
+        assert interna("SP", DIESEL, "2021-02") == Decimal("13.3")
+        assert interna("SP", DIESEL, "2022-12") == Decimal("13.3")
+        assert interna("SP", DIESEL, "2023-02") == Decimal(12)
+
+    def test_toda_vigencia_com_dia_diferente_de_um_recusa_o_proprio_mes(self):
+        """A regra vale para a tabela inteira, não só para os casos conhecidos."""
+        for uf, por_produto in tab.INTERNA.items():
+            for produto, vigencias in por_produto.items():
+                for v in vigencias:
+                    if v.dia == 1:
+                        continue
+                    with pytest.raises(MesPartido):
+                        interna(uf, produto, v.desde)
 
 
 class TestOsTrintaPorCentoQueNuncaValeram:
@@ -201,13 +298,30 @@ class TestAFormaDaTabela:
                 datas = [v.desde for v in vigencias]
                 assert datas == sorted(datas, reverse=True), f"{uf} {produto}"
 
-    def test_toda_vigencia_cita_o_ato_legal(self):
+    def test_toda_vigencia_cita_o_ato_legal_e_o_artigo(self):
         """Número sem fundamento não se confere depois, e vira folclore."""
         for uf, por_produto in tab.INTERNA.items():
             for produto, vigencias in por_produto.items():
                 for v in vigencias:
-                    assert "Lei" in v.fundamento, f"{uf} {produto} {v.desde}"
-                    assert "art." in v.fundamento, f"{uf} {produto} {v.desde}"
+                    onde = f"{uf} {produto} {v.desde}"
+                    assert any(ato in v.fundamento
+                               for ato in ("Lei", "Decreto", "RICMS")), onde
+                    assert "art." in v.fundamento, onde
+
+    def test_todo_valor_refutado_diz_por_que_nao_vale(self):
+        """Refutado sem motivo é só uma opinião, e alguém a reabre."""
+        for (uf, produto), (valor, motivo) in tab.REFUTADO.items():
+            assert valor > 0, f"{uf} {produto}"
+            assert len(motivo) > 60, f"{uf} {produto}"
+
+    def test_os_dois_enganos_conhecidos_erram_para_cima(self):
+        """Fonte secundária infla — nos dois estados, na gasolina, por somas que
+        a lei não manda fazer. Vale registrar como propriedade, não anedota."""
+        for (uf, produto), (errado, _) in tab.REFUTADO.items():
+            conferida = tab.INTERNA.get(uf, {}).get(produto)
+            if not conferida:
+                continue
+            assert errado > conferida[0].aliquota, f"{uf} {produto}"
 
     def test_o_que_esta_a_conferir_nao_esta_conferido(self):
         """Seria conferido e suspeito ao mesmo tempo, e alguém usaria a errada."""

@@ -22,25 +22,51 @@ manda — e errar para baixo é pior, porque o número menor não desperta ningu
 É por isso que esta tabela existe separada de `tab_aliquota_icms`: lá o eixo é a
 UF, aqui são **UF e produto**, e o produto manda mais.
 
-## O que está conferido no Espírito Santo, e o que não está
+## O que está conferido, e onde
 
-Lido no **texto consolidado da Lei 7.000/2001** (175 páginas, com o histórico de
-redações de cada inciso). Diesel e gasolina estão nomeados na lei e entraram em
-`INTERNA`. O **GLP não está nomeado em lugar nenhum do art. 20** — e por isso
-ficou em `A_CONFERIR`, não em `INTERNA`. Ver `A_CONFERIR` para o que falta ler.
+**Espírito Santo** — texto consolidado da Lei 7.000/2001 (175 páginas, com o
+histórico de redações de cada inciso). Diesel 12% (art. 20, II, "k"), gasolina
+27% e álcool de todos os tipos 27% (art. 20, VI).
 
-### A armadilha dos 30% na gasolina, e por que ela está registrada
+**São Paulo** — RICMS, Decreto 45.490/2000, arts. 52 a 56-C. É onde está **todo o
+volume medido**: os quatro clientes com CST 61 são de SP. Diesel 12%/13,3% (art.
+54, VI) e gasolina 25% (art. 55, XXVI).
 
-Uma busca na internet devolve **30%** para a gasolina do Espírito Santo. O número
-existe de fato na lei — a Lei 8.098, de 27/09/2005, incluiu o inciso VI com
-exatamente 30%. Ele **nunca produziu efeitos**: a Lei 8.237, de 28/12/2005, deu
-nova redação ao mesmo inciso antes de o primeiro entrar em vigor, e o texto
+O **GLP não entrou em nenhuma das duas** — não é nomeado nos artigos de alíquota
+de qualquer dos dois estados. Ficou em `A_CONFERIR`, com o que falta ler escrito.
+
+### São Paulo tem dois meses partidos, e eles são a razão do campo `dia`
+
+O complemento de alíquota do art. 22 da **Lei 17.293/2020** somou 1,3 ponto às
+operações do art. 54, levando o diesel de 12% a **13,3%** — e começou em
+**15/01/2021**, não no dia 1º. O Decreto 67.524/2023 o revogou com efeitos
+**retroativos a 15/01/2023**, também meio do mês.
+
+Então 01/2021 e 01/2023 têm **duas alíquotas cada**, e a competência não decide
+qual vale. `interna()` levanta `MesPartido` nesses dois meses em vez de escolher
+um lado: a apuração precisa separar as entradas pela data do documento. Escolher
+calado erraria 1,3 ponto num mês inteiro de compras de diesel.
+
+O complemento **não** alcançou a gasolina: ele é dos arts. 53-A (7%) e 54 (12%),
+e o art. 55 não tem parágrafo equivalente. Nem o adicional de 2% do art. 56-C
+alcança combustível — ele vale só para bebida alcoólica da posição 2203 e fumo.
+
+### Duas armadilhas na gasolina, uma por estado
+
+**Espírito Santo, 30%.** Uma busca na internet devolve 30% para a gasolina do ES.
+O número existe de fato na lei — a Lei 8.098, de 27/09/2005, incluiu o inciso VI
+com exatamente 30%. Ele **nunca produziu efeitos**: a Lei 8.237, de 28/12/2005,
+deu nova redação ao mesmo inciso antes de o primeiro entrar em vigor, e o texto
 consolidado marca a versão anterior como *"sem efeitos"*.
 
-Quem lê um resumo, e não o consolidado com o histórico, pega os 30%. Sobre uma
-base de R$ 10 milhões de gasolina isso são R$ 300 mil de crédito a mais, pedidos
-com fundamento num inciso que nunca valeu. Por isso o valor está em `REFUTADO`:
-para que a próxima pessoa que o encontrar reconheça o que encontrou.
+**São Paulo, 27%.** Uma leitura resumida do RICMS/SP soma o adicional de 2% do
+art. 56-C aos 25% do art. 55 e chega a 27%. O art. 56-C tem dois incisos, e são
+*bebidas alcoólicas da posição 2203* e *fumo* — combustível não está lá.
+
+Os dois erram **para cima**, os dois saem de fonte secundária, e os dois estão em
+`REFUTADO` com o motivo. Sobre R$ 10 milhões de base de gasolina, o do ES são
+R$ 300 mil e o de SP são R$ 200 mil pedidos a mais. Por isso o registro existe:
+para que a próxima pessoa que topar com o número reconheça o que encontrou.
 
 ## Por que o livro do cliente não confere esta tabela
 
@@ -52,16 +78,20 @@ dele sirva de prova.
 
 A prova independente que **vai** existir vem do XML, não do SPED: `vICMSSTRet`
 dividido por `vBCSTRet`, que o leitor em `cat/dominio/notafiscal/xml.py` já lê
-(`valor_st_retido` e `bc_st_retido`). Quando houver XML de compra de combustível
-de um cliente do ES na era do ST, essa divisão confirma ou derruba os 12% e os
-27% — e aí a nota de procedência destas linhas muda.
+(`valor_st_retido` e `bc_st_retido`). Essa divisão confirma ou derruba as
+alíquotas daqui — e aí a nota de procedência destas linhas muda.
 
-Até lá o que dá peso ao Espírito Santo é a lei mais uma concordância
-independente: um papel de trabalho de projeto encerrado, de outro escritório,
-apurou gasolina a 27% e diesel a 12%. Ele **errou** o FCV (usou o de São Paulo
-num cliente do ES, ver `tab_fcv`), e por isso não serve de gabarito sozinho — mas
-acertar a alíquota pelo mesmo número que a lei, tendo errado outra coisa, é
-concordância e não cópia.
+**Em São Paulo isso é factível agora**, e é o próximo passo natural: os clientes
+com volume são de SP, e o que falta é achar XML de compra de combustível anterior
+a maio de 2023. O 13,3% é o alvo mais interessante da conferência, porque é o
+número que ninguém espera encontrar.
+
+No Espírito Santo não há cliente com combustível, então o que dá peso é a lei
+mais uma concordância independente: um papel de trabalho de projeto encerrado, de
+outro escritório, apurou gasolina a 27% e diesel a 12%. Ele **errou** o FCV (usou
+o de São Paulo num cliente do ES, ver `tab_fcv`), e por isso não serve de
+gabarito sozinho — mas acertar a alíquota pelo mesmo número que a lei, tendo
+errado outra coisa, é concordância e não cópia.
 """
 
 from __future__ import annotations
@@ -94,11 +124,19 @@ MONOFASICO_DESDE: dict[str, str] = {
 
 @dataclass(frozen=True)
 class Vigencia:
-    """Uma alíquota interna de combustível, desde quando vale e de onde saiu."""
+    """Uma alíquota interna de combustível, desde quando vale e de onde saiu.
+
+    `dia` é o dia do mês em que ela passou a valer. Quando não é o dia 1º, a
+    competência de `desde` é **mês partido** — duas alíquotas no mesmo mês — e
+    `interna()` recusa aquele mês em vez de escolher um dos lados. Não é zelo:
+    São Paulo tem dois desses (15/01/2021 e 15/01/2023), e devolver o lado
+    errado erra 1,3 ponto num mês inteiro de compras, calado.
+    """
 
     aliquota: Decimal
     desde: str        # "aaaa-mm"; vale desta competência em diante
     fundamento: str   # o ato legal, com inciso e alínea
+    dia: int = 1      # dia do mês em que começou; != 1 marca mês partido
 
 
 # Por UF e por produto, **só o que foi lido no texto da lei do estado**. Em
@@ -125,12 +163,49 @@ INTERNA: dict[str, dict[str, tuple[Vigencia, ...]]] = {
                      "efeitos — ver REFUTADO"),
         ),
         ETANOL_HIDRATADO: (
-            Vigencia(Decimal(27), "2006-04",
+            Vigencia(Decimal(27), "2006-03",
                      "Lei 7.000/2001, art. 20, VI, 'b' ('álcool de todos os "
                      "tipos, inclusive o álcool carburante', NCM 2207.10.0100 e "
-                     "2207.10.9902), efeitos de 29/03/2006 — adotado aqui de "
-                     "04/2006 porque março é mês partido. Segue percentual até "
-                     "hoje: o art. 3º-B só pôs o anidro no monofásico"),
+                     "2207.10.9902), efeitos de 29/03/2006. Segue percentual até "
+                     "hoje: o art. 3º-B só pôs o anidro no monofásico",
+                     dia=29),
+        ),
+    },
+    # São Paulo é onde está todo o volume medido — os quatro clientes com CST 61
+    # são daqui. O RICMS/SP (Decreto 45.490/2000) separa os combustíveis em dois
+    # artigos, e o de 12% levou o complemento da Lei 17.293/2020.
+    "SP": {
+        DIESEL: (
+            Vigencia(Decimal(12), "2023-01",
+                     "RICMS/SP, art. 54, VI: volta aos 12% porque o complemento "
+                     "do § 7º foi **revogado** pelo Decreto 67.524, de "
+                     "27/02/2023, com efeitos retroativos a 15/01/2023",
+                     dia=15),
+            Vigencia(Decimal("13.3"), "2021-01",
+                     "RICMS/SP, art. 54, § 7º: os 12% do inciso VI ficaram "
+                     "sujeitos a complemento de 1,3%, 'passando as operações "
+                     "internas indicadas no caput a ter uma carga tributária de "
+                     "13,3%' (Lei 17.293/2020, art. 22). Decreto 65.253, de "
+                     "15/10/2020, com a redação do Decreto 65.470, de "
+                     "14/01/2021; efeitos de 15/01/2021. O diesel é o inciso VI "
+                     "e **não** está entre as exceções do § 7º (incisos I e XIX)",
+                     dia=15),
+            Vigencia(Decimal(12), "2014-03",
+                     "RICMS/SP, art. 54, VI ('óleo diesel e etanol hidratado "
+                     "combustível - EHC'), na redação do Decreto 59.997, de "
+                     "20/12/2013, em vigor de 1º/03/2014; Lei 6.374/89, art. 34, "
+                     "§ 1º, item 10"),
+        ),
+        GASOLINA: (
+            Vigencia(Decimal(25), "2014-03",
+                     "RICMS/SP, art. 55, XXVI ('etanol anidro combustível - EAC "
+                     "[...] e gasolina classificada nos códigos 2710.00.0301 a "
+                     "0399'), na redação do Decreto 59.997, de 20/12/2013, em "
+                     "vigor de 1º/03/2014. **Sem complemento**: o do art. 22 da "
+                     "Lei 17.293/2020 alcançou só as alíquotas de 7% e de 12% "
+                     "(arts. 53-A e 54), e o art. 55 não tem parágrafo "
+                     "equivalente. E sem o adicional de 2% do art. 56-C, que "
+                     "vale só para bebida alcoólica e fumo"),
         ),
     },
 }
@@ -162,6 +237,21 @@ A_CONFERIR: dict[tuple[str, str], tuple[Decimal, str]] = {
         "monofásico, então a alíquota vale até hoje. Os 30% e os 56,63% que "
         "aparecem perto da palavra 'lubrificante' no texto da lei são **MVA** do "
         "Convênio ICMS 110/2007, não alíquota"),
+    ("SP", GLP): (
+        Decimal(18),
+        "geral do art. 52, I, por resíduo: o GLP não é nomeado nos arts. 54 nem "
+        "55 — só aparece no inciso XXVII do art. 55 como *exclusão* da definição "
+        "de solvente. Antes de usar, procurar redução de base de cálculo no "
+        "Anexo II do RICMS/SP, que é por onde SP costuma tratar o botijão. "
+        "Lembrar que o próprio 18% ainda está em `tab_aliquota_icms.A_CONFERIR`"),
+    ("SP", ETANOL_HIDRATADO): (
+        Decimal("13.3"),
+        "ele divide o inciso VI do art. 54 com o diesel, então à primeira vista "
+        "segue os 12%/13,3%. **Mas o RICMS traz duas notas de Informativo SFP só "
+        "para ele** — uma 'aplicável de 15/07/2022 a 30/06/2023' e outra "
+        "'aplicável a partir de 1º/07/2023' —, o que indica regime próprio "
+        "nessas janelas. Ler os dois informativos (DOE 18/07/2022 e DOE "
+        "30/06/2023) antes de calcular EHC em SP"),
 }
 
 # Valores que se encontram por aí e que **já se provou errados**. Não são
@@ -175,11 +265,28 @@ REFUTADO: dict[tuple[str, str], tuple[Decimal, str]] = {
         "deu nova redação ao mesmo inciso antes da entrada em vigor, fixando "
         "27%. O texto consolidado marca a versão de 2005 como 'sem efeitos'. "
         "Quem lê resumo em vez do consolidado pega os 30% e pede 11% a mais"),
+    ("SP", GASOLINA): (
+        Decimal(27),
+        "soma indevida do adicional de 2% do art. 56-C aos 25% do art. 55, "
+        "XXVI. O art. 56-C tem **dois incisos**, e são bebidas alcoólicas da "
+        "posição 2203 da NCM e fumo do capítulo 24 — combustível não está lá, e "
+        "o adicional só vale em operação destinada a consumidor final. Quem "
+        "soma pede 8% a mais"),
 }
 
 
 class AliquotaDeCombustivelDesconhecida(LookupError):
     """Pediram a alíquota de um combustível, UF ou mês que não se conferiu."""
+
+
+class MesPartido(LookupError):
+    """A alíquota mudou no meio daquele mês: há duas, e a competência não decide.
+
+    Erro separado dos outros dois de propósito, porque a saída é diferente — aqui
+    não falta ler lei nenhuma e a era está certa. O que falta é **a data do
+    documento**: a apuração daquele mês precisa separar as entradas antes e
+    depois do dia da virada. Devolver um dos lados erraria o outro calado.
+    """
 
 
 class ForaDoRegimePercentual(LookupError):
@@ -197,10 +304,15 @@ def interna(uf: str, produto: str, competencia: str) -> Decimal:
     `competencia` em "aaaa-mm". Devolve pontos percentuais (12 para 12%), como
     `tab_aliquota_icms.interna`.
 
-    Levanta `ForaDoRegimePercentual` quando a competência já é do monofásico, e
-    `AliquotaDeCombustivelDesconhecida` quando a UF, o produto ou o mês não
-    estão conferidos — **inclusive havendo palpite em `A_CONFERIR`**, caso em
-    que a mensagem diz qual é e o que falta ler para usá-lo.
+    Três recusas, de propósito distintas, porque a saída de cada uma é outra:
+
+    * `ForaDoRegimePercentual` — a competência já é do monofásico. Não falta
+      dado: ali não existe percentual. Ir para `tab_ad_rem` e `tab_fcv`;
+    * `MesPartido` — a alíquota mudou no meio daquele mês e há duas. Separar as
+      entradas pela data do documento;
+    * `AliquotaDeCombustivelDesconhecida` — a UF, o produto ou o mês não estão
+      conferidos. **Inclusive havendo palpite em `A_CONFERIR`**, caso em que a
+      mensagem diz qual é e o que falta ler para usá-lo.
     """
     uf = (uf or "").strip().upper()
 
@@ -223,6 +335,16 @@ def interna(uf: str, produto: str, competencia: str) -> Decimal:
               "anterior não confere: ver o topo de `tab_aliquota_icms`.")
 
     for vigencia in vigencias:
+        if competencia == vigencia.desde and vigencia.dia != 1:
+            anterior = _anterior_a(vigencias, vigencia)
+            raise MesPartido(
+                f"{produto} em {uf} mudou de alíquota no dia {vigencia.dia} de "
+                f"{competencia}: "
+                + (f"{anterior.aliquota}% até o dia {vigencia.dia - 1} e "
+                   if anterior else "")
+                + f"{vigencia.aliquota}% a partir dele ({vigencia.fundamento}). "
+                f"A competência não decide qual vale — separar as entradas pela "
+                f"data do documento e somar os dois pedaços.")
         if competencia >= vigencia.desde:
             return vigencia.aliquota
 
@@ -231,6 +353,14 @@ def interna(uf: str, produto: str, competencia: str) -> Decimal:
         f"A alíquota de {produto} em {uf} só é conhecida de {mais_antiga} em "
         f"diante, e pediram {competencia}. Acrescentar a vigência anterior em "
         f"`tab_aliquota_combustivel.INTERNA`.")
+
+
+def _anterior_a(vigencias: tuple[Vigencia, ...],
+                vigencia: Vigencia) -> Vigencia | None:
+    """A vigência que valia antes desta — serve à mensagem do mês partido, que
+    só é útil se disser as **duas** alíquotas do mês."""
+    posterior = vigencias.index(vigencia) + 1
+    return vigencias[posterior] if posterior < len(vigencias) else None
 
 
 def _pista(uf: str, produto: str) -> str:

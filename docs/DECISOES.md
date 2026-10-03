@@ -5,6 +5,69 @@
 
 ---
 
+## 2026-10-03 — São Paulo: o complemento de 1,3 ponto, e os dois meses partidos
+
+**Por que SP depois do ES no mesmo dia.** O ES entrou primeiro porque tinha
+gabarito para confrontar. Mas o ES **não tem cliente com combustível** — os
+quatro com CST 61 são todos de São Paulo (7,2 / 3,8 / 2,2 / 0,4 milhões de
+litros). O ES provou o método; SP é onde ele rende.
+
+**O achado é o complemento de alíquota da Lei 17.293/2020.** O art. 22 somou
+1,3 ponto às operações do art. 54 do RICMS/SP, e o § 7º diz com estas palavras
+*"passando [...] a ter uma carga tributária de 13,3%"*. O diesel é o inciso VI e
+não está entre as exceções do parágrafo. **Dois anos de compras de diesel em SP
+foram a 13,3%, não a 12%** — de 15/01/2021 a 14/01/2023, pelo Decreto 65.253/2020
+com a redação do 65.470/2021, revogado pelo Decreto 67.524/2023 com efeitos
+retroativos a 15/01/2023. Quem apurar a 12% perde 10% do crédito do período.
+
+**Os dois meses partidos, e o campo que eles obrigaram a criar.** O complemento
+começou e terminou **no dia 15**. Em 01/2021 e 01/2023 há duas alíquotas, e a
+competência não decide qual vale. A `Vigencia` ganhou um campo `dia` e a tabela
+um erro próprio, `MesPartido`, que **recusa a competência da virada** e manda
+separar as entradas pela data do documento.
+
+Era tentador resolver começando a vigência no mês seguinte — foi o que eu tinha
+feito com o álcool do ES, cuja alínea valeu de 29/03/2006. Só que isso devolve
+calado a alíquota *anterior* para o mês da virada. No ES passou despercebido
+porque não havia vigência anterior e a consulta recusava por outro motivo; em SP
+devolveria 12% para janeiro de 2021 inteiro. Corrigi o ES também: ele agora
+declara `desde="2006-03", dia=29`, que é a regra de verdade, e há teste que
+percorre a tabela inteira exigindo que toda vigência com `dia != 1` recuse o
+próprio mês.
+
+**São três recusas, e a distinção é o que protege.** `ForaDoRegimePercentual`
+(a era é ad rem, vá para `tab_ad_rem`), `MesPartido` (duas alíquotas, separe pela
+data) e `AliquotaDeCombustivelDesconhecida` (ninguém leu, preencha `INTERNA`).
+Nenhuma é subclasse da outra, e há teste que afirma isso: se `MesPartido`
+herdasse de `AliquotaDeCombustivelDesconhecida`, um `except` do motor engoliria o
+mês partido e completaria com qualquer coisa.
+
+**A segunda armadilha na gasolina, e o que ela ensina sobre fonte secundária.**
+Pedi a leitura do RICMS/SP a uma busca antes de abrir o texto, e ela devolveu
+gasolina a **27%**: os 25% do art. 55, XXVI somados ao adicional de 2% do art.
+56-C. O art. 56-C tem **dois incisos** — bebidas alcoólicas da posição 2203 e
+fumo do capítulo 24 —, e o adicional só vale em operação destinada a consumidor
+final. Combustível não está lá. A mesma busca também afirmou que o complemento
+de 1,3% seguia vigente, quando o Decreto 67.524/2023 o revogou.
+
+É o segundo engano de gasolina em um dia, depois dos 30% do ES. **Os dois vêm de
+fonte secundária e os dois erram para cima.** Virou teste de propriedade sobre
+`REFUTADO`, não dois casos anotados: todo valor refutado que tenha par conferido
+tem de ser maior que ele.
+
+**Fica em aberto em SP:** o etanol hidratado, que divide o inciso VI com o diesel
+mas tem dois Informativos SFP próprios (janelas de 15/07/2022 a 30/06/2023 e de
+1º/07/2023 em diante) — indício de regime próprio; e o GLP, que não é nomeado em
+nenhum dos dois artigos e cai na geral por resíduo, faltando descartar redução de
+base no Anexo II. Os dois recusam.
+
+**O que SP viabiliza e o ES não.** A conferência pelo XML (`vICMSSTRet ÷
+vBCSTRet`, campos que `dominio/notafiscal/xml.py` já lê) só é possível onde há
+cliente com compra de combustível na era do ST. Em SP há. O alvo mais
+interessante é o 13,3%, justamente porque é o número que ninguém espera achar.
+
+---
+
 ## 2026-10-03 — A alíquota do combustível na era do ST, e o inciso que nunca valeu
 
 **O que faltava.** O módulo de combustível já sabia calcular o monofásico

@@ -165,6 +165,67 @@ do EXTRABOM apurou gasolina a 27% e diesel a 12%. Ele **errou** o FCV, e por iss
 não serve de gabarito sozinho — mas acertar a alíquota pelo mesmo número que a
 lei, tendo errado outra coisa, é concordância e não cópia.
 
+### São Paulo, que é onde está o volume
+
+Lido no **RICMS/SP (Decreto 45.490/2000), arts. 52 a 56-C**, no sítio da SEFAZ-SP.
+Importa mais que o ES por um motivo simples: os quatro clientes com CST 61 são de
+São Paulo. O ES tem o gabarito; SP tem o dinheiro.
+
+| Produto | SP | Fundamento | Observação |
+|---|---|---|---|
+| Óleo diesel | **12%** | art. 54, VI | até 14/01/2021 e de 15/01/2023 |
+| Óleo diesel | **13,3%** | art. 54, § 7º | de 15/01/2021 a 14/01/2023 |
+| Gasolina / EAC | **25%** | art. 55, XXVI | a era inteira, sem complemento |
+| Etanol hidratado | **não conferido** | art. 54, VI + Informativos SFP | |
+| GLP | **não conferido** | não é nomeado nos arts. 54 nem 55 | |
+
+**O complemento de alíquota da Lei 17.293/2020 é o achado.** O art. 22 daquela lei
+somou **1,3 ponto** às operações do art. 54, e o § 7º diz, com estas palavras,
+*"passando as operações internas indicadas no caput a ter uma carga tributária de
+13,3%"*. O diesel é o inciso VI e **não** está entre as exceções do parágrafo
+(incisos I e XIX). Então dois anos de compras de diesel em SP foram a 13,3%, não
+a 12% — e quem apurar a 12% perde **10% do crédito** daquele período.
+
+Veio pelo Decreto 65.253, de 15/10/2020, com a redação do Decreto 65.470, de
+14/01/2021, e foi **revogado** pelo Decreto 67.524, de 27/02/2023, com efeitos
+retroativos a 15/01/2023.
+
+**E daí nasceram os dois meses partidos.** O complemento começou no **dia 15** de
+janeiro de 2021 e acabou no **dia 15** de janeiro de 2023. Nesses dois meses há
+duas alíquotas, e a competência não decide qual vale. A tabela ganhou o campo
+`dia` na `Vigencia` e um erro próprio, **`MesPartido`**, que recusa a competência
+da virada e manda separar as entradas pela data do documento. Escolher um lado
+calado erraria 1,3 ponto num mês inteiro de compras de diesel.
+
+São agora **três recusas distintas**, e a distinção é o que protege:
+
+| Erro | Significa | O que fazer |
+|---|---|---|
+| `ForaDoRegimePercentual` | a era é ad rem | ir para `tab_ad_rem` e `tab_fcv` |
+| `MesPartido` | duas alíquotas no mês | separar pela data do documento |
+| `AliquotaDeCombustivelDesconhecida` | não se leu | ler o ato e preencher `INTERNA` |
+
+**A gasolina de SP não leva complemento nem adicional.** O complemento é dos
+arts. 53-A (7%) e 54 (12%), e o art. 55 não tem parágrafo equivalente — conferido
+no texto. E o adicional de 2% do **art. 56-C** tem só dois incisos: bebidas
+alcoólicas da posição 2203 e fumo do capítulo 24. Combustível não está lá, e o
+adicional só vale em operação destinada a consumidor final.
+
+Isso derruba uma segunda leitura secundária: somar os 2% aos 25% dá **27%**, que
+é o que uma leitura resumida do RICMS/SP devolve. Entrou em `REFUTADO` junto com
+os 30% do ES. **Os dois enganos são na gasolina, os dois vêm de fonte secundária,
+e os dois erram para cima** — e há teste que afirma essa propriedade, não só os
+dois casos.
+
+**O que ficou em aberto em SP.** O etanol hidratado divide o inciso VI com o
+diesel, mas o RICMS traz **dois Informativos SFP só para ele** — um "aplicável de
+15/07/2022 a 30/06/2023" e outro "aplicável a partir de 1º/07/2023". Isso indica
+regime próprio nessas janelas, e enquanto ninguém ler os dois (DOE 18/07/2022 e
+DOE 30/06/2023) o motor recusa EHC em SP. O GLP, como no ES, não é nomeado: cai
+na geral do art. 52, I por resíduo, e antes de usar há que procurar redução de
+base no Anexo II do RICMS/SP, que é por onde SP costuma tratar o botijão.
+
+
 ---
 
 ## 4. Os arquivos: EFD ICMS/IPI, por (CNPJ, competência)
