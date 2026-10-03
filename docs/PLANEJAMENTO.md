@@ -37,10 +37,8 @@ de construção passa a ser definida pelo combustível.
 Isso reordena o que vem abaixo, e muda o peso de três itens que pareciam
 laterais:
 
-* **o CNPJ na chave do `selecionar_por_competencia`** sai de "latente" para
-  bloqueante: na empresa G ele guardaria 62 arquivos de 411 e perderia três dos
-  quatro estabelecimentos. Quem lê EFD ICMS/IPI não recebe a matriz
-  consolidada, como quem lê Contribuições recebe;
+* ~~o CNPJ na chave da seleção~~ — **feito** (v0.137.0): era o mais urgente dos
+  três, porque sem ele o leitor nasceria descartando três quartos da base;
 * **o leitor de EFD ICMS/IPI** passa a ser caminho crítico. O **leiaute** já
   está feito e medido (`sped/registros_icms.py`, 16 registros em 40 arquivos
   reais, v0.136.0); falta o leitor que o usa — ler em ordem, de-duplicar por
@@ -250,11 +248,11 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       quatro com CST 61 já creditam (empresa G e empresa Y por ajuste; só a
       empresa K não). Confirma que o produto é auditar o tomado
 - [ ] Construir o módulo de combustível, agora como frente principal
-- [ ] Acrescentar o **CNPJ à chave** do `selecionar_por_competencia`: hoje ele
-      chaveia só por competência, e na empresa G isso guardaria 62 arquivos de 411,
-      perdendo três estabelecimentos. Latente porque seus dois usuários leem
-      EFD-Contribuições, que a matriz entrega consolidada. Mexe em código das
-      exclusões, validadas em 100%: vai com teste
+- [x] **CNPJ na chave da seleção** (v0.137.0): `selecionar_por_cnpj_e_competencia`
+      substitui `selecionar_por_competencia`, que guardava uma apuração por
+      competência e tratava filial como duplicata — na empresa G sobrariam 62 de
+      411 arquivos. Três testes novos, e a mutação fiel prova que só eles caem
+      com a chave antiga: o comportamento das exclusões não muda
 - [ ] Acrescentar o grupo **`ICMS61`** ao leitor de XML (`vICMSMonoRet`,
       `adRemICMSRet`): é a fase 2 do combustível. A era do ST já está coberta —
       o leitor tem `vICMSSTRet`, `vICMSSubstituto` e `vICMSEfet`

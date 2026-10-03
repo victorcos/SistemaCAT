@@ -5,6 +5,47 @@
 
 ---
 
+## 2026-10-03 — O CNPJ entrou na chave da seleção, e a função trocou de nome
+
+Segundo pré-requisito do motor de combustível, e o que estava marcado como
+bloqueante: `selecionar_por_competencia` guardava **uma** apuração por
+competência, chamando de duplicata o que era outra filial. Agora a chave é
+`(CNPJ, competência)`, e o nome é `selecionar_por_cnpj_e_competencia` — o antigo
+descrevia o que a função fazia, e passaria a mentir.
+
+**Era latente, não inofensivo.** Os dois usuários da função leem
+EFD-Contribuições, que a matriz entrega consolidada: um CNPJ por competência, e
+aí as duas chaves dão no mesmo. A EFD ICMS/IPI vem **por estabelecimento**, e o
+combustível é o primeiro a lê-la. Medido na empresa G: 411 arquivos em 62
+competências, com até 10 na mesma competência — a chave curta deixaria 62.
+
+**O que fazia o defeito ser invisível era o aviso.** Ele dizia "dois arquivos
+para a mesma competência; usado X, ignorado Y", o que parece correto a quem lê:
+dois arquivos, um escolhido. Só que não eram duplicatas, eram filiais. Agora o
+texto diz "do mesmo estabelecimento", e duas filiais **não geram aviso nenhum**,
+porque não são conflito.
+
+**Entrou um log, e não um aviso, para a contagem de arquivos.** Quando a seleção
+mantém mais de um estabelecimento, o número de arquivos escolhidos deixa de ser
+o número de competências. Quem conferir o total precisa saber por quê, mas isso
+não é problema a reportar na tela — é log.
+
+**Mexeu em código compartilhado com as exclusões, validadas em 100%.** O
+resguardo é a forma do teste: três casos novos de múltiplos estabelecimentos, e
+a prova de que eles pegam o defeito antigo. Revertida a chave para só a
+competência, **exatamente os três novos falham e os antigos continuam
+passando** — isto é, a correção captura o defeito e não altera o comportamento
+de cliente com um estabelecimento só, que é o caso das exclusões.
+
+**Uma mutação minha que não valia.** A primeira tentativa de reverter trocou a
+chave por uma string, e aí a linha que conta estabelecimentos tentou
+desempacotá-la e o código **quebrou** — cinco testes falharam, inclusive dois
+que nada tinham com isso. Teste que falha porque o código explodiu não prova que
+ele detecta comportamento errado. Refeita a mutação de forma fiel (chave
+`("", competência)`), o resultado foi o que interessa: só os três novos caem.
+
+---
+
 ## 2026-10-03 — O leiaute da EFD ICMS/IPI, medido em vez de lido
 
 Primeira peça do motor de combustível: sem leitor não há litro para multiplicar.

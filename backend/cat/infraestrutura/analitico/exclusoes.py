@@ -64,7 +64,7 @@ from cat.infraestrutura.exclusoes.piscofins_na_propria_base import calcular
 from cat.infraestrutura.gestao.agregador import agregar_efd
 from cat.infraestrutura.gestao.agregados import gravar as gravar_agregados
 from cat.infraestrutura.gestao.agregados import ler as ler_agregados
-from cat.infraestrutura.gestao.montagem import selecionar_por_competencia
+from cat.infraestrutura.gestao.montagem import selecionar_por_cnpj_e_competencia
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -474,7 +474,7 @@ def _ler_os_sped(contribuicoes: list[str], destino: str, resumo: Resumo,
     # mesmo arquivo entregue duas vezes conta uma. Sem isto, um lote com a
     # original e a retificadora do mesmo mês somaria as duas e a tese sairia
     # inflada — aconteceu na base da empresa S, com R$ 203.600,56 a mais
-    lidos, avisos = selecionar_por_competencia(lidos)
+    lidos, avisos = selecionar_por_cnpj_e_competencia(lidos)
     resumo.avisos.extend(avisos)
 
     resumo.arquivos = len(lidos)

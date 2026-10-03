@@ -20,7 +20,11 @@ import pytest
 from cat.infraestrutura.gestao.agregador import agregar_efd
 from cat.infraestrutura.gestao.leiaute import CAMPOS, CAMPOS_AJUSTE, campos_m210
 from cat.infraestrutura.gestao.numeros import centavos, credito_recalculado
-from cat.infraestrutura.gestao.montagem import ler, montar, selecionar_por_competencia
+from cat.infraestrutura.gestao.montagem import (
+    ler,
+    montar,
+    selecionar_por_cnpj_e_competencia,
+)
 from cat.infraestrutura.gestao.quadros import montar_relatorio_piscofins
 from cat.infraestrutura.sped.registros import nomes_dos_campos, posicao_do_campo
 
@@ -257,12 +261,76 @@ class TestAMontagem:
         retificadora = self._gravar(tmp_path, "retificadora.txt", "1", "062021")
 
         apuracoes, _ = ler([original, retificadora])
-        escolhidas, avisos = selecionar_por_competencia(apuracoes)
+        escolhidas, avisos = selecionar_por_cnpj_e_competencia(apuracoes)
 
         assert [a.arquivo for a in escolhidas] == [retificadora]
         assert len(avisos) == 1
         # o preterido é nomeado: sumir calado esconderia de onde veio o número
         assert "original.txt" in avisos[0] and "retificadora.txt" in avisos[0]
+
+    @staticmethod
+    def _gravar_de_outra_filial(tmp_path, nome: str, competencia: str,
+                                cnpj: str) -> str:
+        """A mesma EFD, de outro estabelecimento da mesma empresa."""
+        cabecalho = (f"|0000|006|0|||01{competencia}|30{competencia}"
+                     f"|COMERCIO DO TESTE LTDA|{cnpj}|SP|3550308||00|2|")
+        corpo = EFD.replace(CABECALHO, cabecalho, 1)
+        caminho = tmp_path / nome
+        caminho.write_bytes(corpo.encode("cp1252"))
+        return str(caminho)
+
+    def test_duas_filiais_na_mesma_competencia_ficam_as_duas(self, tmp_path):
+        """**O defeito que a chave curta escondia.**
+
+        Até 03/10/2026 a seleção chaveava só por competência, então a segunda
+        filial entrava como se fosse duplicata da primeira e era descartada —
+        com um aviso que dizia "dois arquivos para a mesma competência", o que
+        parece correto a quem lê.
+
+        Medido na empresa G: 411 arquivos em 62 competências. Com a chave curta
+        sobrariam 62, perdendo três dos quatro estabelecimentos.
+        """
+        matriz = self._gravar(tmp_path, "matriz.txt", "0", "062021")
+        filial = self._gravar_de_outra_filial(
+            tmp_path, "filial.txt", "062021", "11222333000262")
+
+        apuracoes, _ = ler([matriz, filial])
+        escolhidas, avisos = selecionar_por_cnpj_e_competencia(apuracoes)
+
+        assert len(escolhidas) == 2, "filial não é duplicata de matriz"
+        assert {a.cnpj for a in escolhidas} == {CNPJ, "11222333000262"}
+        assert avisos == [], "duas filiais não são conflito e não geram aviso"
+
+    def test_a_retificadora_de_uma_filial_nao_derruba_a_outra(self, tmp_path):
+        """A desambiguação é por estabelecimento: a retificadora da matriz vence
+        a original da matriz, e não encosta na filial."""
+        original = self._gravar(tmp_path, "matriz_original.txt", "0", "062021")
+        retificadora = self._gravar(tmp_path, "matriz_retif.txt", "1", "062021")
+        filial = self._gravar_de_outra_filial(
+            tmp_path, "filial.txt", "062021", "11222333000262")
+
+        apuracoes, _ = ler([original, retificadora, filial])
+        escolhidas, avisos = selecionar_por_cnpj_e_competencia(apuracoes)
+
+        assert len(escolhidas) == 2
+        escolhido_da_matriz = next(a for a in escolhidas if a.cnpj == CNPJ)
+        assert escolhido_da_matriz.arquivo == retificadora
+        assert len(avisos) == 1
+        assert "mesmo estabelecimento" in avisos[0]
+
+    def test_a_ordem_e_por_cnpj_e_depois_competencia(self, tmp_path):
+        """A mesma ordem que `ler` já devolvia, para que a seleção não a mude."""
+        filial_junho = self._gravar_de_outra_filial(
+            tmp_path, "filial_junho.txt", "062021", "11222333000262")
+        matriz_julho = self._gravar(tmp_path, "matriz_julho.txt", "0", "072021")
+        matriz_junho = self._gravar(tmp_path, "matriz_junho.txt", "0", "062021")
+
+        apuracoes, _ = ler([filial_junho, matriz_julho, matriz_junho])
+        escolhidas, _ = selecionar_por_cnpj_e_competencia(apuracoes)
+
+        assert [(a.cnpj, a.periodo) for a in escolhidas] == [
+            (CNPJ, "2021-06"), (CNPJ, "2021-07"), ("11222333000262", "2021-06"),
+        ]
 
     def test_competencias_diferentes_convivem_e_viram_colunas(self, tmp_path):
         junho = self._gravar(tmp_path, "junho.txt", "0", "062021")

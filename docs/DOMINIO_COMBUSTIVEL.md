@@ -246,14 +246,18 @@ Empresa F      201 EFD ICMS/IPI   4 estabelecimentos   58 competências
   por (CNPJ, competência):   1 em 144 · 2 em 57
 ```
 
-> **Armadilha no código existente.** O `selecionar_por_competencia`
-> (`gestao/montagem.py`) chaveia **só por competência**. Na empresa G isso guardaria
-> 62 arquivos de 411 — perderia três estabelecimentos inteiros. Hoje não quebra
-> nada porque seus dois usuários leem **EFD-Contribuições**, que a matriz entrega
-> consolidada, uma por competência. A ICMS/IPI é por estabelecimento, e o
-> combustível é o primeiro a usá-la. Acrescentar o CNPJ à chave é mais seguro que
-> escrever um irmão — para Contribuições não muda nada — mas mexe em código
-> compartilhado com as exclusões, validadas em 100%: vai com teste.
+> **Armadilha do código existente — corrigida em 03/10/2026 (v0.137.0).** O
+> `selecionar_por_competencia` chaveava **só por competência**, e na empresa G
+> isso guardaria 62 arquivos de 411, perdendo três estabelecimentos inteiros.
+> Não quebrava nada porque seus dois usuários leem **EFD-Contribuições**, que a
+> matriz entrega consolidada; a ICMS/IPI é por estabelecimento, e o combustível
+> é o primeiro a usá-la.
+>
+> A chave agora é `(CNPJ, competência)` e a função chama-se
+> `selecionar_por_cnpj_e_competencia`. **O que fazia o defeito ser invisível era
+> o aviso:** ele dizia "dois arquivos para a mesma competência; usado X,
+> ignorado Y", o que parece correto a quem lê. Duas filiais agora não geram
+> aviso nenhum, porque não são conflito.
 
 Dentro de cada par ainda há retificadora. A regra existente resolve: retificadora
 vence, depois a mais nova.

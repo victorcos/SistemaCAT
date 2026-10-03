@@ -98,11 +98,30 @@ def _identificar(ap: ApuracaoEFD) -> str:
     return f"{nome} ({mb:,.0f} MB, em {pasta})".replace(",", ".")
 
 
-def selecionar_por_competencia(
+def selecionar_por_cnpj_e_competencia(
     apuracoes: list[ApuracaoEFD],
 ) -> tuple[list[ApuracaoEFD], list[str]]:
-    """Uma apuração por competência: retificadora vence; depois, a mais nova."""
-    melhores: dict[str, ApuracaoEFD] = {}
+    """Uma apuração por **estabelecimento e** competência: retificadora vence;
+    depois, a mais nova.
+
+    ## Por que o CNPJ entra na chave
+
+    Porque sem ele a competência de uma empresa de quatro estabelecimentos
+    guarda **um** arquivo e descarta três, chamando de duplicata o que é outra
+    filial. Medido na empresa G: 411 EFD ICMS/IPI em 62 competências, com até
+    10 arquivos na mesma competência; chaveando só por competência sobrariam 62
+    de 411.
+
+    **Era latente, e deixou de ser.** Os dois usuários desta função leem
+    EFD-Contribuições, que a matriz entrega consolidada — um CNPJ por
+    competência, e aí a chave com e sem o CNPJ dá no mesmo. O módulo de
+    combustível lê EFD ICMS/IPI, que vem por estabelecimento, e nela a chave
+    curta perderia três quartos da base.
+
+    Note que o risco era **silencioso**: o aviso dizia "dois arquivos para a
+    mesma competência", o que pareceria correto a quem lesse.
+    """
+    melhores: dict[tuple[str, str], ApuracaoEFD] = {}
     avisos: list[str] = []
 
     def prioridade(ap: ApuracaoEFD) -> tuple[int, float]:
@@ -113,25 +132,44 @@ def selecionar_por_competencia(
         return (1 if ap.tipo_escrit == "1" else 0, quando)
 
     for apuracao in apuracoes:
-        atual = melhores.get(apuracao.periodo)
+        chave = (apuracao.cnpj, apuracao.periodo)
+        atual = melhores.get(chave)
         if atual is None:
-            melhores[apuracao.periodo] = apuracao
+            melhores[chave] = apuracao
             continue
         vencedor, perdedor = ((apuracao, atual) if prioridade(apuracao) > prioridade(atual)
                               else (atual, apuracao))
-        melhores[apuracao.periodo] = vencedor
+        melhores[chave] = vencedor
         avisos.append(
-            f"{apuracao.periodo}: dois arquivos para a mesma competência; usado "
-            f"{_identificar(vencedor)}, ignorado {_identificar(perdedor)}."
+            f"{apuracao.periodo}: dois arquivos para a mesma competência do "
+            f"mesmo estabelecimento; usado {_identificar(vencedor)}, ignorado "
+            f"{_identificar(perdedor)}."
         )
         log.info("competência com mais de um arquivo na gestão", extra={
-            "periodo": apuracao.periodo,
+            "periodo": apuracao.periodo, "cnpj": apuracao.cnpj,
             "usado": vencedor.arquivo, "usado_bytes": vencedor.tamanho,
             "ignorado": perdedor.arquivo, "ignorado_bytes": perdedor.tamanho,
             "por_retificadora": vencedor.tipo_escrit == "1",
             "mesmo_nome": os.path.basename(vencedor.arquivo) == os.path.basename(perdedor.arquivo),
         })
-    return [melhores[p] for p in sorted(melhores)], avisos
+
+    estabelecimentos = {cnpj for cnpj, _ in melhores}
+    if len(estabelecimentos) > 1:
+        # não é aviso: ler várias filiais é o certo. Mas o número de arquivos
+        # escolhidos passa a não ser o número de competências, e quem for
+        # conferir o total precisa saber por quê
+        log.info("seleção manteve mais de um estabelecimento", extra={
+            "estabelecimentos": len(estabelecimentos),
+            "competencias": len({p for _, p in melhores}),
+            "escolhidos": len(melhores),
+        })
+    return [melhores[c] for c in sorted(melhores)], avisos
+
+
+# O nome antigo chaveava só por competência, e dizia isso. Fica como apelido
+# por um ciclo para não quebrar quem importou — mas o nome novo é o que descreve
+# o que a função faz.
+selecionar_por_competencia = selecionar_por_cnpj_e_competencia
 
 
 def ler_ecfs(caminhos: Iterable[str],
@@ -195,7 +233,7 @@ def montar(apuracoes: list[ApuracaoEFD],
     """
     if not apuracoes:
         return []
-    selecionadas, avisos_da_selecao = selecionar_por_competencia(apuracoes)
+    selecionadas, avisos_da_selecao = selecionar_por_cnpj_e_competencia(apuracoes)
     antes = list(avisos_da_leitura) + avisos_da_selecao
     relatorios = []
     for tributo in TRIBUTOS_DA_EFD:
