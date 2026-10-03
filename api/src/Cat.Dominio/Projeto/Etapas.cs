@@ -174,6 +174,17 @@ public static class Etapas
             "campo do ICMS no C170 das Contribuições é facultativo, e metade dos " +
             "clientes o manda em branco.",
             Implementada: true, Aba: "Exclusões"),
+        new("combustivel", "Crédito de ICMS sobre combustível",
+            "O crédito de quem queima combustível como insumo. Lê a EFD ICMS/IPI do " +
+            "lote, acha as compras, classifica cada item pela NCM e pela descrição, e " +
+            "apura: no regime monofásico é litro × ad rem × fator de correção do " +
+            "volume; na era da substituição tributária é base × alíquota interna do " +
+            "estado, e sai marcado como estimativa, porque o arquivo do destinatário " +
+            "não traz a base do ST. O que a tabela não cobre aparece na linha com o " +
+            "motivo, fora do total — nunca como zero. Também confronta com o que o " +
+            "cliente já creditou por ajuste no E111: o produto é auditar o crédito " +
+            "tomado, não só achar crédito novo.",
+            Implementada: false, Aba: "Combustível"),
         new("historico", "Histórico do trabalho",
             "Tudo o que aconteceu, em ordem: quem importou, quem rodou cada " +
             "etapa, o que cada rodada produziu, quem mudou o status e por quê. " +
@@ -251,6 +262,15 @@ public static class Etapas
                     "interessam. No ICMS é o item que a EFD não traz: NF-e de emissão própria " +
                     "e NFC-e vão à escrituração só com o analítico.",
                     ["quebra_xml"]),
+                // Uma etapa só, por enquanto. A fila de revisão do classificador
+                // — o revisor confirmando o que cada descrição é — será a
+                // segunda, quando existir: hoje o classificador marca a linha
+                // para revisão e quem revisa olha a planilha.
+                new("combustivel", "Crédito de combustível", "CMB",
+                    "Quanto de ICMS o cliente pode recuperar do combustível que queimou como " +
+                    "insumo, e quanto ele já recuperou por conta própria. Lê a EFD ICMS/IPI " +
+                    "direto: não depende da CAT 42 nem de etapa nenhuma dela.",
+                    ["combustivel"]),
             ],
             // Cinco frentes, e não uma só com cinco etapas dentro. Até 28/09/2026
             // a quebra, a 037, as exclusões e a Gestão moravam num card chamado

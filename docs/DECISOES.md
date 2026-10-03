@@ -5,6 +5,47 @@
 
 ---
 
+## 2026-10-03 — O card do combustível no hub de ICMS, antes de a tela existir
+
+Primeiro pedaço de frente, e ele é **uma edição de dado**: a trilha `CMB` entrou
+em `TrilhasPorModulo["icms"]` e a etapa `combustivel` no catálogo de etapas, com
+`Implementada: false`.
+
+O card aparece no hub ao lado de `BASE`, `C42`, `OUT` e `XML`, com a etapa dizendo
+**"Ainda não disponível"** e sem botão. Isso é desenho, não gambiarra — o próprio
+`Projeto.tsx` diz: *"Chave sem entrada aqui aparece na barra e no cartão sem
+botão, o que é o certo para uma funcionalidade ainda sem tela."* E o
+`Implementada` existe exatamente para isso: o usuário vê o caminho inteiro e sabe
+onde o trabalho está.
+
+**O front não mudou**, fora a sigla. As trilhas vêm da API (`d.trilhas`), a
+`sigla()` cai nas iniciais quando a chave é desconhecida, e o mapa de destinos
+não ter a chave é o que tira o botão. Acrescentei `combustivel: "CMB"` só para o
+quadradinho não sair "CDI".
+
+**Uma etapa só, por enquanto.** A fila de revisão do classificador — o revisor
+confirmando o que cada descrição é — será a segunda, quando existir; hoje o
+classificador marca a linha e quem revisa olha a planilha.
+
+### Um teste do domínio quebrou, e ele estava certo
+
+`Projeto_novo_tem_tudo_pendente_e_nada_barrado` afirmava que **toda** etapa de um
+projeto novo sai `Pendente` e `Acessivel`. Com uma etapa não implementada no
+catálogo, isso deixou de valer: ela sai `NaoDisponivel`, e `Acessivel` é
+literalmente `Situacao is not NaoDisponivel`.
+
+Corrigi o teste para afirmar as **duas** metades — implementada sai pendente e
+acessível; por vir sai não disponível e não acessível — com um `Assert.NotEmpty`
+na primeira, para que a regra não passe a valer por vacuidade se alguém marcar
+tudo como não implementado.
+
+**O progresso não inflou**, e isso já estava resolvido antes de mim: `Progresso`
+filtra por `Implementada && Conta`, então a etapa por vir não entra no
+denominador. Sem isso, todo projeto de ICMS passaria a mostrar 7 de 8 para
+sempre.
+
+---
+
 ## 2026-10-03 — A apuração, e a tabela que eu publiquei errada hoje mesmo
 
 Última peça da conta: `sped/credito_de_combustivel.py` recebe uma compra e uma

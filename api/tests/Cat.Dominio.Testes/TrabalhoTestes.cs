@@ -73,8 +73,20 @@ public sealed class EtapasTestes
         // a cobra é o servidor, com a frase que explica o que falta. Aba
         // apagada não explica nada.
         var e = Montar([]);
-        Assert.All(e, x => Assert.Equal(SituacaoEtapa.Pendente, x.Situacao));
-        Assert.All(e, x => Assert.True(x.Acessivel));
+        // A etapa que o sistema **ainda não constrói** sai "não disponível", e
+        // não "pendente": pendente convida a clicar. Ela aparece de propósito,
+        // para o usuário ver o caminho inteiro e saber onde o trabalho está —
+        // mas não é clicável, porque não há o que abrir. Por isso o teste
+        // separa as duas metades em vez de exigir uma regra só.
+        var prontas = e.Where(x => x.Definicao.Implementada).ToList();
+        var porVir = e.Where(x => !x.Definicao.Implementada).ToList();
+
+        Assert.NotEmpty(prontas);
+        Assert.All(prontas, x => Assert.Equal(SituacaoEtapa.Pendente, x.Situacao));
+        Assert.All(prontas, x => Assert.True(x.Acessivel));
+
+        Assert.All(porVir, x => Assert.Equal(SituacaoEtapa.NaoDisponivel, x.Situacao));
+        Assert.All(porVir, x => Assert.False(x.Acessivel));
         // o denominador sai das frentes do módulo, e não de um número escrito
         // aqui: ele muda toda vez que uma frente nova entra, e congelá-lo faz
         // este teste quebrar por acerto do sistema, não por defeito

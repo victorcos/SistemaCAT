@@ -46,6 +46,7 @@ const SIGLAS: Record<string, string> = {
   apuracao_contribuicoes: "GES",
   quebra_xml: "XML",
   credito_outorgado: "OUT",
+  combustivel: "CMB",
 };
 
 /** Sem entrada na tabela, as iniciais servem: "Razão contábil" vira "RC". */
