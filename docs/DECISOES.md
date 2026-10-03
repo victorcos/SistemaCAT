@@ -5,6 +5,94 @@
 
 ---
 
+## 2026-10-03 — A apuração, e a tabela que eu publiquei errada hoje mesmo
+
+Última peça da conta: `sped/credito_de_combustivel.py` recebe uma compra e uma
+classificação e devolve quanto ela vale. Não lê arquivo, não classifica, não
+infere nada — todo número sai de `tab_ad_rem`, `tab_fcv` ou
+`tab_aliquota_combustivel`.
+
+> O humano decide o que o produto é; **a tabela decide quanto ele vale.**
+
+### A era do ST não se calcula, e isso é a tese
+
+Medido antes de escrever: **5.234 linhas de C170 com CST 60 ou 61 e zero com
+base ou valor de ST**; 3.867 linhas de C190 das mesmas CST, todas com `VL_OPR` e
+**nenhuma** com `VL_BC_ICMS_ST`. Não é defeito do arquivo — o imposto foi retido
+na origem e o destinatário não o vê. Foi essa ausência que criou o direito ao
+crédito e é ela que impede de medi-lo no SPED.
+
+Então a era do ST sai como **estimativa rotulada**, com a base no valor do item,
+e `estimativa=True` **na linha** e não em nota de rodapé: quem somar um total com
+estimativa dentro tem de saber pela própria linha. A base verdadeira era o PMPF,
+e a diferença não se sabe sem a tabela dele — nem o sinal. A conferência é o XML
+(`vICMSSTRet ÷ vBCSTRet`), como decidido em 02/10/2026.
+
+### O que não cobre não vira zero
+
+Zero soma; recusa aparece. Competência sem vigência cadastrada, tratada como
+zero, sai do relatório como "não havia crédito naquele mês" — e ninguém procura
+o que não viu. As exceções das três tabelas são capturadas e **viram texto na
+linha**, que é a única forma de o motivo chegar ao relatório.
+
+**O maior buraco de cobertura aparece assim**, e é grande: o monofásico do diesel
+começou em 05/2023 e a vigência mais antiga **conferida** é de 02/2024. As nove
+competências do meio recusam, com a suspeita de 0,9456 na mensagem. A empresa G
+tomou crédito em todas elas — auditá-las exige abrir a redação original da
+cláusula sétima do Conv. 199/2022.
+
+**A cobertura nunca chega a "alta" hoje**, e o `porque` diz por quê: falta a
+tabela de UF que internalizaram o Conv. 26/2023. O convênio dá o direito; quem
+concede é o estado. Chamar de alta sem a norma seria inventar certeza.
+
+### O resultado, com a cadeia inteira rodando
+
+25 competências da matriz da empresa G, leitor → classificador → apuração:
+
+| | |
+|---|---|
+| devido (com FCV) | **R$ 1.567.603,81** |
+| `litros × ad rem` (sem FCV) | R$ 1.571.403,79 |
+| creditado pelo cliente | R$ 1.328.691,14 |
+| **diferença** | **−R$ 238.912,67** |
+
+E três meses batem **ao centavo** com `litros × ad rem`: 2024-02 (−0,07),
+2024-05 (+0,03) e 2024-06 (−0,03). Sete centavos em R$ 69 mil confirmam a ad rem
+de 1,0635 por via independente do convênio, e mostram que o cliente **não aplica
+o FCV**.
+
+Os meses que destoam são o produto: 2025-09 creditou R$ 13.089,81 contra
+R$ 54.279,39 devidos; 2025-01, R$ 32.486,17 contra R$ 71.500,64. Vários a cerca
+de metade.
+
+### A tabela que eu publiquei errada hoje, e como
+
+No commit da rodada (v0.139.0) publiquei um cruzamento que concluía "sete dos
+nove meses saem curtos", com 2025-02 dando razão absurda de 59,79 por litro. **O
+cruzamento somava gasolina junto com diesel** nos litros do denominador, e
+comparava o total com um `E111` que é só de diesel.
+
+Com os produtos separados pelo classificador, nada daquilo se sustenta: a razão
+é 1,0635 nos meses em que o cliente credita certo, e a diferença dos outros é de
+valor, não de proporção. A tabela de v0.139.0 está **superada por esta**.
+
+Pior: foi essa medição errada que me fez **remover do `tab_ad_rem` uma afirmação
+correta** — a de que o livro do cliente corrobora a ad rem. Ela voltou, agora com
+os números medidos pelo motor inteiro.
+
+**A lição é sobre método, não sobre combustível.** Medição errada derruba
+afirmação certa com a mesma facilidade com que sustenta afirmação errada. Em um
+dia: um teste vazio com dados inventados, uma mutação que quebrava o código em
+vez de reproduzir comportamento, uma varredura que devolveu zero por caminho
+assumido, um `heredoc` que comeu a expressão regular, e agora um cruzamento que
+misturou dois produtos. Cinco vezes — e as cinco só apareceram porque alguma
+outra medição as contradisse.
+
+35 testes na apuração, quatro guardas conferidas por mutação (recusa virar zero,
+tirar o FCV da conta, não marcar estimativa, FCV fixo de SP — as quatro falham).
+
+---
+
 ## 2026-10-03 — O classificador, e o corte que esvaziou a fila de revisão
 
 Quinta peça do motor, em dois módulos: `tabelas/tab_combustivel.py` é o dado
@@ -123,6 +211,11 @@ lugar errado, o resumo traz a **primeira e a última emissão** encontradas: que
 roda vê o intervalo e sabe se o assunto existe.
 
 ### O primeiro resultado real, e ele corrige o que eu escrevi hoje
+
+> **Esta tabela está SUPERADA.** O cruzamento abaixo somava gasolina junto com
+> diesel nos litros e comparava com um `E111` que é só de diesel. Ver a entrada
+> da apuração, mais acima nesta mesma data, para os números com os produtos
+> separados pelo classificador.
 
 Cruzando os litros de CST 61 que o leitor acha com o `E111` `SP020799` do mesmo
 arquivo, em nove competências da matriz da empresa G:

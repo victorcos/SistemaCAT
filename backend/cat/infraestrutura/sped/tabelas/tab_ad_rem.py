@@ -25,16 +25,33 @@ começou em **1º de janeiro**. Quem assumir "sempre fevereiro" erra janeiro de
 `A_CONFERIR` guarda o que se suspeita — e o motor **recusa**, levantando
 `AdRemDesconhecida`, até alguém abrir o convênio e mover a linha.
 
-**Uma corroboração que eu afirmei e que não se sustentou.** Até 03/10/2026 este
-módulo dizia que a escrituração da empresa G era uma segunda prova da ad rem:
-que o crédito dela dividido pelos litros daria "exatamente 1,0635". Com o leitor
-de pé (`sped/combustivel.py`), a razão foi **medida** em nove competências e
-varia de **0,58 a 59,79** — 1,0388 em 2024-02, 1,2193 em 2024-03, 0,9808 em
-2024-04.
+## A segunda prova, que se perdeu e se recuperou no mesmo dia
 
-O livro do cliente **não confirma a ad rem**: ele é o *objeto* da auditoria, não
-prova dela. A base destes números é só uma, e basta — o texto do convênio no
-sítio do CONFAZ. Ver `DECISOES.md` de 03/10/2026 para a medição.
+A ad rem de 2024-02 tem uma confirmação independente do convênio: a escrituração
+da empresa G. Medida pelo motor inteiro — leitor, classificador e apuração — em
+25 competências, o crédito que ela lançou por ajuste `SP020799` bate com
+`litros × ad rem` **ao centavo** em três meses:
+
+| competência | litros × ad rem | creditado | diferença |
+|---|---|---|---|
+| 2024-02 | 69.134,52 | 69.134,45 | −0,07 |
+| 2024-05 | 88.182,44 | 88.182,47 | +0,03 |
+| 2024-06 | 75.140,93 | 75.140,90 | −0,03 |
+
+Sete centavos em R$ 69 mil não é coincidência: confirma a ad rem de **1,0635** e,
+de lambuja, que **o cliente não aplica o FCV** — o devido é `litros × ad rem ×
+0,9976`, e ele credita sem o fator, 0,24% a mais, sistemáticos.
+
+**Isto esteve escrito errado, foi removido, e voltou.** Pela manhã o módulo dizia
+a mesma coisa apoiado num par de números inventado — 195.020 litros contra
+R$ 207.403,35 — e o `E111` real daquele mês traz R$ 69.134,45, três vezes menos.
+Removi a afirmação, e com um cruzamento que somava **gasolina junto com diesel**
+nos litros cheguei a razões de 0,58 a 59,79, concluindo que o livro não
+confirmava nada. Errado de novo.
+
+Separados os produtos, a conta fecha ao centavo. A lição não é sobre a ad rem: é
+que **medição errada derruba afirmação certa com a mesma facilidade com que
+sustenta afirmação errada**. Ver `DECISOES.md` de 03/10/2026.
 
 ## O que esta tabela não é
 
@@ -87,11 +104,11 @@ AD_REM: dict[str, tuple[Vigencia, ...]] = {
                  "Conv. 199/2022; vigência de 1º/02/2025"),
         Vigencia(Decimal("1.0635"), "2024-02",
                  "Convênio ICMS 172/2023, incisos I e II da cláusula sétima do "
-                 "Conv. 199/2022; vigência de 1º/02/2024. **A base é só o "
-                 "convênio.** Este fundamento citava a escrituração de um "
-                 "cliente como segunda prova, e a medição de 03/10/2026 "
-                 "derrubou: a razão crédito÷litros dele varia de 0,58 a 59,79 "
-                 "entre competências"),
+                 "Conv. 199/2022; vigência de 1º/02/2024. **Com segunda "
+                 "prova:** a escrituração da empresa G bate com litros × ad rem "
+                 "ao centavo em 2024-02, 2024-05 e 2024-06 (−0,07, +0,03 e "
+                 "−0,03), o que confirma a ad rem e revela que ela não aplica o "
+                 "FCV. Ver o topo do módulo"),
     ),
     GASOLINA: (
         Vigencia(Decimal("1.57"), "2026-01",

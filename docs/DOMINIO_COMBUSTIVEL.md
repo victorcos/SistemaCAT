@@ -519,9 +519,21 @@ E o **`0220`** foi medido (20 milhões de linhas da empresa Z, duas larguras) e
 entrou no leiaute — é a fonte certa do fator de conversão, com o texto da
 descrição como recurso de quem não o tem.
 
-**Falta:** a apuração (multiplicar litro por ad rem e FCV, ou base por
-alíquota); a auditoria do `E111`; a prescrição do ICMS; e medir `0206` e
-`C171`, que nenhum cliente trouxe ainda.
+A **apuração** está feita (`sped/credito_de_combustivel.py`, v0.141.0):
+`quantidade × ad rem × FCV` no monofásico, `base × alíquota` na era do ST, e o
+que a tabela não cobre **vira recusa com o motivo**, não zero. A era do ST sai
+marcada `estimativa` porque **a base não está no arquivo** — medido: zero base
+de ST em 5.234 linhas de CST 60/61.
+
+Rodada a cadeia inteira em 25 competências da empresa G: devido R$ 1.567.603,81
+contra R$ 1.328.691,14 creditados, **R$ 238.912,67 a menos**. E três meses batem
+ao centavo com `litros × ad rem`, confirmando a ad rem e revelando que o cliente
+não aplica o FCV.
+
+**Falta:** a auditoria do `E111` dentro do sistema (o cruzamento acima foi feito
+por script); a prescrição do ICMS; a tabela de UF que internalizaram o Conv.
+26/2023, sem a qual a cobertura não passa de média; a ad rem de 05/2023 a
+01/2024, que recusa nove competências; e medir `0206` e `C171`.
 
 **Atenção ao reúso que não serve:** o `Total.somar` do `exclusoes_por_item` lê
 `linha.pis`, `linha.cofins`, `linha.diferenca_do_pis`, `linha.selic_sobre_o_pis`.
