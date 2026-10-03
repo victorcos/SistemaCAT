@@ -508,9 +508,20 @@ apaga parquet pela metade quando alguém cancela. Ela **não** aplica prescriç�
 a do ICMS conta cinco anos da emissão, regra diferente da do PIS/COFINS — e em
 vez disso devolve a primeira e a última emissão encontradas.
 
-**Falta:** o classificador de produto; a apuração; a auditoria do `E111`; e a
-prescrição do ICMS. Do leiaute, faltam medir `0206`, `0220` e `C171` — e o
-`0220` já apareceu na empresa Z com dois tamanhos, então ele é o próximo.
+O **classificador** está feito (v0.140.0), em dois módulos: `tab_combustivel`
+(que NCM é que produto, medido) e `classificador_de_combustivel` (a cascata).
+Medido nas 15.107 compras da empresa G: **10.323 linhas saem por posição de NCM
+sem revisão**, 4.233 da tese decididas por NCM medida com confiança alta, e a
+**fila de revisão fica em 1,7%**. As 132 descrições do diesel colapsam para 18
+formas canônicas.
+
+E o **`0220`** foi medido (20 milhões de linhas da empresa Z, duas larguras) e
+entrou no leiaute — é a fonte certa do fator de conversão, com o texto da
+descrição como recurso de quem não o tem.
+
+**Falta:** a apuração (multiplicar litro por ad rem e FCV, ou base por
+alíquota); a auditoria do `E111`; a prescrição do ICMS; e medir `0206` e
+`C171`, que nenhum cliente trouxe ainda.
 
 **Atenção ao reúso que não serve:** o `Total.somar` do `exclusoes_por_item` lê
 `linha.pis`, `linha.cofins`, `linha.diferenca_do_pis`, `linha.selic_sobre_o_pis`.

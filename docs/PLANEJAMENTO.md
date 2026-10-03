@@ -43,7 +43,8 @@ laterais:
   (`sped/registros_icms.py`, 16 registros medidos em 40 arquivos reais) e o
   leitor das compras em v0.138.0 (`sped/combustivel.py`). Falta a **rodada** que
   o chama em ordem e grava parquet;
-* **o classificador de produto** idem — sem ele não há litro para multiplicar.
+* ~~o classificador de produto~~ — **feito** (v0.140.0): NCM manda, descrição
+  confirma, fila de revisão em 1,7% das linhas.
 
 **E o produto não é achar crédito: é auditar o tomado.** Medido em 03/10/2026,
 três dos quatro clientes com CST 61 **já creditam** — a empresa G por ajuste

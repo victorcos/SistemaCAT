@@ -33,20 +33,20 @@ agora está medida dos dois lados.
 | `E110` | a apuração do mês, para dimensionar o crédito contra o saldo |
 | `E111` | **o ajuste**: é assim que se descobre o crédito que o cliente já tomou |
 
-## Três registros que esta tabela **não** tem, e não é esquecimento
+## Dois registros que esta tabela **não** tem, e não é esquecimento
 
-`0206` (código ANP), `0220` (fator de conversão de unidade) e `C171` (complemento
-de combustíveis) **não aparecem em nenhum dos 40 arquivos da empresa G**, que
-consome combustível em vez de distribuí-lo. Entrar aqui com leiaute tirado do
-Guia e nunca exercitado seria pior que faltar: quem visse o nome assumiria que
-foi conferido.
+`0206` (código ANP) e `C171` (complemento de combustíveis) **não aparecem em
+nenhum dos 40 arquivos da empresa G**, que consome combustível em vez de
+distribuí-lo. Entrar aqui com leiaute tirado do Guia e nunca exercitado seria
+pior que faltar: quem visse o nome assumiria que foi conferido.
 
-**E a espera já rendeu.** Rodado contra a empresa Z, o
-`tools/medir_leiaute_icms.py` achou o `0220` — com **dois tamanhos no mesmo
-acervo**, 3 e 4 campos. Ele é o registro que converte fardo, caixa e tambor em
-litro, então a tese depende dele; e a variante de tamanho é exatamente o que a
-medição existe para pegar. Medir antes de nomear continua valendo: ele entra
-aqui quando os dois tamanhos estiverem conferidos campo a campo.
+**Eram três, e a espera rendeu o terceiro.** Rodado contra a empresa Z, o
+`tools/medir_leiaute_icms.py` achou o `0220` — o registro que converte fardo,
+caixa e tambor em litro — e achou com **dois tamanhos no mesmo acervo**. Medidos
+depois sobre 20 milhões de linhas: 3 campos em 2,4 milhões (todas de 2021) e 4
+em 17,8 milhões, sendo o quarto um código de barra numérico em 16 milhões e
+vazio em 1,7 milhão. Entrou na tabela com a variante em `CAMPOS_ANTIGOS` — foi a
+ferramenta que encontrou o caso, não a leitura do Guia.
 
 `campos_de` devolve vazio para registro fora da tabela, e `posicao_do_campo`
 levanta `RegistroNaoMedido` com o motivo — o engano vira exceção, não coluna
@@ -103,6 +103,14 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "UNID_INV", "TIPO_ITEM", "COD_NCM", "EX_IPI", "COD_GEN",
         "COD_LST", "ALIQ_ICMS", "CEST",
     ),
+    # 4 campos (17.784.662 linhas da empresa Z, 2022-01 em diante). **O
+    # registro que leva o fardo ao litro**: `FAT_CONV` é quantas unidades de
+    # inventário cabem na unidade do documento.
+    #
+    # O quarto campo é numérico em 16.071.847 linhas e **vazio em 1.712.813** —
+    # é código de barra, que é opcional. A variante de 3 campos, sem ele, está
+    # em `CAMPOS_ANTIGOS`: são 2.448.595 linhas, todas de 2021.
+    "0220": ("REG", "UNID_CONV", "FAT_CONV", "COD_BARRA"),
     # 5 campos (60 linhas). A descrição **anterior** do item, com vigência.
     # Importa ao classificador: o mesmo código muda de nome no meio do período,
     # e medido na empresa G a descrição do diesel aparece truncada em 26
@@ -168,19 +176,23 @@ CAMPOS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+# Leiautes que mudaram de tamanho e cujo arquivo antigo ainda circula, chaveados
+# por `(registro, quantidade de campos da linha)` — o mesmo mecanismo de
+# `registros.py`.
+#
+# **Por que pelo tamanho e não pela data.** A data diz de que competência é o
+# arquivo; o tamanho, qual PVA o gerou. Na empresa Z os dois conviviam no mesmo
+# acervo: 2,4 milhões de linhas com 3 campos e 17,8 milhões com 4.
+CAMPOS_ANTIGOS: dict[tuple[str, int], tuple[str, ...]] = {
+    ("0220", 3): ("REG", "UNID_CONV", "FAT_CONV"),
+}
+
 # Os registros do combustível que **ainda não se mediu** — ver o topo do módulo.
 # Estão nomeados aqui, e só aqui, para que quem procurar por eles encontre a
 # explicação em vez de achar que foram esquecidos.
 NAO_MEDIDOS: dict[str, str] = {
     "0206": "código do produto conforme a tabela da ANP; obrigatório a quem "
             "distribui combustível, e ausente nos 40 arquivos de quem consome",
-    "0220": "fator de conversão de unidade. Ausente nos 40 arquivos da empresa "
-            "G, onde o combustível já vem em litro no C170 — mas **existe na "
-            "empresa Z**, e com dois tamanhos no mesmo acervo: 3 campos em "
-            "38.577 linhas e 4 em 18.302. Achado pelo próprio "
-            "`tools/medir_leiaute_icms.py` em 03/10/2026, e é o caso de "
-            "variante por versão de PVA que pede `CAMPOS_ANTIGOS`. Medição em "
-            "curso; é o registro que leva o fardo ao litro",
     "C171": "complemento de item para operações com combustíveis; ausente nos "
             "40 arquivos medidos",
 }
@@ -194,11 +206,11 @@ def campos_de(registro: str, quantos: int) -> tuple[str, ...]:
     """Os nomes desta linha da EFD ICMS/IPI.
 
     Mesma assinatura de `registros.campos_de`, inclusive o `quantos`, para que
-    um leitor possa trocar de tabela sem trocar de código. Hoje nenhum registro
-    daqui tem variante por tamanho — quando tiver, entra um `CAMPOS_ANTIGOS`
-    como o de lá, e esta função é o lugar que já sabe consultá-lo.
+    um leitor possa trocar de tabela sem trocar de código — e é o `quantos` que
+    resolve o `0220`, cujo leiaute tem duas larguras em circulação.
     """
-    return CAMPOS.get(registro, ())
+    antigo = CAMPOS_ANTIGOS.get((registro, quantos))
+    return antigo if antigo is not None else CAMPOS.get(registro, ())
 
 
 def nomes_dos_campos(registro: str) -> tuple[str, ...]:

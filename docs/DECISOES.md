@@ -5,6 +5,99 @@
 
 ---
 
+## 2026-10-03 — O classificador, e o corte que esvaziou a fila de revisão
+
+Quinta peça do motor, em dois módulos: `tabelas/tab_combustivel.py` é o dado
+(que NCM é que produto) e `sped/classificador_de_combustivel.py` é a regra (a
+cascata). O `tab_ad_rem` já referenciava um `tab_combustivel` que não existia;
+agora existe.
+
+**A NCM manda, e a inversão vale R$ 239.828.** No crédito outorgado é a
+descrição que manda e a NCM confirma, porque a NCM é declarada pelo emitente e
+erra. Aqui é o contrário, e a prova está em 273 linhas: `OLEO MOTOR DIESEL
+SAE15` tem NCM `27101932`, que é lubrificante. Quem deixa a descrição decidir
+lança isso como crédito de combustível.
+
+**Mas a NCM sozinha falha, no mesmo cliente:** 86 linhas de `DIESEL S10` com NCM
+vazio, mais `GASOLINA COMUM` (24) e `DIESEL S-500` (10). Ali só a descrição
+salva — e a mesma lista tem `LANTERNA` e `FAROL`, então a descrição tem de saber
+dizer não.
+
+### O corte por posição de NCM, que eu não tinha previsto
+
+A primeira versão deixava **10.066 das 15.107 linhas** em "não sei, revisar" —
+os parafusos, pneus e correias da empresa, cujo NCM a tabela não conhece. Fila
+de revisão com dez mil parafusos não é fila.
+
+A saída é fato sobre a nomenclatura, não inferência: parafuso é capítulo 73, e
+nenhuma NCM fora das posições 2710, 2711, 2207, 3403, 3819 e 3820 pode ser
+combustível ou lubrificante. Com o corte, o quadro das 15.107 compras fica:
+
+| | linhas | confiança |
+|---|---|---|
+| fora, por posição de NCM | 10.323 | alta, sem revisão |
+| diesel, gasolina e GLP por NCM medida | 4.233 | alta, sem revisão |
+| lubrificante por NCM | 276 | alta, sem revisão |
+| diesel e gasolina **sem NCM**, pela descrição | 136 | média, revisar |
+| não sei | 98 | baixa, revisar |
+
+**A fila de revisão é 1,7% das linhas.** E a NCM curta ou torta continua
+*desconhecida* em vez de descartada — descartar por NCM malformada mataria as 86
+linhas sem NCM.
+
+### Duas normalizações, porque servem a coisas opostas
+
+`normalizar` tira o bico de bomba (`(BOMBA:27 BICO:27)`), os pontos de
+preenchimento e colapsa `S-10`/`S 10`/`BS10`. Mantém marca e variante, porque o
+revisor decide lendo o texto e tirar palavra é tirar evidência.
+
+`forma_canonica` tira também marca e qualificador de grau, e é a **chave de
+agrupamento**. Medido: as **132 descrições de `27101921` colapsam para 18
+formas**; as 26 da gasolina, para 9; as 6 do etanol, para 3. O lubrificante quase
+não colapsa (102 para 99) — e está certo, lubrificante varia de verdade.
+
+Agrupar quer menos informação; revisar quer mais. Uma função só teria de escolher
+um dos dois e serviria mal ao outro.
+
+**A chave não é o `COD_ITEM`:** o posto gera um código por bico de bomba.
+
+### O fator nunca é 1 por omissão
+
+O GLP é tributado por quilo e o SPED declara `UN`. O `0220` é a fonte certa —
+medido em 20 milhões de linhas da empresa Z, com duas larguras, agora na tabela
+de leiaute. Sem ele, o fator vem do texto: `P20 - GLP 20 KGS` e `20 KGS GLP ONU
+1075 2.1`, dois formatos do mesmo cliente. Sem nenhum dos dois, `fator=None` e
+`revisar=True` — assumir "um botijão é um quilo" erraria vinte vezes.
+
+E o fator do texto só vale se a unidade **casar com a tributada**: `20LT` não
+serve para quem é tributado por quilo, porque inventar densidade aqui seria
+calcular no lugar errado.
+
+### A confiança não recusa, e por isso o módulo não tem exceção
+
+Regra da §8: a confiança da classificação é inferência sobre texto livre e emite
+tudo ranqueado, com o motivo; quem recusa é a cobertura da regra, que é fato
+sobre tabela e mora no `tab_ad_rem`. Exceção aqui faria a linha **desaparecer**
+do relatório em vez de chegar ao revisor. Toda classificação traz o `porque`:
+sem ele o revisor não tem o que julgar.
+
+### A mutação que passou, e o teste que ela consertou
+
+Quatro guardas foram testadas por mutação. Três falharam como devia; a quarta
+**passou** — inverter a ordem dentro de `produto_pela_descricao`, pondo o teste
+de diesel antes do de lubrificante, não quebrou teste nenhum.
+
+O motivo: eu guardava a ordem com `OLEO MOTOR - 20 LITROS`, que **não contém a
+palavra DIESEL**. O teste afirmava guardar uma ordem que não exercitava. Agora
+são três descrições com as duas palavras e sem NCM — `OLEO MOTOR DIESEL SAE15`,
+`LUB MOTOR DIESEL 15W40`, `OLEO DIESEL HIDRAULICO` — e a mutação cai.
+
+É a quarta verificação minha hoje que passava sem provar nada. As anteriores
+estão registradas acima; o padrão não muda: **a verificação tem de poder
+falhar.**
+
+---
+
 ## 2026-10-03 — A rodada do combustível, e a corroboração que ela derrubou
 
 Quarta peça do motor: `analitico/combustivel.py` escolhe os arquivos do lote,

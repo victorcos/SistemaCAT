@@ -33,9 +33,10 @@ from cat.infraestrutura.sped.registros_icms import (
 # (02/2023 a 03/2026). Mudar um número aqui exige medir de novo.
 MEDIDO: dict[str, int] = {
     "0000": 15, "0005": 10, "0150": 13, "0190": 3, "0200": 13, "0205": 5,
-    "0400": 3, "0460": 3, "C100": 29, "C110": 3, "C170": 38, "C190": 12,
-    "C197": 8, "E110": 15, "E111": 4, "E116": 10,
+    "0220": 4, "0400": 3, "0460": 3, "C100": 29, "C110": 3, "C170": 38,
+    "C190": 12, "C197": 8, "E110": 15, "E111": 4, "E116": 10,
 }
+
 
 
 class TestAContagemMedida:
@@ -175,13 +176,50 @@ class TestLerUmaLinha:
                      strict=True))
 
 
-class TestOsTresQueNaoSeMediu:
-    @pytest.mark.parametrize("registro", ["0206", "0220", "C171"])
+class TestO0220QueTemDuasLarguras:
+    """O caso que `tools/medir_leiaute_icms.py` encontrou, e que a leitura do
+    Guia não encontraria: o mesmo registro com dois tamanhos no mesmo acervo.
+
+    Não é defeito do cliente — é versão de PVA. Por isso a chave da variante é
+    `(registro, tamanho)` e não a data: retificadora de 2021 transmitida em 2024
+    sai no leiaute novo.
+    """
+
+    def test_a_tabela_tem_a_largura_nova(self):
+        assert nomes_dos_campos("0220")[-1] == "COD_BARRA"
+
+    def test_a_linha_de_tres_campos_cai_na_variante(self):
+        assert campos_de("0220", 3) == ("REG", "UNID_CONV", "FAT_CONV")
+
+    def test_a_linha_de_quatro_campos_cai_na_tabela(self):
+        assert campos_de("0220", 4) == nomes_dos_campos("0220")
+
+    def test_o_fator_esta_no_mesmo_lugar_nas_duas(self):
+        """É o que importa: `FAT_CONV` é o número que multiplica, e ler a
+        largura errada o poria na coluna do código de barra."""
+        for largura in (3, 4):
+            nomes = campos_de("0220", largura)
+            assert nomes.index("FAT_CONV") == 2
+
+    @pytest.mark.parametrize("linha, fator", [
+        ("|0220|CX|12|", "12"),
+        ("|0220|CX|12|7891234567890|", "12"),
+        ("|0220|FD|6,5||", "6,5"),
+    ])
+    def test_le_o_fator_das_duas_larguras(self, linha, fator):
+        partes = linha.split("|")[1:-1]
+        campos = dict(zip(campos_de("0220", len(partes)), partes, strict=True))
+
+        assert campos["FAT_CONV"] == fator
+
+
+class TestOsDoisQueNaoSeMediu:
+    @pytest.mark.parametrize("registro", ["0206", "C171"])
     def test_estao_nomeados_com_o_motivo(self, registro):
         assert registro in icms.NAO_MEDIDOS
         assert len(icms.NAO_MEDIDOS[registro]) > 40
 
-    @pytest.mark.parametrize("registro", ["0206", "0220", "C171"])
+    @pytest.mark.parametrize("registro", ["0206", "C171"])
     def test_pedir_campo_deles_diz_que_falta_medir(self, registro):
         with pytest.raises(RegistroNaoMedido) as erro:
             posicao_do_campo(registro, "QUALQUER")
@@ -192,6 +230,11 @@ class TestOsTresQueNaoSeMediu:
     def test_nao_estao_na_tabela(self):
         """Seria medido e não medido ao mesmo tempo."""
         assert not set(icms.NAO_MEDIDOS) & set(icms.CAMPOS)
+
+    def test_o_0220_saiu_da_lista_porque_foi_medido(self):
+        """Ele esteve aqui, e sair daqui é o que marca que a medição aconteceu."""
+        assert "0220" not in icms.NAO_MEDIDOS
+        assert "0220" in icms.CAMPOS
 
 
 class TestOQueElaRecusa:
