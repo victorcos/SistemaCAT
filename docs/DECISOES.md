@@ -5,6 +5,78 @@
 
 ---
 
+## 2026-10-03 — A alíquota do combustível na era do ST, e o inciso que nunca valeu
+
+**O que faltava.** O módulo de combustível já sabia calcular o monofásico
+(`tab_ad_rem` × `tab_fcv`), mas um pedido cobre cinco anos e a maior parte dele é
+**anterior a maio de 2023**, quando o ICMS do combustível ainda era percentual e
+estadual. Sem a alíquota daquela era, o módulo só enxergava o pedaço novo.
+
+**Começamos pelo Espírito Santo** porque é o estado em que havia com o que
+confrontar — um papel de trabalho de projeto encerrado. A fonte, porém, foi a
+lei: o **texto consolidado da Lei 7.000/2001**, 175 páginas, extraído com `pypdf`
+instalado numa pasta de rascunho e **não** no venv do projeto.
+
+**Diesel 12%, gasolina 27%, álcool 27%.** Nenhum dos três é a interna geral do
+estado, que é 17% — usar a geral na gasolina credita 37% menos do que a lei manda.
+É por isso que a tabela nova é separada de `tab_aliquota_icms`: lá o eixo é a UF,
+aqui são UF **e** produto, e o produto manda mais.
+
+**Os 30% que circulam não existem.** Uma busca na internet devolve 30% para a
+gasolina do ES, e o número está de fato na lei: a Lei 8.098, de 27/09/2005,
+incluiu o inciso VI com exatamente isso. Ele **nunca produziu efeitos** — a Lei
+8.237, de 28/12/2005, deu nova redação ao mesmo inciso antes da entrada em vigor,
+e o consolidado marca a versão anterior como *"sem efeitos"*. Quem lê resumo em
+vez do consolidado pega os 30%: sobre R$ 10 milhões de base são R$ 300 mil
+pedidos com fundamento num inciso que nunca valeu.
+
+Por isso entrou um terceiro registro na tabela, ao lado de `INTERNA` e
+`A_CONFERIR`: **`REFUTADO`**, para valor que já se provou errado, com o motivo
+escrito. Suspeita e engano identificado não são a mesma coisa, e guardar só o
+primeiro condena a casa a reabrir a discussão. Há teste que falha se alguém
+promover um valor refutado para `INTERNA`.
+
+**A revogação que não produziu efeitos.** A Lei 11.768/2022 revogou a alínea dos
+12% do diesel em 30/12/2022, e o monofásico só chegou em 05/2023. Ao pé da letra
+haveria quatro meses a 17% — 42% de crédito a mais. Mas o **art. 179-I, § único**
+diz que a revogação *não produz efeitos*, invocando o art. 32-A, § 1º, III, da
+LC 87/96. Os 12% valeram sem interrupção, e há teste parametrizado nos cinco
+meses da janela.
+
+**Duas eras, dois erros diferentes.** A tabela **acaba** onde a `tab_ad_rem`
+começa, e por produto: o art. 3º-B da mesma lei pôs diesel e GLP no monofásico em
+1º/05/2023 e gasolina e etanol anidro em 1º/06/2023 — **um mês de diferença**, que
+erra maio de 2023 inteiro na gasolina para quem usa uma data só. Pedir percentual
+de competência do monofásico levanta `ForaDoRegimePercentual`, erro **separado**
+de `AliquotaDeCombustivelDesconhecida`. A distinção é o que protege: "não sei" e
+"aqui não há percentual" tratados como a mesma coisa levam alguém a completar com
+a interna do estado uma conta que devia ser `litros × ad rem × FCV`. Esse erro
+vale para qualquer UF, inclusive as não conferidas, porque a virada é nacional.
+
+**O etanol hidratado ficou resolvido de lambuja.** O art. 3º-B nomeia o etanol
+**anidro** (EAC) e só ele; o hidratado nunca entrou no monofásico e segue
+percentual até hoje, a 27% no ES. Não tem ad rem, e pedir uma é erro de
+categoria.
+
+**O GLP ficou de fora, e de propósito.** Ele não é nomeado em nenhum inciso do
+art. 20, o que à primeira vista o joga na geral de 17%. Só que o inciso II, "m"
+põe a **12%** as mercadorias dos **Anexos VII e VIII do Regulamento**, e esses
+anexos estão no Decreto 1.090-R, não na lei — o sítio da SEFAZ-ES não respondeu.
+São cinco pontos sobre toda a base de GLP, e é exatamente a divergência das
+fontes secundárias: o papel de trabalho diz 17%, a busca diz 12%, nenhum dos dois
+leu o anexo. Ficou em `A_CONFERIR` com o caminho escrito, e **o motor recusa**.
+
+**O que esta tabela não pode ter, e por quê.** A regra da casa em
+`tab_aliquota_icms` é *ato legal mais medição na escrituração do cliente*. Aqui a
+segunda metade **não existe**, e a razão é a própria tese: na era do ST o
+consumidor recebe CST 60, que não destaca imposto nenhum. Foi essa ausência que
+criou a tese de recuperação; ela também impede que o livro dele sirva de prova.
+A prova independente virá do XML — `vICMSSTRet ÷ vBCSTRet`, campos que o leitor
+em `dominio/notafiscal/xml.py` já lê. Está escrito no módulo para que ninguém
+confunda a procedência destas linhas com a da linha de Minas.
+
+---
+
 ## 2026-10-02 — O tíquete travava apagar o trabalho, e o teste que escrevi nasceu vazio
 
 **O defeito.** Apagar um trabalho devolvia "Erro interno" com código de suporte,

@@ -106,6 +106,65 @@ temperatura média do INMET e a conversão da Resolução CNP 06/70.
 A `base legal` entra **na linha da planilha**: o gabarito do EXTRABOM tem uma aba
 "BASE LEGAL" porque o cliente pergunta "por que esse número?".
 
+
+### A alíquota do ST: `tab_aliquota_combustivel`
+
+Feita em 03/10/2026, lendo o **texto consolidado da Lei 7.000/2001** do Espírito
+Santo — 175 páginas, com o histórico de redações de cada inciso. O consolidado é
+o que importa: um resumo não distingue inciso vigente de inciso que nunca valeu.
+
+| Produto | ES | Fundamento | Até |
+|---|---|---|---|
+| Óleo diesel / B-100 | **12%** | art. 20, II, "k" (Lei 8.098/05; Lei 9.937/12) | 04/2023 |
+| Gasolina | **27%** | art. 20, VI, "a" (Lei 8.237/05, de 1º/01/2006) | 05/2023 |
+| Álcool de todos os tipos | **27%** | art. 20, VI, "b" (de 29/03/2006) | segue |
+| GLP | **não conferido** | não é nomeado em nenhum inciso do art. 20 | 04/2023 |
+
+**A tabela acaba onde a `tab_ad_rem` começa**, e por produto, não por data: o
+art. 3º-B da mesma lei pôs diesel e GLP no monofásico em **1º/05/2023** e
+gasolina e etanol anidro em **1º/06/2023**. Pedir percentual de uma competência
+do monofásico levanta `ForaDoRegimePercentual`, que é erro **separado** de
+`AliquotaDeCombustivelDesconhecida`: não é dado que falta, é pergunta errada.
+Quem trata os dois como a mesma coisa completa com a interna do estado uma conta
+que devia ser `litros × ad rem × FCV`.
+
+**Nenhum dos três combustíveis segue a interna geral do ES, que é 17%.** Usar a
+geral na gasolina credita 37% menos do que a lei manda. É a razão de esta tabela
+existir separada de `tab_aliquota_icms`: lá o eixo é a UF, aqui são UF **e**
+produto, e o produto manda mais.
+
+**Os 30% da gasolina não existem, e o engano está registrado.** Uma busca na
+internet devolve 30% para a gasolina do ES, e o número está de fato na lei: a
+Lei 8.098, de 27/09/2005, incluiu o inciso VI com 30%. Ele **nunca produziu
+efeitos** — a Lei 8.237, de 28/12/2005, deu nova redação ao mesmo inciso antes da
+entrada em vigor. O valor ficou em `REFUTADO`, com o motivo, para que a próxima
+pessoa que o encontrar reconheça o que encontrou. Sobre R$ 10 milhões de base são
+R$ 300 mil pedidos com fundamento num inciso que nunca valeu.
+
+**A revogação do diesel que não produziu efeitos.** A Lei 11.768/2022 revogou a
+alínea dos 12% em 30/12/2022, e o monofásico só chegou em 05/2023. Tomada ao pé
+da letra, a revogação jogaria o diesel na interna de 17% por quatro meses — 42%
+de crédito a mais. Mas o **art. 179-I, § único** diz que ela *não produz
+efeitos*, invocando o art. 32-A, § 1º, III, da LC 87/96. Os 12% valeram sem
+interrupção. Há teste parametrizado nos cinco meses da janela.
+
+### Por que o livro do cliente não confere esta tabela
+
+Em `tab_aliquota_icms` a regra é *ato legal mais medição na escrituração*. **Aqui
+a segunda metade não existe, e a razão é a própria tese:** na era do ST o
+consumidor recebe CST 60, que não destaca imposto nenhum. Foi essa ausência que
+criou a tese; ela também impede que o livro dele sirva de prova.
+
+A prova independente vem do **XML**, não do SPED: `vICMSSTRet ÷ vBCSTRet`, que o
+leitor em `dominio/notafiscal/xml.py` já lê (`valor_st_retido`, `bc_st_retido`).
+Quando houver XML de compra de combustível de cliente do ES na era do ST, essa
+divisão confirma ou derruba os 12% e os 27%.
+
+Até lá o peso vem da lei mais uma concordância independente: o papel de trabalho
+do EXTRABOM apurou gasolina a 27% e diesel a 12%. Ele **errou** o FCV, e por isso
+não serve de gabarito sozinho — mas acertar a alíquota pelo mesmo número que a
+lei, tendo errado outra coisa, é concordância e não cópia.
+
 ---
 
 ## 4. Os arquivos: EFD ICMS/IPI, por (CNPJ, competência)
@@ -361,7 +420,8 @@ vigência; `planilhas/conferencia.py` e o pacote para a entrega.
 
 **Falta:** o `registros.py` da casa é de **EFD-Contribuições** — o `0000` do
 ICMS/IPI tem outro leiaute, e `0220`, `0206`, `C171`, `1300`–`1370` não existem lá.
-Não há tabela de ad rem, de FCV, de alíquota por produto, nem a prescrição do ICMS.
+A prescrição do ICMS continua faltando; as tabelas de ad rem (`tab_ad_rem`), de FCV
+(`tab_fcv`) e de alíquota por produto (`tab_aliquota_combustivel`, só o ES) já existem.
 
 **Atenção ao reúso que não serve:** o `Total.somar` do `exclusoes_por_item` lê
 `linha.pis`, `linha.cofins`, `linha.diferenca_do_pis`, `linha.selic_sobre_o_pis`.
@@ -381,7 +441,8 @@ regimes num relatório só.
 
 1. o arquivo se chama "2021 e 2022" e os dados são percentuais, mas **o texto da
    metodologia descreve o monofásico** (2023+). Texto e dado não combinam;
-2. o cliente é do **ES** e o papel cita o **FCV de SP**. Pode ser erro;
+2. ~~o cliente é do **ES** e o papel cita o **FCV de SP**~~ — **confirmado erro**
+   em 02/10/2026: 0,9976 contra 0,9943, 0,33% sistemáticos (ver `tab_fcv`);
 3. a reconstrução do ST usa `VL_ITEM × alíquota`, o que **ignora que a base do ST
    era o PMPF**. É simplificação aceita ou é a metodologia?
 4. o texto conclui **R$ 559.997,23** "para os dois meses de amostragem" e a
@@ -390,15 +451,30 @@ regimes num relatório só.
 
 **Mais três:**
 
-5. **Etanol** (108 linhas, R$ 18,5 mil): o Conv. 26/2023 lista Gasolina C, Óleo
-   Diesel B, GLP e GLGN — **etanol não está lá**. O anidro entrou no monofásico
-   pelo Conv. 15/2023 como componente da gasolina C; o **hidratado**, que é o que
-   se vende na bomba, precisa de confirmação;
+5. **Etanol hidratado — resolvido em 03/10/2026, pelo art. 3º-B da lei do ES.**
+   O artigo lista os produtos do monofásico e nomeia o **etanol anidro
+   combustível (EAC)**, e só ele. O **hidratado ficou fora**: segue no regime
+   plurifásico até hoje, e no ES a alíquota é **27%** (art. 20, VI, "b", "álcool
+   de todos os tipos, inclusive o álcool carburante"). Logo ele **não** tem ad
+   rem, e pedir uma é erro de categoria. O que **continua** dúvida é se o ES o
+   mantém sob ST — a alíquota se sabe, o regime não;
 6. **Lubrificante** (R$ ~1 milhão): tese **separada e possivelmente válida** —
    crédito de ST na aquisição por quem usa como insumo, pela legislação estadual,
-   não pelo Conv. 26/2023. Saber que existe; não misturar no mesmo número;
+   não pelo Conv. 26/2023. Saber que existe; não misturar no mesmo número.
+   Confirmado que **nunca entrou no monofásico**, então a alíquota percentual
+   vale até hoje; a do ES está em `A_CONFERIR` pelo mesmo motivo do GLP;
 7. **"Já credita" é regra ou exceção?** Medido só na ETTORI. Medir a ATLAS ou a
-   PRIME PLUS muda a proposta comercial do módulo.
+   PRIME PLUS muda a proposta comercial do módulo;
+8. **O GLP do ES é 17% ou 12%?** A dúvida nasceu ao escrever
+   `tab_aliquota_combustivel` e é específica: o GLP **não é nomeado em nenhum
+   inciso do art. 20**, o que à primeira vista o joga na interna geral de 17%
+   (inciso I, "a"). Só que o inciso II, "m" (Lei 10.773/2017) põe a **12%** "as
+   mercadorias listadas nos **Anexos VII e VIII do Regulamento**" — e esses
+   anexos estão no Decreto 1.090-R, não na lei. São cinco pontos sobre toda a
+   base de GLP. É exatamente a divergência das fontes secundárias: o papel de
+   trabalho diz 17%, uma busca na internet diz 12%, e nenhum dos dois leu o
+   anexo. **O motor recusa GLP no ES até alguém ler.** O sítio da SEFAZ-ES
+   (`www2.sefaz.es.gov.br`, Infobase do Dec. 1.090-R) não respondeu em 03/10/2026.
 
 **Resolvido no levantamento:** o **CST 090** era a maior dúvida, e não é "não sei o
 que é" — é **ICMS destacado a 12%** em 4.383 de 4.995 linhas, **já creditado pelo
