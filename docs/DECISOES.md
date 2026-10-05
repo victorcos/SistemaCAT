@@ -57,6 +57,25 @@ que o docstring do `/saude` já prescrevia: versão do motor diferente do arquiv
 `VERSAO`. Estava em 0.144.0 contra 0.145.0. **Toda etapa nova exige reiniciar a
 fila**, e isso não é opcional nem detectável pela tela.
 
+**E reiniciar levou cinco tentativas, por duas armadilhas.** Valem escritas,
+porque cada uma produz um reinício que parece ter funcionado e não funcionou:
+
+* `Get-NetTCPConnection -LocalPort 8020 -State Listen` respondeu **um**
+  listening enquanto `netstat -ano` mostrava **dois**. O docstring do `/saude`
+  já mandava usar o `netstat` — eu usei o cmdlet, li "porta livre" e fui
+  procurar cache na API em C#, que não tem cache nenhum;
+* o órfão que segurava o socket é um filho de `multiprocessing`, e a linha de
+  comando dele **não contém `uvicorn`**. Meu laço de kill filtrava por
+  `uvicorn|workers.rodar`, dizia "morto" para o pai e deixava o filho vivo
+  atendendo com o código de dois minutos antes. A conta fechou quando vi um
+  processo nascido às 10:43 respondendo a uma requisição às 10:58, com o
+  `VERSAO` escrito às 10:52: só um processo mais velho que o arquivo explica
+  isso.
+
+A fila e o motor pegam um `VERSAO` novo reiniciando. A API em C# **não**: o
+`dotnet watch` reconstrói quando um arquivo muda de **conteúdo**, não reage a
+`touch` de data e não relança o app quando o processo morre por fora.
+
 ---
 
 ## 2026-10-05 — A etapa do combustível existe, e a rota responde

@@ -121,6 +121,21 @@ def saude() -> dict[str, object]:
     daqui não for a do arquivo `VERSAO`, o motor que responde **não é** o que
     você acabou de subir: `netstat -ano | findstr :8020` mostra mais de um
     LISTENING, e todos têm de morrer antes de subir o novo.
+
+    **Duas armadilhas ao caçar o velho** (as duas medidas em 05/10/2026, cada
+    uma custando um reinício que não resolveu nada):
+
+    * `Get-NetTCPConnection -LocalPort 8020 -State Listen` respondeu **um**
+      listening enquanto `netstat -ano` mostrava **dois**. Por isso o parágrafo
+      acima nomeia o `netstat`: não é preferência de ferramenta. Quem confere
+      pelo cmdlet conclui que a porta está limpa e vai procurar o defeito no
+      lugar errado;
+    * o órfão é um filho de `multiprocessing`, e a linha de comando dele **não
+      contém `uvicorn`** — é `python -c "from multiprocessing.spawn import
+      spawn_main; spawn_main(parent_pid=...)"`. Matar os processos filtrando por
+      `uvicorn` na linha de comando o deixa vivo, segurando o socket do pai já
+      morto e atendendo com o código antigo. Mate **a árvore**, não os que
+      casam com o nome.
     """
     cfg = obter_config()
     return {

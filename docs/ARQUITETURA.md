@@ -138,6 +138,26 @@ deixa a execução parada para sempre. O sintoma está no `/saude`: **versão do
 motor diferente do arquivo `VERSAO`** quer dizer que quem responde não é o
 código que você acabou de salvar.
 
+E reiniciar é mais difícil do que parece, porque no Windows dois processos
+prendem a mesma porta sem erro nenhum: o novo anuncia que subiu, o velho
+continua atendendo. Duas armadilhas medidas em 05/10/2026, cada uma custando um
+reinício que não resolveu nada:
+
+* **`Get-NetTCPConnection -State Listen` subconta.** Ele respondeu *um*
+  listening na 8020 enquanto `netstat -ano` mostrava *dois*. Conferir pelo
+  cmdlet leva à conclusão de que a porta está limpa, e daí a procurar o defeito
+  no lugar errado. Use `netstat -ano | findstr :8020`;
+* **o órfão não casa com o nome que você vai filtrar.** Quem segura o socket do
+  pai morto é um filho de `multiprocessing`, cuja linha de comando é
+  `python -c "from multiprocessing.spawn import spawn_main; …"` — sem a palavra
+  `uvicorn` em lugar nenhum. Matar por correspondência de linha de comando o
+  deixa vivo, atendendo com o código antigo. Mate **a árvore**.
+
+As duas valem para a API em C# também, com uma diferença: `dotnet watch`
+reconstrói quando um arquivo **muda de conteúdo** — não reage a `touch` de data,
+nem relança o app quando o processo morre por fora. Para a API pegar um `VERSAO`
+novo, reinicie o `watch`.
+
 ## 6. Leitura de arquivo grande
 
 Duas regras aprendidas medindo.
