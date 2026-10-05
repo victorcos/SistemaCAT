@@ -213,6 +213,36 @@ class TestOAndamento:
         assert set(fases) == set(exclusoes.FASES), (
             f"faltou avisar da fase {set(exclusoes.FASES) - set(fases)}")
 
+    def test_a_etapa_sabe_nomear_toda_fase_que_pode_receber(self):
+        """**O defeito de 05/10/2026, e a razão de ele ter passado.**
+
+        A rodada emite cinco fases; o caso de uso traduz cada uma em texto de
+        barra com `NOME_DA_FASE[a.fase]`. Quando `receita_por_item` entrou na
+        rodada, o mapa de nomes ficou com as quatro antigas — e a apuração
+        morria com `KeyError: 'receita_por_item'` depois de já ter lido os SPED
+        inteiros do cliente.
+
+        O teste acima não pegava porque exercita a **rodada**, que emite certo.
+        O que faltava era cobrar o outro lado da costura. E repare que a linha
+        vizinha, a da fração da barra, já se defendia com `if a.fase in FASES
+        else 0`: defenderam o índice e esqueceram o rótulo.
+        """
+        from cat.aplicacao.casos_de_uso.apurar_exclusoes import NOME_DA_FASE
+
+        faltam = set(exclusoes.FASES) - set(NOME_DA_FASE)
+
+        assert not faltam, (f"a rodada emite fases que a etapa não sabe "
+                            f"nomear: {sorted(faltam)}")
+
+    def test_nenhum_nome_sobra_no_mapa(self):
+        """O outro lado: nome de fase que a rodada não emite é texto morto que
+        alguém vai acreditar que aparece na tela."""
+        from cat.aplicacao.casos_de_uso.apurar_exclusoes import NOME_DA_FASE
+
+        sobram = set(NOME_DA_FASE) - set(exclusoes.FASES)
+
+        assert not sobram, f"nomes de fase que ninguém emite: {sorted(sobram)}"
+
 
 class TestOPacote:
     """O botão que entrega tudo de uma vez.

@@ -42,6 +42,7 @@ from cat.dominio.lote import TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.exclusoes import (
     FASE_DA_RECEITA,
+    FASE_DA_RECEITA_POR_ITEM,
     FASE_DO_ICMS,
     FASE_DO_ICMS_ST,
     FASE_DO_ISS,
@@ -65,6 +66,7 @@ VERSAO_DO_RESUMO = 1
 # vezes seguidas, sem dizer lendo o quê, é o mesmo que não dizer nada
 NOME_DA_FASE = {
     FASE_DA_RECEITA: "Reunindo a receita",
+    FASE_DA_RECEITA_POR_ITEM: "Receita item a item",
     FASE_DO_ICMS: "ICMS",
     FASE_DO_ICMS_ST: "ICMS-ST",
     FASE_DO_ISS: "ISS",
@@ -246,14 +248,20 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     def andou(a: Andamento) -> None:
         execucao.arquivos_lidos = a.arquivos
         execucao.documentos = a.grupos
-        # são quatro leituras do mesmo lote, uma por tese, e cada uma ocupa um
-        # quarto da barra: uma barra que volta a zero três vezes parece rodada
-        # travada três vezes
+        # são cinco leituras do mesmo lote, e cada uma ocupa um quinto da
+        # barra: uma barra que volta a zero quatro vezes parece rodada travada
+        # quatro vezes
         quantas = len(FASES)
         qual = FASES.index(a.fase) if a.fase in FASES else 0
         andada = a.arquivos / max(total, 1) if total else 1.0
         execucao.fracao = min(0.99, (qual + andada) / quantas)
-        execucao.passo = (f"{NOME_DA_FASE[a.fase]}: {a.arquivos} de {total}"
+        # `.get` e não `[...]`: em 05/10/2026 uma fase nova na rodada sem a
+        # chave correspondente aqui matou a apuração com `KeyError` **depois**
+        # de ler os SPED inteiros do cliente. Rótulo de barra de progresso não
+        # pode derrubar uma rodada que custa uma hora de leitura. Quem cobra o
+        # mapa completo é o teste, que é onde a falta tem de doer
+        execucao.passo = (f"{NOME_DA_FASE.get(a.fase, a.fase)}: "
+                          f"{a.arquivos} de {total}"
                           if total else "Calculando")
         diario.base["andamento"] = {"arquivos": a.arquivos, "grupos": a.grupos,
                                     "fase": a.fase}
