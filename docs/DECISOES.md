@@ -5,6 +5,57 @@
 
 ---
 
+## 2026-10-05 — A etapa do combustível existe, e a rota responde
+
+`casos_de_uso/apurar_combustivel.py` é a casca: prepara a execução, chama a
+rodada, escreve o diário que a tela lê e registra no histórico. A regra não está
+nela — está no leitor, no classificador e na apuração, e isso é o ponto.
+
+**Uma recusa que nomeia o arquivo.** Sem EFD ICMS/IPI no lote a etapa não roda, e
+a mensagem diz **qual** arquivo falta e por que a EFD-Contribuições não serve:
+ela não traz o CST do ICMS nem a unidade do item. "Importe a base" não ajuda
+quem importou a base errada achando que servia.
+
+**Dois avisos que levam a providências opostas.** Quando nada é apurado, o
+resumo distingue "a empresa não comprou combustível" de "comprou, mas tudo veio
+com ICMS destacado" — no primeiro caso não há tese, no segundo o crédito já foi
+tomado pelo caminho normal. Um "zero" sem explicação leva à providência errada.
+
+### Eram dois registros. Eram três.
+
+Eu tinha mapeado dois: `PREPARADORES`, do canal interno, e `EXECUTORES`, da
+fila. Escrevi um teste que percorre os dois mapas e cobra os dois lados de
+**toda** etapa — não só da nova —, porque esquecer um deles não quebra teste
+nenhum: quebra no clique, com o canal dizendo "etapa desconhecida" ou a execução
+ficando na fila para sempre.
+
+E aí um teste que **já existia** pegou o terceiro: `ETAPAS_CANCELAVEIS`, em
+`rodada.py`. Ele varre os casos de uso procurando quem constrói um `Freio` e
+cobra que a lista os contenha — *"etapa que sabe parar e a tela recusa
+cancelar"*. A minha sabia parar e não estava na lista.
+
+Vale registrar que o teste que me pegou é do mesmo tipo do que eu acabara de
+escrever: ambos derivam a verdade do código e cobram a lista, em vez de repetir
+a lista. É o formato que sobrevive a quem chega depois.
+
+### A rota, conferida no ar
+
+`Execucoes.Combustivel` e uma linha de `Etapa(...)` em `ExecucoesRotas.cs` — o
+lado C# é fatorado o bastante para isso ser uma linha. Conferido contra a API em
+execução: as quatro rotas respondem **401** (pede sessão) e um caminho
+inexistente responde **404**. O controle importa: sem ele, "401" não provaria
+que a rota existe.
+
+### O botão ainda não acende, de propósito
+
+`Implementada` segue `false`. Acendê-la agora faria a etapa aparecer como
+pendente sem ter para onde ir — a tela é a próxima peça, e é ela que vira a
+chave.
+
+1.869 testes Python, 392 C#.
+
+---
+
 ## 2026-10-05 — As etiquetas de empresa viraram número
 
 Pedido do Victor: *"é bem mais eficiente a leitura"*. `empresa A` virou

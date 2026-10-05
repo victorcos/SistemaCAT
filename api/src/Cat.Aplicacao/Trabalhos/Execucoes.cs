@@ -148,6 +148,7 @@ public sealed class Execucoes(
     public const string CreditoOutorgado = "credito_outorgado";
     public const string Exclusoes = "exclusoes";
     public const string QuebraXml = "quebra_xml";
+    public const string Combustivel = "combustivel";
 
     /// <summary>
     /// A entrega montada e ainda não aprovada. Não é situação gravada: é como o

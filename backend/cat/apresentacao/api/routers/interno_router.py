@@ -37,6 +37,7 @@ from sqlalchemy.orm import Session
 
 from cat.aplicacao.casos_de_uso import (
     apurar_contribuicoes,
+    apurar_combustivel,
     apurar_exclusoes,
     apurar_credito_outorgado,
     apurar_periodo,
@@ -432,6 +433,9 @@ PREPARADORES = {
     apurar_credito_outorgado.ETAPA: (
         apurar_credito_outorgado.preparar, apurar_credito_outorgado.NadaParaVarrer,
         "Já existe uma apuração do crédito outorgado em andamento neste trabalho."),
+    apurar_combustivel.ETAPA: (
+        apurar_combustivel.preparar, apurar_combustivel.NadaParaApurar,
+        "Já existe uma apuração de combustível em andamento neste trabalho."),
 }
 
 # "cancelando" ainda está em curso: a rodada só para no próximo ponto seguro, e

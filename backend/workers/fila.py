@@ -42,6 +42,7 @@ from sqlalchemy import select
 from cat.aplicacao.casos_de_uso import (
     apurar_contribuicoes,
     apurar_credito_outorgado,
+    apurar_combustivel,
     apurar_exclusoes,
     apurar_periodo,
     apurar_piscofins,
@@ -82,6 +83,7 @@ EXECUTORES = {
     apurar_piscofins.ETAPA: apurar_piscofins.executar,
     apurar_credito_outorgado.ETAPA: apurar_credito_outorgado.executar,
     apurar_exclusoes.ETAPA: apurar_exclusoes.executar,
+    apurar_combustivel.ETAPA: apurar_combustivel.executar,
 }
 
 MOTIVO_INTERRUPCAO = "Interrompida: o motor reiniciou durante a rodada. Rode de novo."

@@ -47,6 +47,8 @@ public static class ExecucoesRotas
             "apurar as exclusões da base");
         Etapa(api, Execucoes.QuebraXml, "quebra-xml", detalheExigeEtapa: true,
             "quebrar os XML");
+        Etapa(api, Execucoes.Combustivel, "combustivel", detalheExigeEtapa: true,
+            "apurar o crédito de combustível");
 
         // o catálogo de colunas do XML não depende de execução: é o que a
         // planilha sabe produzir, e a tela precisa dele antes de existir rodada

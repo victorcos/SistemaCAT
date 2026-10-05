@@ -36,8 +36,8 @@ SEGUNDOS_ENTRE_AVISOS = 2.0
 # acrescentar o freio sem acrescentar aqui passa a quebrar o teste.
 ETAPAS_CANCELAVEIS = frozenset({
     "apuracao", "apuracao_contribuicoes", "apuracao_piscofins", "arquivo_digital",
-    "credito_outorgado", "entrega", "exclusoes", "pre_validacao", "quebra_de_sped",
-    "razao", "st_suportado",
+    "combustivel", "credito_outorgado", "entrega", "exclusoes", "pre_validacao",
+    "quebra_de_sped", "razao", "st_suportado",
 })
 
 
