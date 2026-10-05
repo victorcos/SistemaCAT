@@ -221,6 +221,11 @@ export default function Exclusoes() {
                 {resumo?.iniciada_por ? ` por ${resumo.iniciada_por}` : ""}
               </p>
             )}
+            {/* baixar logo abaixo de apurar: são os dois gestos da página, e
+                estavam a uma rolagem um do outro */}
+            {resultado && resumo && !rodando && (
+              <BaixarPacote execucaoId={resultado.id} vazia={(resumo.grupos ?? 0) === 0} />
+            )}
           </div>
         }
       >
@@ -305,8 +310,7 @@ function Concluido({
   resumo: ResumoDasExclusoes;
 }) {
   const download = useAcao();
-  // "pacote" ao lado dos formatos: é o mesmo botão de baixar, com outro alvo
-  const [baixando, setBaixando] = useState<Formato | "pacote" | null>(null);
+  const [baixando, setBaixando] = useState<Formato | null>(null);
   const linhas = resumo.por_competencia ?? [];
   const fora = Object.entries(resumo.fora ?? {});
   const vazia = (resumo.grupos ?? 0) === 0;
@@ -314,12 +318,6 @@ function Concluido({
   async function baixar(formato: Formato) {
     setBaixando(formato);
     await download.executar((sinal) => baixarPlanilhaDasExclusoes(execucao.id, formato, sinal));
-    setBaixando(null);
-  }
-
-  async function baixarPacote() {
-    setBaixando("pacote");
-    await download.executar((sinal) => baixarPacoteDasExclusoes(execucao.id, sinal));
     setBaixando(null);
   }
 
@@ -364,48 +362,22 @@ function Concluido({
 
         <div className="flex min-w-[260px] flex-col items-end justify-between gap-3">
           <div className="flex flex-col items-end gap-2">
-            {/* o pacote é o que se entrega: o consolidado e as quatro teses por
-                item, do mesmo instante, com um LEIA-ME que diz o que é cada um.
-                Cinco downloads em cinco cliques são cinco chances de misturar
-                rodadas, e quem confere põe tudo lado a lado com os arquivos do
-                escritório anterior */}
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Botao
-                variante="principal"
-                icone={IconeBaixar}
-                onClick={baixarPacote}
-                disabled={vazia}
-                carregando={baixando === "pacote"}
-                className="shadow-acao"
-              >
-                Baixar o pacote
-              </Botao>
-              {/* Cancelar **ao lado**, nunca no lugar: o botão que virava
-                  Cancelar punia o clique impaciente, que abortava o próprio
-                  download e apagava o arquivo. Ver `BaixarPlanilha` */}
-              {baixando === "pacote" && download.podeCancelar && (
-                <Botao variante="fantasma" tamanho="sm" onClick={download.cancelar}>
-                  Cancelar
-                </Botao>
-              )}
-            </div>
+            {/* o pacote subiu para o cabeçalho, junto do botão que roda a
+                etapa: ver `BaixarPacote`. Aqui fica o consolidado, que é o
+                download rápido e o único que se pede sozinho */}
             <BaixarPlanilha
               aoBaixar={baixar}
               desabilitado={vazia}
               rotulo="Só o consolidado"
-              baixando={baixando === "pacote" ? null : baixando}
+              baixando={baixando}
               aoCancelar={download.cancelar}
             />
           </div>
           <p className="m-0 max-w-[36ch] text-right text-[11px] leading-relaxed text-texto-fraco">
-            O pacote leva o consolidado e as quatro teses item a item, cada uma no leiaute do
-            relatório do escritório anterior — 680, 903, 839 e 933.{" "}
-            {/* **Dizer o tempo é o que evita o próximo "botão bugado".** Medido
-                na empresa 05: 312 s e 250 MB, porque o 680 tem 3,5 milhões de
-                linhas. Quem não sabe disso clica de novo, e já clicou */}
-            <strong>Numa base grande leva alguns minutos</strong> — o 680 passa de três milhões de
-            linhas. Só o consolidado sai na hora: uma linha por grupo, e somar a coluna da
-            diferença dá exatamente este total.
+            O consolidado sai na hora: uma linha por grupo, e somar a coluna da diferença dá
+            exatamente este total. As quatro teses item a item — 680, 903, 839 e 933, no leiaute
+            do relatório do escritório anterior — vêm no <strong>pacote</strong>, no botão lá em
+            cima, junto do de apurar.
             {resumo.segundos ? ` Apurado em ${duracao(resumo.segundos)}` : ""}
             {resumo.fonte === "agregados"
               ? ", a partir do que a Gestão já tinha lido."
@@ -784,6 +756,68 @@ function PorCompetenciaDaTese({
 }
 
 /* ------------------------------------------------------------------ */
+
+/**
+ * O pacote, no alto — ao lado do botão que roda a etapa.
+ *
+ * Os dois gestos desta página são **apurar** e **levar o resultado**, e eram
+ * dois cliques em lugares diferentes: um no cabeçalho, o outro a uma rolagem
+ * de distância, no canto de um cartão. Pedido em 05/10/2026, e a razão é
+ * simples: quem acabou de rodar quer baixar, e estava procurando.
+ *
+ * O que **não** podia subir sozinho é o botão sem o aviso do tempo. Medido na
+ * empresa 05: 312 segundos e 250 MB, porque o 680 tem 3,5 milhões de linhas.
+ * Quem não sabe disso clica de novo — e já clicou. Por isso a linha do tempo
+ * viaja junto com o botão, e não ficou para trás no cartão.
+ *
+ * Estado próprio, e não o do `Concluido`: o pacote é renderizado no cabeçalho
+ * e o consolidado dentro do cartão, então um `useAcao` de cada. Eles não se
+ * bloqueiam — já não se bloqueavam antes —, e cada um mostra o seu próprio
+ * erro onde o clique aconteceu.
+ */
+function BaixarPacote({ execucaoId, vazia }: { execucaoId: number; vazia: boolean }) {
+  const download = useAcao();
+  const [baixando, setBaixando] = useState(false);
+
+  async function baixar() {
+    setBaixando(true);
+    await download.executar((sinal) => baixarPacoteDasExclusoes(execucaoId, sinal));
+    setBaixando(false);
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1.5">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Botao
+          variante="principal"
+          icone={IconeBaixar}
+          onClick={baixar}
+          disabled={vazia}
+          carregando={baixando}
+        >
+          Baixar o pacote
+        </Botao>
+        {/* Cancelar **ao lado**, nunca no lugar: o botão que virava Cancelar
+            punia o clique impaciente, que abortava o próprio download e
+            apagava o arquivo. Ver `BaixarPlanilha` */}
+        {baixando && download.podeCancelar && (
+          <Botao variante="fantasma" tamanho="sm" onClick={download.cancelar}>
+            Cancelar
+          </Botao>
+        )}
+      </div>
+      <p className="m-0 max-w-[34ch] text-right text-[11px] leading-normal text-texto-fraco">
+        O consolidado e as quatro teses item a item, do mesmo instante, com um LEIA-ME.{" "}
+        <strong>Numa base grande leva alguns minutos.</strong>
+      </p>
+      {download.erro && (
+        <p className="m-0 max-w-[34ch] text-right text-[11px] leading-normal text-erro">
+          {download.erro.message}
+        </p>
+      )}
+    </div>
+  );
+}
 
 function Numero({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
