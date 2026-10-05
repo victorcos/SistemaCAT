@@ -99,6 +99,45 @@ Cada execução vira **linha na tabela `execucao`**, com parâmetros, bytes lido
 linhas lidas, arquivos gerados e hash de cada um. É o que permite responder de
 onde veio um número meses depois.
 
+### 5.1 Onde uma etapa se registra — os cinco lugares
+
+Uma etapa nova não existe por ter caso de uso. Ela precisa estar registrada em
+**cinco** lugares, em três programas, e esquecer qualquer um deles dá falha que
+teste nenhum pega — só o clique em produção.
+
+No motor, três mapas:
+
+| Onde | O que faz | O que acontece se faltar |
+| --- | --- | --- |
+| `PREPARADORES` (`routers/interno_router.py`) | põe a execução na fila | o canal responde "etapa desconhecida" |
+| `EXECUTORES` (`workers/fila.py`) | roda a execução | ela entra na fila e fica lá para sempre |
+| `ETAPAS_CANCELAVEIS` (`casos_de_uso/rodada.py`) | aceita o pedido de parar | o botão de cancelar não faz nada |
+
+Os três **têm teste que os cobra para toda etapa**, não só para a nova:
+`test_apurar_combustivel.py` percorre `PREPARADORES` e `EXECUTORES` e cobra os
+dois lados; `test_toda_etapa_com_freio_esta_na_lista` cobra o terceiro. Foi esse
+último que pegou a falta no combustível.
+
+No front, dois — e estes **não tinham teste**, por isso estão escritos aqui:
+
+* a **rota**, em `constants/routes.ts`, com a tela em `routers/index.tsx`;
+* o **rótulo do botão**, em `DESTINOS` de `pages/Projeto.tsx`. Sem ele o card da
+  etapa acende e não leva a lugar nenhum — o card renderiza, o botão não aparece.
+
+E no servidor da API, a chave `Implementada` em `Cat.Dominio/Projeto/Etapas.cs`.
+Ela fica **`false` de propósito** enquanto a tela não existe: a etapa aparece no
+hub como "ainda não construída", visível para o usuário ver o caminho inteiro,
+mas não clicável. Acendê-la antes da tela faz o card convidar a clicar para
+lugar nenhum; deixá-la apagada depois faz a demanda não existir.
+
+**E a fila precisa reiniciar.** O motor sobe com `--reload` e pega `.py` salvo;
+a fila (`workers.rodar`) roda fora dele e **não** recarrega — de propósito, pois
+com a fila dentro do motor uma apuração de uma hora morria a cada arquivo salvo
+(23/09/2026). O preço: uma fila antiga não conhece a etapa nova, e o clique
+deixa a execução parada para sempre. O sintoma está no `/saude`: **versão do
+motor diferente do arquivo `VERSAO`** quer dizer que quem responde não é o
+código que você acabou de salvar.
+
 ## 6. Leitura de arquivo grande
 
 Duas regras aprendidas medindo.

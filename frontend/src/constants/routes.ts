@@ -33,6 +33,8 @@ export const ROTAS = {
   quebraDeSped: (id: number | string) => `/projetos/${id}/quebra-de-sped`,
   /** a triagem dos itens beneficiados pelo crédito outorgado, no ICMS */
   creditoOutorgado: (id: number | string) => `/projetos/${id}/credito-outorgado`,
+  /** o crédito de ICMS do combustível queimado como insumo: a tese do monofásico */
+  combustivel: (id: number | string) => `/projetos/${id}/combustivel`,
   /** a apuração de PIS/COFINS: a 037 e o razão da ECD, o par que se confronta */
   apuracaoPisCofins: (id: number | string) => `/projetos/${id}/apuracao-piscofins`,
   gestao: (id: number | string) => `/projetos/${id}/apuracao-contribuicoes`,

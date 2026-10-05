@@ -35,6 +35,20 @@ export function competencia(iso: string | null): string {
   return `${mes}/${ano}`;
 }
 
+/**
+ * "2024-02-15" vira "15/02/2024". Data de calendário, não instante.
+ *
+ * Parte a string em vez de montar um `Date`: `new Date("2024-02-15")` é
+ * meia-noite **UTC**, e em Brasília isso volta um dia — a emissão de 15/02
+ * apareceria como 14/02. Data de emissão de documento não tem fuso: é o dia
+ * que está escrito no arquivo.
+ */
+export function dia(iso: string | null | undefined, vazio = "—"): string {
+  if (!iso) return vazio;
+  const [ano, mes, d] = iso.split("-");
+  return ano && mes && d ? `${d}/${mes}/${ano}` : iso;
+}
+
 /** Data e hora de um instante ISO. `vazio` é o que aparece quando não há
  *  valor — na tela de usuários, "nunca entrou" diz mais que um travessão. */
 export function dataHora(iso: string | null, vazio = "—"): string {

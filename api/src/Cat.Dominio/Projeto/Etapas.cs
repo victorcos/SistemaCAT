@@ -184,7 +184,7 @@ public static class Etapas
             "motivo, fora do total — nunca como zero. Também confronta com o que o " +
             "cliente já creditou por ajuste no E111: o produto é auditar o crédito " +
             "tomado, não só achar crédito novo.",
-            Implementada: false, Aba: "Combustível"),
+            Implementada: true, Aba: "Combustível"),
         new("historico", "Histórico do trabalho",
             "Tudo o que aconteceu, em ordem: quem importou, quem rodou cada " +
             "etapa, o que cada rodada produziu, quem mudou o status e por quê. " +

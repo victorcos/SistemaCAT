@@ -434,6 +434,64 @@ da rodada, que é o que responde depois por que aquela lista tinha aquelas linha
 Em disco, na pasta da execução: `credito_outorgado_elegiveis.parquet` sempre, e
 `credito_outorgado_descartados.parquet` só quando o trabalho pediu para guardar.
 
+### Crédito de ICMS sobre combustível (v0.146.0)
+
+| Método | Rota | Quem |
+| --- | --- | --- |
+| `POST` | `/api/projetos/{id}/combustivel` | quem escreve |
+| `GET` | `/api/projetos/{id}/combustivel` | quem vê o trabalho |
+| `GET` | `/api/combustivel/{execucaoId}` | quem vê o trabalho |
+| `POST` | `/api/combustivel/{execucaoId}/cancelar` | quem escreve |
+
+**Não depende de etapa nenhuma.** Lê a EFD ICMS/IPI do lote direto, como a quebra
+de SPED e o crédito outorgado. Lote sem EFD ICMS/IPI faz o `POST` recusar com
+**422** nomeando o arquivo que falta — e dizendo que a EFD-Contribuições **não
+serve**, porque não traz o CST do ICMS nem a unidade do item. É a confusão
+provável, não uma hipótese: quem tem o lote cheio de Contribuições acha que
+importou a base certa.
+
+O resumo traz `arquivos_no_lote`, `arquivos_lidos`,
+`ignorados_por_duplicidade`, `ilegiveis`, `linhas`, `linhas_de_monofasico`,
+`estabelecimentos`, `competencias`, `grupos`, `credito`, `credito_estimado`,
+`linhas_recusadas`, `recusas`, `recusas_com_exemplo`, `a_revisar`,
+`primeira_emissao`, `ultima_emissao`, `avisos` e `segundos`.
+
+Três campos do resumo carregam contrato, e não só número:
+
+* **`credito` e `credito_estimado` são `Decimal` em texto**, nunca float — e o
+  estimado **não** está somado por dentro do crédito. Ele é a parcela da era da
+  substituição tributária, cuja base é o valor do item porque o arquivo do
+  destinatário não traz a do ST (medido: zero em 5.234 linhas de CST 60/61).
+  Quem mostra o total **tem** de mostrar o estimado junto;
+* **`recusas` e `recusas_com_exemplo` são a mesma informação em dois cortes**:
+  `recusas` é motivo → contagem, para o log; `recusas_com_exemplo` é motivo →
+  `{linhas, exemplo}`, para a tela. A frase de exemplo traz competência e
+  valores dentro, então não serve de chave de agrupamento — por isso o motivo é
+  um **código curto** (`ad_rem_nao_conferida`, `mes_partido`,
+  `icms_ja_destacado`, `cst_nao_e_do_regime`, …) e a tradução mora no front.
+  **Código que o front não conhece aparece pela chave**, nunca escondido: a
+  lista de recusas é o que explica a diferença entre o que foi lido e o que foi
+  creditado, e linha oculta faria o total não fechar;
+* **`primeira_emissao` e `ultima_emissao` são `aaaa-mm-dd`**, data de
+  calendário e não instante. Nenhuma etapa corta por prescrição: o intervalo é
+  informado para quem decide ver.
+
+Em disco, na pasta da execução: **um** arquivo,
+`compras_de_combustivel.parquet`, com **todas** as compras linha a linha — as
+três camadas juntas: o que o arquivo trouxe, o que o classificador decidiu e o
+que a tabela calculou. A compra que não é combustível também sai, com
+`produto = "fora"`: é assim que se confere que ela foi descartada por regra e
+não por omissão.
+
+As três somas do resumo (`grupos`, `creditos`, `recusas`) **não** são arquivos
+— saem contadas no resumo e por inteiro no parquet, porque numa base de
+supermercado são milhares de grupos e lista que ninguém lê não serve de lista.
+As chaves são diferentes de propósito: `grupos` por cnpj/competência/CST/unidade
+("o que entrou", conta tudo), `creditos` por cnpj/competência/produto/regime
+("quanto vale", conta só o que entra no total) e `recusas` por motivo ("o que era
+da tese e não entrou"). Uma chave só para as três faria a contagem de recusas
+virar a loja inteira.
+
 ### Apuração das contribuições — a Gestão (v0.83.0)
 
 | Método | Rota | Quem |

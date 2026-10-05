@@ -100,6 +100,14 @@ const DESTINOS: Record<
       padrao: "Apurar PIS/COFINS",
     },
   },
+  combustivel: {
+    rota: ROTAS.combustivel,
+    rotulos: {
+      concluida: "Ver o crédito apurado e o que ficou de fora",
+      em_andamento: "Acompanhar a apuração",
+      padrao: "Apurar o crédito de combustível",
+    },
+  },
   apuracao_contribuicoes: {
     rota: ROTAS.gestao,
     rotulos: {

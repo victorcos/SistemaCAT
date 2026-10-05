@@ -5,6 +5,60 @@
 
 ---
 
+## 2026-10-05 — A tela do combustível, e a demanda acendeu
+
+`pages/Combustivel.tsx` é a última peça: até agora a etapa aparecia no hub com
+"ainda não construída", porque `Implementada: false` era de propósito — acender
+a chave sem ter tela faria o card convidar a clicar para lugar nenhum. Com a
+tela no ar, a chave virou.
+
+**O registro de uma etapa tem cinco pontos, e não três.** Os três do servidor
+(`PREPARADORES`, `EXECUTORES`, `ETAPAS_CANCELAVEIS`) já têm teste que os cobra.
+Os do front não tinham nome escrito em lugar nenhum, e são dois: a rota em
+`constants/routes.ts` com a tela em `routers/index.tsx`, e o rótulo do botão em
+`DESTINOS` de `pages/Projeto.tsx` — sem o segundo o card acende e não leva a
+nada. Mais a chave `Implementada` no `Etapas.cs`, que é o que o servidor
+responde. Ficam registrados aqui porque descobri cada um por falta.
+
+**O número grande sozinho é resposta incompleta, e a tela recusa dá-la.** Três
+coisas saem junto com o total, porque sem elas alguém soma errado:
+
+* **quanto do total é estimativa** — na era da substituição tributária a base é
+  o valor do item, porque o arquivo do destinatário não traz a do ST (medido:
+  zero em 5.234 linhas de CST 60/61). Sai em aviso próprio, com o valor, e
+  **não** somado por dentro do número grande;
+* **o que ficou fora, e por quê** — cada motivo com a contagem e uma frase de
+  exemplo. Competência sem ad rem conferida não vira zero: vira linha com
+  explicação, porque a providência é diferente em cada caso (uns se resolvem
+  cadastrando tabela, outros são crédito que o documento já deu);
+* **o intervalo de emissão** — é ele que diz se prescrição é assunto. A tela
+  mostra e não corta nada por prazo: cortar sozinha esconderia a decisão.
+
+**Motivo que o front não sabe traduzir aparece pela chave.** O motor ganha
+código curto de recusa novo toda vez que uma tabela nova entra, e a tradução
+mora no front. A tentação é filtrar o desconhecido para não mostrar
+`ad_rem_nao_conferida` cru na tela — e é justamente o erro: a linha sumiria, o
+total não fecharia, e ninguém saberia por quê. Dois testes cobram isso, um na
+marcação e um na função.
+
+**O formatador de data não passa por `Date`.** `new Date("2024-01-01")` é
+meia-noite **UTC**: em Brasília imprime `31/12/2023`. Data de emissão de
+documento não tem fuso — é o dia escrito no arquivo —, então `format.dia()`
+parte a string em vez de montar um `Date`. A mutação fiel confirmou que o bug é
+real nesta máquina: trocar a implementação faz dois testes caírem com
+`31/12/2023`.
+
+**A fila não recarrega, e foi ela que segurou a demanda.** O motor sobe com
+`--reload` e pega `.py` salvo; a fila (`workers.rodar`) **não**, de propósito —
+com ela dentro do motor, uma apuração de uma hora morria a cada arquivo salvo
+(23/09/2026). O efeito colateral: a fila de 03/10 não conhecia a etapa
+`combustivel`, e o clique deixaria a execução parada para sempre. O sintoma é o
+que o docstring do `/saude` já prescrevia: versão do motor diferente do arquivo
+`VERSAO`. Estava em 0.144.0 contra 0.145.0. **Toda etapa nova exige reiniciar a
+fila**, e isso não é opcional nem detectável pela tela.
+
+---
+
 ## 2026-10-05 — A etapa do combustível existe, e a rota responde
 
 `casos_de_uso/apurar_combustivel.py` é a casca: prepara a execução, chama a

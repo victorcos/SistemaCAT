@@ -3,6 +3,7 @@ import { ADMINISTRA_USUARIOS } from "@/constants/roles";
 import { ROTAS } from "@/constants/routes";
 import Leiaute from "@/layout/Leiaute";
 import LeiauteDeEntrada from "@/layout/LeiauteDeEntrada";
+import Combustivel from "@/pages/Combustivel";
 import Conferencia from "@/pages/Conferencia";
 import Gestao from "@/pages/Gestao";
 import Historico from "@/pages/Historico";
@@ -116,6 +117,7 @@ export const roteador = createBrowserRouter([
               { path: "/projetos/:id/pre-validacao", element: <PreValidacao /> },
               { path: "/projetos/:id/quebra-de-sped", element: <QuebraDeSped /> },
               { path: "/projetos/:id/credito-outorgado", element: <CreditoOutorgado /> },
+              { path: "/projetos/:id/combustivel", element: <Combustivel /> },
               // a mesma tela do trabalho, um nível dentro: os cards passam a
               // ser as etapas da frente em vez das frentes do trabalho
               { path: "/projetos/:id/frente/:trilha", element: <Projeto /> },

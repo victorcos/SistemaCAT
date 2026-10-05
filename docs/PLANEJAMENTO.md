@@ -77,6 +77,12 @@ leitura do `E111`, que é como se descobre o que o cliente já tomou.
 Fora do roteiro: **pré-validar o arquivo que o cliente já transmitiu** (v0.48),
 para auditoria de quem gera a CAT 42 com outra ferramenta.
 
+**O combustível não está nesta tabela de propósito.** O roteiro acima é o da
+CAT 42, onde a ordem é real — não se monta razão sem movimentos. O crédito de
+combustível é frente própria, de uma etapa só, e não depende de nenhuma delas:
+lê a EFD ICMS/IPI do lote direto. Quem importou a base já tem tudo o que ela
+precisa (v0.146.0).
+
 Em volta: login com Argon2id e escopo por empresa, gestão de usuários com as
 três salvaguardas, acesso às empresas, histórico do trabalho com sucessão,
 cadastro do trabalho editável com aviso de base fora do período (v0.51).
@@ -248,7 +254,17 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] Medir se "o cliente já credita" é regra ou exceção: **é regra**. Três dos
       quatro com CST 61 já creditam (empresa 06 e empresa 21 por ajuste; só a
       empresa 09 não). Confirma que o produto é auditar o tomado
-- [ ] Construir o módulo de combustível, agora como frente principal
+- [x] **Construir o módulo de combustível, agora como frente principal** —
+      **no ar em v0.146.0**. O motor em v0.138.0 a v0.145.0 (leitor,
+      classificador, apuração, rodada, caso de uso) e a tela em v0.146.0
+      (`pages/Combustivel.tsx`). Validado ponta a ponta contra a empresa 06,
+      matriz, 25 competências: devido R$ 1.566.349,35 contra creditado
+      R$ 1.328.691,14 — **R$ 237.658,21** a levantar. Três competências batem
+      `litros × ad rem` a 7 centavos, o que prova de uma vez os litros do
+      leitor, a ad rem de 1,0635 e que o cliente omite o FCV.
+      **O que a tela diz além do total**: quanto é estimativa (a era do ST, cuja
+      base é o valor do item), o que ficou fora com o motivo de cada recusa, e o
+      intervalo de emissão — nenhuma etapa corta por prescrição sozinha
 - [x] **CNPJ na chave da seleção** (v0.137.0): `selecionar_por_cnpj_e_competencia`
       substitui `selecionar_por_competencia`, que guardava uma apuração por
       competência e tratava filial como duplicata — na empresa 06 sobrariam 62 de
