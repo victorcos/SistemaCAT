@@ -245,7 +245,7 @@ class TestPorQueNaoTemChave:
     """Três coisas diferentes, que a mensagem antiga tratava como uma só.
 
     Ela dizia sempre "costuma ser chave que o Excel converteu em número". Nos
-    relatórios da empresa V isso era 0% dos casos: as 1.270 linhas sem chave
+    relatórios da empresa 19 isso era 0% dos casos: as 1.270 linhas sem chave
     tinham a coluna **vazia**, e 1.205 delas nem número de documento tinham —
     movimentação interna de estoque, CFOP 1.949, R$ 0,00 de ST. Chamar isso de
     problema de leitura enchia a tela de alarme e escondia falha de verdade.

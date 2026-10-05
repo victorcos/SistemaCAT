@@ -4,7 +4,7 @@
 O layout C170 do EFD Contribuições NÃO tem campo NAT_BC_CRED nativo — essa
 informação precisa ser derivada do CFOP da operação. Regra validada
 campo a campo contra o arquivo de referência real "C100, C170, 0200 -
-Documento e Itens - Nota Fiscal" (empresa C, 43.497 linhas, out/2024): cruzando `Natureza Crédito` x `CFOP` x
+Documento e Itens - Nota Fiscal" (empresa 03, 43.497 linhas, out/2024): cruzando `Natureza Crédito` x `CFOP` x
 `Tipo Operação`, a natureza do crédito segue o CFOP (não o TIPO_ITEM do
 0200, como uma heurística anterior do projeto supunha — ver
 `src/efd_entradas/entradas.py::_natureza_credito_por_tipo_item`, que não
@@ -21,7 +21,7 @@ p/industrialização ou uso/consumo->02, ativo imobilizado->10, devolução de
 venda->12) mas não foram observadas na amostra.
 
 Reconfirmado uma terceira vez em 30/09/2026, contra o gabarito do 037 da
-empresa F (458.792 linhas, 57 competências): os CFOP já mapeados bateram todos, e
+empresa 05 (458.792 linhas, 57 competências): os CFOP já mapeados bateram todos, e
 três novos entraram — 1113->01, 2122->02 e 1124->03, este último a primeira
 natureza de **serviço** do mapa, com 157 linhas e nenhuma exceção.
 
@@ -54,7 +54,7 @@ TABELA: dict[str, str] = {
     "1102": "01",  # CONFIRMADO
     "1121": "01",  # CONFIRMADO (MA, Gestão PIS/COFINS) — venda à ordem, já recebida do remetente
     "2121": "01",  # CONFIRMADO (MA, Gestão PIS/COFINS)
-    "1113": "01",  # CONFIRMADO (MA, 037 da empresa F) — consignação já recebida
+    "1113": "01",  # CONFIRMADO (MA, 037 da empresa 05) — consignação já recebida
     "1403": "01",  # CONFIRMADO
     "1652": "01",  # CONFIRMADO
     "2102": "01",  # CONFIRMADO
@@ -64,7 +64,7 @@ TABELA: dict[str, str] = {
     # Compra para industrialização / uso ou consumo (insumo) -> 02
     "1101": "02",  # CONFIRMADO — compra p/indust ou prod rural (o bem vira insumo da produção própria)
     "1122": "02",  # CONFIRMADO
-    "2122": "02",  # CONFIRMADO (MA, 037 da empresa F) — o par interestadual do 1122
+    "2122": "02",  # CONFIRMADO (MA, 037 da empresa 05) — o par interestadual do 1122
     "1401": "02",  # CONFIRMADO
     "1407": "02",  # CONFIRMADO
     "1556": "02",  # CONFIRMADO
@@ -83,7 +83,7 @@ TABELA: dict[str, str] = {
     # dos quadros de crédito.
 
     # Industrialização feita por terceiro -> 03 (aquisição de serviço)
-    "1124": "03",  # CONFIRMADO (MA, 037 da empresa F) — 157 linhas, sem exceção
+    "1124": "03",  # CONFIRMADO (MA, 037 da empresa 05) — 157 linhas, sem exceção
 
     # Devolução de venda (entrada) -> 12
     "1202": "12",  # CONFIRMADO

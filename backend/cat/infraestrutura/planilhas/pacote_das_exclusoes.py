@@ -21,11 +21,11 @@ por esse número que quem confere acha o arquivo de referência correspondente.
 
 ## Por que o 680 vai em CSV, e os outros em xlsx
 
-**Porque é o formato em que o MA o exporta.** O arquivo de referência da empresa F
+**Porque é o formato em que o MA o exporta.** O arquivo de referência da empresa 05
 veio em CSV de 1,17 GB, e os do 839 e do 933 vieram em xlsx — e a razão é a
 mesma nos dois casos: o 680 é o detalhe geral da receita e não cabe no Excel.
 
-Medido no 680 da empresa F, 3.568.362 linhas:
+Medido no 680 da empresa 05, 3.568.362 linhas:
 
 ```
 csv      33 s     862 MB
@@ -45,7 +45,7 @@ Os outros três cabem: o 839 tem 463.212 linhas, o 903 tem 138.358 e o 933 tem
 A tese 1 aparece **duas vezes**: consolidada, somada por grupo, e detalhada item
 a item no 680. É de propósito, e os dois totais não batem: o consolidado
 arredonda uma vez por grupo, com a alíquota efetiva daquele grupo, e o detalhe
-arredonda por linha, como o MA. Na empresa F a diferença é de 0,06% — cerca de
+arredonda por linha, como o MA. Na empresa 05 a diferença é de 0,06% — cerca de
 R$ 1,6 mil em R$ 2,7 milhões (decisão de 24/09/2026).
 
 Quem abrir os dois vai subtrair um do outro. O `LEIA-ME.txt` existe para que

@@ -101,7 +101,7 @@ const SEPARADOR = ";";
 /**
  * A planilha que vai ao cliente: os códigos com saída e sem origem, e duas
  * colunas para ele preencher — o código do mesmo produto e, se for kit, quantas
- * unidades. É o que a RVZ fez na empresa D, com os códigos de marketplace.
+ * unidades. É o que a RVZ fez na empresa 04, com os códigos de marketplace.
  */
 export function planilhaParaOCliente(semPar: CodigoSemPar[]): string {
   const cabecalho = ["CNPJ", "Código sem origem", "Descrição", "NCM", "Quantidade saída",

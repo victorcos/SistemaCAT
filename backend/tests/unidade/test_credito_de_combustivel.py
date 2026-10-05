@@ -162,7 +162,7 @@ class TestAViradaDeEra:
         não se calculam: a ad rem delas está em `A_CONFERIR`, com a suspeita de
         0,9456 que ninguém leu no texto do convênio.
 
-        Não é defeito desta função — é a recusa funcionando. A empresa G tomou
+        Não é defeito desta função — é a recusa funcionando. A empresa 06 tomou
         crédito nesses meses, e auditá-los exige abrir a redação original da
         cláusula sétima do Conv. 199/2022. O relatório mostra a linha, com este
         motivo, fora do total.
@@ -314,7 +314,7 @@ class TestOIcmsDestacadoFechaAPorta:
     escriturou, e ele erra. O que decide é o **destaque**: compra com ICMS
     destacado já deu crédito pelo caminho normal.
 
-    Medido na empresa G: 1.080 linhas da tese com CST 90, **792 delas com ICMS
+    Medido na empresa 06: 1.080 linhas da tese com CST 90, **792 delas com ICMS
     destacado** — e **zero** das 1.026 linhas de CST 60.
 
     ### A primeira versão desta porta estava errada, e a medição mostrou
@@ -337,7 +337,7 @@ class TestOIcmsDestacadoFechaAPorta:
         assert "duas vezes" in c.porque
 
     def test_o_destaque_fecha_a_porta_ate_no_cst_61(self):
-        """São 2 linhas em 2.226 na empresa G, e as duas estariam duplicadas."""
+        """São 2 linhas em 2.226 na empresa 06, e as duas estariam duplicadas."""
         linha = LinhaDeCompra(**{**_linha(competencia="2024-06", cst="061").__dict__,
                                  "valor_do_icms": Decimal("50.00")})
 

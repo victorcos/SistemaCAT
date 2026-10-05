@@ -49,7 +49,7 @@ CAMPOS: dict[str, tuple[str, ...]] = {
 
     # --- serviços (bloco A) e o analítico da NFC-e (C175) ---
     # Entraram em 29/09/2026, com o 047. Contagem e formato de cada campo
-    # conferidos contra a EFD real da empresa F de 10/2025.
+    # conferidos contra a EFD real da empresa 05 de 10/2025.
     "A010": ("REG", "CNPJ"),
     "A100": (
         "REG", "IND_OPER", "IND_EMIT", "COD_PART", "COD_SIT", "SER", "SUB",

@@ -22,7 +22,7 @@ conferiu.
 
 ## Ficha 3 em CSV
 
-A Ficha 3 de uma filial num ano passa com folga do que o Excel aguenta (a empresa T
+A Ficha 3 de uma filial num ano passa com folga do que o Excel aguenta (a empresa 17
 tem 875 mil linhas num mês de uma loja). O resto do dossiê é xlsx.
 """
 

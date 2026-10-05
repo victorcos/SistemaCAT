@@ -6,7 +6,7 @@ empresa — que envelhece e ninguém mantém — o sistema **descobre** três co
 do próprio arquivo:
 
 1. **o separador**, pelo caractere cuja contagem se repete igual em mais
-   linhas. Consistência vale mais que quantidade: no relatório da empresa V o
+   linhas. Consistência vale mais que quantidade: no relatório da empresa 19 o
    ponto-e-vírgula aparece 45 vezes na primeira linha, mas só dentro de nomes
    de coluna (``Qtde;Unitária``); o pipe é o que dá o mesmo número em toda
    linha;

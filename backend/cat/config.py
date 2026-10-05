@@ -61,7 +61,7 @@ class Config(BaseSettings):
     # Quantos processos escrevem e pré-validam os arquivos digitais ao mesmo
     # tempo — os que a etapa 7 gera e os que o cliente já transmitiu. As duas
     # partes são Python puro, uma por arquivo: num perfil de 12 arquivos da
-    # empresa V, 48% do tempo era pré-validação e 40% escrita. Zero escolhe pelo
+    # empresa 19, 48% do tempo era pré-validação e 40% escrita. Zero escolhe pelo
     # processador, deixando folga para a API e o Postgres; 1 lê um por vez.
     # O teto de 4 é pela memória, não pelo processador: cada filho pode passar
     # de 1 GB, e a máquina de desenvolvimento já ficou com 4 GB livres com o

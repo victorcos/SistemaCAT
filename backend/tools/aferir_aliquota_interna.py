@@ -15,7 +15,7 @@ escrito na linha da tabela; esta metade é o que o próprio cliente escriturou.
 
 As saídas **internas tributadas integralmente** da EFD ICMS/IPI — CFOP 5xxx com
 CST de ICMS 00 —, agrupadas por ano. A alíquota geral do estado é a que domina:
-na empresa F, 18% responde por 56% a 59% das linhas em todos os anos de 2021 a
+na empresa 05, 18% responde por 56% a 59% das linhas em todos os anos de 2021 a
 2025, e as outras são produtos de alíquota reduzida ou majorada.
 
 **Ler o degrau é o ponto.** Um estado que subiu a interna aparece aqui como

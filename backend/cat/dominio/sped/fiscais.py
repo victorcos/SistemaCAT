@@ -15,7 +15,7 @@ bater com o leiaute publicado (foi o caso da ECD), e um campo deslocado aqui
 trocaria chave de nota por número de nota em milhões de linhas.
 
 O C800 é de São Paulo: CF-e-SAT não existe nas outras UFs. Numa amostra da
-empresa N, os estabelecimentos do Paraná não têm nenhum.
+empresa 12, os estabelecimentos do Paraná não têm nenhum.
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ class DocumentoEscriturado:
     emitente: Emitente = Emitente.PROPRIA
     # DT_E_S do C100. `data` é a emissão, que é o que a conferência com o XML
     # compara; a Ficha 3 e o arquivo digital pedem a data da entrada ou da
-    # saída. Na empresa V, 5,55% das entradas entraram em mês diferente do emitido
+    # saída. Na empresa 19, 5,55% das entradas entraram em mês diferente do emitido
     data_entrada_saida: date | None = None
 
     @property

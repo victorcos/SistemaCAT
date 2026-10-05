@@ -76,7 +76,7 @@ const CONCLUIDA = {
 
 function montar(modulo: string, resumo: object = CONCLUIDA.resumo) {
   detalhar.mockResolvedValue({
-    projeto: { id: 6, modulo, modulo_rotulo: modulo, empresa: "empresa S", status: "em_andamento" },
+    projeto: { id: 6, modulo, modulo_rotulo: modulo, empresa: "empresa 16", status: "em_andamento" },
     etapas: [],
   } as never);
   listar.mockResolvedValue([{ ...CONCLUIDA, resumo }] as never);

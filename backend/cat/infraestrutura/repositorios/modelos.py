@@ -163,7 +163,7 @@ class EstabelecimentoDB(Base):
 class ProjetoDB(Base):
     """Um trabalho contratado para uma empresa, numa frente e num período.
 
-    Frente e competências são o que delimita o escopo: "CAT 42 da empresa N,
+    Frente e competências são o que delimita o escopo: "CAT 42 da empresa 12,
     01/2021 a 12/2025". Toda execução e toda entrega pendura aqui.
     """
 
@@ -193,7 +193,7 @@ class ProjetoDB(Base):
     # dura meses, e a sucessão fica registrada no histórico.
     responsavel_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     # como a venda a consumidor final entra no razão: "enquadramento_1" (o
-    # manual) ou "demais_saidas" (como a empresa T transmitiu). Ver
+    # manual) ou "demais_saidas" (como a empresa 17 transmitiu). Ver
     # cat.dominio.icms.cat42.enquadramento.VendaAConsumidor
     venda_a_consumidor: Mapped[str] = mapped_column(
         String(20), default="enquadramento_1", server_default="enquadramento_1", nullable=False

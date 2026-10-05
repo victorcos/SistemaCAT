@@ -7,7 +7,7 @@ solto no lote ou dentro de zip — e o que só se confere com vários meses junt
 
 ## Zip sem extrair
 
-Os arquivos da empresa T chegaram em três zips, um deles com dois zips dentro:
+Os arquivos da empresa 17 chegaram em três zips, um deles com dois zips dentro:
 805 e 295 TXT, dezenas de GB descompactados. Extrair para ler seria dobrar o
 disco por nada: cada TXT é lido em fluxo de dentro do zip. O zip aninhado é a
 exceção — lido por dentro, cada membro descomprimiria o de fora desde o começo
@@ -16,7 +16,7 @@ exceção — lido por dentro, cada membro descomprimiria o de fora desde o come
 ## O que só se vê com o conjunto
 
 * **Arquivo repetido.** O mesmo estabelecimento e mês em dois lugares (o zip que
-  é cópia de outro, na empresa T). O primeiro é lido; os outros ficam listados como
+  é cópia de outro, na empresa 17). O primeiro é lido; os outros ficam listados como
   repetidos, sem ler de novo — salvo a **substituição** (COD_FIN 02), que é o
   que vale na SEFAZ: lida depois de um original, ela é validada e o original
   vira substituído, fora dos totais, das ocorrências e da continuidade.
@@ -203,7 +203,7 @@ def _validar_local(local: tuple) -> tuple[int, str, Validacao]:
 
     Os exemplos e os saldos voltam ao principal, que grava e em seguida os solta
     — com centenas de arquivos, segurá-los todos não caberia. Cada filho lê um
-    arquivo por vez, e a empresa T manda arquivos de até 77 MB: é por arquivo, e não
+    arquivo por vez, e a empresa 17 manda arquivos de até 77 MB: é por arquivo, e não
     por linha, que a leitura se divide.
     """
     tipo, caminho, membro = local
@@ -451,7 +451,7 @@ def pre_validar(
 def _com_nome_unico(c: Candidato, cnpj: str, competencia: str, nomes: dict[str, tuple[str, str]]) -> Candidato:
     """O nome é a chave das ocorrências na tela e na planilha.
 
-    A empresa T nomeia pelo CNPJ e mês, mas outra ferramenta pode chamar todo mês de
+    A empresa 17 nomeia pelo CNPJ e mês, mas outra ferramenta pode chamar todo mês de
     `CAT42.txt` em pastas diferentes — e aí as ocorrências de janeiro e de
     fevereiro se misturariam. O segundo nome igual ganha o estabelecimento e o
     mês entre parênteses.

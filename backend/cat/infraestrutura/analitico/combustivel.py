@@ -46,10 +46,10 @@ seleção usa. O `tipo_escrit` dela vem do **`COD_FIN`** da EFD ICMS/IPI, que te
 outro nome e a mesma convenção: `0` original, `1` substituto. Conferido em 40
 arquivos reais — 17 com `0` e 23 com `1`.
 
-**E a de-duplicação não é teórica.** Os 411 arquivos da empresa G estão em três
+**E a de-duplicação não é teórica.** Os 411 arquivos da empresa 06 estão em três
 pastas que repetem as mesmas competências; um lote que aponte a pasta-mãe traz
 cada mês três vezes, e somar os três triplicaria a tese. Aconteceu antes, na
-empresa S: R$ 203.600,56 a mais por somar original e retificadora do mesmo mês.
+empresa 16: R$ 203.600,56 a mais por somar original e retificadora do mesmo mês.
 
 ## O que esta etapa deliberadamente não faz
 
@@ -113,7 +113,7 @@ class Grupo:
     """Onde a soma mora: estabelecimento, mês, código de tributação e unidade.
 
     **A unidade entra na chave de propósito.** O mesmo cliente escreve o litro
-    como `L`, `LT` e `LTS` — medido na empresa G —, e somar as três numa coluna
+    como `L`, `LT` e `LTS` — medido na empresa 06 —, e somar as três numa coluna
     só produziria um número sem grandeza. Separadas, a soma é conferível e o
     tamanho do problema de normalização fica visível para o classificador.
 

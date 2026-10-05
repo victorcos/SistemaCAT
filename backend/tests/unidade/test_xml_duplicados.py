@@ -1,6 +1,6 @@
 """A mesma nota em mais de um XML, e a nota de uso denegado.
 
-Na empresa D, 28.407 chaves vieram em mais de um arquivo (solta e no zip, em
+Na empresa 04, 28.407 chaves vieram em mais de um arquivo (solta e no zip, em
 dois zips), e 16 notas tinham protocolo de uso denegado. A cópia autorizada
 vence a sem protocolo; a denegada sai, com todas as cópias.
 """

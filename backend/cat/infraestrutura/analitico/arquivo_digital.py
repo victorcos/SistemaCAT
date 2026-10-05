@@ -206,7 +206,7 @@ class CadastroDoMes:
     participantes: dict[str, ParticipanteDaEfd] = field(default_factory=dict)
     # o 0150 de todas as EFD do estabelecimento, a mais recente vencendo. A nota
     # escriturada fora do mês cita participante que só está no 0150 de outro
-    # mês: no piloto da empresa V, 127 arquivos travavam por isso
+    # mês: no piloto da empresa 19, 127 arquivos travavam por isso
     de_outros_meses: dict[str, ParticipanteDaEfd] = field(default_factory=dict)
 
     def participante(self, codigo: str) -> ParticipanteDaEfd | None:
@@ -409,7 +409,7 @@ def _preparar(con, apuracao: str, saldos: str, ficha3: str, itens: str, itens_do
                     "codigo_barras VARCHAR, unidade VARCHAR, ncm VARCHAR, aliq_icms DECIMAL(9, 4), cest VARCHAR)")
     # O manual pede no 0200 a "última ocorrência do período" — o período do
     # arquivo é o mês. O cadastro mais recente punha a descrição e a alíquota de
-    # dezembro no arquivo de janeiro (na empresa V, 23 mil itens mudam de alíquota
+    # dezembro no arquivo de janeiro (na empresa 19, 23 mil itens mudam de alíquota
     # em 2021). A unidade fica fora daqui de propósito: ver `_itens`.
     if os.path.isfile(itens_do_mes):
         con.execute(f"""

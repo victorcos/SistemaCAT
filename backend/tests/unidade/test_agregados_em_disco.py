@@ -78,7 +78,7 @@ def test_pasta_sem_agregado_volta_vazio(tmp_path):
 
 
 def test_o_mesmo_arquivo_gravado_duas_vezes_conta_uma_e_nao_em_silencio(tmp_path, caplog):
-    """Aconteceu na base da empresa S: o mesmo SPED entrou duas vezes no lote.
+    """Aconteceu na base da empresa 16: o mesmo SPED entrou duas vezes no lote.
 
     Contar as duas somaria a competência inteira de novo — foram R$ 203.600,56
     a mais na tese. Ficar com uma é o certo; fazê-lo calado, não.

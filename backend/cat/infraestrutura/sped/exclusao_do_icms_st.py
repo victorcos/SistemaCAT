@@ -9,7 +9,7 @@ a receita cheia — e nessa receita está embutido um imposto que não é dele.
 
 No 903 o ICMS está escrito na nota: lê-se `VL_ICMS` e exclui-se. **Aqui não há
 o que ler.** A revenda com ST já retido não destaca imposto nenhum — é o que a
-CST 60 significa. Medido nos 57 arquivos da empresa F e também na EFD ICMS/IPI do
+CST 60 significa. Medido nos 57 arquivos da empresa 05 e também na EFD ICMS/IPI do
 mesmo cliente: **zero** linhas com ICMS-ST destacado, nem na entrada, nem na
 saída, nem no analítico C190.
 

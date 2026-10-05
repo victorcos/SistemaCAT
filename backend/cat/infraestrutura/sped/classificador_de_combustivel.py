@@ -14,7 +14,7 @@ regra: quem decide, em que ordem, e com que confiança.
 
 A NCM manda porque a subposição é juridicamente precisa e **é a descrição que
 mente**: `OLEO MOTOR DIESEL SAE15` está em `27101932`, que é lubrificante. São
-R$ 239.828 em 273 linhas na empresa G que um classificador de descrição lançaria
+R$ 239.828 em 273 linhas na empresa 06 que um classificador de descrição lançaria
 como crédito.
 
 Mas a NCM sozinha também falha, e no mesmo cliente: **86 linhas de `DIESEL S10`
@@ -54,7 +54,7 @@ para revisar 100% uma vez. Nem o reenquadrador nem o de-para puderam fazer isso.
 ## O fator de conversão: 0220 primeiro, texto depois
 
 O `0220` é a fonte certa — `UNID_CONV` e `FAT_CONV`, medidos em 20 milhões de
-linhas da empresa Z. Quem tiver o 0220 do item passa em `conversao`; quem não
+linhas da empresa 22. Quem tiver o 0220 do item passa em `conversao`; quem não
 tiver cai no texto, que é onde o GLP escreve o fardo: `P20 - GLP 20 KGS`.
 
 Sem nenhum dos dois, o fator sai `None` e `revisar` sai `True`. **Nunca 1 por
@@ -89,7 +89,7 @@ MEDIA = "media"
 BAIXA = "baixa"
 
 # As unidades em que o próprio litro vem declarado. Medidas em CST 60/61 da
-# empresa G: `L` (1.920), `LT` (947), `LTS` (318), `l` (117), `LITRO` (9).
+# empresa 06: `L` (1.920), `LT` (947), `LTS` (318), `l` (117), `LITRO` (9).
 # `LI` entrou do levantamento de 95 arquivos.
 UNIDADES_DE_LITRO = frozenset({"L", "LT", "LTS", "LITRO", "LITROS", "LI"})
 
@@ -193,7 +193,7 @@ RUIDO = frozenset({
 def forma_canonica(descricao: str) -> str:
     """A descrição reduzida ao que decide o produto — a chave de agrupamento.
 
-    É o que torna este classificador **conferível**: medido na empresa G, as 132
+    É o que torna este classificador **conferível**: medido na empresa 06, as 132
     descrições distintas de `27101921` colapsam para **3** formas, e as 26 da
     gasolina para **4**. Num universo de sete produtos, dá para revisar 100% uma
     vez — e aí a confiança passa a ser taxa de acerto medida, não número
@@ -311,7 +311,7 @@ def classificar(descricao_do_item: str, ncm: str, unidade: str,
 
     # a resposta categórica primeiro: parafuso é capítulo 73 e não é
     # combustível em nenhuma circunstância. Sem isto a fila de revisão recebe
-    # toda a compra comum da empresa — 10.066 linhas na empresa G
+    # toda a compra comum da empresa — 10.066 linhas na empresa 06
     if tab_combustivel.fora_das_posicoes(ncm):
         return Classificacao(
             produto=FORA, confianca=ALTA,

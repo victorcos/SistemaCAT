@@ -229,7 +229,7 @@ class TestEstoqueZerado:
 
 class TestItemSemStEmEstoque:
     def test_baixa_de_item_sem_st_nao_gera_ressarcimento(self):
-        """Foi o caso de 236 mil linhas na empresa T: item com suportado zerado."""
+        """Foi o caso de 236 mil linhas na empresa 17: item com suportado zerado."""
         l = razao(
             entrada(10, 0),
             saida(1, enq=EnquadramentoLegal.FATO_GERADOR_NAO_REALIZADO,
@@ -242,7 +242,7 @@ class TestItemSemStEmEstoque:
 class TestFichaComoElaVemDoCliente:
     """A sequência que a Ficha 3 de um cliente real traz, do começo ao fim.
 
-    Confrontado em 14/09/2026 contra a Ficha 3 já calculada da IRMAOS EMPRESA_T, uma
+    Confrontado em 14/09/2026 contra a Ficha 3 já calculada da IRMAOS EMPRESA_17, uma
     filial e um mês: 10.741 itens, 550.862 linhas, saldo e ressarcimento
     batendo em 100% delas e diferença de R$ 0,00 no total. Este teste guarda o
     formato daquela conferência para que ela não precise ser refeita à mão.

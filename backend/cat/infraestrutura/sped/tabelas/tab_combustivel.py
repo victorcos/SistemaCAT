@@ -15,13 +15,13 @@ OLEO MOTOR DIESEL SAE15     ← NCM 27101932: é LUBRIFICANTE, e a descrição d
 ```
 
 A subposição é juridicamente precisa — `2710.19.21` é óleo diesel, `2710.19.3` é
-óleo lubrificante — e é a descrição que mente. Na empresa G são **R$ 239.828 em
+óleo lubrificante — e é a descrição que mente. Na empresa 06 são **R$ 239.828 em
 273 linhas** sob `27101932`, que um classificador baseado em "a descrição contém
 DIESEL" lançaria como crédito.
 
 ## O que está medido
 
-Varredura de 40 EFD ICMS/IPI da empresa G (02/2023 a 03/2026), sobre todas as
+Varredura de 40 EFD ICMS/IPI da empresa 06 (02/2023 a 03/2026), sobre todas as
 compras, filtrando as NCM das posições 2710, 2711, 2207, 3403, 3819 e 3820:
 
 | NCM | linhas | valor | CST vistos | produto |
@@ -142,7 +142,7 @@ SEM_NCM_PROPRIO = frozenset({ETANOL_ANIDRO})
 # nenhum dos dois é combustível em nenhuma circunstância.
 #
 # Serve para **não encher a fila de revisão**: sem isto, as 10.066 linhas de
-# compra comum da empresa G caíam em "não sei, revisar" — e fila de revisão com
+# compra comum da empresa 06 caíam em "não sei, revisar" — e fila de revisão com
 # dez mil parafusos não é fila.
 POSICOES_DE_INTERESSE = ("2710", "2711", "2207", "3403", "3819", "3820")
 
@@ -165,7 +165,7 @@ def produto_de(ncm: str) -> str:
     Vazio, e não `FORA`: "a tabela não conhece esta NCM" e "esta NCM está fora
     da tese" são fatos diferentes, e tratá-los igual faria o classificador parar
     de consultar a descrição justamente onde ela é a única fonte — nas 86
-    descrições de NCM vazio da empresa G, que incluem `DIESEL S10` em 86 linhas.
+    descrições de NCM vazio da empresa 06, que incluem `DIESEL S10` em 86 linhas.
     """
     limpo = (ncm or "").strip()
     if not limpo:

@@ -2,7 +2,7 @@
 
 Domínio padronizado e estável (não específico de nenhuma empresa). Os
 códigos 50, 70, 71, 73, 98, 99 e 51 foram efetivamente observados no
-arquivo de referência "037 - Entradas" (empresa A); os demais
+arquivo de referência "037 - Entradas" (empresa 01); os demais
 completam a tabela oficial e não têm ocorrência confirmada nesse arquivo.
 
 Não aparece como coluna própria no arquivo de referência (a saída só traz

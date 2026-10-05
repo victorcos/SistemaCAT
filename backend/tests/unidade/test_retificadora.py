@@ -15,7 +15,7 @@ from cat.infraestrutura.arquivos.classificador import classificar
 
 # raiz 44000003 — Irmãos Boa. COD_FIN é o campo antes de DT_INI: 0 / 1.
 ORIGINAL_MAIO = (
-    "|0000|018|0|01052025|31052025|EMPRESA T LTDA|44000003000109||SP"
+    "|0000|018|0|01052025|31052025|EMPRESA 17 LTDA|44000003000109||SP"
     "|407048962113|3550308|||A|0|"
 )
 RETIFICADORA_MAIO = ORIGINAL_MAIO.replace("|0000|018|0|", "|0000|018|1|", 1)

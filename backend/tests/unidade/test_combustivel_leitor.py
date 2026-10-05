@@ -164,7 +164,7 @@ class TestOQueNaoSai:
         assert all(l.numero != "999" for l in linhas)
 
     def test_a_entrada_cancelada_nao_rende_linha(self, arquivo):
-        """**Medido: 21 dos 7.210 documentos da empresa G têm `COD_SIT` 02.**
+        """**Medido: 21 dos 7.210 documentos da empresa 06 têm `COD_SIT` 02.**
 
         Pouco o bastante para passar despercebido num total, e o suficiente
         para um pedido conter nota cancelada. A nota cancelada do arquivo deste
@@ -225,7 +225,7 @@ class TestVazioNaoEZero:
     zero não erra o total — erra a pergunta "este fornecedor destacou imposto?",
     que é a que decide se a linha entra na tese.
 
-    **E não é hipótese:** o CST `000` da empresa G tem 610 linhas de entrada e
+    **E não é hipótese:** o CST `000` da empresa 06 tem 610 linhas de entrada e
     só 24 com valor de ICMS. O campo é facultativo por perfil, e este cliente
     quase não o preenche.
     """

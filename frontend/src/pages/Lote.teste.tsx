@@ -59,7 +59,7 @@ const RESUMO = {
 
 async function conferir(resumo: object) {
   detalhar.mockResolvedValue({
-    projeto: { id: 6, modulo: "piscofins", modulo_rotulo: "PIS/COFINS", empresa: "empresa S",
+    projeto: { id: 6, modulo: "piscofins", modulo_rotulo: "PIS/COFINS", empresa: "empresa 16",
                status: "em_andamento" },
     etapas: [],
   } as never);

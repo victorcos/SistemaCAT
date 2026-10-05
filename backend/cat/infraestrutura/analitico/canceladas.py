@@ -1,6 +1,6 @@
 """As NF-e canceladas na SEFAZ que a EFD e o XML ainda trazem como válidas.
 
-Na empresa D, a RVZ achou notas canceladas na SEFAZ e ativas na escrituração
+Na empresa 04, a RVZ achou notas canceladas na SEFAZ e ativas na escrituração
 — o cliente não tinha a lista, e a ferramenta dela consultou a SEFAZ nota a
 nota. Pedir ressarcimento sobre elas seria pedir sobre operação que não existe.
 
@@ -43,7 +43,7 @@ _RE_CHAVE = re.compile(r"(?<!\d)(\d{44})(?!\d)")
 _RE_CHAVE_DO_EVENTO = re.compile(rb"<chNFe>\s*(\d{44})\s*</chNFe>")
 _RE_CANCELAMENTO = re.compile(rb"<tpEvento>\s*110111\s*</tpEvento>")
 # a linha da lista que diz, ela mesma, que a nota não foi cancelada: o pedido de
-# cancelamento rejeitado e o uso autorizado (na lista do cliente da empresa D,
+# cancelamento rejeitado e o uso autorizado (na lista do cliente da empresa 04,
 # 4 "Rejeição: Pedido de Cancelamento..." e 2 "Autorizado o uso da NF-e")
 _RE_NAO_CANCELADA = re.compile(r"rejei|autorizado o uso|uso autorizado|denegad", re.IGNORECASE)
 _RE_CANCELADA = re.compile(r"cancelamento\s+(autorizado|homologado)", re.IGNORECASE)

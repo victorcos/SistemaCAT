@@ -11,7 +11,7 @@ então sobre 120 mil XML por vez. O que mudou na travessia:
 * **a saída é parquet**, e não CSV — a planilha sai depois, a pedido, com o
   recorte que a tela pediu. É o caminho de todas as etapas daqui;
 * **uma cópia por chave.** A mesma nota vem no zip do mês e no do trimestre; na
-  empresa D foram 28.407 chaves repetidas. Contar duas vezes inflaria o valor
+  empresa 04 foram 28.407 chaves repetidas. Contar duas vezes inflaria o valor
   elegível, que é o número que interessa;
 * **só o que a empresa vendeu.** O benefício é sobre a saída, e o lote costuma
   ter tudo junto — a nota que a empresa emitiu e a que ela recebeu do

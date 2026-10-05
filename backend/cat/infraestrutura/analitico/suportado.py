@@ -83,7 +83,7 @@ ARQUIVO_DOCUMENTOS = "suportado_documentos.parquet"
 LINHAS_POR_LOTE = 200_000
 
 # quantas linhas de um relatório se olham antes de concluir que ele é só de
-# saídas — o relatório de saídas da empresa V tem 21 GB, e ler tudo para achar
+# saídas — o relatório de saídas da empresa 19 tem 21 GB, e ler tudo para achar
 # zero entradas é tempo jogado fora
 AMOSTRA_PARA_ACHAR_ENTRADA = 5_000
 
@@ -213,7 +213,7 @@ def extrair_retido(
     **Um arquivo por vez em memória.** Cada relatório vira uma parte em
     parquet, e a soma entre relatórios é do DuckDB. Acumular tudo num
     dicionário, como era, segurava 14,1 milhões de itens em Python na base real
-    da empresa V (94 relatórios, 20 GB) — gigabytes de memória numa máquina que
+    da empresa 19 (94 relatórios, 20 GB) — gigabytes de memória numa máquina que
     roda Docker, Excel e o resto ao lado.
     """
     from cat.dominio.gerencial.campos import Especie
@@ -427,12 +427,12 @@ def apurar(
         if ao_indexar is not None:
             ao_indexar()
         # conexão nova para o índice: na do percurso, que acabou de ler 8,7
-        # milhões de itens, ele levou 19 minutos na empresa V (15/09/2026); numa
+        # milhões de itens, ele levou 19 minutos na empresa 19 (15/09/2026); numa
         # conexão limpa, 2
         con.close()
         con = _abrir(destino)
         # e com metade do fôlego: o agrupamento por documento foi o que caiu por
-        # falta de memória na empresa V (#55, 16/09/2026), com a máquina em 4 GB
+        # falta de memória na empresa 19 (#55, 16/09/2026), com a máquina em 4 GB
         # livres. Menos linhas de execução e teto menor derramam em disco em vez
         # de pedir ao sistema o que ele não tem
         _economizar(con)
@@ -510,7 +510,7 @@ def _percorrer(con, saida: str, avisar: Aviso | None,
 # O que identifica um documento. A chave, quando há; sem ela — nota modelo 1,
 # que não tem chave de acesso —, estabelecimento, participante, modelo, número
 # e competência. Agrupar só pela chave juntava todas as notas sem chave num
-# "documento" só: 904 itens de 667 notas na base real da empresa V.
+# "documento" só: 904 itens de 667 notas na base real da empresa 19.
 _DOCUMENTO = """
     CASE WHEN length(coalesce(chave, '')) = 44 THEN chave
          ELSE 'sem-chave|' || coalesce(cnpj, '') || '|' || coalesce(participante, '')
@@ -557,7 +557,7 @@ def _indexar_documentos(con, saida: str, destino: str) -> None:
 
     **Sem `mode()`.** O CST e a fonte que mais pesam saem de contagens e de
     `arg_max` sobre número pequeno. O `mode()` guarda uma tabela por documento
-    fora do controle de memória do DuckDB: na empresa V (8,7 milhões de itens) o
+    fora do controle de memória do DuckDB: na empresa 19 (8,7 milhões de itens) o
     agrupamento passou de 8 GB com teto de 2 GB, e a apuração caiu duas vezes
     por falta de memória (#55 e #56, 16/09/2026). Contagem e `arg_max` derramam
     em disco como o resto.

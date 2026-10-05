@@ -3,7 +3,7 @@ Cálculo dos Créditos (registros C170/C181/C185/C191/C195/C501/C505/D101/
 D105/D501/D505/F100, campo NAT_BC_CRED).
 
 Entradas marcadas com # CONFIRMADO foram extraídas diretamente do arquivo
-de referência "037 - Entradas" (empresa A, jul-dez/2021) —
+de referência "037 - Entradas" (empresa 01, jul-dez/2021) —
 valores garantidamente iguais aos usados pelo Sistema MA. As demais vêm do
 texto oficial do Guia Prático e ainda não foram confrontadas com nenhum
 arquivo de referência real — confirmar antes de tratar como definitivas.
@@ -53,7 +53,7 @@ TABELA: dict[str, str] = {
 # esta é a grafia de quem compara relatório com relatório. Mesmo arranjo de
 # `tab_cfop`, e pelo mesmo motivo.
 #
-# Das 10 naturezas do gabarito do 037 da empresa F (458.792 linhas, 30/09/2026),
+# Das 10 naturezas do gabarito do 037 da empresa 05 (458.792 linhas, 30/09/2026),
 # 6 batem com a oficial e estas 4 não:
 COMO_O_MA_ESCREVE: dict[str, str] = {
     "04": "Energia elétrica e térmica",

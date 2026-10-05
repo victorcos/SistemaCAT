@@ -23,7 +23,7 @@ transcritas:
     https://api.bcb.gov.br/dados/serie/bcdata.sgs.4390/dados?formato=json
 
 **Que esta é a série certa não foi suposto, foi medido.** As diferenças entre
-competências consecutivas do gabarito do 903 da empresa F (138.358 linhas,
+competências consecutivas do gabarito do 903 da empresa 05 (138.358 linhas,
 30/09/2026) batem com a 4390 nos **56 meses** que o gabarito cobre, de 04/2021
 a 11/2025 — e a validação completa fecha 100% usando esta tabela, sem pedir a
 acumulada emprestada ao gabarito.

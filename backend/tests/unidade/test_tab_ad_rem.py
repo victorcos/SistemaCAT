@@ -75,7 +75,7 @@ class TestOQueElaRecusa:
         """**O palpite entra na mensagem, nunca na conta.**
 
         O diesel de 0,9456 é o caso mais forte que existe: aparece no exemplo da
-        própria SEFAZ-SP e bate exato com a escrituração da empresa G em 2024-01.
+        própria SEFAZ-SP e bate exato com a escrituração da empresa 06 em 2024-01.
         Mesmo assim recusa, porque ninguém leu a redação original da cláusula
         sétima — e exemplo em resposta de consulta não é o ato legal.
         """
@@ -96,7 +96,7 @@ class TestOQueElaRecusa:
 class TestOLivroDoClienteNaoCorroboraAAdRem:
     """A corroboração que eu afirmei em 03/10/2026 e que a medição derrubou.
 
-    O módulo dizia que a escrituração da empresa G era uma segunda prova da ad
+    O módulo dizia que a escrituração da empresa 06 era uma segunda prova da ad
     rem — "o crédito dela dividido pelos litros dá exatamente 1,0635". E havia
     um teste aqui que parecia confirmar isso.
 

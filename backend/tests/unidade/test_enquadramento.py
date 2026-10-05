@@ -119,7 +119,7 @@ class TestModeloDoDocumento:
 
 
 class TestVendaAConsumidorEEscolhaDoTrabalho:
-    """O trabalho diz se pede o enquadramento 1. A empresa T transmitiu o cupom no 0:
+    """O trabalho diz se pede o enquadramento 1. A empresa 17 transmitiu o cupom no 0:
     só a perda e a interestadual geram ressarcimento, e não há complemento."""
 
     O_ZERO = VendaAConsumidor.DEMAIS_SAIDAS

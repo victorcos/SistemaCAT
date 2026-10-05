@@ -17,7 +17,7 @@ import type { ErroApi } from "@/types/erro";
  * Como o trabalho enquadra a venda a consumidor final.
  *
  * É escolha do trabalho (decisão de 16/09/2026): o manual põe o cupom no
- * enquadramento 1, com ressarcimento e complemento; a empresa T o transmitiu no 0,
+ * enquadramento 1, com ressarcimento e complemento; a empresa 17 o transmitiu no 0,
  * e só a perda gerou ressarcimento. As duas mudam o valor do pedido, então a
  * troca pede confirmação e a tela diz quando o razão montado usou a outra.
  */

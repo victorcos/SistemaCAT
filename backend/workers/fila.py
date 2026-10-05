@@ -21,7 +21,7 @@ mesma linha.
 roda por banco, então uma linha "rodando" quando ele sobe é uma rodada que o
 reinício interrompeu. Melhor dizer isso na tela do que deixar a barra parada.
 
-**Cada rodada num processo próprio.** A etapa 4 da empresa V lê 20 GB de relatório
+**Cada rodada num processo próprio.** A etapa 4 da empresa 19 lê 20 GB de relatório
 em Python, e o que o Python solta ele não devolve ao sistema: o motor chegou a
 12 GB e a apuração caiu por falta de memória duas vezes (#55 e #56, 16/09/2026),
 na fase que vem depois da leitura. Num processo filho, a memória volta inteira

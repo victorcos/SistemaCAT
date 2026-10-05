@@ -23,7 +23,7 @@ módulo a marca como tal — ver abaixo.
 
 ## Por que a era do ST é estimativa, e não cálculo
 
-Porque **a base não está no arquivo**. Medido nos 40 arquivos da empresa G:
+Porque **a base não está no arquivo**. Medido nos 40 arquivos da empresa 06:
 5.234 linhas de C170 com CST 60 ou 61 e **zero** com base ou valor de ST; 3.867
 linhas de C190 das mesmas CST, todas com `VL_OPR` preenchido e **nenhuma** com
 `VL_BC_ICMS_ST` ou `VL_ICMS_ST`.
@@ -216,7 +216,7 @@ def _o_cst_nao_casa(linha: LinhaDeCompra, produto: str,
 
     ### Quanto esta porta vale, medido
 
-    Rodada a cadeia nas 25 competências da empresa G com e sem ela: o devido cai
+    Rodada a cadeia nas 25 competências da empresa 06 com e sem ela: o devido cai
     de R$ 1.567.603,81 para **R$ 1.566.349,35**. São **R$ 1.254,46** de crédito
     que seriam pedidos duas vezes.
 

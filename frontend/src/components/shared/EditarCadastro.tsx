@@ -11,7 +11,7 @@ import type { ErroApi } from "@/types/erro";
 /**
  * Nome e período do trabalho.
  *
- * Existe porque o período muda de verdade: o trabalho da empresa V nasceu como
+ * Existe porque o período muda de verdade: o trabalho da empresa 19 nasceu como
  * 2025 e a base que existia era de 2021. A mudança fica no histórico com o de
  * e o para — a API grava o evento, a tela só diz que vai gravar.
  */

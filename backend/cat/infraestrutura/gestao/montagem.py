@@ -108,7 +108,7 @@ def selecionar_por_cnpj_e_competencia(
 
     Porque sem ele a competência de uma empresa de quatro estabelecimentos
     guarda **um** arquivo e descarta três, chamando de duplicata o que é outra
-    filial. Medido na empresa G: 411 EFD ICMS/IPI em 62 competências, com até
+    filial. Medido na empresa 06: 411 EFD ICMS/IPI em 62 competências, com até
     10 arquivos na mesma competência; chaveando só por competência sobrariam 62
     de 411.
 

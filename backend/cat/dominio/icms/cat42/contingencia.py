@@ -3,7 +3,7 @@
 Nota não escriturada não entra na ficha (decisão do Victor, 16/09/2026). Mas
 ela não some: o fisco que pegar a nota fora da EFD cobra multa, e o cliente
 precisa saber quanto, para decidir se retifica antes. A RVZ calculou isso na
-empresa D, e é o que se reproduz aqui, com uma diferença:
+empresa 04, e é o que se reproduz aqui, com uma diferença:
 
 * **sem SELIC.** A CAT 42 não se atualiza pela SELIC (orientação dos colegas do
   Victor). A multa é sobre o valor do documento, como está.

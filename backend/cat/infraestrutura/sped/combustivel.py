@@ -24,7 +24,7 @@ F100 nem existe aqui.
 
 ## O que o dado real ensinou, e sem o que eu teria errado
 
-Medido em 40 EFD ICMS/IPI da empresa G (02/2023 a 03/2026): 7.210 documentos,
+Medido em 40 EFD ICMS/IPI da empresa 06 (02/2023 a 03/2026): 7.210 documentos,
 6.819 de entrada, 15.107 itens de entrada.
 
 **O `CST_ICMS` carrega duas coisas diferentes.** Para o fornecedor de regime
@@ -241,7 +241,7 @@ class ItemDoCadastro:
     """O `0200` de um item, com as descrições anteriores do `0205`.
 
     O classificador precisa das duas pontas: a descrição de hoje e as de antes.
-    Medido na empresa G, a do diesel aparece truncada em 26 caracteres
+    Medido na empresa 06, a do diesel aparece truncada em 26 caracteres
     ("OLEO DIESEL B S-10 ORIGINA") — e o mesmo código troca de nome no meio do
     período, que é o que o `0205` registra.
     """

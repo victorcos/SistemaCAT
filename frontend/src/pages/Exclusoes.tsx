@@ -401,7 +401,7 @@ function Concluido({
             O pacote leva o consolidado e as quatro teses item a item, cada uma no leiaute do
             relatório do escritório anterior — 680, 903, 839 e 933.{" "}
             {/* **Dizer o tempo é o que evita o próximo "botão bugado".** Medido
-                na empresa F: 312 s e 250 MB, porque o 680 tem 3,5 milhões de
+                na empresa 05: 312 s e 250 MB, porque o 680 tem 3,5 milhões de
                 linhas. Quem não sabe disso clica de novo, e já clicou */}
             <strong>Numa base grande leva alguns minutos</strong> — o 680 passa de três milhões de
             linhas. Só o consolidado sai na hora: uma linha por grupo, e somar a coluna da

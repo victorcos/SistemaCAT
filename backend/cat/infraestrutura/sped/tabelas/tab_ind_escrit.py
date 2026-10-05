@@ -1,7 +1,7 @@
 """Registro C010.IND_ESCRIT (indicador de tipo de escrituração) -> rótulo.
 
 Só o código "2" está confirmado 1:1 contra o arquivo de referência real
-"C100, C170, 0200 - Documento e Itens - Nota Fiscal" (empresa C, 43.497/43.497 linhas com esse código) — replicado
+"C100, C170, 0200 - Documento e Itens - Nota Fiscal" (empresa 03, 43.497/43.497 linhas com esse código) — replicado
 literalmente, inclusive a grafia truncada ("Individualiza" em vez de
 "Individualizada") como o MA escreve. Os códigos "0" e "1" seguem o texto
 oficial do Guia Prático (não confrontados com nenhum arquivo real).

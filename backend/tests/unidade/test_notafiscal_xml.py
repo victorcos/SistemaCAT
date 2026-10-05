@@ -123,7 +123,7 @@ class TestNFe:
 class TestBaseDaOperacao:
     """A base do ICMS, que é o que vai para a coluna VL_ITEM da Ficha 3.
 
-    Os números são os da nota 71782 da empresa D, 5 itens com frete rateado
+    Os números são os da nota 71782 da empresa 04, 5 itens com frete rateado
     pelo emitente: o item 1421 sai por 23,71 de mercadoria e 2,52 de frete, e o
     ICMS é calculado sobre 26,23 — que é o que a DANFE mostra em "B.CALC ICMS".
     """

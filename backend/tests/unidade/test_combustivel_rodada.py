@@ -5,7 +5,7 @@ O leitor já tem teste próprio (`test_combustivel_leitor.py`). Aqui se testa a
 aviso em vez de derrubar a rodada, que cancelamento não deixe parquet pela
 metade, e que vazio continue vazio depois de gravado.
 
-A de-duplicação é o que mais importa. Os 411 arquivos da empresa G estão em três
+A de-duplicação é o que mais importa. Os 411 arquivos da empresa 06 estão em três
 pastas que repetem as mesmas competências: um lote que aponte a pasta-mãe traz
 cada mês três vezes, e somar os três triplicaria a tese.
 """
@@ -101,7 +101,7 @@ class TestIdentificar:
 
 class TestEscolher:
     def test_o_mesmo_arquivo_em_duas_pastas_entra_uma_vez(self, tmp_path):
-        """**O caso real.** Os 411 arquivos da empresa G estão em três pastas
+        """**O caso real.** Os 411 arquivos da empresa 06 estão em três pastas
         que repetem as competências; somar as três triplicaria a tese."""
         pasta_a = tmp_path / "a"
         pasta_b = tmp_path / "b"

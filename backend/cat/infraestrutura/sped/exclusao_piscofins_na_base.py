@@ -18,7 +18,7 @@ São duas frentes da mesma tese, e cada uma responde a uma pergunta diferente:
 
 **A soma do detalhe não bate com o total do consolidado, e isso é de
 propósito.** Arredondar linha a linha numa base de milhões de itens move o
-total — na empresa F são 0,06%, cerca de R$ 1,6 mil em R$ 2,7 milhões. A decisão
+total — na empresa 05 são 0,06%, cerca de R$ 1,6 mil em R$ 2,7 milhões. A decisão
 de 24/09/2026 escolheu o arredondamento por grupo para o número que se pede; o
 detalhe reproduz o do MA para que a conferência seja possível. Quem olhar os
 dois lado a lado tem de encontrar essa diferença escrita, e não descobri-la.

@@ -5,7 +5,7 @@ Três famílias de teste, cada uma guardando uma decisão que custou medição.
 **A ordem da cascata.** `OLEO MOTOR DIESEL SAE15` tem NCM `27101932`, que é
 lubrificante, e descrição que diz DIESEL. Quem deixa a descrição decidir lança
 R$ 239.828 de lubrificante como crédito de combustível — medido em 273 linhas da
-empresa G.
+empresa 06.
 
 **E a NCM sozinha também falha**, no mesmo cliente: 86 linhas de `DIESEL S10`
 com NCM vazio. Ali só a descrição salva — e a mesma lista tem `LANTERNA`, então
@@ -121,7 +121,7 @@ class TestQuandoNaoHaNcm:
     @pytest.mark.parametrize("descricao", ["LANTERNA", "FAROL", "PARAFUSO",
                                            "", "   "])
     def test_a_descricao_tambem_sabe_dizer_nao(self, descricao):
-        """Medido: a lista de NCM vazio da empresa G tem `LANTERNA` e `FAROL`."""
+        """Medido: a lista de NCM vazio da empresa 06 tem `LANTERNA` e `FAROL`."""
         c = classificar(descricao, "", "PC")
 
         assert c.produto == ""

@@ -7,7 +7,7 @@ fazer com ele (`movimentacao.py`): completar o documento que a EFD escriturou
 sem item, e pôr os valores do XML ao lado do C170 que já existe — o XML vence.
 
 Um documento por chave. O mesmo XML aparece mais de uma vez quando o cliente
-manda a pasta do mês e a do trimestre — na empresa D, 28.407 chaves em mais de
+manda a pasta do mês e a do trimestre — na empresa 04, 28.407 chaves em mais de
 um arquivo. Vale a cópia com protocolo de autorização sobre a que não tem
 protocolo (o XML do ERP antes de transmitir); entre iguais, a primeira lida, na
 ordem do caminho. As outras são contadas. Nota com protocolo que não autoriza

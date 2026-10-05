@@ -24,7 +24,7 @@ imprime só nomes de coluna e de campo — nunca valores.
 
     python tools/inferir_047.py <csv do MA> <arquivo SPED> [--linhas 500]
 
-## O que a primeira rodada respondeu (empresa F, 10/2025, 3.000 linhas)
+## O que a primeira rodada respondeu (empresa 05, 10/2025, 3.000 linhas)
 
 Quarenta e seis das 53 colunas são **cópia direta**, e sete são **derivadas**:
 

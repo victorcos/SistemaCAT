@@ -242,7 +242,7 @@ def acrescentar(caminho, linhas: list[dict]) -> None:
 
 
 class TestRevisao:
-    """O que a revisão da etapa 7 corrigiu, com o piloto da empresa V como origem."""
+    """O que a revisão da etapa 7 corrigiu, com o piloto da empresa 19 como origem."""
 
     def test_o_0200_leva_o_cadastro_do_mes_com_a_unidade_da_ficha(self, fontes, tmp_path):
         # em janeiro o item tinha outra descrição, 12% e estava cadastrado em caixa

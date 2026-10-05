@@ -12,7 +12,7 @@ não tem um formato, tem **três espécies de arquivo** com propósitos diferent
 reprovar arquivo bom por falta de campo que aquela espécie nunca teve. Então
 primeiro se classifica, depois se mapeia.
 
-O outro achado: o relatório de movimento da empresa V já traz colunas rotuladas
+O outro achado: o relatório de movimento da empresa 19 já traz colunas rotuladas
 ``XML`` — base e valor de ICMS-ST vindos do documento, mais a chave da NF-e.
 Ou seja, **o relatório gerencial pode substituir o XML** para os campos de que
 precisamos, quando o ERP faz essa extração. Nem todo ERP faz, e por isso o
@@ -169,7 +169,7 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
 # abertura sai pronto — sem a derivação, que é onde mais se erra.
 #
 # Só que "quando entrega" não é sempre, e coluna existir não é coluna
-# preenchida: no inventário da empresa V as quatro colunas de imposto por unidade
+# preenchida: no inventário da empresa 19 as quatro colunas de imposto por unidade
 # estão no cabeçalho e vêm vazias nas 842.785 linhas. Por isso o imposto é
 # IMPORTANTE e não OBRIGATÓRIO, e por isso existe `tem_imposto_pronto` — o
 # sistema precisa dizer que vai ter de derivar, em vez de somar zero calado.

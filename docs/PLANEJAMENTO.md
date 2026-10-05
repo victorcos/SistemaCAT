@@ -7,13 +7,13 @@
 
 ## Onde estamos
 
-**As oito etapas da CAT 42 estão no ar (v0.64.0), e o trabalho da empresa V passou
+**As oito etapas da CAT 42 estão no ar (v0.64.0), e o trabalho da empresa 19 passou
 por todas** (de novo em 16/09/2026, da etapa 4 à 8, em 59 min). Desde a v0.53, a
 etapa 3 lê o item do XML, o razão aplica o de-para aprovado e confronta os
 enquadramentos 2 e 4 com o crédito do art. 271; na v0.54, a nota cancelada na
 SEFAZ sai da movimentação, a não escriturada ganha a contingência do art. 527 e o
 XML dentro de zip é lido sem extrair — correções que vieram da comparação com a
-CAT 42 da empresa D (DECISOES). Da pasta com EFD, XML e relatórios do ERP até o pacote de entrega
+CAT 42 da empresa 04 (DECISOES). Da pasta com EFD, XML e relatórios do ERP até o pacote de entrega
 com o arquivo digital pré-validado e o manifesto com SHA-256, pela tela, com
 fila, cancelamento, histórico e aprovação de quem responde pelo negócio.
 
@@ -21,7 +21,7 @@ A API é C# (.NET 10) e o trabalho pesado é Python com DuckDB, num motor sem
 rota pública (DECISOES, 13/09/2026). O front é React. Postgres guarda cadastro,
 execuções e histórico; os dados de cada execução ficam em parquet no disco local.
 
-O que o piloto deixou claro é que **o sistema calcula e a empresa V ainda não tem
+O que o piloto deixou claro é que **o sistema calcula e a empresa 19 ainda não tem
 dado para pedir**: todo o ressarcimento apurado é de lojas de MS, e as 234
 competências de São Paulo saem como prévia porque o relatório de saídas que
 chegou não tem as lojas paulistas (ver "Dados que faltam").
@@ -47,14 +47,14 @@ laterais:
   confirma, fila de revisão em 1,7% das linhas.
 
 **E o produto não é achar crédito: é auditar o tomado.** Medido em 03/10/2026,
-três dos quatro clientes com CST 61 **já creditam** — a empresa G por ajuste
-`SP020799`, e a **empresa Y** também, com a descrição do próprio ajuste citando
+três dos quatro clientes com CST 61 **já creditam** — a empresa 06 por ajuste
+`SP020799`, e a **empresa 21** também, com a descrição do próprio ajuste citando
 os Convênios 26/2023 e 61/2023 e *"a proporcionalidade das operações
 tributadas"*, que é um elemento novo: ela rateia o crédito pela parcela de
-saídas tributadas. Só a empresa K não credita.
+saídas tributadas. Só a empresa 09 não credita.
 
 Isso não enfraquece o módulo; define o que ele vende. O que se acha não é um
-crédito virgem, é a diferença: a empresa G credita `litros × ad rem` sem o FCV,
+crédito virgem, é a diferença: a empresa 06 credita `litros × ad rem` sem o FCV,
 0,24% a mais, sistemático; a maioria dos meses dela sai curta; e um mês de 2024
 sai 18% acima. Auditar isso exige a mesma conta que calcular do zero — mais a
 leitura do `E111`, que é como se descobre o que o cliente já tomou.
@@ -87,13 +87,13 @@ cadastro do trabalho editável com aviso de base fora do período (v0.51).
 
 | O quê | Contra | Resultado |
 |---|---|---|
-| Fórmula do ressarcimento | Ficha 3 da empresa T e da empresa X, 706 milhões de linhas | 99,63% das linhas; o resto, 1 centavo de arredondamento |
-| Razão do item | Ficha 3 da empresa T, uma filial e um mês | 550.862 linhas, 100% em saldo e ressarcimento, R$ 0,00 de diferença |
-| ICMS suportado | Book da empresa J | ICMS + ST + FECOP em 100% de 1.242.621 linhas |
-| Leiaute do arquivo digital | 7 arquivos que a SEFAZ aceitou da empresa T (2021 a 2024) | registro a registro; nenhum erro de pré-validação nos aceitos |
-| Pré-validação | Arquivos da empresa T | recompõe 100% das quantidades e 99,99% dos valores a 5 centavos |
+| Fórmula do ressarcimento | Ficha 3 da empresa 17 e da empresa 20, 706 milhões de linhas | 99,63% das linhas; o resto, 1 centavo de arredondamento |
+| Razão do item | Ficha 3 da empresa 17, uma filial e um mês | 550.862 linhas, 100% em saldo e ressarcimento, R$ 0,00 de diferença |
+| ICMS suportado | Book da empresa 08 | ICMS + ST + FECOP em 100% de 1.242.621 linhas |
+| Leiaute do arquivo digital | 7 arquivos que a SEFAZ aceitou da empresa 17 (2021 a 2024) | registro a registro; nenhum erro de pré-validação nos aceitos |
+| Pré-validação | Arquivos da empresa 17 | recompõe 100% das quantidades e 99,99% dos valores a 5 centavos |
 | Leitura da EFD | 7.036 EFD reais, seis versões de leiaute | sem falha |
-| Conferência | 37,9 milhões de documentos da empresa V | três listas, validada também com relatório do cliente simulado |
+| Conferência | 37,9 milhões de documentos da empresa 19 | três listas, validada também com relatório do cliente simulado |
 | Consulta de Saídas (047) | Gabarito do MA: 7.784.121 linhas, 57 competências | as 53 colunas iguais em 100% das linhas |
 | Consulta de Entradas (037) | Gabarito do MA: 458.792 linhas, 57 competências | as 52 colunas iguais em 100% das linhas |
 
@@ -103,7 +103,7 @@ cadastro do trabalho editável com aviso de base fora do período (v0.51).
 
 Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 
-### 1. Fechar o piloto da empresa V
+### 1. Fechar o piloto da empresa 19
 
 - [ ] **Aprovar a entrega.** Só revisor ou gestor aprova; o dev não conta como
       responsável pelo negócio. Depende do Pedro, do Rafael ou do Vinícius.
@@ -114,7 +114,7 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
     (item 3.3.8 do manual); hoje 400 mil fichas abrem sem ICMS;
   - os arquivos de 2023 em diante que o OneDrive não baixou.
 
-### 2. Comparação com a CAT 42 da empresa D (16/09/2026)
+### 2. Comparação com a CAT 42 da empresa 04 (16/09/2026)
 
 - [x] Item do XML na etapa 3, com consumidor final pelo `indFinal` (v0.53)
 - [x] De-para: propostas por GTIN, sufixo, kit e descrição; revisão na tela;
@@ -131,7 +131,7 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [x] Reimportar a pasta atualiza o tipo do arquivo já no trabalho; nota denegada
       (cStat fora de 100/150) sai; cópia autorizada vence a sem protocolo (v0.55.0)
 - [x] Certificado digital na pasta do cliente não é aberto nem listado (v0.55.1)
-- [x] Carregar a empresa D no sistema (trabalho 5) e comparar o de-para com a RVZ:
+- [x] Carregar a empresa 04 no sistema (trabalho 5) e comparar o de-para com a RVZ:
       44 de 44 pares, os 10 do cliente como sem par (v0.55.2)
 - [x] Base da multa das não escrituradas sem valor no XML: a da nota vizinha do
       mesmo produto (decisão do Victor, v0.55.3)
@@ -206,7 +206,7 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       a rodada é idêntica, a conta não. Os três motores seguem separados, cada um
       conferido contra o seu gabarito (v0.118.0)
 - [x] Tabela `aliquota_de_item` no banco, com carregador (`tools/carregar_aliquotas.py`)
-      e as 556 exceções da empresa F carregadas (v0.118.0)
+      e as 556 exceções da empresa 05 carregadas (v0.118.0)
 - [x] **Mapa de valores** (`tools/mapear_valores.py`): total por tese e por
       competência, o nosso contra o do arquivo base. Serve também sem gabarito,
       como retrato de cliente novo (v0.118.0)
@@ -236,7 +236,7 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       classificador (NCM manda, descrição confirma — ao contrário do crédito
       outorgado), o percentual de confiança duplo, valor nominal sem SELIC e o
       prazo de 5 anos da emissão. **O produto não é achar crédito, é auditar o
-      tomado**: a empresa G já credita R$ 5 mi via ajuste `SP020799`, sem aplicar o
+      tomado**: a empresa 06 já credita R$ 5 mi via ajuste `SP020799`, sem aplicar o
       FCV e com a maioria dos meses curta (v0.128.0)
 - [x] **As três tabelas de tributação do combustível** (v0.129.0 a v0.132.0):
       `tab_ad_rem` (ad rem por competência, só o lido no convênio), `tab_fcv`
@@ -246,12 +246,12 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       quando a alíquota muda no meio do mês (SP tem dois) e
       `AliquotaDeCombustivelDesconhecida` quando ninguém leu o ato
 - [x] Medir se "o cliente já credita" é regra ou exceção: **é regra**. Três dos
-      quatro com CST 61 já creditam (empresa G e empresa Y por ajuste; só a
-      empresa K não). Confirma que o produto é auditar o tomado
+      quatro com CST 61 já creditam (empresa 06 e empresa 21 por ajuste; só a
+      empresa 09 não). Confirma que o produto é auditar o tomado
 - [ ] Construir o módulo de combustível, agora como frente principal
 - [x] **CNPJ na chave da seleção** (v0.137.0): `selecionar_por_cnpj_e_competencia`
       substitui `selecionar_por_competencia`, que guardava uma apuração por
-      competência e tratava filial como duplicata — na empresa G sobrariam 62 de
+      competência e tratava filial como duplicata — na empresa 06 sobrariam 62 de
       411 arquivos. Três testes novos, e a mutação fiel prova que só eles caem
       com a chave antiga: o comportamento das exclusões não muda
 - [ ] Acrescentar o grupo **`ICMS61`** ao leitor de XML (`vICMSMonoRet`,
@@ -263,14 +263,14 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       No ES são 27%; em SP ele divide o inciso VI com o diesel mas tem dois
       Informativos SFP próprios, e por isso ainda recusa
 - [ ] Decidir se o **lubrificante** entra como tese separada — R$ ~1 mi medido
-      na empresa G. Confirmado que nunca entrou no monofásico, então a alíquota
+      na empresa 06. Confirmado que nunca entrou no monofásico, então a alíquota
       percentual vale até hoje
 - [ ] Ler os **Anexos VII e VIII do RICMS/ES** (Decreto 1.090-R) e o **Anexo II
       do RICMS/SP** para resolver o **GLP**: nos dois estados ele não é nomeado
       no artigo de alíquota, e no ES o inciso II, "m" põe a 12% o que está no
       anexo — cinco pontos sobre toda a base de GLP. O motor recusa até lá
 - [ ] Decidir o **F100 `IND_OPER = 2`** ("outros documentos e operações"): o
-      agregador da Gestão o conta como saída e o 680 o recusa. Na empresa F não
+      agregador da Gestão o conta como saída e o 680 o recusa. Na empresa 05 não
       existe nenhum, então não há como medir qual está certo — fica para a
       primeira base que tiver. É divergência latente entre o número que se pede
       e o detalhe que o acompanha (ver DECISOES de 01/10/2026)
@@ -294,7 +294,7 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
       2025, então quase todos vão precisar de **mais de uma vigência**
 - [ ] Ler a **NFS-e** para o 933: o XML (INF/SERVICO/VALORES) e o leiaute do
       município de São Paulo, de onde sai o ISS que a escrituração não trouxe.
-      Sem isso a tese só alcança quem preencheu o A100 — 1 de 33 notas na empresa F
+      Sem isso a tese só alcança quem preencheu o A100 — 1 de 33 notas na empresa 05
 - [ ] Varrer os outros motores atrás do mesmo descuido do `C010`: documento que
       fica em buffer e é emitido **depois** de o bloco seguinte já ter trocado o
       estabelecimento. Custou 61 linhas no 903 e estava latente no 037; a 047 já
@@ -364,7 +364,7 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 
 ### 4. Leitura e desempenho
 
-- [ ] **Movimentos em paralelo por arquivo.** A etapa 3 leu os 12 GB da empresa V
+- [ ] **Movimentos em paralelo por arquivo.** A etapa 3 leu os 12 GB da empresa 19
       em 44 min, um arquivo por vez; a escrita e a pré-validação dos arquivos
       digitais já dividem por processo (DECISOES, 16/09/2026).
 - [ ] Leitura de rar e 7z. O lote reconhece como compactado, mas só o zip é
@@ -375,8 +375,8 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 
 ## Riscos conhecidos
 
-**Baixa em 5.927 sem enquadramento na origem.** A empresa T transmitiu parte das
-5.927 no enquadramento 0; na empresa X a proporção é outra (15% contra 74%).
+**Baixa em 5.927 sem enquadramento na origem.** A empresa 17 transmitiu parte das
+5.927 no enquadramento 0; na empresa 20 a proporção é outra (15% contra 74%).
 O sistema segue o manual (5.927 é enquadramento 2). Enquanto a origem não
 explicar, número derivado das baixas das duas não vai ao cliente como definitivo.
 
@@ -384,7 +384,7 @@ explicar, número derivado das baixas das duas não vai ao cliente como definiti
 aceitos, não contra rejeições. Um lote de rejeições reais vale mais que a norma.
 
 **Venda a consumidor final é escolha do trabalho.** O manual põe o cupom no
-enquadramento 1; a empresa T transmitiu no 0 e a SEFAZ aceitou. A escolha muda o
+enquadramento 1; a empresa 17 transmitiu no 0 e a SEFAZ aceitou. A escolha muda o
 complemento inteiro (R$ 1,53 milhão no piloto) e fica registrada no histórico.
 
 **Espaço e rede.** A razão de expansão da base é de cerca de nove vezes, e as
@@ -395,7 +395,7 @@ pacote pronto vai à rede, conferido pelo SHA-256 do manifesto.
 
 ## Histórico
 
-**2026-09-09** — Análise da CAT já existente na empresa T e na empresa X: leiaute
+**2026-09-09** — Análise da CAT já existente na empresa 17 e na empresa 20: leiaute
 decifrado, manuais oficiais localizados, fórmula validada. Arquitetura, modelo
 de usuários e estrutura de pastas definidos.
 
@@ -413,7 +413,7 @@ sucessão, acesso às empresas, CSV ao lado do xlsx, cancelar carregamentos.
 **2026-09-13 e 14** — API migrada para C#, com o motor Python atrás de canal
 interno (v0.28 a v0.35). ICMS suportado em cascata, relatório do cliente como
 fonte, enquadramento pelo modelo do documento, razão confrontado com a Ficha 3
-real da empresa T a 100%.
+real da empresa 17 a 100%.
 
 **2026-09-15** — Etapa 4 com rodada e tela, primeira rodada real (8,76 milhões
 de itens em 33 min). Etapa 5, razão dos itens, com unidade de conversão e
@@ -421,7 +421,7 @@ fichas de estoque negativo fora do total.
 
 **2026-09-16** — Etapas 6, 7 e 8: apuração do período, arquivo digital com
 pré-validação, relatórios e entrega com aprovação. Pré-validação do arquivo do
-cliente. Revisão da etapa 7 contra os arquivos aceitos da empresa T. Lapidação:
+cliente. Revisão da etapa 7 contra os arquivos aceitos da empresa 17. Lapidação:
 cadastro editável, pendências por assunto, abertura pelas entradas anteriores,
 uso e consumo fora da ficha, série no 1200, substituição entre arquivos do
 cliente, CSV pelo DuckDB e arquivos digitais em paralelo.

@@ -11,7 +11,7 @@ O 903 exclui o ICMS que está escrito na nota; o 839 exclui o ICMS-ST que
 ninguém escreveu e precisa ser presumido; este exclui o ISS, que **às vezes**
 está escrito. O registro A100 tem o campo `VL_ISS`, e ele é facultativo: quem
 preenche entrega a tese pronta, quem não preenche entrega uma linha sem nada a
-excluir. Na empresa F, de 33 notas de serviço, **uma** tem ISS — R$ 5.586,51 sobre
+excluir. Na empresa 05, de 33 notas de serviço, **uma** tem ISS — R$ 5.586,51 sobre
 R$ 279.325,68, que rendem R$ 646,71 corrigidos.
 
 **O relatório sai mesmo assim, e é assim que tem de ser.** As outras 32 linhas

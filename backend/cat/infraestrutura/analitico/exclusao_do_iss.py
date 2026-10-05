@@ -2,7 +2,7 @@
 
 O relatório 933 do MA: uma linha por item de nota de serviço, com o ISS
 rateado, a base sem ele, a diferença de cada contribuição, a Selic e o total a
-recuperar. Trinta e duas colunas, conferidas 100% nas 33 linhas da empresa F.
+recuperar. Trinta e duas colunas, conferidas 100% nas 33 linhas da empresa 05.
 
 A mecânica da rodada mora em `exclusoes_por_item.py`, compartilhada com o 903 e
 o 839. O que é desta tese cabe em duas observações.
@@ -19,7 +19,7 @@ O `VL_ISS` do registro A100 é facultativo. Quem não o preenche não perde o
 valor — ele está na NFS-e, que este motor ainda não lê —, mas a linha sai sem
 exclusão. `sem_iss` no resumo conta essas notas: é o tamanho do que a tese
 ainda não alcança, e tem de estar visível na tela, não enterrado no log. Na
-empresa F são 32 de 33.
+empresa 05 são 32 de 33.
 """
 
 from __future__ import annotations

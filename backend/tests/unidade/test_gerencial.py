@@ -1,6 +1,6 @@
 """Leitura do relatório gerencial.
 
-Os nomes de coluna abaixo são **os nomes reais** dos arquivos da empresa V, só
+Os nomes de coluna abaixo são **os nomes reais** dos arquivos da empresa 19, só
 que em cabeçalhos reduzidos: o de movimento tem 143 colunas e o de inventário
 40, e repetir tudo aqui não provaria mais nada do que provam as colunas que o
 trabalho usa.
@@ -88,7 +88,7 @@ class TestDecimal:
 
 class TestData:
     @pytest.mark.parametrize(("bruto", "esperado"), [
-        ("02/01/20", date(2020, 1, 2)),      # ano de dois dígitos, o da empresa V
+        ("02/01/20", date(2020, 1, 2)),      # ano de dois dígitos, o da empresa 19
         ("31/12/2021", date(2021, 12, 31)),
         ("02012020", date(2020, 1, 2)),      # colado, como no SPED
         ("2020-01-02", date(2020, 1, 2)),
@@ -110,7 +110,7 @@ class TestCfop:
         assert v.cfop("1.102") == v.cfop("1102") == "1102"
 
     def test_branco_do_erp_vira_nada(self):
-        # é assim que a empresa V escreve CFOP ausente
+        # é assim que a empresa 19 escreve CFOP ausente
         assert v.cfop("  .      ") is None
 
     def test_tamanho_errado_levanta(self):
@@ -312,7 +312,7 @@ class TestInventario:
         assert i.valor_do_estoque == Decimal("20.00")
 
     def test_diz_quando_o_erp_nao_mandou_o_imposto(self):
-        # é o caso do arquivo real da empresa V: as colunas existem e vêm vazias
+        # é o caso do arquivo real da empresa 19: as colunas existem e vêm vazias
         i = ItemInventariado.de(
             {"codigo_item": "1", "quantidade_estoque": "2",
              "custo_medio": "10,00", "st_unitario": "", "icms_unitario": ""}, 1)

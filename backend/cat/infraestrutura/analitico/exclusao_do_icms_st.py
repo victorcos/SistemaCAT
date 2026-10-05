@@ -3,7 +3,7 @@
 O relatório 839 do MA: uma linha por item de nota fiscal, com o ICMS-ST
 **presumido**, a base sem ele, a diferença de cada contribuição, a Selic e o
 total a recuperar. Quarenta e seis colunas, conferidas 100% nas 463.212 linhas
-da empresa F.
+da empresa 05.
 
 A mecânica da rodada mora em `exclusoes_por_item.py`, compartilhada com o 903 e
 o 933. Aqui fica o que é desta tese — e o que é dela é a **alíquota**.
@@ -19,7 +19,7 @@ a alíquota tem duas metades:
   interestadual. Sozinha acerta 98,66% das linhas medidas;
 * **a exceção por produto**, que é cadastro do cliente e mora no **banco**
   (`aliquota_de_item`) — cesta básica a 12%, supérfluo a 25%, isento a 0%,
-  importado a 4%. São 556 pares na empresa F.
+  importado a 4%. São 556 pares na empresa 05.
 
 A exceção entra aqui por parâmetro e nunca é lida daqui de dentro: quem sabe de
 qual empresa é a rodada é a camada de cima, e código de item de um cliente não

@@ -321,8 +321,8 @@ def _gerar_csv(parquet: str, destino: str, colunas: tuple[Coluna, ...],
     """Uma linha por registro, sem limite e sem aba.
 
     Escrito pelo DuckDB, e não linha a linha em Python: a Ficha 3 de uma loja
-    da empresa V (1,17 milhão de linhas) levava 60 s, e o dossiê de uma base do
-    tamanho da empresa T leva uma por filial. Os bytes são os mesmos que o módulo
+    da empresa 19 (1,17 milhão de linhas) levava 60 s, e o dossiê de uma base do
+    tamanho da empresa 17 leva uma por filial. Os bytes são os mesmos que o módulo
     `csv` escrevia — `;`, aspas só onde precisa, CRLF, vírgula decimal —, e o
     BOM vai à mão: sem ele o Excel lê o arquivo como ANSI e todo acento vira lixo.
     """

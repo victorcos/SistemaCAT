@@ -7,8 +7,8 @@ exportados quanto para o filtro de CFOP na UI (mostra "código - descrição").
 
 Códigos marcados com # CONFIRMADO foram extraídos diretamente de arquivos
 de referência reais:
-  - "037 - Entradas" (empresa A, jul-dez/2021) — grupo 1/2/3xxx
-  - "C100, C170, 0200 - Documento e Itens - Nota Fiscal" (empresa C,
+  - "037 - Entradas" (empresa 01, jul-dez/2021) — grupo 1/2/3xxx
+  - "C100, C170, 0200 - Documento e Itens - Nota Fiscal" (empresa 03,
     out/2024) — grupo 5/6xxx e alguns 1xxx adicionais
 Os códigos na seção "Demais códigos oficiais" (uma por grupo) vêm da tabela
 oficial de CFOP (Ajuste SINIEF 07/01), abreviados automaticamente no mesmo
@@ -604,7 +604,7 @@ def descricao(codigo: str) -> str:
 # são todos os CFOP que aquela base tem. Para o que não está aqui, a grafia
 # abreviada serve: descrição curta é melhor que coluna vazia.
 POR_EXTENSO: dict[str, str] = {
-    # ── Entrada (1xxx/2xxx) — do gabarito do 037 da empresa F, 458.792 linhas,
+    # ── Entrada (1xxx/2xxx) — do gabarito do 037 da empresa 05, 458.792 linhas,
     # conferido em 30/09/2026. São todos os CFOP de entrada daquela base
     "1101": "Compra para Industrialização ou prod rural",
     "1102": "Compra para comercialização",

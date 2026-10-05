@@ -28,7 +28,7 @@ começou em **1º de janeiro**. Quem assumir "sempre fevereiro" erra janeiro de
 ## A segunda prova, que se perdeu e se recuperou no mesmo dia
 
 A ad rem de 2024-02 tem uma confirmação independente do convênio: a escrituração
-da empresa G. Medida pelo motor inteiro — leitor, classificador e apuração — em
+da empresa 06. Medida pelo motor inteiro — leitor, classificador e apuração — em
 25 competências, o crédito que ela lançou por ajuste `SP020799` bate com
 `litros × ad rem` **ao centavo** em três meses:
 
@@ -105,7 +105,7 @@ AD_REM: dict[str, tuple[Vigencia, ...]] = {
         Vigencia(Decimal("1.0635"), "2024-02",
                  "Convênio ICMS 172/2023, incisos I e II da cláusula sétima do "
                  "Conv. 199/2022; vigência de 1º/02/2024. **Com segunda "
-                 "prova:** a escrituração da empresa G bate com litros × ad rem "
+                 "prova:** a escrituração da empresa 06 bate com litros × ad rem "
                  "ao centavo em 2024-02, 2024-05 e 2024-06 (−0,07, +0,03 e "
                  "−0,03), o que confirma a ad rem e revela que ela não aplica o "
                  "FCV. Ver o topo do módulo"),
@@ -137,7 +137,7 @@ AD_REM: dict[str, tuple[Vigencia, ...]] = {
 # for conferir saiba por onde começar, e não para serem usadas.
 #
 # O diesel de 0,9456 é o caso mais forte: aparece no exemplo da própria SEFAZ-SP
-# (RC 28013/2023) e bate exato com a escrituração da empresa G em 2024-01. Mesmo
+# (RC 28013/2023) e bate exato com a escrituração da empresa 06 em 2024-01. Mesmo
 # assim fica aqui, porque ninguém leu a redação original da cláusula sétima — e
 # a regra desta casa é que exemplo em resposta de consulta não é o ato legal.
 A_CONFERIR: dict[tuple[str, str], tuple[Decimal, str]] = {

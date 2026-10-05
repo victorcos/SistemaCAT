@@ -352,7 +352,7 @@ class TestORecorte:
 # ---------------------------------------------------------------------------
 class TestOLeiauteQueMudou:
     """Cinco leiautes estavam errados, e o erro só apareceu ao medir contra
-    arquivo real (três competências da empresa F, 29/09/2026). O que se fixa aqui
+    arquivo real (três competências da empresa 05, 29/09/2026). O que se fixa aqui
     é a **quantidade de campos**: ela é o que o arquivo confirma, e um campo a
     mais ou a menos desloca tudo o que vem depois sem erro nenhum."""
 

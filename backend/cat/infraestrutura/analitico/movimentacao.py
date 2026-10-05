@@ -20,8 +20,8 @@ Quando a etapa leu XML (`itens_do_xml.parquet`), ele entra de duas formas:
   cancelado e denegado não têm operação a completar;
 * **ao lado do C170 que já existe** — pelo número do item, confirmado pela
   quantidade ou pelo valor; sem nenhum dos dois, só em nota de um item só. A
-  contagem de itens igual não basta: na empresa D, nota com os itens em outra
-  ordem no C170 levava o GTIN de um produto para o código de outro. O valor sozinho não serve: na empresa D o C170 grava o custo com ST
+  contagem de itens igual não basta: na empresa 04, nota com os itens em outra
+  ordem no C170 levava o GTIN de um produto para o código de outro. O valor sozinho não serve: na empresa 04 o C170 grava o custo com ST
   e IPI embutidos (15.044,19) e o XML, a mercadoria (10.465,92). Os valores do
   XML vão em colunas próprias (`valor_st_xml`, `retido_xml`...) e vencem na
   apuração do suportado; os da EFD ficam como vieram.

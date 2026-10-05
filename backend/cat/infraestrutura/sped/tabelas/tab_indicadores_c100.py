@@ -2,7 +2,7 @@
 
 Domínios fixos e pequenos do Guia Prático EFD-Contribuições. Valores
 marcados com # CONFIRMADO batem 1:1 com o arquivo de referência real
-"C100, C170, 0200 - Documento e Itens - Nota Fiscal" (empresa C, 43.497 linhas, out/2024) — inclusive a grafia
+"C100, C170, 0200 - Documento e Itens - Nota Fiscal" (empresa 03, 43.497 linhas, out/2024) — inclusive a grafia
 exata usada pelo MA (ex.: "Saida" sem acento). Os demais vêm do texto
 oficial do Guia Prático e não foram confrontados com um arquivo real.
 """

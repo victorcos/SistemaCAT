@@ -287,7 +287,7 @@ class TestAMontagem:
         com um aviso que dizia "dois arquivos para a mesma competência", o que
         parece correto a quem lê.
 
-        Medido na empresa G: 411 arquivos em 62 competências. Com a chave curta
+        Medido na empresa 06: 411 arquivos em 62 competências. Com a chave curta
         sobrariam 62, perdendo três dos quatro estabelecimentos.
         """
         matriz = self._gravar(tmp_path, "matriz.txt", "0", "062021")

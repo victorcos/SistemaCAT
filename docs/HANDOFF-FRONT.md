@@ -266,7 +266,7 @@ está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
 | `CardDeEscolha.tsx` | CardDeEscolha | `escolha` | O card das telas de entrada — segmentos e módulos. Os dois níveis mostram a mesma coisa com palavras diferentes: uma sigla, um |
 | `CardDeFuncionalidade.tsx` | CardDeFuncionalidade | `etapa` | Uma funcionalidade do trabalho, como card. É o card do hub (`CardDeEscolha`) um nível abaixo: lá se escolhe o tributo, |
 | `CorrecoesAMao.tsx` | CorrecoesAMao | `projetoId` | Correção à mão do trabalho: a porta da planilha e a lista do que já foi |
-| `EditarCadastro.tsx` | EditarCadastro | `projeto, aberto, aoFechar, aoSalvar` | Nome e período do trabalho. Existe porque o período muda de verdade: o trabalho da empresa V nasceu como |
+| `EditarCadastro.tsx` | EditarCadastro | `projeto, aberto, aoFechar, aoSalvar` | Nome e período do trabalho. Existe porque o período muda de verdade: o trabalho da empresa 19 nasceu como |
 | `ExtrairDoSped.tsx` | ExtrairDoSped | `execucaoId` | Extrair um registro do SPED, consolidado de todos os arquivos. |
 | `FrentesDoTrabalho.tsx` | FrentesDoTrabalho | `projetoId, modulo, trilhas, rota` | As frentes de trabalho de um trabalho: a CAT 42, o crédito outorgado, e as |
 | `OcorrenciasDoArquivo.tsx` | OcorrenciasDoArquivo | `chave, carregar, cabecalho` | O que a pré-validação achou num arquivo digital. Serve às duas telas que pré-validam — a do arquivo que o sistema gerou e a |

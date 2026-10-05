@@ -27,7 +27,7 @@ o mês de maio/2023 na gasolina. A chave de regime é `(produto, competência)`.
 crédito = C170_VL_ITEM × alíquota interna do produto na UF
 ```
 
-**Medido** no papel de trabalho da empresa H (projeto encerrado, ES, 2021-2022,
+**Medido** no papel de trabalho da empresa 07 (projeto encerrado, ES, 2021-2022,
 2.650 linhas): GLP 17%, diesel 12%, gasolina 27% — e 25% em algumas linhas, que é
 uma vigência anterior. Total de R$ 792.861,06 em 20 competências.
 
@@ -103,7 +103,7 @@ foi alterada por 10/23, 12/23, 19/23, 24/23, 64/23, 65/23, 74/23, 85/23, 112/23,
 gasolina** (Ato COTEPE 64/2019). Publicado anualmente, da densidade da ANP com a
 temperatura média do INMET e a conversão da Resolução CNP 06/70.
 
-A `base legal` entra **na linha da planilha**: o gabarito da empresa H tem uma aba
+A `base legal` entra **na linha da planilha**: o gabarito da empresa 07 tem uma aba
 "BASE LEGAL" porque o cliente pergunta "por que esse número?".
 
 
@@ -161,7 +161,7 @@ Quando houver XML de compra de combustível de cliente do ES na era do ST, essa
 divisão confirma ou derruba os 12% e os 27%.
 
 Até lá o peso vem da lei mais uma concordância independente: o papel de trabalho
-da empresa H apurou gasolina a 27% e diesel a 12%. Ele **errou** o FCV, e por isso
+da empresa 07 apurou gasolina a 27% e diesel a 12%. Ele **errou** o FCV, e por isso
 não serve de gabarito sozinho — mas acertar a alíquota pelo mesmo número que a
 lei, tendo errado outra coisa, é concordância e não cópia.
 
@@ -238,16 +238,16 @@ E111 não há auditoria, só estimativa. Contribuições, ECD e ECF não entram.
 **A de-duplicação é por `(CNPJ, competência)`, não por competência.** Medido:
 
 ```
-Empresa G      411 EFD ICMS/IPI   4 estabelecimentos   62 competências
+Empresa 06      411 EFD ICMS/IPI   4 estabelecimentos   62 competências
   por competência só:        até 10 arquivos (9 em 34 competências)
   por (CNPJ, competência):   1 em 48 · 2 em 93 · 4 em 58 · 7 em 1
 
-Empresa F      201 EFD ICMS/IPI   4 estabelecimentos   58 competências
+Empresa 05      201 EFD ICMS/IPI   4 estabelecimentos   58 competências
   por (CNPJ, competência):   1 em 144 · 2 em 57
 ```
 
 > **Armadilha do código existente — corrigida em 03/10/2026 (v0.137.0).** O
-> `selecionar_por_competencia` chaveava **só por competência**, e na empresa G
+> `selecionar_por_competencia` chaveava **só por competência**, e na empresa 06
 > isso guardaria 62 arquivos de 411, perdendo três estabelecimentos inteiros.
 > Não quebrava nada porque seus dois usuários leem **EFD-Contribuições**, que a
 > matriz entrega consolidada; a ICMS/IPI é por estabelecimento, e o combustível
@@ -296,7 +296,7 @@ mudar entre uma apresentação e outra.
 
 ## 6. O produto não é achar crédito: é auditar o crédito tomado
 
-**Medido na empresa G**, e foi a descoberta que reverteu o módulo:
+**Medido na empresa 06**, e foi a descoberta que reverteu o módulo:
 
 ```
 E111  SP020799   111 lançamentos   32 competências   "CRÉDITO DE DIESEL MONOFASICO"
@@ -344,7 +344,7 @@ esconderia o que o cliente precisa saber.
 
 ## 7. O classificador: NCM manda, descrição confirma
 
-Medido na empresa G: **324 descrições distintas**, 16 NCM, e o registro **0206
+Medido na empresa 06: **324 descrições distintas**, 16 NCM, e o registro **0206
 (código ANP) não aparece em nenhum dos 95 arquivos** — a chave exata não existe
 na prática.
 
@@ -444,7 +444,7 @@ aproveitamento decorrente de resistência ilegítima do Fisco*. Sem oposição, 
 correção. O STF entende inadmissível a correção de crédito escritural extemporâneo
 de ICMS.
 
-Confirmado também pelo gabarito: **o papel de trabalho da empresa H não tem coluna
+Confirmado também pelo gabarito: **o papel de trabalho da empresa 07 não tem coluna
 de correção nenhuma** — `AD REM / ALÍQ`, `CRÉDITO`, `CLASSIFICAÇÃO` e depois SPED
 cru. Valor nominal.
 
@@ -510,12 +510,12 @@ vez disso devolve a primeira e a última emissão encontradas.
 
 O **classificador** está feito (v0.140.0), em dois módulos: `tab_combustivel`
 (que NCM é que produto, medido) e `classificador_de_combustivel` (a cascata).
-Medido nas 15.107 compras da empresa G: **10.323 linhas saem por posição de NCM
+Medido nas 15.107 compras da empresa 06: **10.323 linhas saem por posição de NCM
 sem revisão**, 4.233 da tese decididas por NCM medida com confiança alta, e a
 **fila de revisão fica em 1,7%**. As 132 descrições do diesel colapsam para 18
 formas canônicas.
 
-E o **`0220`** foi medido (20 milhões de linhas da empresa Z, duas larguras) e
+E o **`0220`** foi medido (20 milhões de linhas da empresa 22, duas larguras) e
 entrou no leiaute — é a fonte certa do fator de conversão, com o texto da
 descrição como recurso de quem não o tem.
 
@@ -525,7 +525,7 @@ que a tabela não cobre **vira recusa com o motivo**, não zero. A era do ST sai
 marcada `estimativa` porque **a base não está no arquivo** — medido: zero base
 de ST em 5.234 linhas de CST 60/61.
 
-Rodada a cadeia inteira em 25 competências da empresa G: devido R$ 1.567.603,81
+Rodada a cadeia inteira em 25 competências da empresa 06: devido R$ 1.567.603,81
 contra R$ 1.328.691,14 creditados, **R$ 238.912,67 a menos**. E três meses batem
 ao centavo com `litros × ad rem`, confirmando a ad rem e revelando que o cliente
 não aplica o FCV.
@@ -554,7 +554,7 @@ regimes num relatório só.
 
 ## 11. O que ainda é dúvida, e continua dúvida
 
-**Quatro coisas no papel de trabalho da empresa H** que não vou tratar como verdade:
+**Quatro coisas no papel de trabalho da empresa 07** que não vou tratar como verdade:
 
 1. o arquivo se chama "2021 e 2022" e os dados são percentuais, mas **o texto da
    metodologia descreve o monofásico** (2023+). Texto e dado não combinam;
@@ -585,10 +585,10 @@ regimes num relatório só.
 
    | Cliente | Litros CST 61 | Credita? | Fundamento que o próprio ajuste cita |
    |---|---|---|---|
-   | empresa Z | 7.231.083 | **sim**, 72 ajustes | LC 192/2022 e cláusula 7ª do Conv. 199/2022 |
-   | empresa G | 3.772.408 | **sim**, 111 linhas, R$ 5,08 mi em 32 competências | *(ajuste sem texto de fundamento)* |
-   | empresa K | 2.235.536 | **não** | — |
-   | empresa Y | 445.861 | **sim**, 13 ajustes | Conv. 26/2023 e 61/2023, "e a proporcionalidade das operações tributadas" |
+   | empresa 22 | 7.231.083 | **sim**, 72 ajustes | LC 192/2022 e cláusula 7ª do Conv. 199/2022 |
+   | empresa 06 | 3.772.408 | **sim**, 111 linhas, R$ 5,08 mi em 32 competências | *(ajuste sem texto de fundamento)* |
+   | empresa 09 | 2.235.536 | **não** | — |
+   | empresa 21 | 445.861 | **sim**, 13 ajustes | Conv. 26/2023 e 61/2023, "e a proporcionalidade das operações tributadas" |
 
    **O achado não é o placar, são os fundamentos.** As três que creditam citam
    bases legais **diferentes**: uma a cláusula da ad rem (que diz *quanto* é o
@@ -597,18 +597,18 @@ regimes num relatório só.
    o fundamento entra na linha da planilha justamente porque o cliente pergunta
    "por que esse número?".
 
-   **E a empresa Y rateia.** O texto dela diz "a proporcionalidade das operações
+   **E a empresa 21 rateia.** O texto dela diz "a proporcionalidade das operações
    tributadas" — ela credita só a parcela correspondente às saídas tributadas,
    o que as outras duas aparentemente não fazem. É uma **terceira** variável de
-   divergência, ao lado do FCV que a empresa G não aplica e dos meses curtos.
+   divergência, ao lado do FCV que a empresa 06 não aplica e dos meses curtos.
    Se o rateio é devido ou é conservadorismo do contador é questão aberta, e
-   decide se a empresa Y tem crédito **a mais** para pedir.
+   decide se a empresa 21 tem crédito **a mais** para pedir.
 
    **Uma advertência de método.** A primeira varredura devolveu zero `E111` para
-   a empresa G — justamente a que se sabia creditar R$ 5 mi. O motivo era banal:
+   a empresa 06 — justamente a que se sabia creditar R$ 5 mi. O motivo era banal:
    o script assumia uma subpasta que aquele cliente não usa. Os números acima da
-   empresa Y e da empresa Z vêm de **duas rodadas independentes** que
-   concordaram; o da empresa G vem de contagem direta de `SP020799`. Varredura
+   empresa 21 e da empresa 22 vêm de **duas rodadas independentes** que
+   concordaram; o da empresa 06 vem de contagem direta de `SP020799`. Varredura
    que devolve zero para um caso conhecido não prova nada sobre os outros zeros.
 
 **Resolvido no levantamento:** o **CST 090** era a maior dúvida, e não é "não sei o
@@ -626,8 +626,8 @@ energia, CIAP, fretes, bloco E, créditos extemporâneos — compartilham a leit
 mesmo arquivo. Vale desenhar o motor sabendo disso, ainda que se construa só o
 combustível.
 
-Gabaritos disponíveis: `14 - Encerrado/empresa H` (projeto encerrado, era do ST) e
-`03 - Em Execução/01 - empresa G` (atravessa os dois regimes, com
+Gabaritos disponíveis: `14 - Encerrado/empresa 07` (projeto encerrado, era do ST) e
+`03 - Em Execução/01 - empresa 06` (atravessa os dois regimes, com
 `WP - GRUPO ETTORI_072021 a 052026.xlsb` e uma pasta `Relatorios MA`).
 
 [RC 28013/2023]: https://legislacao.fazenda.sp.gov.br/Paginas/RC28013_2023.aspx

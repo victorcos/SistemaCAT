@@ -9,7 +9,7 @@ desta tem 15; o `0200` de lá tem 12 e o daqui tem 13, por causa do `CEST`.
 ## De onde saiu cada linha
 
 **Medido contra arquivo real, não copiado do Guia Prático.** 40 EFD ICMS/IPI da
-empresa G (02/2023 a 03/2026, matriz), contando os campos de cada linha e
+empresa 06 (02/2023 a 03/2026, matriz), contando os campos de cada linha e
 conferindo valor por valor contra o significado esperado. A contagem vai escrita
 em cada registro, porque é ela que torna a tabela conferível: quem desconfiar
 roda `tools/medir_leiaute_icms.py` e compara.
@@ -36,11 +36,11 @@ agora está medida dos dois lados.
 ## Dois registros que esta tabela **não** tem, e não é esquecimento
 
 `0206` (código ANP) e `C171` (complemento de combustíveis) **não aparecem em
-nenhum dos 40 arquivos da empresa G**, que consome combustível em vez de
+nenhum dos 40 arquivos da empresa 06**, que consome combustível em vez de
 distribuí-lo. Entrar aqui com leiaute tirado do Guia e nunca exercitado seria
 pior que faltar: quem visse o nome assumiria que foi conferido.
 
-**Eram três, e a espera rendeu o terceiro.** Rodado contra a empresa Z, o
+**Eram três, e a espera rendeu o terceiro.** Rodado contra a empresa 22, o
 `tools/medir_leiaute_icms.py` achou o `0220` — o registro que converte fardo,
 caixa e tambor em litro — e achou com **dois tamanhos no mesmo acervo**. Medidos
 depois sobre 20 milhões de linhas: 3 campos em 2,4 milhões (todas de 2021) e 4
@@ -103,7 +103,7 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "UNID_INV", "TIPO_ITEM", "COD_NCM", "EX_IPI", "COD_GEN",
         "COD_LST", "ALIQ_ICMS", "CEST",
     ),
-    # 4 campos (17.784.662 linhas da empresa Z, 2022-01 em diante). **O
+    # 4 campos (17.784.662 linhas da empresa 22, 2022-01 em diante). **O
     # registro que leva o fardo ao litro**: `FAT_CONV` é quantas unidades de
     # inventário cabem na unidade do documento.
     #
@@ -113,7 +113,7 @@ CAMPOS: dict[str, tuple[str, ...]] = {
     "0220": ("REG", "UNID_CONV", "FAT_CONV", "COD_BARRA"),
     # 5 campos (60 linhas). A descrição **anterior** do item, com vigência.
     # Importa ao classificador: o mesmo código muda de nome no meio do período,
-    # e medido na empresa G a descrição do diesel aparece truncada em 26
+    # e medido na empresa 06 a descrição do diesel aparece truncada em 26
     # caracteres ("OLEO DIESEL B S-10 ORIGINA")
     "0205": ("REG", "DESCR_ANT_ITEM", "DT_INI", "DT_FIM", "COD_ANT_ITEM"),
     # 3 campos (296 linhas). Natureza da operação, que o C170 cita em COD_NAT
@@ -166,7 +166,7 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "VL_SLD_CREDOR_TRANSPORTAR", "DEB_ESP",
     ),
     # 4 campos (37 linhas). **O registro central da auditoria**: é por ele que
-    # se descobre o crédito que o cliente já tomou. Na empresa G o código é
+    # se descobre o crédito que o cliente já tomou. Na empresa 06 o código é
     # `SP020799`, com `DESCR_COMPL_AJ` = "CRÉDITO DE DIESEL MONOFASICO"
     "E111": ("REG", "COD_AJ_APUR", "DESCR_COMPL_AJ", "VL_AJ_APUR"),
     # 10 campos (39 linhas). A obrigação a recolher do mês
@@ -181,7 +181,7 @@ CAMPOS: dict[str, tuple[str, ...]] = {
 # `registros.py`.
 #
 # **Por que pelo tamanho e não pela data.** A data diz de que competência é o
-# arquivo; o tamanho, qual PVA o gerou. Na empresa Z os dois conviviam no mesmo
+# arquivo; o tamanho, qual PVA o gerou. Na empresa 22 os dois conviviam no mesmo
 # acervo: 2,4 milhões de linhas com 3 campos e 17,8 milhões com 4.
 CAMPOS_ANTIGOS: dict[tuple[str, int], tuple[str, ...]] = {
     ("0220", 3): ("REG", "UNID_CONV", "FAT_CONV"),
