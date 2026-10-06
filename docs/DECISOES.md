@@ -5,6 +5,95 @@
 
 ---
 
+## 2026-10-06 — A noite perdida: o erro que mentiu e a conta que não cabia
+
+Uma apuração de PIS/COFINS rodou das 20:27 às 02:56 — **6h29** — e morreu com
+
+    ArrowInvalid: Column 13 named participante
+                  expected length 49365 but got length 49364
+
+A mensagem fala de parquet, de pyarrow e de uma coluna por número. **Nenhuma
+dessas três coisas era o problema**, e foram precisas duas correções: uma para
+o erro parar de mentir, outra para a rodada passar a caber.
+
+### O erro mentia, e isso tinha conserto próprio
+
+`Escritor.escrever` apendava coluna a coluna. Algo levantou no meio da linha, as
+doze primeiras colunas ficaram com um valor a mais que as cinco seguintes, a
+exceção subiu até o `finally` que fecha os escritores, e `fechar` levantou o
+erro do pyarrow **por cima** da exceção original — a única que explicava a
+rodada. Seis horas e meia de leitura, e o que sobrou para diagnosticar foi o
+tamanho de uma lista.
+
+Corrigido em v0.146.4, nas duas pontas: a linha entra inteira ou não entra (os
+valores são montados antes de encostar no lote), e um lote desemparelhado passa
+a ser cortado com `log.error` em vez de levantar por cima de quem já estava
+caindo. A linha incompleta seria lixo de qualquer jeito; o diagnóstico, não.
+
+**A regra que fica:** `fechar()` chamado em `finally` não pode levantar. Quem
+está caindo já tem um erro melhor para contar.
+
+### A causa era memória, e a aritmética fecha
+
+Medido na **menor** ECD do lote (1,81 GB; a maior tem 23 GB):
+
+| | |
+|---|---|
+| partidas (I250) | 13.429.009 |
+| lançamentos (I200) | 354.264 — 38 partidas por lançamento |
+| contas com movimento | 438 |
+| **a maior conta sozinha** | **3.134.668 partidas** |
+
+`ecd.razao` montava a `LinhaDoRazao` de cada partida e guardava todas numa
+lista, para só então ordenar por data. A ~1,3 KB por linha, aquela conta pedia
+**3,8 GB** — na menor ECD do lote. No arquivo de 23 GB a conta equivalente pede
+cerca de **48 GB**, numa máquina de 23,7. Era `MemoryError`, e a rodada tinha
+escrito 271.779.552 linhas e 7,10 GB de parquet quando caiu, em 18 de 60
+arquivos.
+
+### A troca: guardar a chave, reler a linha
+
+Agora a primeira passada guarda **oito bytes por partida** — o posto do
+lançamento nos 32 bits de cima, o índice da partida nos de baixo. Ordenar essa
+chave ordena por data, por número do lançamento e, no empate, pela ordem do
+arquivo: o mesmo critério de antes. A segunda passada relê a linha e entrega
+uma de cada vez.
+
+E a ordenação cara acontece **uma vez por arquivo**, não uma por conta: são 38
+vezes menos lançamentos que partidas, e as 438 contas reusam a mesma tabela de
+postos.
+
+**Conferido contra a ECD real.** Seis contas e 758.928 linhas, as duas versões:
+saída idêntica byte a byte (mesmo sha256), pico de 238,5 MB para 77,7 MB.
+
+E o custo por linha, medido dos dois lados, é o número que generaliza:
+
+| | bytes por linha | a maior conta (3.134.668 partidas) |
+|---|---|---|
+| antes | 1.237 | 3,6 GB |
+| depois | **48** | **143,9 MB** (medido) |
+
+**25,7 vezes menos.** Na maior ECD do lote, a conta equivalente sai de ~46 GB
+para ~1,8 GB — de impossível numa máquina de 23,7 GB para folgado.
+
+Dois testes novos de caracterização pinam o desempate — e passam **nas duas versões**,
+que é o que um refactor precisa provar. Entre eles fica escrito que o desempate
+é o `NUM_LCTO` **como texto**, então "10" vem antes de "2": é o que o código
+sempre fez, e agora mudar isso é decisão de alguém em vez de efeito colateral.
+
+### E o lote estava errado desde o começo
+
+Separado dos dois defeitos, e pior que eles: o lote tinha **60 ECD e nenhuma
+EFD-Contribuições** — 294 GB apontados para a pasta `SPED Contábil`, com uma
+`SPED Contribuições` ao lado que ninguém importou. O diário avisou no primeiro
+minuto, às 20:27:16, e o aviso passou despercebido. Mesmo que a rodada
+terminasse, entregaria metade da apuração: sem a 037 e sem a 047.
+
+Vale como lembrete de que **aviso no diário não é aviso visto**. A etapa diz a
+coisa certa; quem põe para rodar à noite não está lá para ler.
+
+---
+
 ## 2026-10-05 — A tela do combustível, e a demanda acendeu
 
 `pages/Combustivel.tsx` é a última peça: até agora a etapa aparecia no hub com

@@ -123,6 +123,67 @@ class TestORazao:
         assert next(iter(razao(arquivo, indice, ["3.1.1"]))).competencia == "2021-06-01"
 
 
+class TestODesempate:
+    """Dois lançamentos na mesma data: quem vem primeiro?
+
+    Importa porque a ordem deixou de ser decidida linha a linha. Desde
+    06/10/2026 `razao` ordena uma tabela de **postos dos lançamentos**, montada
+    uma vez por arquivo, e a conta só carrega a chave de 8 bytes — era isso ou
+    não ler ECD de supermercado (ver o docstring de `razao`). O risco da troca é
+    exatamente este: um critério de desempate diferente reordena o razão em
+    silêncio, e ninguém confere 13 milhões de linhas à mão.
+
+    **O desempate é o `NUM_LCTO` como texto**, não como número — então "10" vem
+    antes de "2". É o que o código sempre fez; está escrito aqui para que mudar
+    isso seja decisão de alguém, e não efeito colateral.
+    """
+
+    # mesma data nos dois, e o 10 vem antes do 2 no arquivo
+    MESMA_DATA = """|0000|LECD|01062021|30062021|COMERCIO DO TESTE LTDA|11222333000181|SP|111222333|3550308|||0|0|N||
+|I050|01012021|01|A|3|3.1.1|3|CAIXA|
+|I200|10|15062021|100,00|N||
+|I250|3.1.1||100,00|D|1|001|LANCAMENTO DEZ|||
+|I200|2|15062021|200,00|N||
+|I250|3.1.1||200,00|D|1|002|LANCAMENTO DOIS|||
+|9999|7|
+"""
+
+    @pytest.fixture
+    def empatados(self, tmp_path):
+        caminho = tmp_path / "empate.txt"
+        caminho.write_bytes(self.MESMA_DATA.encode("cp1252"))
+        return str(caminho)
+
+    def test_na_mesma_data_desempata_pelo_numero_do_lancamento(self, empatados):
+        indice = indexar_ecd(empatados)
+
+        linhas = list(razao(empatados, indice, ["3.1.1"]))
+
+        assert [l.numero for l in linhas] == ["10", "2"], (
+            "o desempate é o NUM_LCTO em ordem de texto")
+        # e o saldo corre na ordem em que saíram, não na do arquivo
+        assert [l.saldo for l in linhas] == [Decimal("100"), Decimal("300")]
+
+    def test_a_ordem_do_arquivo_decide_quando_data_e_numero_empatam(self, tmp_path):
+        """Último critério: quem veio antes no arquivo. Sem ele, duas partidas
+        idênticas trocariam de lugar a cada rodada."""
+        igual = """|0000|LECD|01062021|30062021|COMERCIO DO TESTE LTDA|11222333000181|SP|111222333|3550308|||0|0|N||
+|I050|01012021|01|A|3|3.1.1|3|CAIXA|
+|I200|7|15062021|300,00|N||
+|I250|3.1.1||100,00|D|1|001|PRIMEIRA|||
+|I250|3.1.1||200,00|D|1|002|SEGUNDA|||
+|9999|6|
+"""
+        caminho = tmp_path / "igual.txt"
+        caminho.write_bytes(igual.encode("cp1252"))
+
+        indice = indexar_ecd(str(caminho))
+        linhas = list(razao(str(caminho), indice, ["3.1.1"]))
+
+        assert [l.historico for l in linhas] == ["PRIMEIRA", "SEGUNDA"]
+        assert [l.saldo for l in linhas] == [Decimal("100"), Decimal("300")]
+
+
 class TestORecorteDePeriodo:
     def test_a_partida_anterior_ao_recorte_nao_vira_linha_mas_entra_no_saldo(self, arquivo):
         """Sem isso o razão do mês começaria do zero e o saldo seria ficção."""

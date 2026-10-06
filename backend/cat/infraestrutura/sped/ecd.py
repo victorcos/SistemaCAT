@@ -279,6 +279,45 @@ class LinhaDoRazao:
         return self.valor if self.debito_ou_credito == "D" else -self.valor
 
 
+def _ordem_dos_lancamentos(indice: IndiceDaEcd,
+                           linha_em: Callable[[int], list[str]],
+                           ) -> tuple[array.array, array.array]:
+    """Em que ordem os lançamentos entram no razão, e em que data cada um é.
+
+    Uma passada pelos I200, **uma vez por arquivo** — e são muitos menos que as
+    partidas: medido numa ECD real de 1,81 GB, 354 mil lançamentos para 13,4
+    milhões de partidas, 38 para um. Por isso a ordenação cara acontece aqui, e
+    não dentro de cada conta.
+
+    Devolve duas tabelas rasas, de 4 bytes por lançamento:
+
+    * `posto[i]` — a posição do lançamento `i` na ordem (data, número), que é o
+      critério do razão;
+    * `data_de[i]` — a data como ordinal, ou **0** quando o arquivo não trouxe
+      data utilizável. É o que permite aplicar o recorte `de`/`ate` sem reler a
+      linha do lançamento.
+
+    Lançamento sem data ordena como `date.min`, que é o que o código fazia
+    quando escrevia `quando or date.min` — e `date.min.toordinal()` é 1.
+    """
+    total = len(indice.posicoes_i200)
+    data_de = array.array("i")
+    numeros: list[str] = []
+    for posicao in indice.posicoes_i200:
+        lancamento = _dicionario(linha_em(posicao), "I200")
+        quando = _data(lancamento["DT_LCTO"])
+        data_de.append(quando.toordinal() if quando else 0)
+        numeros.append(lancamento["NUM_LCTO"])
+
+    # `sorted` é estável: lançamentos com a mesma data e o mesmo número ficam na
+    # ordem do arquivo, como antes
+    ordem = sorted(range(total), key=lambda i: (data_de[i] or 1, numeros[i]))
+    posto = array.array("i", bytes(data_de.itemsize * total))
+    for lugar, i in enumerate(ordem):
+        posto[i] = lugar
+    return posto, data_de
+
+
 def razao(caminho: str, indice: IndiceDaEcd, contas: list[str] | None = None,
           de: date | None = None, ate: date | None = None) -> Iterator[LinhaDoRazao]:
     """O razão das contas pedidas, conta a conta, em ordem de data.
@@ -289,6 +328,37 @@ def razao(caminho: str, indice: IndiceDaEcd, contas: list[str] | None = None,
 
     Partida sem data utilizável fica de fora quando há recorte (não dá para
     afirmar que está na faixa) e entra quando não há.
+
+    ## Por que duas passadas por conta
+
+    O razão sai em ordem de data, e o SPED não obriga o arquivo a estar em
+    ordem — então ordenar é inevitável. **O que é evitável é ordenar as
+    linhas.** Até 06/10/2026 esta função montava a `LinhaDoRazao` de cada
+    partida, guardava todas numa lista e só então ordenava. Medido numa ECD
+    real de 1,81 GB, a menor de um lote de 60:
+
+    * 13.429.009 partidas, 354.264 lançamentos — 38 partidas por lançamento;
+    * 438 contas com movimento, e **a maior sozinha com 3.134.668 partidas**;
+    * a ~1,3 KB por linha montada, essa conta pedia **3,8 GB** de memória.
+
+    A maior ECD do mesmo lote tem 23 GB, doze vezes a menor. A conta
+    equivalente lá pede cerca de 48 GB, numa máquina de 23,7 — e foi assim que
+    uma apuração morreu às 02:56 depois de seis horas e meia, com um
+    `MemoryError` que chegou à tela disfarçado de erro do pyarrow.
+
+    Agora a primeira passada guarda **oito bytes por partida**: o posto do
+    lançamento nos 32 bits de cima, o índice da partida nos de baixo. Ordenar
+    essa chave ordena por data, por número do lançamento e, no empate, pela
+    ordem do arquivo — o mesmo critério de antes, com ~160 vezes menos memória.
+    A segunda passada relê a linha e entrega uma de cada vez.
+
+    A ordenação cara acontece **uma vez por arquivo**, em
+    `_ordem_dos_lancamentos`, e não uma vez por conta: são 38 vezes menos
+    lançamentos que partidas, e toda conta reusa a mesma tabela.
+
+    O preço é reler a linha da partida na segunda passada. É leitura que esta
+    função já fazia — e trocar memória que não existe por leitura que existe
+    não é troca difícil.
     """
     alvos = contas if contas else [c.codigo for c in indice.analiticas]
     orfas = sem_data = fora = 0
@@ -299,41 +369,66 @@ def razao(caminho: str, indice: IndiceDaEcd, contas: list[str] | None = None,
             arquivo.seek(posicao)
             return campos(arquivo.readline().decode(indice.codificacao, errors="replace"))
 
+        posto, data_de = _ordem_dos_lancamentos(indice, linha_em)
+
         for codigo in alvos:
             posicoes = indice.posicoes_i250.get(codigo)
             if not posicoes:
                 continue
             dados_da_conta = indice.conta(codigo)
-            colhidas: list[tuple[date, str, LinhaDoRazao]] = []
             abertura = ZERO
 
-            for posicao in posicoes:
+            # **Primeira passada: só a chave de ordenação, nunca a linha.**
+            # Oito bytes por partida em vez de ~1,3 KB — ver o docstring. O
+            # posto do lançamento ocupa os 32 bits de cima e o índice da
+            # partida os de baixo, então ordenar a chave ordena por data, por
+            # número do lançamento e, no empate, pela ordem do arquivo — que é
+            # exatamente o critério de antes.
+            chaves: list[int] = []
+            for k in range(len(posicoes)):
+                posicao = posicoes[k]
                 # o lançamento dono da partida é o último I200 antes dela
                 anterior = bisect.bisect_right(indice.posicoes_i200, posicao) - 1
                 if anterior < 0:
                     orfas += 1
                     continue
+
+                if de is not None or ate is not None:
+                    ordinal = data_de[anterior]
+                    if not ordinal:
+                        sem_data += 1
+                        continue
+                    if de is not None and ordinal < de.toordinal():
+                        # entra no saldo, não na lista — e só este caso obriga
+                        # a ler a partida aqui, para saber o movimento
+                        partida = _dicionario(linha_em(posicao), "I250")
+                        valor = _decimal(partida["VL_DC"])
+                        lado = (partida["IND_DC"] or "").strip().upper()
+                        abertura += valor if lado == "D" else -valor
+                        fora += 1
+                        continue
+                    if ate is not None and ordinal > ate.toordinal():
+                        fora += 1
+                        continue
+
+                chaves.append((posto[anterior] << 32) | k)
+
+            chaves.sort()
+
+            # Segunda passada: relê a linha e entrega uma de cada vez. O que
+            # era pico de memória vira leitura — e leitura esta função já fazia.
+            saldo = abertura
+            for chave in chaves:
+                posicao = posicoes[chave & 0xFFFFFFFF]
+                anterior = bisect.bisect_right(indice.posicoes_i200, posicao) - 1
                 lancamento = _dicionario(linha_em(indice.posicoes_i200[anterior]), "I200")
                 partida = _dicionario(linha_em(posicao), "I250")
 
                 quando = _data(lancamento["DT_LCTO"])
                 valor = _decimal(partida["VL_DC"])
                 lado = (partida["IND_DC"] or "").strip().upper()
-                movimento = valor if lado == "D" else -valor
 
-                if de is not None or ate is not None:
-                    if quando is None:
-                        sem_data += 1
-                        continue
-                    if de is not None and quando < de:
-                        abertura += movimento     # entra no saldo, não na lista
-                        fora += 1
-                        continue
-                    if ate is not None and quando > ate:
-                        fora += 1
-                        continue
-
-                colhidas.append((quando or date.min, lancamento["NUM_LCTO"], LinhaDoRazao(
+                pronta = LinhaDoRazao(
                     cnpj=indice.cnpj, conta=codigo,
                     descricao=dados_da_conta.nome if dados_da_conta else "",
                     conta_referencial=indice.referencial.get(codigo, ""),
@@ -347,12 +442,8 @@ def razao(caminho: str, indice: IndiceDaEcd, contas: list[str] | None = None,
                     participante=partida["COD_PART"],
                     tipo=TIPO_DE_LANCAMENTO.get((lancamento["IND_LCTO"] or "").strip().upper(),
                                                 lancamento["IND_LCTO"]),
-                    saldo=ZERO, arquivo=os.path.basename(caminho))))
+                    saldo=ZERO, arquivo=os.path.basename(caminho))
 
-            # a ordem do razão é a do tempo, não a do arquivo: o SPED não
-            # obriga os lançamentos a virem em ordem de data
-            saldo = abertura
-            for _, _, pronta in sorted(colhidas, key=lambda x: (x[0], x[1])):
                 saldo += pronta.movimento
                 pronta.saldo = saldo
                 saiu += 1

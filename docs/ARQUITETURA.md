@@ -160,7 +160,7 @@ novo, reinicie o `watch`.
 
 ## 6. Leitura de arquivo grande
 
-Duas regras aprendidas medindo.
+Três regras aprendidas medindo.
 
 **Uma passagem só.** Arquivos RAR sólidos re-descomprimem do início a cada
 abertura. Abrir 1.152 arquivos um a um é ordens de grandeza mais lento que
@@ -171,6 +171,32 @@ cada linha da Ficha 3 carrega CNPJ e período.
 segundos quebrando toda linha em 35 campos, e 293 segundos comparando bytes no
 início da linha. Mesma linguagem, 2,4 vezes de diferença. O gargalo raramente é
 a linguagem; quase sempre é o algoritmo.
+
+**Ordenar a chave, nunca a linha.** Quando a saída precisa de outra ordem que
+não a do arquivo, a tentação é montar todos os registros, guardá-los numa lista
+e ordenar. O custo não aparece em teste: aparece no cliente grande, seis horas
+depois do início.
+
+Medido numa ECD de 1,81 GB — a **menor** de um lote de 60, cujo maior tem 23 GB:
+13,4 milhões de partidas, 354 mil lançamentos, e uma única conta concentrando
+3,1 milhões de partidas. A ~1,3 KB por registro montado, essa conta sozinha
+pedia 3,8 GB; a conta equivalente no arquivo de 23 GB pede cerca de 48, numa
+máquina de 23,7.
+
+A forma certa é guardar **só a chave de ordenação**, em inteiro, e reler a linha
+depois de ordenar. Em `sped/ecd.py` a chave são oito bytes — o posto do
+lançamento nos 32 bits de cima, o índice da partida nos de baixo —, e medido
+contra ECD real o custo caiu de **1.237 para 48 bytes por linha** — 25,7 vezes
+menos — com a saída idêntica byte a byte. A conta de 3,1 milhões de partidas,
+que pedia 3,6 GB, passou a rodar em 143,9 MB. Duas observações que generalizam:
+
+* **ordene o agrupador, não o agrupado.** São 38 partidas por lançamento, e a
+  ordem do razão é a dos lançamentos; ordenar os 354 mil uma vez por arquivo
+  serve às 438 contas, enquanto ordenar as 13,4 milhões se repetia conta a
+  conta;
+* **reler é mais barato que não caber.** A segunda passada relê a linha da
+  partida — leitura que a função já fazia. Trocar memória que não existe por
+  leitura que existe não é troca difícil.
 
 ## 7. Formato intermediário
 
