@@ -16,6 +16,10 @@ from collections.abc import Callable
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from cat.log import obter_log
+
+log = obter_log(__name__)
+
 # quantas linhas o escritor segura antes de despejar em disco
 LINHAS_POR_LOTE = 50_000
 
@@ -44,14 +48,52 @@ class Escritor:
         self.gravadas = 0
 
     def escrever(self, linha: dict) -> None:
-        for coluna in self.lote:
-            self.lote[coluna].append(str(linha.get(coluna, "")))
+        """A linha entra inteira ou não entra.
+
+        Montar os valores antes de encostar no lote parece o mesmo que apendar
+        coluna a coluna, e não é. Se algo levantar no meio do caminho — e em
+        05/10/2026 levantou na 13ª de 17 colunas, depois de seis horas e meia
+        de leitura —, as colunas anteriores ficam com um valor a mais que as
+        seguintes. O lote nunca mais fecha, e aí vem o pior: o `finally` que
+        chama `fechar` troca a exceção de verdade por um
+
+            ArrowInvalid: Column 13 named participante
+                          expected length 49365 but got length 49364
+
+        que manda quem lê procurar defeito no parquet — que não tem nenhum.
+        """
+        valores = [str(linha.get(coluna, "")) for coluna in self.lote]
+        for coluna, valor in zip(self.lote, valores, strict=True):
+            self.lote[coluna].append(valor)
         self.gravadas += 1
         if len(self.lote[next(iter(self.lote))]) >= LINHAS_POR_LOTE:
             self._despejar()
 
+    def _emparelhar(self) -> int:
+        """Corta o lote no tamanho da coluna mais curta, e diz que cortou.
+
+        Com `escrever` sendo tudo ou nada, isto não deveria acontecer nunca.
+        Está aqui porque **aconteceu**, e porque o estrago não foi a linha
+        perdida: foi o `fechar` dentro de um `finally` ter levantado por cima da
+        exceção que explicava a rodada inteira. Preferir a linha incompleta a
+        destruir o diagnóstico é a escolha certa, e não é escolha difícil — a
+        linha incompleta seria lixo de qualquer jeito.
+        """
+        tamanhos = {c: len(v) for c, v in self.lote.items()}
+        menor = min(tamanhos.values())
+        if min(tamanhos.values()) == max(tamanhos.values()):
+            return menor
+        log.error(
+            "lote desemparelhado: alguma linha ficou pela metade. A rodada já "
+            "estava caindo por outro motivo — é esse outro que interessa",
+            extra={"tamanhos": {c: n for c, n in tamanhos.items() if n != menor},
+                   "cortado_em": menor})
+        for coluna, valores in self.lote.items():
+            del valores[menor:]
+        return menor
+
     def _despejar(self) -> None:
-        if not self.lote[next(iter(self.lote))]:
+        if not self._emparelhar():
             return
         self.escritor.write_table(pa.Table.from_pydict(self.lote, schema=self.esquema))
         self.lote = {c: [] for c in self.lote}
