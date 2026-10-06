@@ -5,6 +5,69 @@
 
 ---
 
+## 2026-10-06 — Atacar os seeks do razão, e descobrir que não eram eles
+
+Sequência do dia anterior. Com a memória resolvida (1.237 → 48 bytes por
+linha), sobrou um custo de tempo: a versão nova ficou **1,4× mais lenta** que a
+antiga. Fui atacar, e o registro aqui vale mais pelo que **não** era.
+
+### Duas hipóteses minhas, as duas erradas
+
+**"São os seeks."** A segunda passada relia a linha do I200 a cada partida.
+Guardar os quatro campos do lançamento em `_ler_os_lancamentos` levou 13,4
+milhões de seeks por arquivo para 354 mil. Medido: **6%** (96 s → 90 s). As
+leituras já vinham do buffer — o perfil mostra `readline` a 6 µs por chamada,
+que é custo de memória e não de disco.
+
+**"É custo fixo mal amortizado."** O teste cobrava a parte fixa inteira sobre
+5,7% das partidas do arquivo, então pareceu explicação. Medido:
+`_ler_os_lancamentos` custa **1,9 s**. Irrelevante.
+
+A lição de processo é a de sempre, e eu a repeti duas vezes no mesmo dia:
+**medir antes de construir**, não depois.
+
+### O que o perfil mostrou, e que vale guardar
+
+Uma coisa inesperada e grande: **o seek custa pela ordem, não pela
+quantidade**. Duas amostras disjuntas de 150 mil posições da mesma conta, no
+mesmo arquivo — em ordem de arquivo saem do buffer e praticamente não custam;
+embaralhadas custam **2,1 ms cada**. Ordens de grandeza. É isso que decide o
+desenho de qualquer leitura por posição neste sistema, e está em
+`ARQUITETURA.md` §6.
+
+E uma ineficiência que **já existia antes desta mudança**:
+`os.path.basename(caminho)` era recalculado **a cada linha** — 127.515 chamadas
+a `ntpath.split` para produzir a mesma string, ~6% do tempo. `descricao` e
+`conta_referencial` idem, constantes da conta avaliadas por linha. Levantadas
+para fora do laço.
+
+### Onde o tempo está de verdade
+
+Espalhado em interpretar texto: decodificar, `campos`, `_dicionario`,
+`_decimal`, e construir a `LinhaDoRazao`. São ~80 µs por linha, 13,4 milhões de
+vezes, **sem vilão único para derrubar**. Fechar a conta exigiria não construir
+um objeto por partida — escrever colunas direto no parquet —, o que muda o
+contrato de `razao()`. Fica anotado como decisão de outra hora, não feita.
+
+### O placar, medido
+
+Seis contas, 758.928 linhas da mesma ECD real, sempre com **o mesmo sha256**:
+
+| | tempo | pico de memória |
+|---|---|---|
+| original | **63 s** | 238,5 MB |
+| só duas passadas (v0.147.0) | 96 s | **77,7 MB** |
+| + tabela de lançamentos e hoists | 84 s | 123,8 MB |
+
+**A troca é 1,33× mais lento em troca de 25,7× menos memória.** Vale porque o
+original não era mais rápido — ele **não terminava**: pedia ~46 GB numa conta
+da ECD de 23 GB, numa máquina de 23,7. O que não termina não tem velocidade.
+
+A tabela de lançamentos custa 46 MB nesta ECD e cresce com os lançamentos, não
+com as partidas; fica pelos 7% de tempo que ela devolve.
+
+---
+
 ## 2026-10-06 — A noite perdida: o erro que mentiu e a conta que não cabia
 
 Uma apuração de PIS/COFINS rodou das 20:27 às 02:56 — **6h29** — e morreu com

@@ -279,43 +279,76 @@ class LinhaDoRazao:
         return self.valor if self.debito_ou_credito == "D" else -self.valor
 
 
-def _ordem_dos_lancamentos(indice: IndiceDaEcd,
-                           linha_em: Callable[[int], list[str]],
-                           ) -> tuple[array.array, array.array]:
-    """Em que ordem os lançamentos entram no razão, e em que data cada um é.
+@dataclass
+class _Lancamentos:
+    """Os campos do I200 de que a linha do razão precisa, lidos uma vez só.
 
-    Uma passada pelos I200, **uma vez por arquivo** — e são muitos menos que as
-    partidas: medido numa ECD real de 1,81 GB, 354 mil lançamentos para 13,4
-    milhões de partidas, 38 para um. Por isso a ordenação cara acontece aqui, e
-    não dentro de cada conta.
+    São 38 partidas por lançamento (medido: 13.429.009 para 354.264 numa ECD
+    real), e cada partida precisa de quatro campos do lançamento que a contém.
+    Reler a linha do I200 a cada partida custava **13,4 milhões de seeks e 13,4
+    milhões de `Decimal` interpretados** por arquivo, para 354 mil valores
+    distintos. Ler uma vez e guardar troca isso por uma tabela que cabe:
+    referências e inteiros, proporcionais ao número de lançamentos e não ao de
+    partidas.
 
-    Devolve duas tabelas rasas, de 4 bytes por lançamento:
+    Os campos:
 
-    * `posto[i]` — a posição do lançamento `i` na ordem (data, número), que é o
-      critério do razão;
-    * `data_de[i]` — a data como ordinal, ou **0** quando o arquivo não trouxe
-      data utilizável. É o que permite aplicar o recorte `de`/`ate` sem reler a
-      linha do lançamento.
+    * `posto[i]` — a posição do lançamento na ordem (data, número), que é o
+      critério do razão. É ele que vai na chave de ordenação de cada conta;
+    * `data[i]` — a data como ordinal, ou **0** quando o arquivo não trouxe
+      data utilizável. Permite aplicar o recorte `de`/`ate` sem ler nada;
+    * `numero`, `valor`, `tipo` — o que a linha copia do lançamento;
+    * `data_crua` — só os lançamentos cuja data não deu para interpretar, que
+      é quando a linha do razão repete o texto do arquivo em vez da data. É
+      dicionário e não lista porque o caso é raro, e uma lista cheia de `""`
+      custaria uma referência por lançamento para nada.
+    """
 
-    Lançamento sem data ordena como `date.min`, que é o que o código fazia
-    quando escrevia `quando or date.min` — e `date.min.toordinal()` é 1.
+    posto: array.array
+    data: array.array
+    numero: list[str]
+    valor: list[Decimal]
+    tipo: list[str]
+    data_crua: dict[int, str]
+
+
+def _ler_os_lancamentos(indice: IndiceDaEcd,
+                        linha_em: Callable[[int], list[str]]) -> _Lancamentos:
+    """Uma passada pelos I200, e a ordem em que eles entram no razão.
+
+    A ordenação cara acontece aqui, **uma vez por arquivo**, e não dentro de
+    cada conta: toda conta reusa a mesma tabela de postos.
     """
     total = len(indice.posicoes_i200)
-    data_de = array.array("i")
-    numeros: list[str] = []
-    for posicao in indice.posicoes_i200:
+    data = array.array("i")
+    numero: list[str] = []
+    valor: list[Decimal] = []
+    tipo: list[str] = []
+    data_crua: dict[int, str] = {}
+
+    for i, posicao in enumerate(indice.posicoes_i200):
         lancamento = _dicionario(linha_em(posicao), "I200")
         quando = _data(lancamento["DT_LCTO"])
-        data_de.append(quando.toordinal() if quando else 0)
-        numeros.append(lancamento["NUM_LCTO"])
+        data.append(quando.toordinal() if quando else 0)
+        if quando is None:
+            data_crua[i] = lancamento["DT_LCTO"]
+        numero.append(lancamento["NUM_LCTO"])
+        valor.append(_decimal(lancamento["VL_LCTO"]))
+        # o `get` devolve o rótulo do dicionário, que é compartilhado; só o
+        # caso desconhecido guarda texto próprio
+        tipo.append(TIPO_DE_LANCAMENTO.get(
+            (lancamento["IND_LCTO"] or "").strip().upper(), lancamento["IND_LCTO"]))
 
     # `sorted` é estável: lançamentos com a mesma data e o mesmo número ficam na
-    # ordem do arquivo, como antes
-    ordem = sorted(range(total), key=lambda i: (data_de[i] or 1, numeros[i]))
-    posto = array.array("i", bytes(data_de.itemsize * total))
+    # ordem do arquivo, como antes. Sem data ordena como `date.min`, que é o que
+    # o código fazia escrevendo `quando or date.min` — e `date.min` é o dia 1
+    ordem = sorted(range(total), key=lambda i: (data[i] or 1, numero[i]))
+    posto = array.array("i", bytes(data.itemsize * total))
     for lugar, i in enumerate(ordem):
         posto[i] = lugar
-    return posto, data_de
+
+    return _Lancamentos(posto=posto, data=data, numero=numero, valor=valor,
+                        tipo=tipo, data_crua=data_crua)
 
 
 def razao(caminho: str, indice: IndiceDaEcd, contas: list[str] | None = None,
@@ -353,29 +386,56 @@ def razao(caminho: str, indice: IndiceDaEcd, contas: list[str] | None = None,
     A segunda passada relê a linha e entrega uma de cada vez.
 
     A ordenação cara acontece **uma vez por arquivo**, em
-    `_ordem_dos_lancamentos`, e não uma vez por conta: são 38 vezes menos
+    `_ler_os_lancamentos`, e não uma vez por conta: são 38 vezes menos
     lançamentos que partidas, e toda conta reusa a mesma tabela.
 
-    O preço é reler a linha da partida na segunda passada. É leitura que esta
-    função já fazia — e trocar memória que não existe por leitura que existe
-    não é troca difícil.
+    ## A segunda passada lê só o I250, e isso rendeu menos do que parecia
+
+    `_ler_os_lancamentos` já abre cada I200 para saber data e número, então
+    guardar ali os outros dois campos que a linha copia — valor e tipo — tira
+    da segunda passada o seek do lançamento: 13,4 milhões de seeks por arquivo
+    viram 354 mil, e junto vão 13,4 milhões de `Decimal` interpretados.
+
+    **Medido, isso valeu 6%**, e vale registrar por quê: as leituras já vinham
+    do buffer. O perfil mostra `readline` a 6 µs por chamada, que é custo de
+    memória e não de disco. Quem for otimizar isto de novo não deve começar
+    pelos seeks — já foram.
+
+    O custo real está espalhado em interpretar texto: `campos`, `_dicionario`,
+    `_decimal`, e a construção da `LinhaDoRazao`. São ~80 µs por linha, 13,4
+    milhões de vezes, e não há vilão único para derrubar. Fechar essa conta
+    exigiria **não construir um objeto por partida** — escrever colunas direto
+    no parquet —, o que muda o contrato desta função e é decisão de outra hora.
+
+    Onde o seek **importa de verdade** é na ordem: medido no mesmo arquivo,
+    posições embaralhadas custam ~2,1 ms por linha contra leitura agrupada que
+    sai do buffer. A segunda passada lê em ordem de data, que nestas ECD fica
+    perto da ordem do arquivo — se algum dia ficar longe, é aqui que dói.
+
+    A tabela de lançamentos cresce com os **lançamentos**, não com as partidas:
+    ~46 MB nesta ECD, contra os 3,6 GB que a versão antiga pedia numa conta só.
     """
     alvos = contas if contas else [c.codigo for c in indice.analiticas]
     orfas = sem_data = fora = 0
     saiu = 0
+    # fora do laço: `basename` é 6% do tempo quando chamado por linha — medido
+    # em 127.515 chamadas a `ntpath.split` para recalcular a mesma string
+    nome_do_arquivo = os.path.basename(caminho)
 
     with open(caminho, "rb", buffering=BUFFER_DE_REDE) as arquivo:
         def linha_em(posicao: int) -> list[str]:
             arquivo.seek(posicao)
             return campos(arquivo.readline().decode(indice.codificacao, errors="replace"))
 
-        posto, data_de = _ordem_dos_lancamentos(indice, linha_em)
+        lanc = _ler_os_lancamentos(indice, linha_em)
 
         for codigo in alvos:
             posicoes = indice.posicoes_i250.get(codigo)
             if not posicoes:
                 continue
             dados_da_conta = indice.conta(codigo)
+            descricao = dados_da_conta.nome if dados_da_conta else ""
+            referencial = indice.referencial.get(codigo, "")
             abertura = ZERO
 
             # **Primeira passada: só a chave de ordenação, nunca a linha.**
@@ -394,7 +454,7 @@ def razao(caminho: str, indice: IndiceDaEcd, contas: list[str] | None = None,
                     continue
 
                 if de is not None or ate is not None:
-                    ordinal = data_de[anterior]
+                    ordinal = lanc.data[anterior]
                     if not ordinal:
                         sem_data += 1
                         continue
@@ -411,38 +471,37 @@ def razao(caminho: str, indice: IndiceDaEcd, contas: list[str] | None = None,
                         fora += 1
                         continue
 
-                chaves.append((posto[anterior] << 32) | k)
+                chaves.append((lanc.posto[anterior] << 32) | k)
 
             chaves.sort()
 
-            # Segunda passada: relê a linha e entrega uma de cada vez. O que
-            # era pico de memória vira leitura — e leitura esta função já fazia.
+            # Segunda passada: **uma** leitura por partida, a do próprio I250.
+            # O lançamento já está na tabela, então o seek do I200 — que era
+            # metade de toda a leitura desta função — deixou de existir.
             saldo = abertura
             for chave in chaves:
                 posicao = posicoes[chave & 0xFFFFFFFF]
                 anterior = bisect.bisect_right(indice.posicoes_i200, posicao) - 1
-                lancamento = _dicionario(linha_em(indice.posicoes_i200[anterior]), "I200")
                 partida = _dicionario(linha_em(posicao), "I250")
 
-                quando = _data(lancamento["DT_LCTO"])
+                ordinal = lanc.data[anterior]
+                quando = date.fromordinal(ordinal) if ordinal else None
                 valor = _decimal(partida["VL_DC"])
                 lado = (partida["IND_DC"] or "").strip().upper()
 
                 pronta = LinhaDoRazao(
                     cnpj=indice.cnpj, conta=codigo,
-                    descricao=dados_da_conta.nome if dados_da_conta else "",
-                    conta_referencial=indice.referencial.get(codigo, ""),
+                    descricao=descricao, conta_referencial=referencial,
                     competencia=quando.replace(day=1).isoformat() if quando else "",
-                    data=quando.isoformat() if quando else lancamento["DT_LCTO"],
-                    numero=lancamento["NUM_LCTO"],
-                    valor_do_lancamento=_decimal(lancamento["VL_LCTO"]),
+                    data=quando.isoformat() if quando else lanc.data_crua.get(anterior, ""),
+                    numero=lanc.numero[anterior],
+                    valor_do_lancamento=lanc.valor[anterior],
                     centro_de_custo=partida["COD_CCUS"], valor=valor,
                     debito_ou_credito=lado, historico=partida["HIST"],
                     codigo_do_historico=partida["COD_HIST_PAD"],
                     participante=partida["COD_PART"],
-                    tipo=TIPO_DE_LANCAMENTO.get((lancamento["IND_LCTO"] or "").strip().upper(),
-                                                lancamento["IND_LCTO"]),
-                    saldo=ZERO, arquivo=os.path.basename(caminho))
+                    tipo=lanc.tipo[anterior],
+                    saldo=ZERO, arquivo=nome_do_arquivo)
 
                 saldo += pronta.movimento
                 pronta.saldo = saldo
@@ -450,6 +509,6 @@ def razao(caminho: str, indice: IndiceDaEcd, contas: list[str] | None = None,
                 yield pronta
 
     log.info("razão da ecd gerado", extra={
-        "arquivo": os.path.basename(caminho), "contas": len(alvos), "linhas": saiu,
+        "arquivo": nome_do_arquivo, "contas": len(alvos), "linhas": saiu,
         "orfas": orfas, "fora_do_periodo": fora, "sem_data": sem_data,
     })

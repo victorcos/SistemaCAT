@@ -198,6 +198,24 @@ que pedia 3,6 GB, passou a rodar em 143,9 MB. Duas observações que generalizam
   partida — leitura que a função já fazia. Trocar memória que não existe por
   leitura que existe não é troca difícil.
 
+**E o seek custa pela ordem, não pela quantidade.** Medido no mesmo arquivo,
+com duas amostras disjuntas de 150 mil posições da mesma conta: lidas em ordem
+de arquivo saem do buffer e praticamente não custam; embaralhadas custam **2,1
+ms cada**. É uma diferença de ordens de grandeza, e ela decide o desenho de
+qualquer leitura por posição.
+
+O corolário surpreende e está medido: **cortar a quantidade de seeks quase não
+adianta**. Guardar os campos do lançamento para a segunda passada ler só o
+I250 levou 13,4 milhões de seeks por arquivo para 354 mil — e rendeu **6%**,
+porque aqueles seeks já vinham do buffer (`readline` a 6 µs por chamada, que é
+custo de memória, não de disco).
+
+Onde o tempo realmente está, no leitor de SPED, é em **interpretar texto**:
+decodificar, quebrar em campos, montar dicionário, converter `Decimal`,
+construir o objeto da linha. São ~80 µs por linha e não há vilão único. Quem
+quiser atacar isso tem de atacar o objeto por linha — escrever colunas direto
+no parquet —, não os seeks.
+
 ## 7. Formato intermediário
 
 CSV é formato de **entrega**, não de trabalho. Entre etapas vale parquet: menor,
