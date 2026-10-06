@@ -5,6 +5,41 @@
 
 ---
 
+## 2026-10-06 — O número grande passou a dizer qual dos dois ele é
+
+A tese das contribuições tem **duas frentes**, e isso já estava escrito em três
+lugares — no motor, no serviço do front e no bloco do 680. Não estava no único
+lugar que importa: **ao lado do número que a pessoa lê**.
+
+O consolidado arredonda uma vez por grupo, com a alíquota efetiva do grupo; o
+detalhe item a item arredonda por linha, como o relatório do escritório
+anterior. Os dois não batem de propósito — 0,06% na base em que a regra foi
+medida, cerca de R$ 1,6 mil em R$ 2,7 milhões.
+
+Quem lê o número grande e vai conferir contra o 680 do escritório encontra essa
+diferença e vai procurar defeito onde não há. A explicação existia, mas **a uma
+rolagem dali**, no cartão da tese por item — que é onde ninguém passa antes de
+conferir.
+
+Agora o rótulo diz `· consolidado`, e logo abaixo do número vem o total do 680
+com a diferença e o percentual. Quando o detalhe não foi apurado na rodada, só
+se diz qual é este: comparar com um número que não existe seria pior que não
+comparar.
+
+### A mutação que passou, e o teste que faltava
+
+Os cinco primeiros testes renderizavam o componente isolado — e **arrancá-lo do
+cartão passou por todos eles**. Componente que existe não é componente que
+aparece: é a mesma classe de defeito dos "dois registros" de uma etapa, o
+código certo no lugar errado.
+
+O sexto teste renderiza o cartão inteiro e cobra a frase lá dentro. Com ele, a
+mesma mutação cai. Vale como regra para esta base: **todo componente novo numa
+tela precisa de um teste que o exercite pelo pai**, ou a fiação não está
+coberta.
+
+---
+
 ## 2026-10-06 — O mesmo classificador respondia diferente conforme quem perguntava
 
 Conferindo a descrição oficial da tese no MA contra o que o motor faz, apareceu

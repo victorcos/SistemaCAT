@@ -302,7 +302,10 @@ function EmCurso({ e }: { e: ExecucaoDasExclusoes }) {
 
 /* ------------------------------------------------------------------ */
 
-function Concluido({
+/** Exportado para o teste: provar que o componente existe não prova que ele
+ *  está na tela — a mutação que o arrancou do cartão passou por todos os
+ *  testes que o exercitavam isolado. */
+export function Concluido({
   execucao,
   resumo,
 }: {
@@ -326,7 +329,9 @@ function Concluido({
       {/* o número da tese, e o que ele custou de base */}
       <section className="flex flex-wrap items-stretch gap-4 rounded-cartao border border-borda bg-superficie p-6 shadow-cat">
         <div className="min-w-[280px] flex-1">
-          <Rotulo>Crédito no prazo, excluindo as contribuições da base</Rotulo>
+          <Rotulo>
+            Crédito no prazo, excluindo as contribuições da base · consolidado
+          </Rotulo>
           <p className="m-0 mt-1 font-mono text-[34px] font-extrabold leading-none text-sucesso">
             {dinheiro(resumo.total_atualizado ?? resumo.diferenca ?? "0")}
           </p>
@@ -335,6 +340,7 @@ function Concluido({
             {dinheiro(resumo.diferenca_cofins ?? "0")} de COFINS ·{" "}
             {dinheiro(resumo.selic ?? "0")} de Selic
           </p>
+          <QualDosDois resumo={resumo} />
           {mesDe(resumo.ate) && (
             <p className="m-0 mt-2 text-[12px] leading-relaxed text-texto-fraco">
               Corrigido pela Selic até{" "}
@@ -480,6 +486,60 @@ interface Tese {
    */
   mesmaTeseQue?: string;
 }
+
+/**
+ * Qual dos dois números este é — dito onde ele é lido.
+ *
+ * A tese das contribuições tem **duas frentes**: o consolidado, que arredonda
+ * uma vez por grupo com a alíquota efetiva do grupo, e o detalhe item a item,
+ * que arredonda por linha como o relatório 680 do escritório anterior. Os dois
+ * não batem, de propósito — arredondar milhões de itens um a um move o total,
+ * cerca de 0,06% na base em que a regra foi medida (decisão de 24/09/2026).
+ *
+ * A explicação já existia, mas **no bloco do 680, a uma rolagem daqui**. Quem
+ * lê o número grande e vai conferir contra o relatório do escritório não passa
+ * por ela — encontra uma diferença de alguns milhares de reais e vai procurar
+ * defeito onde não há. Dizer aqui é o que evita essa caçada.
+ *
+ * Quando o detalhe não foi apurado na rodada, só se diz qual é este. Inventar
+ * a comparação com um número que não existe seria pior que não compará-los.
+ */
+export function QualDosDois({ resumo }: { resumo: ResumoDasExclusoes }) {
+  const consolidado = Number(resumo.total_atualizado ?? resumo.diferenca ?? 0);
+  const porItem = Number(resumo.receita_por_item?.total_atualizado ?? 0);
+
+  if (!porItem || !consolidado) {
+    return (
+      <p className="m-0 mt-2 text-[12px] leading-relaxed text-texto-fraco">
+        Este é o <strong>consolidado</strong>: arredonda uma vez por grupo, com a alíquota
+        efetiva do próprio grupo. É o número que se pede.
+      </p>
+    );
+  }
+
+  const diferenca = porItem - consolidado;
+  const percentual = Math.abs(diferenca / consolidado) * 100;
+  return (
+    <p className="m-0 mt-2 text-[12px] leading-relaxed text-texto-fraco">
+      Este é o <strong>consolidado</strong> — arredonda uma vez por grupo, com a alíquota
+      efetiva do grupo, e é o número que se pede. O detalhe item a item, no leiaute do{" "}
+      <strong>680</strong>, soma <strong className="font-mono">{dinheiro(String(porItem))}</strong>
+      {": "}
+      {diferenca === 0 ? (
+        "os dois batem nesta base."
+      ) : (
+        <>
+          <strong className="font-mono">{dinheiro(String(Math.abs(diferenca)))}</strong>{" "}
+          {diferenca > 0 ? "a mais" : "a menos"} ({percentual.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2, maximumFractionDigits: 2,
+          })}
+          %). A diferença é o arredondamento — por grupo aqui, por linha lá — e é esperada.
+        </>
+      )}
+    </p>
+  );
+}
+
 
 const TESES: Tese[] = [
   {
