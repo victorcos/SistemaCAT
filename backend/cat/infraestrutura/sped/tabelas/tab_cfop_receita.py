@@ -34,6 +34,7 @@ feita a elas.
 from __future__ import annotations
 
 from cat.infraestrutura.sped.tabelas import (
+    tab_cfop,
     tab_cfop_natureza_credito,
     tab_cfop_natureza_operacao,
 )
@@ -52,8 +53,29 @@ def classificacao_do_cfop(cfop: str) -> str:
 
     Vazio significa fora das teses de exclusão: elas são sobre a **receita**, e
     o que não é venda nem devolução de venda não compõe receita.
+
+    **A descrição oficial entra na pergunta, e isso não é detalhe.** Até
+    06/10/2026 esta função perguntava a natureza passando descrição **vazia**,
+    e `tab_cfop_natureza_operacao` só sabe responder sem descrição os CFOP que
+    estão na sua tabela medida — 21, do gabarito de uma base distribuidora, dos
+    quais **seis** são venda. Tudo o mais caía como "fora da receita".
+
+    O efeito: num cliente industrial, o 5101 e o 6101 — venda de produção do
+    próprio estabelecimento — ficavam inteiros fora da tese. A conta saía
+    esvaziada, e o contador do resumo dizia "CFOP fora da receita" para o
+    faturamento principal da empresa.
+
+    O 047 nunca teve esse problema porque sempre passou a descrição
+    (`sped/saidas.py::_da_operacao`). Era o **mesmo classificador** respondendo
+    diferente conforme quem perguntava.
+
+    Com a descrição, a regra vira a do MA: ele escreve a natureza pela operação,
+    e o gabarito mostrou que 20 dos 21 CFOP sairiam certos só pelo começo da
+    descrição. A tabela medida continua mandando — é ela que guarda a exceção
+    (o 5209, que o MA classifica pela operação original, não pela do retorno).
     """
-    if tab_cfop_natureza_operacao.natureza(cfop, "") == tab_cfop_natureza_operacao.VENDA:
+    descricao = tab_cfop.descricao_por_extenso(cfop)
+    if tab_cfop_natureza_operacao.natureza(cfop, descricao) == tab_cfop_natureza_operacao.VENDA:
         return FATURAMENTO
     if tab_cfop_natureza_credito.codigo(cfop) == _DEVOLUCAO_DE_VENDA:
         return DEVOLUCAO_DE_FATURAMENTO

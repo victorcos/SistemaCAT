@@ -5,6 +5,67 @@
 
 ---
 
+## 2026-10-06 — O mesmo classificador respondia diferente conforme quem perguntava
+
+Conferindo a descrição oficial da tese no MA contra o que o motor faz, apareceu
+um defeito que estava à vista e ninguém tinha olhado.
+
+`tab_cfop_receita.classificacao_do_cfop` é **o filtro comum das quatro teses de
+exclusão**. Ele pergunta a natureza da operação a `tab_cfop_natureza_operacao`
+— e perguntava passando a descrição do CFOP **vazia**. Sem descrição, aquela
+tabela só sabe responder pelos 21 CFOP que ela mediu, e desses apenas **seis**
+são venda: 5102, 5403, 5405, 6102, 6403 e 6404.
+
+**O efeito:** num cliente industrial, o 5101 e o 6101 — venda de produção do
+próprio estabelecimento — caíam inteiros em "CFOP fora da receita". A tese saía
+esvaziada, e o contador do resumo acusava como "fora" o faturamento principal
+da empresa.
+
+O relatório 047 nunca teve o problema: `sped/saidas.py::_da_operacao` sempre
+passou a descrição. Era o **mesmo classificador respondendo diferente conforme
+quem perguntava** — e a diferença não aparecia em teste nenhum, porque o
+gabarito que validou a tabela vinha de uma base distribuidora, cujos 21 CFOP
+estão todos nela.
+
+### A correção é a lógica do MA, não uma invenção nossa
+
+O MA escreve a natureza pela operação, e o próprio gabarito mostrou que **20
+dos 21 CFOP sairiam certos só pelo começo da descrição oficial**. A tabela
+medida existe para a exceção: o 5209, que o MA classifica como Transferência —
+pela natureza da operação **original**, não pela do retorno.
+
+Então a ordem certa é a que já estava escrita no módulo e não estava sendo
+usada: a tabela medida manda, a descrição responde pelo resto. Agora
+`classificacao_do_cfop` passa `tab_cfop.descricao_por_extenso(cfop)`, como o
+047 sempre fez.
+
+### O alcance, medido
+
+Dos 541 CFOP da tabela oficial, **85 mudaram de classificação — todos de "fora"
+para "Faturamento"**, 76 deles de saída. Nenhum foi no sentido contrário: a
+mudança só acrescenta receita reconhecida, então nenhum crédito já calculado
+encolhe.
+
+O que **continua fora**, e é o que os testes prendem:
+
+* **o X929** — a nota que duplica um cupom do ECF (OBS 2 do MA). Entrar aqui
+  contaria a mesma receita duas vezes;
+* **o 5209** — a tabela medida vence a descrição, que diria "Devolução";
+* **a devolução de compra** (5202) — estorno de entrada, não de receita;
+* remessa, transferência e "outras saídas".
+
+As exportações (7xxx) passam a classificar como venda, que é a leitura do MA —
+e na prática o filtro de CST as derruba, por serem isentas ou sem incidência.
+
+### O que isto não é
+
+Não é a correção da inflação relatada. Esta vai na direção **oposta**: ela
+aumenta a receita reconhecida. A inflação tem outra causa — a contribuição
+somada por grupo é a **bruta**, antes dos ajustes redutores do M220/M620 —, e
+depende do bloco M, que passou a viajar com o agregado em v0.148.0.
+
+---
+
 ## 2026-10-06 — Atacar os seeks do razão, e descobrir que não eram eles
 
 Sequência do dia anterior. Com a memória resolvida (1.237 → 48 bytes por

@@ -42,6 +42,7 @@ from cat.infraestrutura.sped.registros import CAMPOS
 from cat.infraestrutura.sped.tabelas.tab_cfop_receita import (
     DEVOLUCAO_DE_FATURAMENTO,
     FATURAMENTO,
+    classificacao_do_cfop,
 )
 
 MATRIZ = "11222333000181"
@@ -236,6 +237,56 @@ class TestQuemEntra:
     def test_o_f100_de_aquisicao_fica_fora(self, linhas):
         """Sem CFOP para perguntar, o IND_OPER é quem diz o sentido."""
         assert not [l for l in linhas if l.registro == RAMO_F100 and l.cst == "50"]
+
+
+class TestOCfopQueCompoeReceita:
+    """Quais CFOP a tese reconhece como faturamento — e por que importa.
+
+    Até 06/10/2026 `classificacao_do_cfop` perguntava a natureza da operação
+    **sem passar a descrição do CFOP**. Sem ela, `tab_cfop_natureza_operacao`
+    só sabe responder pelos 21 CFOP da tabela medida, e desses apenas **seis**
+    são venda. Resultado: num cliente industrial, o 5101 e o 6101 — venda de
+    produção do próprio estabelecimento — caíam inteiros em "CFOP fora da
+    receita", e a tese saía esvaziada.
+
+    O relatório 047 nunca teve o problema, porque sempre passou a descrição
+    (`sped/saidas.py::_da_operacao`): era o mesmo classificador respondendo
+    diferente conforme quem perguntava.
+
+    Estes testes prendem os dois lados — o que passou a entrar e, sobretudo, o
+    que **não pode** entrar junto.
+    """
+
+    def test_a_venda_de_producao_propria_entra(self):
+        """O CFOP central da indústria. É o que estava faltando."""
+        assert classificacao_do_cfop("5101") == FATURAMENTO
+        assert classificacao_do_cfop("6101") == FATURAMENTO
+
+    def test_as_outras_vendas_da_familia_tambem(self):
+        for cfop in ("5103", "5104", "5105", "5109", "5110", "5116", "5117"):
+            assert classificacao_do_cfop(cfop) == FATURAMENTO, cfop
+
+    def test_o_cfop_do_ecf_continua_fora(self):
+        """**OBS 2 do MA.** O X929 é a nota que duplica um cupom já registrado
+        no ECF. Entrar aqui contaria a mesma receita duas vezes."""
+        for cfop in ("5929", "6929", "1929", "2929"):
+            assert classificacao_do_cfop(cfop) == "", cfop
+
+    def test_a_tabela_medida_vence_a_descricao(self):
+        """O 5209 começa com "Devol" e o MA o classifica como **Transferência**,
+        pela natureza da operação original. É a exceção que faz a tabela medida
+        existir — ver `tab_cfop_natureza_operacao`. Se a descrição passasse na
+        frente dela, esta devolução viraria receita."""
+        assert classificacao_do_cfop("5209") == ""
+
+    def test_devolucao_de_compra_nao_e_devolucao_de_venda(self):
+        """Estorno de uma entrada, não de uma receita: não compõe faturamento."""
+        assert classificacao_do_cfop("5202") == ""
+        assert classificacao_do_cfop("1202") == DEVOLUCAO_DE_FATURAMENTO
+
+    def test_remessa_e_transferencia_seguem_fora(self):
+        for cfop in ("5901", "5910", "5152", "5949"):
+            assert classificacao_do_cfop(cfop) == "", cfop
 
 
 class TestAConta:
