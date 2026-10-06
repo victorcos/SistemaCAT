@@ -5,6 +5,12 @@ dos mesmos números. O que o teste cobra é a ida e a volta sem perda — e, em
 especial, que o registro **sem linha de documento** sobreviva: é justamente ele
 (C601, D350 e companhia) que a tese precisa contar para avisar que ficou
 receita de fora.
+
+Desde 06/10/2026 o **bloco M** vai junto, e a ida e a volta dele é cobrada aqui
+pelo mesmo motivo: sem os ajustes do M220/M620 a tese soma a contribuição bruta
+dos grupos, e sem o M200/M600 ela não sabe quanto do débito virou DARF e quanto
+foi quitado com crédito. Os dois buracos apareceram numa base real, como um
+"excluído da base" maior que a contribuição escriturada.
 """
 
 from __future__ import annotations
@@ -20,6 +26,86 @@ def _apuracao(**campos) -> ApuracaoEFD:
                 cnpj=CNPJ, periodo="2021-09")
     base.update(campos)
     return ApuracaoEFD(**base)
+
+
+class TestOBlocoM:
+    """A apuração que o cliente declarou, que até 06/10/2026 ficava de fora."""
+
+    # o M210 do PIS como o arquivo escreve: campos vazios no meio, e é assim
+    # que têm de voltar — um "" virando ausente desloca todo o resto do leiaute
+    M210 = ["M210", "01", "1000000", "1000000", "", "", "1000000", "1,65",
+            "", "", "16500", "", "500", "", "", "16000"]
+    M200 = ["M200", "16000", "4000", "0", "12000", "0", "0", "12000",
+            "0", "0", "0", "0", "12000"]
+
+    def test_os_registros_voltam_iguais_e_na_ordem(self, tmp_path):
+        registros = {"M200": [self.M200],
+                     "M210": [self.M210, ["M210", "02"] + self.M210[2:]]}
+        gravar([_apuracao(registros=registros)], str(tmp_path))
+
+        (voltou,) = ler(str(tmp_path))
+
+        assert voltou.registros == registros, "campo vazio e ordem inclusive"
+
+    def test_o_campo_vazio_no_fim_nao_some(self, tmp_path):
+        """`"a|b|"` e `"a|b"` são leiautes diferentes: o último campo existe e
+        está vazio. Perder isso desalinharia a leitura de quem contar posições."""
+        registros = {"M400": [["M400", "04", "1000", "", ""]]}
+        gravar([_apuracao(registros=registros)], str(tmp_path))
+
+        (voltou,) = ler(str(tmp_path))
+
+        assert voltou.registros["M400"][0] == ["M400", "04", "1000", "", ""]
+
+    def test_os_ajustes_voltam_somados_por_codigo(self, tmp_path):
+        ajustes = {("M220", "0", "01"): 150_000, ("M620", "1", "02"): -47_350,
+                   ("M110", "0", "03"): 900}
+        gravar([_apuracao(ajustes=ajustes)], str(tmp_path))
+
+        (voltou,) = ler(str(tmp_path))
+
+        assert voltou.ajustes == ajustes, "o negativo é redutor, e tem de sobreviver"
+
+    def test_arquivo_so_com_bloco_m_nao_some_da_lista(self, tmp_path):
+        """Um SPED sem documento que a leitura cubra existe só aqui. Se apenas
+        os documentos criassem o agregado, ele sumiria com a apuração dentro."""
+        gravar([_apuracao(documentos={}, contagens={},
+                          registros={"M200": [self.M200]})], str(tmp_path))
+
+        (voltou,) = ler(str(tmp_path))
+
+        assert voltou.registros["M200"] == [self.M200]
+
+    def test_agregado_gravado_antes_da_mudanca_volta_sem_bloco_m(self, tmp_path):
+        """Compatibilidade: pasta de execução antiga não tem os dois parquets
+        novos. Volta sem bloco M — que é o que as teses viam — em vez de quebrar."""
+        import os
+
+        gravar([_apuracao(
+            documentos={("PIS", "C170", "S", "01", "5102", "", "1,65"): [10, 10, 1, 0, 1]},
+            registros={"M200": [self.M200]}, ajustes={("M220", "0", "01"): 1},
+        )], str(tmp_path))
+        os.remove(tmp_path / "apuracao_efd.parquet")
+        os.remove(tmp_path / "ajustes_efd.parquet")
+
+        (voltou,) = ler(str(tmp_path))
+
+        assert voltou.documentos, "os documentos continuam vindo"
+        assert voltou.registros == {} and voltou.ajustes == {}
+
+    def test_dois_arquivos_nao_misturam_a_apuracao(self, tmp_path):
+        """Cada competência tem o seu M200. Misturá-los somaria débito de meses
+        diferentes — e é o tipo de erro que passa despercebido num total."""
+        janeiro = _apuracao(periodo="2021-01", arquivo="C:/base/a.txt",
+                            registros={"M200": [["M200", "100"]]})
+        fevereiro = _apuracao(periodo="2021-02", arquivo="C:/base/b.txt",
+                              registros={"M200": [["M200", "200"]]})
+        gravar([janeiro, fevereiro], str(tmp_path))
+
+        voltaram = {a.periodo: a for a in ler(str(tmp_path))}
+
+        assert voltaram["2021-01"].registros["M200"] == [["M200", "100"]]
+        assert voltaram["2021-02"].registros["M200"] == [["M200", "200"]]
 
 
 def test_ida_e_volta_preserva_chave_e_somas(tmp_path):
