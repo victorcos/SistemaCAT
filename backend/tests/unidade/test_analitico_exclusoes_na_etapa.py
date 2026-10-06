@@ -244,6 +244,56 @@ class TestOAndamento:
         assert not sobram, f"nomes de fase que ninguém emite: {sorted(sobram)}"
 
 
+class TestUmaTeseQueCaiNaoLevaAsOutras:
+    """**O defeito de 06/10/2026.** Uma base com estabelecimento em GO derrubou
+    a rodada inteira com `AliquotaDesconhecida` — e o cliente ficou sem o número
+    de PIS/COFINS, que é o que ele tinha ido buscar.
+
+    A recusa da tabela está certa: ela existe para não adivinhar alíquota
+    interna, e a mensagem diz como conferir. O errado era o alcance. As quatro
+    teses são pedidos diferentes, com fundamentos diferentes — o módulo repete
+    isso em todo lugar, e é por isso que elas nunca se somam num número só.
+    Faltar a alíquota de um estado impede o ICMS-ST e **só ele**.
+    """
+
+    def test_sem_aliquota_interna_as_outras_teses_saem(self, tmp_path, monkeypatch):
+        from cat.infraestrutura.analitico import exclusao_do_icms_st
+        from cat.infraestrutura.sped.tabelas.tab_aliquota_icms import AliquotaDesconhecida
+
+        def recusa(*_, **__):
+            raise AliquotaDesconhecida("A alíquota interna de GO não está conferida.")
+
+        monkeypatch.setattr(exclusao_do_icms_st, "apurar", recusa)
+        sped = tmp_path / "contribuicoes.txt"
+        sped.write_bytes(EFD.encode("cp1252"))
+
+        resumo = exclusoes.apurar([str(sped)], str(tmp_path / "saida"), ate=ATE,
+                                  referencia=REFERENCIA)
+
+        assert resumo.icms_st == {}, "a tese sem tabela não sai"
+        assert resumo.icms, "a do ICMS não tem nada com isso"
+        assert resumo.iss, "a do ISS tampouco"
+        assert resumo.receita_por_item, "e o 680 é o que o cliente foi buscar"
+        assert any("ICMS-ST" in a and "GO" in a for a in resumo.avisos), (
+            f"o motivo tem de chegar à tela; avisos: {resumo.avisos}")
+
+    def test_o_numero_consolidado_sobrevive(self, tmp_path, monkeypatch):
+        """A tese 1 consolidada nem passa por aqui — mas passava a derrubada."""
+        from cat.infraestrutura.analitico import exclusao_do_icms_st
+        from cat.infraestrutura.sped.tabelas.tab_aliquota_icms import AliquotaDesconhecida
+
+        monkeypatch.setattr(exclusao_do_icms_st, "apurar",
+                            lambda *a, **k: (_ for _ in ()).throw(
+                                AliquotaDesconhecida("GO não conferida")))
+        sped = tmp_path / "contribuicoes.txt"
+        sped.write_bytes(EFD.encode("cp1252"))
+
+        resumo = exclusoes.apurar([str(sped)], str(tmp_path / "saida"), ate=ATE,
+                                  referencia=REFERENCIA)
+
+        assert resumo.base > 0 and resumo.excluido > 0
+
+
 class TestOPacote:
     """O botão que entrega tudo de uma vez.
 

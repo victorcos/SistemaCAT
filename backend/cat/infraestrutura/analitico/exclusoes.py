@@ -59,6 +59,7 @@ from cat.infraestrutura.analitico import (
 )
 from cat.infraestrutura.analitico.escrita import LeituraCancelada
 from cat.infraestrutura.sped.tabelas import tab_selic
+from cat.infraestrutura.sped.tabelas.tab_aliquota_icms import AliquotaDesconhecida
 from cat.infraestrutura.sped.tabelas.tab_selic import SelicDesconhecida
 from cat.infraestrutura.exclusoes.piscofins_na_propria_base import calcular
 from cat.infraestrutura.gestao.agregador import agregar_efd
@@ -392,40 +393,90 @@ def _apurar_por_item(contribuicoes: list[str], destino: str, resumo: Resumo,
 
     comum = {"ate": ate, "deve_parar": deve_parar, "referencia": referencia,
              "mensal": mensal}
+
+    def tentar(rotulo: str, funcao):
+        """Roda uma tese; **recusa de tabela vira aviso, não queda.**
+
+        As quatro são pedidos diferentes, com fundamentos diferentes — o módulo
+        repete isso em todo lugar, e é por isso que elas nunca se somam num
+        número só. Então faltar a alíquota interna de um estado impede o ICMS-ST
+        e **só ele**: derrubar junto a tese da receita, que não usa alíquota de
+        ICMS para nada, é perder três apurações por causa de uma tabela.
+
+        Medido em 06/10/2026, numa base com estabelecimento em GO: a rodada
+        inteira falhou com `AliquotaDesconhecida`, e o cliente ficou sem o
+        número de PIS/COFINS — que é o que ele tinha ido buscar.
+
+        O que **não** se engole aqui é cancelamento (sobe) nem Selic
+        desconhecida (sobe de dentro da tese, de propósito: ali o número sairia
+        menor que o devido, calado).
+        """
+        try:
+            return funcao()
+        except LeituraCancelada:
+            raise
+        except AliquotaDesconhecida as erro:
+            resumo.avisos.append(f"{rotulo} não foi apurada. {erro}")
+            log.warning("tese por item sem tabela para rodar",
+                        extra={"tese": rotulo, "motivo": str(erro)[:300]})
+            return None
+
     try:
-        da_receita = exclusao_piscofins_na_base.apurar(
-            contribuicoes, destino, avisar=andando(FASE_DA_RECEITA_POR_ITEM),
-            **comum)
+        da_receita = tentar(
+            "A exclusão das contribuições item a item (680)",
+            lambda: exclusao_piscofins_na_base.apurar(
+                contribuicoes, destino, avisar=andando(FASE_DA_RECEITA_POR_ITEM),
+                **comum))
 
-        do_icms = exclusao_do_icms.apurar(
-            contribuicoes, destino, avisar=andando(FASE_DO_ICMS), **comum)
+        do_icms = tentar(
+            "A exclusão do ICMS da base (Tema 69, relatório 903)",
+            lambda: exclusao_do_icms.apurar(
+                contribuicoes, destino, avisar=andando(FASE_DO_ICMS), **comum))
 
-        # a alíquota por produto que foge da regra do estado, dos
-        # estabelecimentos que este lote tem. Ver `infraestrutura/aliquotas`
-        excecoes = _excecoes_dos(do_icms.estabelecimentos)
-        do_icms_st = exclusao_do_icms_st.apurar(
-            contribuicoes, destino, avisar=andando(FASE_DO_ICMS_ST),
-            excecoes=excecoes, **comum)
+        if do_icms is None:
+            # as exceções saem dos estabelecimentos que o ICMS descobriu; sem
+            # elas o ICMS-ST sairia pela regra do estado e ninguém saberia
+            resumo.avisos.append(
+                "A exclusão do ICMS-ST da base (839) não foi apurada: ela "
+                "depende dos estabelecimentos que a tese do ICMS levanta, e "
+                "aquela não rodou.")
+            do_icms_st = None
+        else:
+            # a alíquota por produto que foge da regra do estado, dos
+            # estabelecimentos que este lote tem. Ver `infraestrutura/aliquotas`
+            excecoes = _excecoes_dos(do_icms.estabelecimentos)
+            do_icms_st = tentar(
+                "A exclusão do ICMS-ST da base (relatório 839)",
+                lambda: exclusao_do_icms_st.apurar(
+                    contribuicoes, destino, avisar=andando(FASE_DO_ICMS_ST),
+                    excecoes=excecoes, **comum))
 
-        do_iss = exclusao_do_iss.apurar(
-            contribuicoes, destino, avisar=andando(FASE_DO_ISS), **comum)
+        do_iss = tentar(
+            "A exclusão do ISS da base (relatório 933)",
+            lambda: exclusao_do_iss.apurar(
+                contribuicoes, destino, avisar=andando(FASE_DO_ISS), **comum))
     except LeituraCancelada as erro:
         # a etapa conhece o nome dela, não o da leitura
         raise ExclusaoCancelada("apuração das exclusões cancelada a pedido") from erro
 
-    resumo.receita_por_item = exclusao_piscofins_na_base.serializar(da_receita)
-    resumo.icms = exclusao_do_icms.serializar(do_icms)
-    resumo.icms_st = exclusao_do_icms_st.serializar(do_icms_st)
-    resumo.iss = exclusao_do_iss.serializar(do_iss)
+    if da_receita is not None:
+        resumo.receita_por_item = exclusao_piscofins_na_base.serializar(da_receita)
+    if do_icms is not None:
+        resumo.icms = exclusao_do_icms.serializar(do_icms)
+    if do_icms_st is not None:
+        resumo.icms_st = exclusao_do_icms_st.serializar(do_icms_st)
+    if do_iss is not None:
+        resumo.iss = exclusao_do_iss.serializar(do_iss)
     for resultado in (da_receita, do_icms, do_icms_st, do_iss):
-        resumo.avisos.extend(resultado.avisos)
+        if resultado is not None:
+            resumo.avisos.extend(resultado.avisos)
 
     # o detalhe da receita fica fora do agregado de propósito: ver o docstring
-    return {
-        exclusao_do_icms.TESE_ICMS_NA_BASE: do_icms,
-        exclusao_do_icms_st.TESE_ICMS_ST_NA_BASE: do_icms_st,
-        exclusao_do_iss.TESE_ISS_NA_BASE: do_iss,
-    }
+    return {nome: r for nome, r in (
+        (exclusao_do_icms.TESE_ICMS_NA_BASE, do_icms),
+        (exclusao_do_icms_st.TESE_ICMS_ST_NA_BASE, do_icms_st),
+        (exclusao_do_iss.TESE_ISS_NA_BASE, do_iss),
+    ) if r is not None}
 
 
 def _excecoes_dos(estabelecimentos: list[str]) -> dict:
