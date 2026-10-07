@@ -17,7 +17,11 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { BlocoDaTese, Concluido, QualDosDois, TESES } from "./Exclusoes";
-import type { ExecucaoDasExclusoes, ResumoDasExclusoes } from "@/services/exclusoes";
+import type {
+  ExecucaoDasExclusoes,
+  LinhaDaCompetencia,
+  ResumoDasExclusoes,
+} from "@/services/exclusoes";
 
 function resumo(parcial: Partial<ResumoDasExclusoes> = {}): ResumoDasExclusoes {
   return { total_atualizado: "100000.00", ...parcial } as ResumoDasExclusoes;
@@ -165,5 +169,61 @@ describe("os três estados de uma tese por item", () => {
       expect(tese.semNada.length).toBeGreaterThan(10);
       expect(tese.semNada).not.toBe(tese.semRodar);
     }
+  });
+});
+
+describe("a composição da tela", () => {
+  /**
+   * O desenho pedido em 07/10/2026: três blocos, cada um com as suas ações à
+   * direita — gerar a apuração, o consolidado, e as exclusões à parte. Antes
+   * eram oito seções empilhadas sem hierarquia, com duas tabelas de 64 linhas
+   * abertas no meio do caminho.
+   */
+  const execucao = { id: 1, situacao: "concluida" } as ExecucaoDasExclusoes;
+
+  /** Uma linha de competência com todos os campos que a tabela lê — sem algum
+   *  deles o teste quebra por falta de fixture, não por defeito do código. */
+  const mes = (competencia: string): LinhaDaCompetencia => ({
+    competencia, prescrita: false, grupos: 10,
+    base: "1000.00", excluido: "92.50", pis: "16.50", cofins: "76.00",
+    pis_novo: "14.97", cofins_novo: "68.97",
+    diferenca_pis: "1.53", diferenca_cofins: "7.03", diferenca: "8.56",
+    selic: "1.00", total_atualizado: "9.56", selic_acumulada: "11.68",
+  });
+
+  function completo() {
+    return resumo({
+      total_atualizado: "2700000.00",
+      grupos: 646,
+      por_competencia: [mes("2021-09"), mes("2021-10")],
+      fora: { "CFOP fora da receita": 10421 },
+      receita_por_item: { linhas: 30836472, total_atualizado: "10649964.82" } as never,
+      iss: { linhas: 0, total_atualizado: "0" } as never,
+    });
+  }
+
+  it("os dois blocos têm nome: consolidado e exclusões à parte", () => {
+    render(<Concluido execucao={execucao} resumo={completo()} />);
+
+    expect(screen.getByText("Consolidado")).toBeTruthy();
+    expect(screen.getByText("Exclusões à parte")).toBeTruthy();
+  });
+
+  it("as tabelas mês a mês ficam dobradas, não abertas", () => {
+    const { container } = render(<Concluido execucao={execucao} resumo={completo()} />);
+
+    const dobras = container.querySelectorAll("details");
+    expect(dobras.length).toBeGreaterThan(0);
+    // nenhuma aberta por padrão: era isso que empurrava o número para fora da tela
+    for (const d of dobras) expect(d.hasAttribute("open")).toBe(false);
+  });
+
+  it("a dobra do consolidado diz quantas competências esconde", () => {
+    render(<Concluido execucao={execucao} resumo={completo()} />);
+
+    // dentro da dobra certa: outras teses têm a sua, e todas contam competências
+    const resumoDaDobra = screen.getByText(/O consolidado mês a mês/).closest("summary");
+
+    expect(resumoDaDobra?.textContent).toMatch(/2 competências/);
   });
 });

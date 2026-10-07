@@ -14,7 +14,7 @@ import {
 import { TrabalhoParado } from "@/components/shared/TrabalhoParado";
 import { Aviso } from "@/components/ui/Aviso";
 import { Botao } from "@/components/ui/Botao";
-import { CabecalhoDePagina, Voltar } from "@/components/ui/Pagina";
+import { CabecalhoDePagina, Secao, Voltar } from "@/components/ui/Pagina";
 import { IconeBaixar, IconeParar, IconeTentarDeNovo } from "@/constants/icons";
 import { INTERVALO_POLL_MS } from "@/constants/polling";
 import { ROTAS } from "@/constants/routes";
@@ -209,9 +209,9 @@ export default function Exclusoes() {
       <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
 
       <CabecalhoDePagina
-        eyebrow="PIS/COFINS · Exclusões"
+        eyebrow="PIS/COFINS · Exclusões · gerar apuração"
         titulo="Exclusões da base"
-        sub="A receita embute o PIS e a COFINS, e receita não é imposto. Excluindo as duas da base de cada uma, a contribuição é recalculada grupo a grupo — registro, CST e CFOP dentro da competência — e a diferença é o que volta. Vale só no débito: o crédito das aquisições fica como está."
+        sub="A receita embute o PIS e a COFINS, e receita não é imposto. Excluindo as duas da base de cada uma, a contribuição é recalculada e a diferença é o que volta. Vale só no débito: o crédito das aquisições fica como está."
         acao={
           <div className="flex flex-col items-end gap-2.5">
             {acao}
@@ -276,6 +276,56 @@ export default function Exclusoes() {
 
 /* ------------------------------------------------------------------ */
 
+/**
+ * Uma dobra: o detalhe que existe, mas não ocupa a tela até alguém pedir.
+ *
+ * A tela das exclusões tinha **oito seções empilhadas sem hierarquia** — o
+ * consolidado, o que ficou de fora, uma tabela mês a mês de 64 linhas, e depois
+ * quatro teses, cada uma com *outra* tabela de 64 linhas. Quem abria procurando
+ * um número rolava por centenas de linhas de tabela para achá-lo.
+ *
+ * As tabelas não sobram: elas é que provam o total, e quem confere contra o
+ * escritório anterior precisa delas. O que sobrava era elas estarem **abertas
+ * por padrão**. Aqui ficam fechadas, com a contagem no rótulo — quem quer, abre.
+ *
+ * `<details>` nativo de propósito: ele já faz teclado, leitor de tela e o
+ * "procurar na página" do navegador, que uma dobra feita à mão perde.
+ */
+function Dobra({
+  titulo,
+  quantas,
+  children,
+}: {
+  titulo: string;
+  quantas?: number;
+  children: ReactNode;
+}) {
+  return (
+    <details className="group rounded-raio-g border border-borda bg-superficie-vidro">
+      <summary
+        className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-[13px]
+                   font-semibold text-texto-suave hover:text-texto
+                   focus-visible:outline-2 focus-visible:outline-offset-2
+                   focus-visible:outline-borda-foco"
+      >
+        <span
+          aria-hidden
+          className="inline-block transition-transform duration-150 group-open:rotate-90"
+        >
+          ›
+        </span>
+        {titulo}
+        {quantas !== undefined && (
+          <span className="font-mono text-[11px] font-normal text-texto-fraco">
+            {numero(quantas)} {quantas === 1 ? "competência" : "competências"}
+          </span>
+        )}
+      </summary>
+      <div className="border-t border-borda">{children}</div>
+    </details>
+  );
+}
+
 function EmCurso({ e }: { e: ExecucaoDasExclusoes }) {
   const lidos = e.resumo?.andamento?.arquivos ?? e.arquivos_lidos ?? 0;
   const total = e.arquivos_totais ?? 0;
@@ -326,8 +376,24 @@ export function Concluido({
 
   return (
     <>
-      {/* o número da tese, e o que ele custou de base */}
-      <section className="flex flex-wrap items-stretch gap-4 rounded-cartao border border-borda bg-superficie p-6 shadow-cat">
+      {/* **O consolidado, com o seu nome.** Antes era só um número grande solto
+          no topo de uma pilha — e quem chegava nele não sabia que havia outras
+          quatro teses abaixo, nem que este era o que se pede. */}
+      <Secao
+        titulo="Consolidado"
+        sub="A tese das próprias contribuições fora da base, somada por grupo — registro, CST e CFOP dentro da competência. É este o número que se pede."
+        destaque
+        acao={
+          <BaixarPlanilha
+            aoBaixar={baixar}
+            desabilitado={vazia}
+            rotulo="Baixar o consolidado"
+            baixando={baixando}
+            aoCancelar={download.cancelar}
+          />
+        }
+      >
+      <section className="mt-4 flex flex-wrap items-stretch gap-4">
         <div className="min-w-[280px] flex-1">
           <Rotulo>
             Crédito no prazo, excluindo as contribuições da base · consolidado
@@ -367,18 +433,9 @@ export function Concluido({
         </dl>
 
         <div className="flex min-w-[260px] flex-col items-end justify-between gap-3">
-          <div className="flex flex-col items-end gap-2">
-            {/* o pacote subiu para o cabeçalho, junto do botão que roda a
-                etapa: ver `BaixarPacote`. Aqui fica o consolidado, que é o
-                download rápido e o único que se pede sozinho */}
-            <BaixarPlanilha
-              aoBaixar={baixar}
-              desabilitado={vazia}
-              rotulo="Só o consolidado"
-              baixando={baixando}
-              aoCancelar={download.cancelar}
-            />
-          </div>
+          {/* o botão deste bloco subiu para a direita do título — ver o `acao`
+              da `Secao` acima. Aqui fica só o que ele precisa dizer antes de
+              alguém baixar */}
           <p className="m-0 max-w-[36ch] text-right text-[11px] leading-relaxed text-texto-fraco">
             O consolidado sai na hora: uma linha por grupo, e somar a coluna da diferença dá
             exatamente este total. As quatro teses item a item — 680, 903, 839 e 933, no leiaute
@@ -401,7 +458,7 @@ export function Concluido({
       {/* o que ficou de fora vem antes da tabela de propósito: é o que decide
           se o número acima pode ser assinado */}
       {(fora.length > 0 || (resumo.avisos?.length ?? 0) > 0) && (
-        <section className="rounded-cartao border border-borda bg-superficie-vidro p-6">
+        <section className="mt-4 rounded-raio-g border border-borda bg-superficie-vidro p-4">
           <Rotulo>O que a conta não incluiu</Rotulo>
           {fora.length > 0 && (
             <ul className="m-0 mt-3 flex list-none flex-col gap-1.5 p-0">
@@ -434,16 +491,33 @@ export function Concluido({
         </section>
       )}
 
-      <PorCompetencia linhas={linhas} />
+        <div className="mt-4">
+          <Dobra titulo="O consolidado mês a mês" quantas={linhas.length}>
+            <PorCompetencia linhas={linhas} />
+          </Dobra>
+        </div>
+      </Secao>
 
-      {TESES.map((tese) => (
-        <BlocoDaTese
-          key={tese.alvo}
-          execucao={execucao}
-          tese={tese}
-          dados={resumo[tese.campo]}
-        />
-      ))}
+      {/* **As exclusões à parte, num bloco só.** Até 07/10/2026 as quatro teses
+          ficavam soltas na mesma pilha do consolidado, cada uma com a sua tabela
+          aberta — e nada dizia que eram outra coisa. São pedidos diferentes, com
+          fundamentos diferentes, e um título em volta é o que diz isso sem
+          precisar de parágrafo. */}
+      <Secao
+        titulo="Exclusões à parte"
+        sub="Cada uma é um pedido próprio, com fundamento próprio — e por isso elas nunca se somam num número só. Em cada bloco dá para baixar a exclusão detalhada, item a item, no leiaute em que o escritório anterior exporta."
+      >
+        <div className="mt-4 flex flex-col gap-4">
+          {TESES.map((tese) => (
+            <BlocoDaTese
+              key={tese.alvo}
+              execucao={execucao}
+              tese={tese}
+              dados={resumo[tese.campo]}
+            />
+          ))}
+        </div>
+      </Secao>
     </>
   );
 }
@@ -725,7 +799,10 @@ export function BlocoDaTese({
 
       {download.erro && <Aviso titulo={download.erro.message} codigo={download.erro.requisicaoId} />}
 
-      <PorCompetenciaDaTese tese={tese} linhas={icms.por_competencia ?? []} />
+      <Dobra titulo={`${tese.imposto} mês a mês`}
+             quantas={(icms.por_competencia ?? []).length}>
+        <PorCompetenciaDaTese tese={tese} linhas={icms.por_competencia ?? []} />
+      </Dobra>
     </>
   );
 }
