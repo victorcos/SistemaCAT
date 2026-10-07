@@ -476,6 +476,9 @@ interface Tese {
   /** o título da faixa quando a tese não rodou — frase inteira, porque
    *  "O as contribuições fora da base não foi apurado" não é português */
   semRodar: string;
+  /** e o título quando ela rodou e não achou nada. Outra frase, porque é outra
+   *  coisa: uma é trabalho que falta, a outra é resposta */
+  semNada: string;
   /**
    * **A outra frente da mesma tese**, dita em voz alta na tela.
    *
@@ -541,7 +544,7 @@ export function QualDosDois({ resumo }: { resumo: ResumoDasExclusoes }) {
 }
 
 
-const TESES: Tese[] = [
+export const TESES: Tese[] = [
   {
     campo: "receita_por_item",
     alvo: "receita-por-item",
@@ -550,6 +553,7 @@ const TESES: Tese[] = [
     excluido: "Contribuições excluídas",
     rotulo: "As contribuições fora da própria base, item a item · relatório 680",
     semRodar: "O detalhe por item das contribuições não foi apurado nesta rodada",
+    semNada: "Contribuições na própria base: a análise rodou, nenhum crédito encontrado",
     mesmaTeseQue:
       "É a mesma tese do número lá em cima, vista item a item. Os dois totais não " +
       "batem de propósito: o consolidado arredonda uma vez por grupo, com a " +
@@ -566,6 +570,7 @@ const TESES: Tese[] = [
     imposto: "ICMS",
     excluido: "ICMS excluído",
     semRodar: "O ICMS fora da base não foi apurado nesta rodada",
+    semNada: "ICMS fora da base: a análise rodou, nenhum crédito encontrado",
     rotulo: "Crédito no prazo, excluindo o ICMS da base · Tema 69",
     detalhe:
       "Uma linha por item de nota fiscal, nas quarenta colunas do relatório 903 — na ordem em que o escritório anterior exporta, para conferir lado a lado.",
@@ -577,6 +582,7 @@ const TESES: Tese[] = [
     imposto: "ICMS-ST",
     excluido: "ICMS-ST excluído",
     semRodar: "O ICMS-ST fora da base não foi apurado nesta rodada",
+    semNada: "ICMS-ST fora da base: a análise rodou, nenhum crédito encontrado",
     rotulo: "Crédito no prazo, excluindo o ICMS-ST da base",
     detalhe:
       "O ICMS-ST não está escrito em nota nenhuma: a revenda com ST já retido não o destaca. Ele é reconstruído de uma base presumida e da alíquota do produto, e a planilha mostra as duas colunas ao lado do resultado — pedido que nasce de arbitramento se defende mostrando a conta.",
@@ -588,6 +594,7 @@ const TESES: Tese[] = [
     imposto: "ISS",
     excluido: "ISS excluído",
     semRodar: "O ISS fora da base não foi apurado nesta rodada",
+    semNada: "ISS fora da base: a análise rodou, nenhum crédito encontrado",
     rotulo: "Crédito no prazo, excluindo o ISS da base",
     detalhe:
       "Uma linha por item de nota de serviço, nas trinta e duas colunas do relatório 933. A coluna do ISS sai em branco quando o cliente não a escriturou: o valor está na NFS-e, e em branco não é zero.",
@@ -603,7 +610,7 @@ const TESES: Tese[] = [
  * principal e a Selic vêm em números distintos, porque a Selic é a parte que
  * muda de valor a cada mês que o pedido demora.
  */
-function BlocoDaTese({
+export function BlocoDaTese({
   execucao,
   tese,
   dados,
@@ -624,14 +631,32 @@ function BlocoDaTese({
     setBaixando(null);
   }
 
-  // sem `linhas` a tese não rodou — falta EFD-Contribuições, ou a série da
-  // Selic não alcança o mês. O porquê já está na lista de avisos acima
-  if (!icms || !(icms.linhas ?? 0)) {
+  // **Três estados, e por muito tempo a tela mostrou dois como um.** "Não
+  // rodou" e "rodou e não achou nada" são coisas diferentes: a primeira é
+  // trabalho que falta, a segunda é resposta. Até 07/10/2026 as duas saíam como
+  // "não foi apurado", culpando a série da Selic — e numa base sem ISS nenhum
+  // isso mandava procurar defeito onde havia resultado.
+  //
+  // O que separa as duas é `linhas`: a tese que rodou sempre o traz, nem que
+  // seja zero; a que não rodou não traz campo nenhum.
+  const rodou = icms != null && icms.linhas !== undefined;
+
+  if (!rodou) {
     return (
       <Faixa titulo={tese.semRodar}>
-        Ele se calcula no item da nota, direto da EFD-Contribuições, e precisa da série da Selic
-        cobrindo o mês da restituição. O motivo está em{" "}
+        Ela se calcula no item da nota, direto da EFD-Contribuições. O motivo de não ter
+        rodado — lote sem EFD-Contribuições, série da Selic que não alcança o mês da
+        restituição, ou tabela que falta — está em{" "}
         <strong>o que a conta não incluiu</strong>, acima.
+      </Faixa>
+    );
+  }
+
+  if (!icms.linhas) {
+    return (
+      <Faixa titulo={tese.semNada}>
+        A base foi percorrida inteira e nenhum item carrega {tese.imposto} a recuperar.
+        É <strong>resposta</strong>, não trabalho pendente: não há o que pedir nesta tese.
       </Faixa>
     );
   }

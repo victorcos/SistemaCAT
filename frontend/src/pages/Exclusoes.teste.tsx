@@ -16,7 +16,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { Concluido, QualDosDois } from "./Exclusoes";
+import { BlocoDaTese, Concluido, QualDosDois, TESES } from "./Exclusoes";
 import type { ExecucaoDasExclusoes, ResumoDasExclusoes } from "@/services/exclusoes";
 
 function resumo(parcial: Partial<ResumoDasExclusoes> = {}): ResumoDasExclusoes {
@@ -110,5 +110,60 @@ describe("a frase está no cartão, e não só no componente", () => {
     // a frase é única do `QualDosDois`: o rótulo acima também diz "consolidado"
     expect(screen.getByText(/arredonda uma vez por grupo/)).toBeTruthy();
     expect(screen.getByText(/^R\$\s*1\.620,00$/)).toBeTruthy();
+  });
+});
+
+describe("os três estados de uma tese por item", () => {
+  /**
+   * "Não rodou" e "rodou e não achou nada" são coisas diferentes: a primeira é
+   * trabalho que falta, a segunda é resposta. Até 07/10/2026 as duas saíam como
+   * "não foi apurado", culpando a série da Selic — e numa base sem ISS nenhum
+   * isso mandava procurar defeito onde havia resultado.
+   */
+  const execucao = { id: 1, situacao: "concluida" } as ExecucaoDasExclusoes;
+  const doIss = TESES.find((x) => x.campo === "iss")!;
+
+  it("sem campo nenhum, diz que não rodou e manda ver o motivo", () => {
+    render(<BlocoDaTese execucao={execucao} tese={doIss} dados={{} as never} />);
+
+    expect(screen.getByText(doIss.semRodar)).toBeTruthy();
+    expect(screen.getByText(/o que a conta não incluiu/)).toBeTruthy();
+  });
+
+  it("com zero linhas, diz que não há o que excluir — e isso é resposta", () => {
+    render(
+      <BlocoDaTese
+        execucao={execucao}
+        tese={doIss}
+        dados={{ linhas: 0, total_atualizado: "0" } as never}
+      />,
+    );
+
+    expect(screen.getByText(doIss.semNada)).toBeTruthy();
+    expect(screen.getByText(/nenhum item carrega/)).toBeTruthy();
+    // e **não** pode insinuar que faltou Selic ou arquivo
+    expect(screen.queryByText(doIss.semRodar)).toBeNull();
+  });
+
+  it("o zero não é confundido com a ausência", () => {
+    const { unmount } = render(
+      <BlocoDaTese execucao={execucao} tese={doIss} dados={{} as never} />,
+    );
+    const ausente = screen.getByText(doIss.semRodar).textContent;
+    unmount();
+
+    render(
+      <BlocoDaTese execucao={execucao} tese={doIss} dados={{ linhas: 0 } as never} />,
+    );
+
+    expect(screen.queryByText(ausente!)).toBeNull();
+  });
+
+  it("toda tese tem as duas frases, e elas são diferentes", () => {
+    for (const tese of TESES) {
+      expect(tese.semRodar.length).toBeGreaterThan(10);
+      expect(tese.semNada.length).toBeGreaterThan(10);
+      expect(tese.semNada).not.toBe(tese.semRodar);
+    }
   });
 });

@@ -5,6 +5,43 @@
 
 ---
 
+## 2026-10-07 — "Não rodou" e "rodou e não achou" não são a mesma coisa
+
+Relatado hoje: duas teses "nunca aparecem" na tela das exclusões. Olhando o
+resumo da rodada, eram **dois casos diferentes mostrados como um**:
+
+| tese | o que de fato aconteceu |
+|---|---|
+| `icms_st` | **não rodou** — alíquota interna de GO não conferida |
+| `iss` | **rodou e achou zero** — não há ISS nesta base |
+
+A tela dizia o mesmo dos dois: *"não foi apurado nesta rodada… precisa da série
+da Selic cobrindo o mês da restituição"*. Para o ISS isso é falso em tudo: ele
+rodou, percorreu a base inteira, e a Selic não tinha nada a ver.
+
+O defeito estava numa linha: `if (!icms || !(icms.linhas ?? 0))` — **zero
+tratado como ausência**. E o comentário ao lado dizia que só havia duas causas
+para não rodar; depois de 06/10/2026 há uma terceira, a recusa de tabela.
+
+Agora são três estados, e o que os separa é `linhas`: a tese que rodou sempre o
+traz, nem que seja zero; a que não rodou não traz campo nenhum.
+
+1. **não rodou** — diz as causas possíveis e aponta para os avisos, que trazem
+   o motivo específico;
+2. **rodou e não achou** — *"a análise rodou, nenhum crédito encontrado"*. É
+   **resposta**, não trabalho pendente;
+3. **rodou com valor** — o cartão de sempre.
+
+**A lição é de produto, não de código.** Zero e ausência somam igual e
+significam o oposto: um diz "não há o que pedir", o outro diz "falta trabalho".
+Mostrar os dois como o segundo manda procurar defeito onde havia resultado —
+e foi exatamente o que aconteceu.
+
+Quatro testes novos; a mutação fiel (voltar a tratar zero como ausência)
+derruba dois deles.
+
+---
+
 ## 2026-10-07 — As ECD passaram a ser lidas em paralelo
 
 A apuração de PIS/COFINS de uma base de 60 ECD e 294 GB ficou **15,6 h em 32
