@@ -216,6 +216,17 @@ construir o objeto da linha. São ~80 µs por linha e não há vilão único. Qu
 quiser atacar isso tem de atacar o objeto por linha — escrever colunas direto
 no parquet —, não os seeks.
 
+**E paralelizar por arquivo tem dose, não receita.** Medido em 07/10/2026 numa
+base de 60 ECD no disco de rede: com **4** processos a leitura ficou *mais
+lenta* que em série (17,5 contra 20,1 MB/min), porque indexar é ler o arquivo
+inteiro do Z: e quatro leituras de 5 GB simultâneas disputam o
+compartilhamento. Com **2**, o ganho foi de **1,91x** — ~9 minutos por arquivo
+contra ~29.
+
+O teto de 4 processos do arquivo digital **não transfere para cá**: lá cada
+filho escreve, com a leitura já feita; aqui cada filho lê gigabytes de rede. O
+número é o mesmo e a natureza é outra.
+
 ## 7. Formato intermediário
 
 CSV é formato de **entrega**, não de trabalho. Entre etapas vale parquet: menor,

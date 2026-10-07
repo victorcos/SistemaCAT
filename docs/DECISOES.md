@@ -5,6 +5,58 @@
 
 ---
 
+## 2026-10-07 — O paralelismo entregou 1,9x, não os 4x que eu projetei
+
+A entrada de hoje sobre a leitura das ECD em paralelo diz que o ganho esperado
+era "próximo de linear". **Não foi**, e o número medido fica aqui.
+
+### O que aconteceu com 4 processos
+
+A primeira rodada com o teto padrão — 4 processos, herdado da etapa 7 — ficou
+**mais lenta que o serial**: 17,5 MB/min contra 20,1. Trinta e um minutos sem
+nenhum arquivo concluído, e a memória livre da máquina caiu a 2,0 GB.
+
+A causa é a que o próprio `workers/fila.py` adverte, e que eu li como valendo só
+entre etapas: *"duas extrações simultâneas disputam a mesma rede e o mesmo disco
+e terminam as duas mais devagar"*. Vale **dentro** de uma etapa também. Indexar
+uma ECD é ler o arquivo inteiro do Z:, e quatro leituras de 5 GB ao mesmo tempo
+brigam pelo compartilhamento até anular o ganho de processador.
+
+**O teto de 4 da etapa 7 não transfere.** Lá cada filho *escreve* um arquivo
+digital, com a leitura já feita; aqui cada filho *lê* gigabytes de disco de
+rede. O mesmo número, duas naturezas diferentes.
+
+### O que 2 processos entregaram
+
+Medido na mesma base de 60 ECD, ao longo de 20 arquivos e 3,25 h:
+
+| | serial | 4 processos | **2 processos** |
+|---|---|---|---|
+| por arquivo | ~29 min | — | **~9 min** |
+| linhas/s | 13.919 | pior que serial | **26.595** |
+| contra o serial | 1,00x | < 1 | **1,91x** |
+
+Os carimbos das partes mostram o padrão com clareza: os dois trabalhadores
+terminam **em pares**, a cada ~17 minutos, com arquivos homogêneos (349 a 400 MB
+de parquet cada). A rodada que pedia ~29 h passou a pedir ~9.
+
+### Duas lições, e a segunda é de método
+
+**A dose importa mais que a ideia.** Paralelizar não é bom ou ruim: 4 processos
+pioraram, 2 quase dobraram. Entre uma coisa e outra não há teoria que decida —
+só medição.
+
+**Métrica errada muda de opinião a cada cinco minutos.** Acompanhei por MB/min e
+por linhas/s, e as duas se contradisseram por mais de uma hora: 50, 38, 27, 49,
+41. Eu cheguei a anunciar tendência de queda com três pontos, e o quarto me
+desmentiu. A causa era mecânica: os contadores só andam quando um arquivo fecha,
+então entre fechamentos a taxa decai sozinha — dente de serra, não desempenho.
+**Com dois trabalhadores e arquivos de 17 minutos, nenhuma amostra menor que uma
+hora diz coisa alguma.** O que resolveu foi medir por marco de arquivos
+concluídos, e ler os carimbos de tempo das partes em disco.
+
+---
+
 ## 2026-10-07 — O 680 ganhou o resumo diário do SAT, e o mapeamento foi medido
 
 Consequência direta da divergência de 70,81% entre as duas frentes da tese das
