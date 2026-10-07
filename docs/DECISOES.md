@@ -5,6 +5,47 @@
 
 ---
 
+## 2026-10-07 — O 680 ganhou o resumo diário do SAT, e o mapeamento foi medido
+
+Consequência direta da divergência de 70,81% entre as duas frentes da tese das
+contribuições: o detalhe por item **não cobria o C860/C870**, e numa base de
+varejo isso era dois terços do crédito — R$ 4.572.159,48 de R$ 6,85 milhões. O
+consolidado somava, o 680 não mostrava.
+
+### O mapeamento não foi suposto
+
+O C860 traz `COD_MOD`, `NR_SAT`, `DT_DOC`, `DOC_INIC` e `DOC_FIM`, e a coluna
+"Número Documento" do MA podia ser qualquer um dos três últimos. Testadas as
+três contra o gabarito de um cliente que tem SAT, restrito ao mesmo
+estabelecimento e à mesma competência:
+
+| candidato | pares que explica |
+|---|---|
+| `NR_SAT` | 0 de 51 |
+| **`DOC_INIC`** | **51 de 51** |
+| `DOC_FIM` | 0 de 51 |
+
+Sem o recorte por estabelecimento e competência, o `DOC_INIC` explicava só
+3,7% — e eu quase li isso como "nenhum dos três serve". O recorte errado
+produziu um número que negava a resposta certa; foi preciso comparar maçã com
+maçã para a evidência aparecer.
+
+### O que o ramo tem, e o que não tem
+
+Modelo, número e data vêm do **C860**; código, CFOP, valor, desconto, CST, base
+e alíquota vêm do **C870**. Não tem número de item — é resumo de um dia, não
+documento — nem ICMS nem rateio, porque o C870 não os traz. A ausência é do
+**ramo** e não do campo, e escrever zero no lugar do vazio divergiria do MA
+(ver `_do_ramo`).
+
+Sete testes novos. Um deles nasceu de um erro meu: pus o C860/C870 depois do
+bloco da filial no exemplo e esperei a descrição da matriz. O leitor atribuiu à
+filial, que é o **certo** — e a asserção virou prova de que o ramo segue o
+`C010` aberto, como os outros. Num cliente com cadastro divergente entre
+estabelecimentos, seguir a matriz mostraria o produto errado na planilha.
+
+---
+
 ## 2026-10-07 — A tela afirmava uma causa que não tinha, e errou por 70 pontos
 
 Relatado: o consolidado não bate com as exclusões abaixo. Na tela, R$ 8.646.129,43

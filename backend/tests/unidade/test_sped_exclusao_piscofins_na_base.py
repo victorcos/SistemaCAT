@@ -145,6 +145,22 @@ EFD = "\n".join([
          VL_ICMS="36,00", VL_BC_PIS="200,00", VL_PIS="3,30",
          VL_BC_COFINS="200,00", VL_COFINS="15,20"),
 
+    # ---- o resumo diário do SAT-CF-e ------------------------------------
+    # O C860 vale para os C870 que vierem depois, como o C100 para os C170.
+    # "Número Documento" é o DOC_INIC — medido contra o gabarito do MA em
+    # 07/10/2026: das 51 combinações de (data, número), o DOC_INIC explica 51,
+    # o NR_SAT nenhuma e o DOC_FIM nenhuma
+    reg("C860", COD_MOD="59", NR_SAT="900111", DT_DOC="20102022",
+        DOC_INIC="5500", DOC_FIM="5620"),
+    reg("C870", COD_ITEM="SKU1", CFOP="5102", VL_ITEM="200,00", VL_DESC="0,00",
+        CST_PIS="01", VL_BC_PIS="200,00", ALIQ_PIS_PERC="1,6500", VL_PIS="3,30",
+        CST_COFINS="01", VL_BC_COFINS="200,00", ALIQ_COFINS_PERC="7,6000",
+        VL_COFINS="15,20"),
+    # CST 06 (alíquota zero): não há contribuição, logo não há o que excluir
+    reg("C870", COD_ITEM="SKU2", CFOP="5102", VL_ITEM="80,00", VL_DESC="0,00",
+        CST_PIS="06", VL_BC_PIS="0", ALIQ_PIS_PERC="0", VL_PIS="0",
+        CST_COFINS="06", VL_BC_COFINS="0", ALIQ_COFINS_PERC="0", VL_COFINS="0"),
+
     # ---- bloco A: serviço prestado e serviço contratado -----------------
     reg("A010", CNPJ=MATRIZ),
     # prestado: entra. O A170 tem VL_DESC no leiaute, e o MA o deixa em branco
@@ -205,10 +221,14 @@ def por_chave(linhas):
 
 class TestQuemEntra:
     def test_so_as_linhas_de_receita_saem(self, linhas, por_chave):
-        """Nove linhas: duas do 1001, a devolução, os dois C175, a filial, o
-        serviço prestado e dois F100 (um por dia)."""
-        assert len(linhas) == 9
-        assert len(por_chave) == 9, "duas linhas disputaram a mesma identidade"
+        """Dez linhas: duas do 1001, a devolução, os dois C175, a filial, o
+        serviço prestado, dois F100 (um por dia) e **um C870**.
+
+        O segundo C870 tem CST 06 — alíquota zero — e por isso não entra: não
+        há contribuição embutida, logo não há o que excluir.
+        """
+        assert len(linhas) == 10
+        assert len(por_chave) == 10, "duas linhas disputaram a mesma identidade"
 
     def test_o_cfop_fora_da_receita_fica_de_fora(self, por_chave):
         """A remessa para industrialização tem contribuição apurada e não entra."""
@@ -287,6 +307,64 @@ class TestOCfopQueCompoeReceita:
     def test_remessa_e_transferencia_seguem_fora(self):
         for cfop in ("5901", "5910", "5152", "5949"):
             assert classificacao_do_cfop(cfop) == "", cfop
+
+
+class TestOResumoDiarioDoSat:
+    """O ramo C860/C870, que faltava até 07/10/2026.
+
+    **Por que faltava doía.** Numa base de varejo o C870 era dois terços do
+    crédito — R$ 4.572.159,48 de R$ 6,85 milhões. O consolidado o somava, o
+    detalhe por item não o alcançava, e as duas frentes da mesma tese
+    divergiam em 70,81%. Quem comparava os dois números concluía que um estava
+    errado; nenhum estava, faltava ramo.
+
+    **O mapeamento foi medido, não suposto** — ver `_do_c870`.
+    """
+
+    @pytest.fixture
+    def do_sat(self, por_chave):
+        # o ramo não tem número de item, então a chave cai no valor — ver
+        # o docstring de `por_chave`
+        return por_chave[("C860/C870", "5500", "200.00")]
+
+    def test_o_numero_do_documento_e_o_DOC_INIC(self, do_sat):
+        """Das três candidatas do C860 — NR_SAT, DOC_INIC e DOC_FIM — só o
+        DOC_INIC explica o gabarito: 51 de 51 pares contra zero das outras."""
+        assert do_sat.numero_do_documento == "5500"
+
+    def test_o_modelo_e_a_data_vem_do_C860(self, do_sat):
+        assert do_sat.modelo == "59"
+        assert do_sat.data_do_documento == "20/10/2022"
+
+    def test_o_ramo_nao_tem_item_nem_icms_nem_rateio(self, do_sat):
+        """A ausência é do **ramo**, não do campo: o C870 não traz nenhum dos
+        três. Escrever zero no lugar do vazio divergiria do MA — ver `_do_ramo`."""
+        assert do_sat.numero_do_item == ""
+        assert do_sat.icms == ""
+        assert do_sat.rateio == ""
+
+    def test_o_item_traz_codigo_descricao_e_valores(self, do_sat):
+        assert do_sat.codigo_do_item == "SKU1"
+        assert do_sat.valor_do_item == "200.00"
+        assert do_sat.cfop == "5102"
+
+    def test_a_descricao_vem_do_cadastro_do_estabelecimento_certo(self, do_sat):
+        """O C860/C870 do exemplo está no bloco da **filial**, e o SKU1 dela se
+        chama diferente do da matriz. O ramo segue o `C010` aberto, como os
+        outros — se seguisse a matriz, a planilha mostraria o produto errado
+        num cliente com cadastro divergente entre estabelecimentos."""
+        assert do_sat.cnpj == FILIAL
+        assert do_sat.descricao_do_item == "ARROZ 5KG DA FILIAL"
+
+    def test_a_base_nova_perde_as_duas_contribuicoes(self, do_sat):
+        """A regra da tese, igual para todos os ramos: 200 − (3,30 + 15,20)."""
+        assert do_sat.base_do_pis == "200.00"
+        assert do_sat.base_do_pis_stf == "181.50"
+        assert do_sat.base_da_cofins_stf == "181.50"
+
+    def test_o_cst_sem_incidencia_nao_entra(self, por_chave):
+        """O segundo C870 é CST 06. Sem contribuição, não há o que excluir."""
+        assert ("C860/C870", "5500", "80.00") not in por_chave
 
 
 class TestAConta:

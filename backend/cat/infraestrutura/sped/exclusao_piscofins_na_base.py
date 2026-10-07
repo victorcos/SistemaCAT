@@ -105,6 +105,9 @@ RAMO_C170 = "C100/C170"
 RAMO_C175 = "C100/C175"
 RAMO_A170 = "A100/A170"
 RAMO_F100 = "F100"
+# o resumo diário do SAT-CF-e: o C860 identifica o equipamento e o dia, o C870
+# traz os itens vendidos naquele dia. O MA escreve os dois juntos na coluna
+RAMO_C870 = "C860/C870"
 
 # o que o MA escreve na coluna do CFOP quando o registro não tem CFOP: o
 # sentido da operação, e não um código
@@ -119,6 +122,7 @@ GERACAO_DE_RECEITA = "1"
 _DE_INTERESSE = {
     b"0000", b"0140", b"0200",
     b"C010", b"C100", b"C170", b"C175",
+    b"C860", b"C870",
     b"A010", b"A100", b"A170",
     b"F010", b"F100",
 }
@@ -296,6 +300,9 @@ class _Contexto:
         self.cnpj_c = self.cnpj_a = self.cnpj_f = ""
         self.c100: dict[str, str] = {}
         self.a100: dict[str, str] = {}
+        # o C860 vale para todos os C870 que vierem depois dele, como o C100
+        # vale para os seus C170 — é o cabeçalho do resumo diário do SAT
+        self.c860: dict[str, str] = {}
         # os itens do C100 aberto, à espera do rateio. Ver o topo da classe
         self.itens_do_documento: list[dict[str, str]] = []
         # o F100 somado por dia. Ver `fechar_f100`
@@ -348,6 +355,12 @@ class _Contexto:
                 yield linha
         elif registro == b"A170":
             linha = self._do_a170(_nomeados("A170", valores))
+            if linha:
+                yield linha
+        elif registro == b"C860":
+            self.c860 = _nomeados("C860", valores)
+        elif registro == b"C870":
+            linha = self._do_c870(_nomeados("C870", valores))
             if linha:
                 yield linha
         elif registro == b"F100":
@@ -410,6 +423,42 @@ class _Contexto:
             pis=item["C175_VL_PIS"],
             base_cof=item["C175_VL_BC_COFINS"], aliq_cof=item["C175_ALIQ_COFINS"],
             cofins=item["C175_VL_COFINS"])
+
+    def _do_c870(self, item: dict[str, str]) -> LinhaDaExclusaoPisCofins | None:
+        """Os itens do resumo diário do SAT-CF-e. **Não têm número de item.**
+
+        Entrou em 07/10/2026, e entrou porque faltava: numa base de varejo o
+        C870 era **dois terços do crédito** — R$ 4.572.159,48 de R$ 6,85 milhões
+        —, e o detalhe por item não o alcançava. O consolidado o somava (ele não
+        está em `REGISTROS_DE_FORA`), então o número que se pede incluía uma
+        receita que o relatório de acompanhamento não mostrava. Diferença de
+        70,81% entre as duas frentes da mesma tese.
+
+        **O mapeamento foi medido contra o gabarito**, não suposto. O C860 traz
+        `COD_MOD`, `NR_SAT`, `DT_DOC`, `DOC_INIC` e `DOC_FIM`, e a coluna
+        "Número Documento" do MA podia ser qualquer um dos três últimos. É o
+        **`DOC_INIC`**: das 51 combinações de (data, número) daquele
+        estabelecimento numa competência, o `DOC_INIC` explica **51**, o
+        `NR_SAT` nenhuma e o `DOC_FIM` nenhuma.
+
+        O ramo não tem ICMS nem rateio — o C870 não os traz —, e não tem número
+        de item, porque é resumo de um dia e não documento. Ver `_do_ramo`: a
+        ausência é do ramo, e escrever zero no lugar do vazio divergiria.
+        """
+        return self._montar(
+            cnpj=self.cnpj_c, ramo=RAMO_C870, cfop=item["C870_CFOP"],
+            modelo=self.c860.get("C860_COD_MOD", ""),
+            documento=self.c860.get("C860_DOC_INIC", ""),
+            chave="", data=self.c860.get("C860_DT_DOC", ""),
+            numero_do_item="", codigo=item["C870_COD_ITEM"],
+            descricao=self._descricao(item["C870_COD_ITEM"], self.cnpj_c),
+            valor=item["C870_VL_ITEM"], desconto=item["C870_VL_DESC"],
+            icms=None, rateio=None,
+            cst=item["C870_CST_PIS"],
+            base_pis=item["C870_VL_BC_PIS"], aliq_pis=item["C870_ALIQ_PIS_PERC"],
+            pis=item["C870_VL_PIS"],
+            base_cof=item["C870_VL_BC_COFINS"], aliq_cof=item["C870_ALIQ_COFINS_PERC"],
+            cofins=item["C870_VL_COFINS"])
 
     def _do_a170(self, item: dict[str, str]) -> LinhaDaExclusaoPisCofins | None:
         """A nota de serviço **prestada**. Não tem CFOP: entra pelo sentido.
