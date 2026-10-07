@@ -596,6 +596,12 @@ export function QualDosDois({ resumo }: { resumo: ResumoDasExclusoes }) {
 
   const diferenca = porItem - consolidado;
   const percentual = Math.abs(diferenca / consolidado) * 100;
+  // **Arredondamento é da ordem de 0,06%** (medido em 24/09/2026). Acima de 1%
+  // a causa é outra, e dizer "é o arredondamento" seria mentir: em 07/10/2026
+  // uma base de varejo mostrou 70,81%, porque dois terços da receita dela
+  // estavam no C870 — o resumo diário do SAT-CF-e, que não tem item e por isso
+  // o detalhe não alcança
+  const soArredondamento = percentual < 1;
   return (
     <p className="m-0 mt-2 text-[12px] leading-relaxed text-texto-fraco">
       Este é o <strong>consolidado</strong> — arredonda uma vez por grupo, com a alíquota
@@ -607,10 +613,23 @@ export function QualDosDois({ resumo }: { resumo: ResumoDasExclusoes }) {
       ) : (
         <>
           <strong className="font-mono">{dinheiro(String(Math.abs(diferenca)))}</strong>{" "}
-          {diferenca > 0 ? "a mais" : "a menos"} ({percentual.toLocaleString("pt-BR", {
-            minimumFractionDigits: 2, maximumFractionDigits: 2,
+          {diferenca > 0 ? "a mais" : "a menos"} (
+          {percentual.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
           })}
-          %). A diferença é o arredondamento — por grupo aqui, por linha lá — e é esperada.
+          %).{" "}
+          {soArredondamento ? (
+            "A diferença é o arredondamento — por grupo aqui, por linha lá — e é esperada."
+          ) : (
+            <>
+              <strong>Isso não é arredondamento.</strong> O detalhe item a item só alcança os
+              registros que <em>têm</em> item — C170, C175, A170 e F100. O consolidado soma
+              também os que consolidam sem item, como o <strong>C870</strong> do SAT-CF-e e o
+              C860. Numa base de varejo esses costumam ser a maior parte da receita. Para o
+              pedido vale o consolidado; o 680 cobre o que ele cobre.
+            </>
+          )}
         </>
       )}
     </p>

@@ -63,6 +63,42 @@ describe("qual dos dois números é este", () => {
     expect(screen.getByText(/0,06/)).toBeTruthy();
   });
 
+  it("acima de 1% diz que NÃO é arredondamento, e por quê", () => {
+    /**
+     * **O defeito de 07/10/2026.** Uma base de varejo mostrou 70,81% de
+     * diferença e a tela afirmava "a diferença é o arredondamento". Era falso:
+     * dois terços da receita estavam no C870 — o resumo diário do SAT-CF-e, que
+     * não tem item, e por isso o detalhe não alcança. Arredondamento é da ordem
+     * de 0,06%; afirmar causa que não se tem é pior que não explicar.
+     */
+    render(
+      <QualDosDois
+        resumo={resumo({
+          total_atualizado: "8646129.43",
+          receita_por_item: { total_atualizado: "2523726.55" } as never,
+        })}
+      />,
+    );
+
+    expect(screen.getByText(/70,81/)).toBeTruthy();
+    expect(screen.getByText(/não é arredondamento/i)).toBeTruthy();
+    expect(screen.getByText(/C870/)).toBeTruthy();
+  });
+
+  it("abaixo de 1% continua dizendo que é arredondamento", () => {
+    render(
+      <QualDosDois
+        resumo={resumo({
+          total_atualizado: "2700000.00",
+          receita_por_item: { total_atualizado: "2701620.00" } as never,
+        })}
+      />,
+    );
+
+    expect(screen.getByText(/é o arredondamento/)).toBeTruthy();
+    expect(screen.queryByText(/C870/)).toBeNull();
+  });
+
   it("diz 'a menos' quando o detalhe fica abaixo do consolidado", () => {
     render(
       <QualDosDois

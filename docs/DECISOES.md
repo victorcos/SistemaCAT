@@ -5,6 +5,55 @@
 
 ---
 
+## 2026-10-07 — A tela afirmava uma causa que não tinha, e errou por 70 pontos
+
+Relatado: o consolidado não bate com as exclusões abaixo. Na tela, R$ 8.646.129,43
+contra R$ 2.523.726,55 do 680 — **70,81% de diferença** — e logo abaixo a frase
+que eu havia escrito ontem: *"a diferença é o arredondamento — por grupo aqui,
+por linha lá — e é esperada."*
+
+**Era falsa.** Arredondamento é da ordem de **0,06%**, que foi o que se mediu em
+24/09/2026. Setenta por cento é outra coisa, e a tela afirmava conhecer a causa
+sem conhecê-la.
+
+### A causa real: cobertura, não arredondamento
+
+Quebrando o consolidado daquela rodada por registro:
+
+| registro | grupos | diferença |
+|---|---|---|
+| C170 | 155 | R$ 375.817,22 |
+| **C870** | **95** | **R$ 4.572.159,48** |
+| C175 | 28 | R$ 1.891.762,78 |
+| F100 | 86 | R$ 11.485,87 |
+
+O **C870** — itens do resumo diário do SAT-CF-e — responde por dois terços do
+total. E o detalhe item a item lê **quatro ramos**: C100/C170, C100/C175,
+A100/A170 e F100. O C870 não está entre eles; o consolidado o soma porque ele
+não está em `REGISTROS_DE_FORA`.
+
+Num varejo que fatura por cupom, portanto, o 680 alcança **uma fração** do que o
+consolidado soma — e isso não é defeito de nenhum dos dois: é o alcance de cada
+frente.
+
+### Duas coisas separadas, e só uma foi feita
+
+**Feito:** a tela parou de mentir. Abaixo de 1% ela diz arredondamento; acima,
+diz que **não é** arredondamento e explica o alcance de cada frente, nomeando o
+C870 e o C860. Dois testes novos; a mutação (voltar a culpar arredondamento
+sempre) derruba um deles.
+
+**Não feito, e anotado:** o 680 não cobre C860/C870. Para um cliente de varejo
+isso é a maior parte da receita, e o relatório que acompanha o pedido sai
+incompleto. Cobrir exige ler o resumo diário do SAT-CF-e no leiaute do 680 — é
+trabalho de verdade, e não se faz junto com a correção de um texto.
+
+**A lição:** explicação na tela é afirmação. Escrever "a diferença é X" sem
+medir X em cada base é inventar — e o número grande ao lado dá a ela uma
+autoridade que ela não tem.
+
+---
+
 ## 2026-10-07 — "Não rodou" e "rodou e não achou" não são a mesma coisa
 
 Relatado hoje: duas teses "nunca aparecem" na tela das exclusões. Olhando o
