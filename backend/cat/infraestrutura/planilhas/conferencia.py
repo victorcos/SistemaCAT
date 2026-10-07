@@ -30,6 +30,7 @@ quem precisa carregar em ferramenta baixa o CSV, que é correto.
 from __future__ import annotations
 
 import csv
+import glob
 import os
 import shutil
 from collections.abc import Iterator
@@ -225,6 +226,17 @@ def gerar(parquet: str, destino: str, colunas: tuple[Coluna, ...],
                        modelos, classificacoes, campo_da_classificacao)
 
 
+def _arquivos_de(parquet: str) -> list[str]:
+    """Um parquet, ou o conjunto que um glob descreve.
+
+    O razão da apuração de PIS/COFINS virou uma **pasta de partes** em
+    07/10/2026, porque as ECD passaram a ser lidas em paralelo — uma parte por
+    arquivo. Quem gera planilha não precisa saber disso; precisa ler todas, e em
+    ordem estável, para que duas gerações da mesma rodada saiam iguais.
+    """
+    return sorted(glob.glob(parquet)) if "*" in parquet else [parquet]
+
+
 def _filtradas(parquet: str, modelos: frozenset[str] | None,
                classificacoes: frozenset[str] | None,
                campo: str = "classificacao") -> Iterator[dict]:
@@ -233,14 +245,15 @@ def _filtradas(parquet: str, modelos: frozenset[str] | None,
     Fica separado porque é a parte que precisa ser idêntica nas duas saídas:
     xlsx e csv filtrando diferente dariam dois totais para a mesma cobrança.
     """
-    for lote in pq.ParquetFile(parquet).iter_batches(LINHAS_POR_LEITURA):
-        for r in lote.to_pylist():
-            if modelos is not None and r.get("modelo") not in modelos:
-                continue
-            if (classificacoes is not None
-                    and r.get(campo) not in classificacoes):
-                continue
-            yield r
+    for caminho in _arquivos_de(parquet):
+        for lote in pq.ParquetFile(caminho).iter_batches(LINHAS_POR_LEITURA):
+            for r in lote.to_pylist():
+                if modelos is not None and r.get("modelo") not in modelos:
+                    continue
+                if (classificacoes is not None
+                        and r.get(campo) not in classificacoes):
+                    continue
+                yield r
 
 
 def _texto_para_csv(valor, coluna: Coluna) -> str:

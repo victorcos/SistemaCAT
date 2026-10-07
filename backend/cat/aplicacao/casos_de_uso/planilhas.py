@@ -63,6 +63,7 @@ from cat.infraestrutura.analitico.piscofins import (
     ARQUIVO_DAS_ENTRADAS,
     ARQUIVO_DAS_SAIDAS,
     ARQUIVO_DO_RAZAO,
+    fonte_do_razao,
 )
 from cat.infraestrutura.analitico.quebra_de_sped import (
     ARQUIVO_DAS_CONTAGENS,
@@ -311,7 +312,12 @@ def gerar(execucao: ExecucaoDB, etapa_da_rota: str, qual: str,
     classes = conjunto(classificacoes)
     pasta = execucao.pasta_de_trabalho or ""
     origem = os.path.join(pasta, parquet)
-    if not os.path.isfile(origem):
+    if parquet == ARQUIVO_DO_RAZAO:
+        # o razão é o único que pode ser uma pasta de partes: as ECD são lidas
+        # em paralelo desde 07/10/2026, uma parte por arquivo. `fonte_do_razao`
+        # devolve a forma que esta execução gravou — a antiga ou a nova
+        origem = fonte_do_razao(pasta) or origem
+    if not (os.path.isfile(origem) or "*" in origem):
         # os parquets são de disco local e podem ter sido limpos; a linha da
         # execução fica para sempre, o material de trabalho não. Ou a execução
         # é de antes de esta lista existir: a pasta está lá, a lista não.

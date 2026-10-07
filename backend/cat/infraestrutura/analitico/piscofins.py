@@ -22,8 +22,13 @@ fundido numa coisa só.
 
 from __future__ import annotations
 
+import glob
+import multiprocessing
 import os
+import sys
 from collections.abc import Callable
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass, field
 
 from cat.infraestrutura.analitico.escrita import (
@@ -37,6 +42,7 @@ from cat.infraestrutura.sped.entradas import colunas_da_entrada, entradas
 from cat.infraestrutura.sped.leitor import codificacao_de
 from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido, ler_cabecalho
 from cat.infraestrutura.sped.saidas import Contagem, colunas_da_saida, saidas
+from cat.config import obter_config
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -44,6 +50,11 @@ log = obter_log(__name__)
 ARQUIVO_DAS_ENTRADAS = "entradas.parquet"
 ARQUIVO_DAS_SAIDAS = "saidas.parquet"
 ARQUIVO_DO_RAZAO = "razao.parquet"
+# Uma parte por ECD, quando elas são lidas em paralelo. Em pasta própria, e não
+# `razao-000.parquet` ao lado: `razao_por_conta.parquet` mora no mesmo destino,
+# e um glob `razao*.parquet` o pegaria junto — somando o resumo ao detalhe.
+PASTA_DO_RAZAO = "razao"
+NOME_DA_PARTE = "parte-{:04d}.parquet"
 
 COLUNAS_DO_RAZAO = [
     "cnpj", "conta", "descricao", "conta_referencial", "competencia", "data", "numero",
@@ -120,7 +131,6 @@ def confrontar(contribuicoes: list[str], ecds: list[str], destino: str,
 
     das_entradas = Escritor(os.path.join(destino, ARQUIVO_DAS_ENTRADAS), colunas_da_entrada())
     das_saidas = Escritor(os.path.join(destino, ARQUIVO_DAS_SAIDAS), colunas_da_saida())
-    do_razao = Escritor(os.path.join(destino, ARQUIVO_DO_RAZAO), COLUNAS_DO_RAZAO)
     try:
         for caminho in contribuicoes:
             parar_se_pedirem(deve_parar)
@@ -129,19 +139,17 @@ def confrontar(contribuicoes: list[str], ecds: list[str], destino: str,
             _saidas_de(caminho, das_saidas, resumo, andamento)
             if avisar:
                 avisar(andamento)
-        for caminho in ecds:
-            parar_se_pedirem(deve_parar)
-            _razao_de(caminho, do_razao, resumo, andamento)
-            if avisar:
-                avisar(andamento)
     finally:
         das_entradas.fechar()
         das_saidas.fechar()
-        do_razao.fechar()
+
+    # as ECD vão à parte: elas são o peso da etapa, e cada uma grava a sua parte
+    # do razão em processo próprio. Ver `_ler_as_ecd`
+    resumo.linhas_do_razao = _ler_as_ecd(ecds, destino, resumo, andamento,
+                                         avisar, deve_parar)
 
     resumo.entradas = das_entradas.gravadas
     resumo.saidas = das_saidas.gravadas
-    resumo.linhas_do_razao = do_razao.gravadas
     log.info("apuração de pis/cofins concluída", extra=serializar(resumo))
     return resumo
 
@@ -233,6 +241,175 @@ def _saidas_de(caminho: str, das_saidas: Escritor, resumo: Resumo,
     andamento.saidas = das_saidas.gravadas
 
 
+def _processos_viaveis() -> bool:
+    """Se um processo novo consegue preparar o módulo principal.
+
+    Mesma checagem de `analitico/arquivo_digital.py`, e pela mesma razão: o
+    `spawn` refaz o `__main__` no filho, e só quebra quando ele diz ter um
+    arquivo que não existe — o script lido da entrada padrão.
+    """
+    principal = sys.modules.get("__main__")
+    if getattr(principal, "__spec__", None) is not None:
+        return True
+    arquivo = getattr(principal, "__file__", None)
+    return arquivo is None or os.path.isfile(arquivo)
+
+
+def _ler_as_ecd(ecds: list[str], destino: str, resumo: Resumo, andamento: Andamento,
+                avisar: Callable[[Andamento], None] | None,
+                deve_parar: Callable[[], bool] | None) -> int:
+    """Lê as ECD em processos paralelos, uma parte do razão por arquivo.
+
+    **O paralelismo é por arquivo porque o gargalo é processador.** Medido em
+    07/10/2026 numa base de 60 ECD: `readline` custa 6 µs e vem do buffer, não
+    do disco; o que custa são os ~80 µs por linha montando campo, dicionário,
+    `Decimal` e objeto. A rodada ficou 15,6 h em 32 arquivos usando 79% de
+    **um** núcleo, com o resto da máquina parado.
+
+    Uma ECD não depende de outra, então cada processo lê a sua e grava a sua
+    parte. O pai só soma o que volta — e o que volta é pequeno: contagens e
+    identificação, nunca linha.
+
+    Cai para serial sozinho quando há um arquivo só, quando a configuração pede
+    um processo, ou quando o `spawn` não conseguiria refazer o módulo principal.
+    """
+    processos = obter_config().processos_para_ecd
+    if processos > 1 and not _processos_viaveis():
+        log.warning("o módulo principal não se reimporta num processo novo; "
+                    "as ECD vão num processo só")
+        processos = 1
+
+    if processos <= 1 or len(ecds) <= 1:
+        do_razao = Escritor(os.path.join(destino, ARQUIVO_DO_RAZAO), COLUNAS_DO_RAZAO)
+        try:
+            for caminho in ecds:
+                parar_se_pedirem(deve_parar)
+                _razao_de(caminho, do_razao, resumo, andamento)
+                if avisar:
+                    avisar(andamento)
+        finally:
+            do_razao.fechar()
+        return do_razao.gravadas
+
+    tarefas = [{"caminho": c, "destino": destino, "ordem": i}
+               for i, c in enumerate(ecds)]
+    log.info("ecd em paralelo", extra={"arquivos": len(tarefas), "processos": processos})
+    # spawn explícito: é o que o Windows faz, e o mesmo em todo lugar evita surpresa
+    contexto = multiprocessing.get_context("spawn")
+    linhas = 0
+    with ProcessPoolExecutor(max_workers=min(processos, len(tarefas)),
+                             mp_context=contexto) as pool:
+        futuros = [pool.submit(_uma_ecd_isolada, tarefa) for tarefa in tarefas]
+        try:
+            for futuro in as_completed(futuros):
+                try:
+                    feito = futuro.result()
+                except BrokenProcessPool as erro:
+                    raise RuntimeError(
+                        "Um processo da leitura das ECD morreu sem avisar. São "
+                        "duas causas, e a segunda só pega quem roda por script: "
+                        "(1) memória — o índice de uma ECD grande passa de 1 GB e "
+                        "são vários ao mesmo tempo; rode com "
+                        "CAT_PROCESSOS_DE_ECD=2 no backend/.env, ou 1 para ler uma "
+                        "de cada vez; (2) o módulo que chamou não tem a guarda "
+                        "`if __name__ == \"__main__\":` — sem ela o `spawn` do "
+                        "Windows reimporta o script e ele tenta rodar tudo de novo "
+                        "dentro de cada filho.") from erro
+
+                if feito["ilegivel"]:
+                    log.warning("não deu para ler a ECD",
+                                extra={"arquivo": feito["nome"], "erro": feito["erro"]})
+                    resumo.ilegiveis += 1
+                    resumo.avisos.append(f"{feito['nome']}: {feito['erro']}")
+                else:
+                    linhas += feito["linhas"]
+                    resumo.arquivos += 1
+                    resumo.ecd += 1
+                    andamento.arquivos += 1
+                    andamento.razao = linhas
+                    anotar_identificacao(resumo.estabelecimentos, resumo.competencias,
+                                         feito["cnpj"], feito["inicio"])
+                if avisar:
+                    avisar(andamento)
+                parar_se_pedirem(deve_parar)
+        except BaseException:
+            for futuro in futuros:
+                futuro.cancel()
+            raise
+    return linhas
+
+
+def _como_linha(linha) -> dict:
+    """A partida no formato do parquet. Usada pelos dois caminhos, o serial e o
+    paralelo — duas cópias divergiriam na primeira correção de coluna."""
+    return {
+        "cnpj": linha.cnpj, "conta": linha.conta, "descricao": linha.descricao,
+        "conta_referencial": linha.conta_referencial, "competencia": linha.competencia,
+        "data": linha.data, "numero": linha.numero,
+        "valor_do_lancamento": f"{linha.valor_do_lancamento:.2f}",
+        "centro_de_custo": linha.centro_de_custo, "valor": f"{linha.valor:.2f}",
+        "debito_ou_credito": linha.debito_ou_credito, "historico": linha.historico,
+        "codigo_do_historico": linha.codigo_do_historico,
+        "participante": linha.participante, "tipo": linha.tipo,
+        "saldo": f"{linha.saldo:.2f}", "arquivo": linha.arquivo,
+    }
+
+
+def fonte_do_razao(destino: str) -> str | None:
+    """Onde está o razão desta execução, no formato que o DuckDB lê.
+
+    **Duas formas, porque execução antiga não se regrava.** Até 07/10/2026 a
+    apuração gravava um `razao.parquet`; agora grava uma pasta `razao/` com uma
+    parte por ECD, porque as ECD são lidas em paralelo. Quem lê o razão de uma
+    execução precisa aceitar as duas — e `None` quer dizer que não há razão
+    nenhum, que é diferente de haver um vazio.
+    """
+    unico = os.path.join(destino, ARQUIVO_DO_RAZAO)
+    if os.path.isfile(unico):
+        return unico
+    pasta = os.path.join(destino, PASTA_DO_RAZAO)
+    if os.path.isdir(pasta) and glob.glob(os.path.join(pasta, "*.parquet")):
+        return os.path.join(pasta, "*.parquet")
+    return None
+
+
+def partes_do_razao(destino: str) -> list[str]:
+    """Os arquivos do razão, um a um — para quem lê com pyarrow e não com SQL."""
+    unico = os.path.join(destino, ARQUIVO_DO_RAZAO)
+    if os.path.isfile(unico):
+        return [unico]
+    return sorted(glob.glob(os.path.join(destino, PASTA_DO_RAZAO, "*.parquet")))
+
+
+def _uma_ecd_isolada(tarefa: dict) -> dict:
+    """Lê uma ECD inteira e grava a sua parte do razão. **Roda noutro processo.**
+
+    Devolve só o que o pai precisa somar: contagens, identificação e o motivo
+    quando o arquivo não deu para ler. O parquet não volta — ele já está em
+    disco, na parte que esta tarefa escreveu.
+
+    Arquivo ilegível vira resposta, não exceção: um SPED corrompido no meio de
+    sessenta não pode derrubar os outros cinquenta e nove.
+    """
+    caminho, destino, ordem = tarefa["caminho"], tarefa["destino"], tarefa["ordem"]
+    nome = os.path.basename(caminho)
+    try:
+        indice = indexar_ecd(caminho)
+    except (EcdInvalida, OSError) as erro:
+        return {"nome": nome, "ilegivel": True, "erro": str(erro)}
+
+    os.makedirs(os.path.join(destino, PASTA_DO_RAZAO), exist_ok=True)
+    parte = os.path.join(destino, PASTA_DO_RAZAO, NOME_DA_PARTE.format(ordem))
+    escritor = Escritor(parte, COLUNAS_DO_RAZAO)
+    try:
+        for linha in razao(caminho, indice):
+            escritor.escrever(_como_linha(linha))
+    finally:
+        escritor.fechar()
+    return {"nome": nome, "ilegivel": False, "linhas": escritor.gravadas,
+            "cnpj": indice.cnpj, "inicio": indice.inicio}
+
+
 def _razao_de(caminho: str, do_razao: Escritor, resumo: Resumo,
               andamento: Andamento) -> None:
     """O razão de todas as contas analíticas de uma ECD."""
@@ -246,17 +423,7 @@ def _razao_de(caminho: str, do_razao: Escritor, resumo: Resumo,
         return
 
     for linha in razao(caminho, indice):
-        do_razao.escrever({
-            "cnpj": linha.cnpj, "conta": linha.conta, "descricao": linha.descricao,
-            "conta_referencial": linha.conta_referencial, "competencia": linha.competencia,
-            "data": linha.data, "numero": linha.numero,
-            "valor_do_lancamento": f"{linha.valor_do_lancamento:.2f}",
-            "centro_de_custo": linha.centro_de_custo, "valor": f"{linha.valor:.2f}",
-            "debito_ou_credito": linha.debito_ou_credito, "historico": linha.historico,
-            "codigo_do_historico": linha.codigo_do_historico,
-            "participante": linha.participante, "tipo": linha.tipo,
-            "saldo": f"{linha.saldo:.2f}", "arquivo": linha.arquivo,
-        })
+        do_razao.escrever(_como_linha(linha))
 
     resumo.arquivos += 1
     resumo.ecd += 1

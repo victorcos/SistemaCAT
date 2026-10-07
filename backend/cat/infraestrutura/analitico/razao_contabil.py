@@ -32,7 +32,10 @@ import time
 from decimal import Decimal
 
 from cat.infraestrutura.analitico.confronto import _escapar
-from cat.infraestrutura.analitico.piscofins import ARQUIVO_DO_RAZAO
+from cat.infraestrutura.analitico.piscofins import (
+    ARQUIVO_DO_RAZAO,
+    fonte_do_razao,
+)
 from cat.infraestrutura.analitico.suportado import _leitura
 from cat.log import obter_log
 
@@ -63,8 +66,10 @@ class RazaoNaoGerado(FileNotFoundError):
 
 
 def _arquivo(destino: str) -> str:
-    caminho = os.path.join(destino, ARQUIVO_DO_RAZAO)
-    if not os.path.isfile(caminho):
+    # uma forma ou a outra: arquivo único nas rodadas até 07/10/2026, pasta de
+    # partes nas de agora, porque as ECD passaram a ser lidas em paralelo
+    caminho = fonte_do_razao(destino)
+    if caminho is None:
         raise RazaoNaoGerado(
             f"O razão contábil não está em disco nesta execução ({ARQUIVO_DO_RAZAO}). "
             "Rode a apuração de PIS/COFINS de novo, com pelo menos uma ECD no lote.")

@@ -17,6 +17,8 @@ from cat.infraestrutura.analitico.piscofins import (
     ARQUIVO_DAS_SAIDAS,
     ARQUIVO_DO_RAZAO,
     confrontar,
+    fonte_do_razao,
+    partes_do_razao,
     serializar,
 )
 
@@ -54,6 +56,77 @@ def base(tmp_path):
 
 def _ler(pasta: str, nome: str) -> list[dict]:
     return pq.read_table(f"{pasta}/{nome}").to_pylist()
+
+
+class TestAsEcdEmParalelo:
+    """As ECD lidas em processos paralelos, uma parte do razão por arquivo.
+
+    **Por que existe.** Medido em 07/10/2026 numa base de 60 ECD e 294 GB: a
+    leitura é Python puro em um núcleo — `readline` a 6 µs, que é buffer e não
+    disco, contra ~80 µs por linha montando campo, dicionário, `Decimal` e
+    objeto. A rodada ficou 15,6 h em 32 arquivos usando 79% de **um**
+    processador, com o resto da máquina parado.
+
+    O que estes testes cobram é o que a paralelização não pode quebrar: a mesma
+    saída, lida pelos mesmos lugares. O razão deixou de ser um arquivo e passou
+    a poder ser uma pasta de partes — e **execução antiga não se regrava**, então
+    quem lê tem de aceitar as duas formas.
+    """
+
+    def test_duas_ecd_produzem_o_mesmo_que_uma_de_cada_vez(self, base, tmp_path,
+                                                           monkeypatch):
+        """A prova que importa: paralelo e serial dão a mesma coisa."""
+        from cat.infraestrutura.analitico import piscofins
+
+        contrib, ecd, _ = base
+        outra = tmp_path / "ecd2.txt"
+        outra.write_bytes(ECD.encode("cp1252"))
+
+        from cat.config import obter_config
+
+        serial = str(tmp_path / "serial")
+        monkeypatch.setenv("CAT_PROCESSOS_DE_ECD", "1")
+        obter_config.cache_clear()
+        r1 = confrontar([contrib], [ecd, str(outra)], serial)
+
+        paralelo = str(tmp_path / "paralelo")
+        monkeypatch.setenv("CAT_PROCESSOS_DE_ECD", "2")
+        obter_config.cache_clear()
+        r2 = confrontar([contrib], [ecd, str(outra)], paralelo)
+        obter_config.cache_clear()
+
+        # **sem isto o teste passaria sem exercitar nada**: o caminho paralelo
+        # grava uma parte por ECD, o serial grava um arquivo só. É a forma em
+        # disco que prova por onde a rodada foi
+        assert len(partes_do_razao(serial)) == 1
+        assert len(partes_do_razao(paralelo)) == 2, (
+            "a rodada caiu no caminho serial e o teste não provaria nada")
+
+        assert r1.linhas_do_razao == r2.linhas_do_razao == 4
+        assert r1.ecd == r2.ecd == 2
+        # a soma das partes é a mesma lista, qualquer que seja a forma
+        def tudo(pasta):
+            linhas = []
+            for parte in partes_do_razao(pasta):
+                linhas += pq.read_table(parte).to_pylist()
+            return sorted((l["conta"], l["historico"], l["saldo"]) for l in linhas)
+        assert tudo(serial) == tudo(paralelo)
+
+    def test_o_razao_de_uma_execucao_antiga_continua_sendo_achado(self, base):
+        """Arquivo único: é o que todas as rodadas até 07/10/2026 gravaram."""
+        contrib, ecd, destino = base
+        confrontar([contrib], [ecd], destino)
+
+        fonte = fonte_do_razao(destino)
+
+        assert fonte is not None and fonte.endswith(ARQUIVO_DO_RAZAO)
+        assert partes_do_razao(destino) == [fonte]
+
+    def test_sem_ecd_nenhuma_nao_ha_razao_e_isso_e_dito(self, tmp_path):
+        """`None` é diferente de "um razão vazio": quem lê precisa distinguir
+        para dizer "rode de novo" em vez de mostrar zero linhas."""
+        assert fonte_do_razao(str(tmp_path)) is None
+        assert partes_do_razao(str(tmp_path)) == []
 
 
 class TestOParQueSeConfronta:

@@ -5,6 +5,54 @@
 
 ---
 
+## 2026-10-07 — As ECD passaram a ser lidas em paralelo
+
+A apuração de PIS/COFINS de uma base de 60 ECD e 294 GB ficou **15,6 h em 32
+arquivos** — e o perfil disse onde o tempo estava: `readline` custa **6 µs** e
+vem do buffer, não do disco; o que custa são os **~80 µs por linha** montando
+campo, dicionário, `Decimal` e objeto. A rodada usava **79% de um núcleo**, com
+os outros onze parados.
+
+Ou seja: o gargalo é processador, e uma ECD não depende de outra. Agora cada
+uma é lida num processo próprio e grava **a sua parte** do razão.
+
+**O padrão não é novo aqui.** A etapa 7 já gera arquivos digitais assim desde
+16/09/2026, com `ProcessPoolExecutor`, `spawn` explícito, `_processos_viaveis()`
+e queda para serial. Reusei a forma inteira em vez de inventar outra —
+inclusive o teto de 4 processos, que é por **memória**: o índice de uma ECD de
+23 GB passa de 1 GB, e o pico de uma conta grande soma a isso.
+
+### O razão virou uma pasta, e execução antiga não se regrava
+
+Até ontem a rodada gravava um `razao.parquet`. Agora grava `razao/parte-NNNN.parquet`,
+uma por ECD. As partes vão em **pasta própria** e não como `razao-NNNN.parquet`
+ao lado: `razao_por_conta.parquet` mora no mesmo destino, e um glob
+`razao*.parquet` somaria o resumo ao detalhe.
+
+`fonte_do_razao()` e `partes_do_razao()` devolvem a forma que **aquela** execução
+gravou. Os três lugares que leem o razão passaram a usá-las: a tela do razão
+contábil (DuckDB, que aceita glob nativamente), a planilha (pyarrow, que agora
+itera as partes) e o caso de uso das planilhas.
+
+### O teste que quase não provou nada
+
+Os primeiros testes passavam **sem exercitar o caminho paralelo** — e eu só
+percebi porque um script avulso quebrou de um jeito que o pytest não quebrava.
+A correção foi cobrar a **forma em disco**: uma parte por ECD no paralelo, um
+arquivo só no serial. Sem isso, o teste passaria com a paralelização desligada.
+
+Vale como regra: **quando há dois caminhos, o teste precisa provar por qual
+passou.** Asserção sobre o resultado não distingue — os dois dão o mesmo
+resultado, que é justamente o ponto.
+
+### E a mensagem de erro ganhou a segunda causa
+
+`BrokenProcessPool` eu atribuía a memória. Bati nele por outro motivo: um script
+sem `if __name__ == "__main__":` faz o `spawn` do Windows reimportar o módulo e
+rodar tudo de novo dentro de cada filho. A mensagem agora diz as duas.
+
+---
+
 ## 2026-10-06 — O número grande passou a dizer qual dos dois ele é
 
 A tese das contribuições tem **duas frentes**, e isso já estava escrito em três

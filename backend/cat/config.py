@@ -74,6 +74,26 @@ class Config(BaseSettings):
             return self.processos_do_arquivo_digital
         return max(1, min(4, (os.cpu_count() or 2) - 4))
 
+    # Quantas ECD são lidas ao mesmo tempo na apuração de PIS/COFINS. Medido em
+    # 07/10/2026 numa base de 60 ECD e 294 GB: a leitura é **Python puro em um
+    # núcleo** — 6 µs por `readline`, que é buffer e não disco, contra ~80 µs
+    # por linha montando campo, dicionário, `Decimal` e objeto. A rodada ficou
+    # 15,6 h em 32 de 60 arquivos, a 79% de **um** processador, com a máquina
+    # ociosa no resto.
+    #
+    # Por isso o paralelismo é por arquivo: uma ECD não depende de outra, e
+    # cada uma grava a sua parte do razão. O teto é memória, não processador —
+    # o índice de uma ECD de 23 GB passa de 1 GB, e o pico de uma conta grande
+    # soma a isso (ver `sped/ecd.py::razao`). Zero escolhe pelo processador
+    # deixando folga; 1 volta a ler uma de cada vez.
+    processos_de_ecd: int = 0
+
+    @property
+    def processos_para_ecd(self) -> int:
+        if self.processos_de_ecd > 0:
+            return self.processos_de_ecd
+        return max(1, min(4, (os.cpu_count() or 2) - 4))
+
     @property
     def raiz_de_trabalho(self) -> str:
         """A pasta de trabalho como caminho absoluto.
