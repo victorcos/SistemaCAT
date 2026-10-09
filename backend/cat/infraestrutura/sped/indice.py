@@ -44,6 +44,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from cat.dominio.sped.cabecalho import ArquivoNaoReconhecido, ler_cabecalho
@@ -136,6 +137,24 @@ class Cabecalho:
 
 
 @dataclass
+class ResumoDoIndice:
+    """O índice sem as posições: o que existe, não onde está.
+
+    Separado de `IndiceDoArquivo` de propósito. A lista de alvos de uma quebra
+    só pergunta *quais* registros há; carregar as posições para responder isso
+    custava 142 s numa base de 169 milhões de linhas, e nenhuma delas entrava
+    na resposta.
+    """
+
+    caminho: str
+    bytes_totais: int
+    codificacao: str
+    contagens: dict[str, int] = field(default_factory=dict)
+    indexados: set[str] = field(default_factory=set)
+    cabecalho: Cabecalho = field(default_factory=Cabecalho)
+
+
+@dataclass
 class IndiceDoArquivo:
     """O que uma passada pelo arquivo descobriu."""
 
@@ -157,9 +176,15 @@ class IndiceDoArquivo:
     def tem_posicoes(self, registro: str) -> bool:
         return bool(self.posicoes.get(registro))
 
+    @property
+    def indexados(self) -> set[str]:
+        return {r for r, p in self.posicoes.items() if p}
+
     def como_json(self) -> dict:
         return {
             "caminho": self.caminho,
+            # "indexados" é o que `ResumoDoIndice` lê para não abrir o parquet.
+            # Gravado desde sempre; o resumo tem recuo para quem não o tenha.
             "bytes_totais": self.bytes_totais,
             "codificacao": self.codificacao,
             "linhas": self.linhas,
@@ -297,8 +322,8 @@ def guardar(indice: IndiceDoArquivo, pasta: str) -> str:
     return pasta
 
 
-def buscar(pasta: str, caminho: str) -> IndiceDoArquivo | None:
-    """O índice guardado, se ainda serve. Nulo quando não serve — e por quê.
+def _json_do_indice(pasta: str, caminho: str) -> dict | None:
+    """O `indice.json`, se ainda serve. Nulo quando não serve — e por quê.
 
     Não serve quando: não existe, foi feito por uma versão anterior do esquema,
     ou o arquivo mudou de tamanho desde então. Em qualquer dos casos a resposta
@@ -321,6 +346,57 @@ def buscar(pasta: str, caminho: str) -> IndiceDoArquivo | None:
     if bruto.get("bytes_totais") != tamanho_de(caminho):
         log.info("o arquivo mudou desde o índice, será refeito",
                  extra={"arquivo": os.path.basename(caminho)})
+        return None
+    return bruto
+
+
+def resumo(pasta: str, caminho: str) -> ResumoDoIndice | None:
+    """O que o índice sabe **sem** abrir as posições.
+
+    Existe porque montar a lista de alvos de uma quebra custava 142 s numa base
+    de 169 milhões de linhas: `buscar` carregava os 789 MB de `posicoes.parquet`
+    dos 46 arquivos, posição por posição, para responder apenas *quais*
+    registros têm posição — e descartava todas em seguida. A resposta já estava
+    no `indice.json`, no campo `indexados`, que custa 32 ms por arquivo.
+
+    O recuo para o parquet fica para o índice que não tenha o campo: devolver
+    conjunto vazio ali seria dizer "nada é extraível", que é errado em silêncio.
+    """
+    bruto = _json_do_indice(pasta, caminho)
+    if bruto is None:
+        return None
+    indexados = bruto.get("indexados")
+    if indexados is None:
+        indexados = sorted(_registros_com_posicao(pasta))
+        log.info("índice sem a lista de indexados, lida do parquet",
+                 extra={"pasta": pasta, "registros": len(indexados)})
+    cabecalho = bruto.get("cabecalho", {})
+    return ResumoDoIndice(
+        caminho=bruto.get("caminho", caminho),
+        bytes_totais=bruto.get("bytes_totais", 0),
+        codificacao=bruto.get("codificacao", "cp1252"),
+        contagens=bruto.get("contagens", {}),
+        indexados=set(indexados),
+        cabecalho=Cabecalho(**{c: cabecalho.get(c, "") for c in ("cnpj", "nome", "inicio", "fim")}),
+    )
+
+
+def _registros_com_posicao(pasta: str) -> set[str]:
+    """Só a coluna `registro`, distinta — sem materializar posição nenhuma."""
+    parquet = os.path.join(pasta, ARQUIVO_DAS_POSICOES)
+    if not os.path.isfile(parquet):
+        return set()
+    coluna = pq.read_table(parquet, columns=["registro"]).column("registro")
+    return set(pc.unique(coluna).to_pylist())
+
+
+def buscar(pasta: str, caminho: str) -> IndiceDoArquivo | None:
+    """O índice guardado **com as posições**, se ainda serve.
+
+    Quem só precisa saber o que existe usa `resumo`, que não abre o parquet.
+    """
+    bruto = _json_do_indice(pasta, caminho)
+    if bruto is None:
         return None
 
     posicoes: dict[str, array.array] = {}

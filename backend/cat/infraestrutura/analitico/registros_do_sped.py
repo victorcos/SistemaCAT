@@ -49,7 +49,12 @@ from cat.infraestrutura.analitico.quebra_de_sped import (
     PASTA_DOS_INDICES,
 )
 from cat.infraestrutura.sped.extracao import RegistroNaoIndexado, registros
-from cat.infraestrutura.sped.indice import IndiceDoArquivo, buscar
+from cat.infraestrutura.sped.indice import (
+    IndiceDoArquivo,
+    ResumoDoIndice,
+    buscar,
+    resumo,
+)
 from cat.infraestrutura.sped.leitor import campos_da_linha
 from cat.infraestrutura.sped.registros import CAMPOS, campos_de
 from cat.log import obter_log
@@ -326,9 +331,18 @@ def _arquivos(destino: str) -> list[dict]:
     return pq.read_table(caminho).to_pylist()
 
 
+def _pasta_do(destino: str, caminho_do_sped: str) -> str:
+    return os.path.join(destino, PASTA_DOS_INDICES, pasta_do_indice(caminho_do_sped))
+
+
 def _indice(destino: str, caminho_do_sped: str) -> IndiceDoArquivo | None:
-    pasta = os.path.join(destino, PASTA_DOS_INDICES, pasta_do_indice(caminho_do_sped))
-    return buscar(pasta, caminho_do_sped)
+    """O índice inteiro, com as posições. Só a extração precisa disto."""
+    return buscar(_pasta_do(destino, caminho_do_sped), caminho_do_sped)
+
+
+def _resumo(destino: str, caminho_do_sped: str) -> ResumoDoIndice | None:
+    """O que o índice sabe sem abrir o parquet das posições."""
+    return resumo(_pasta_do(destino, caminho_do_sped), caminho_do_sped)
 
 
 def disponiveis(destino: str) -> dict:
@@ -354,14 +368,18 @@ def disponiveis(destino: str) -> dict:
     com_posicao: set[str] = set()
     sem_indice = 0
     for linha in _arquivos(destino):
-        indice = _indice(destino, linha.get("caminho") or "")
+        # `_resumo` e não `_indice`: esta função só pergunta o que existe, e
+        # abrir as posições para isso custava 142 s numa quebra de 169 milhões
+        # de linhas -- tempo que a tela não espera, e que chegou ao usuário
+        # como "o motor do sistema não respondeu" (09/10/2026, execução #181).
+        indice = _resumo(destino, linha.get("caminho") or "")
         if indice is None:
             sem_indice += 1
             continue
         for registro, quantos in indice.contagens.items():
             if quantos and registro in CAMPOS:
                 total[registro] = total.get(registro, 0) + quantos
-        com_posicao.update(r for r, posicoes in indice.posicoes.items() if posicoes)
+        com_posicao.update(indice.indexados)
 
     simples = [{"alvo": r, "rotulo": r, "bloco": bloco_de(r), "quantidade": q,
                 "colunas": len(COLUNAS_DA_ORIGEM) + len(CAMPOS[r]), "hierarquia": False}

@@ -5,6 +5,71 @@
 
 ---
 
+## 2026-10-09 — A lista de alvos da quebra carregava 169 milhões de posições para não usar nenhuma
+
+A execução #181 quebrou 46 EFD-Contribuições — **169.480.272 linhas** — e
+concluiu em 16 min 23 s. Em seguida, abrir a lista do que dava para extrair
+**travou**, e a tela mostrou *"O motor do sistema não respondeu"*.
+
+### Não era o motor
+
+O motor nunca caiu: respondia `interno/saude` em 4 a 10 ms, estava no ar desde
+07/10 sem reinício, e não houve evento de falha no Windows. A `#181` consta
+`concluida` no banco, sem erro. Reproduzindo a chamada direto no motor,
+`POST /interno/quebra/alvos` passava de 120 s sem responder.
+
+### Era `disponiveis()`
+
+Para responder *quais* registros dá para extrair, ela chamava `buscar()` por
+arquivo — e `buscar()` carrega o `posicoes.parquet` inteiro, posição por
+posição, em objeto Python:
+
+```python
+tabela = pq.read_table(parquet)
+for registro, posicao in zip(tabela.column("registro").to_pylist(),
+                             tabela.column("posicao").to_pylist()):
+    posicoes.setdefault(registro, array.array("q")).append(posicao)
+```
+
+Nos 46 índices da #181 isso é **789 MB e 169.200.030 posições**. Medido a frio:
+**142,4 s**. E **nenhuma delas entra na resposta** — `disponiveis()` só usa
+`indice.contagens` e o conjunto de registros que têm alguma posição.
+
+### A resposta já estava gravada
+
+O `indice.json` sempre teve o campo `indexados`: `sorted(r for r, p in
+self.posicoes.items() if p)`. Ler esse JSON custa **32 ms** por arquivo.
+
+Entrou `ResumoDoIndice` e a função `resumo()`, que leem só o JSON; `buscar()`
+continua existindo, com as posições, para a extração — que precisa delas de
+verdade. `disponiveis()` passou a usar o resumo.
+
+| | tempo na #181 |
+|---|---|
+| antes, carregando as posições | **142,4 s** (a frio) |
+| depois, só o JSON | **0,49 s** |
+
+**290x**, e a saída é byte a byte idêntica — comparei os dois caminhos sobre a
+mesma pasta.
+
+### O recuo, e por que ele existe
+
+Índice sem o campo `indexados` lê a coluna `registro` do parquet e tira o
+distinto por `pyarrow.compute.unique` — 12,5 s nos 46, ainda 11x melhor que
+hoje. Devolver conjunto vazio ali seria dizer *"nada é extraível"* em silêncio,
+que é pior que demorar.
+
+### O que isso ensina
+
+A separação errada não era de desempenho, era de **pergunta**. "O que existe" e
+"onde está" são duas perguntas, e a segunda custa mil vezes mais. Uma função só
+respondendo as duas faz quem precisa da primeira pagar pela segunda — e o preço
+só aparece quando a base cresce, longe de quem escreveu o código.
+
+Vale olhar os outros pontos que chamam `buscar()` com a mesma lente.
+
+---
+
 ## 2026-10-07 — O paralelismo entregou 1,9x, não os 4x que eu projetei
 
 A entrada de hoje sobre a leitura das ECD em paralelo diz que o ganho esperado
