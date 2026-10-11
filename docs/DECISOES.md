@@ -5,6 +5,71 @@
 
 ---
 
+## 2026-10-11 — A extração carregava 169 milhões de posições para usar 46 (ou nenhuma)
+
+Dois dias depois de a lista de alvos deixar de carregar as posições, o mesmo
+defeito apareceu no outro lado: marcar seis registros do bloco M e pedir o zip
+dava *"Não foi possível baixar a planilha"*. `status 0` — o `fetch` morreu, não
+houve resposta de recusa.
+
+### A extração pedia o índice inteiro, por alvo
+
+`extrair()` chamava `_indice()` por arquivo, e `buscar()` carregava **todas** as
+posições: 169.200.030 nos 46 índices da #181, **205,6 s**. Por alvo. Seis alvos
+viravam vinte minutos só de índice.
+
+E ela precisa de muito menos:
+
+* **registro simples** usa as posições de **um** registro — 46 delas no M200;
+* **hierarquia** não usa **nenhuma**. Ela varre o arquivo em ordem porque o
+  vínculo do SPED *é* a ordem; pular para a posição da folha perderia o pai.
+
+`buscar()` ganhou `registros`: `None` carrega tudo (a reindexação quer isso),
+uma lista filtra no parquet, e `()` não carrega nada. `_posicoes_necessarias`
+decide — o alvo quando é registro, vazio quando é hierarquia.
+
+| | por alvo, na #181 |
+|---|---|
+| tudo (como era) | **205,6 s**, 169.200.030 posições |
+| um registro, filtrado | **6,3 s**, 46 posições |
+| hierarquia | **0 s** |
+
+`M200` inteiro saiu de 205 s + seeks para **5,7 s** — 36x.
+
+### `indexados` deixou de sair das posições
+
+Com o filtro, deduzir "o que este arquivo tem" do que foi carregado diria *"só
+existe o que você pediu"*. A mensagem de registro não indexado é justamente o
+que orienta quem está conferindo, e ela passaria a mentir. O campo agora vem do
+`indice.json`, e só cai para a dedução quando quem montou o índice não o disse.
+
+### O que a correção **não** resolve, e é o número que importa
+
+Os 46 EFD somam **13,8 GB no Z:**. Hierarquia relê os 46 inteiros, e isso é
+inerente ao leiaute. Medido depois da correção: **407 s** para `M200+M210`,
+**398 s** para `M100+M110`.
+
+Seis alvos de hierarquia = **83 GB de leitura em rede**, uns quarenta minutos.
+Nenhuma requisição HTTP sobrevive a isso, e é por isso que o erro chegou como
+`status 0` em vez de uma recusa do servidor.
+
+Ficam duas frentes abertas, nesta ordem de valor:
+
+1. **Zip pela fila**, como as apurações: o clique enfileira, a tela acompanha,
+   o download fica pronto no fim. Resolve o teto de vez — inclusive para o
+   `C175`, com 117.604.626 linhas, que nunca caberá numa requisição.
+2. **Uma passada para vários alvos**: os seis varrem os mesmos 46 arquivos.
+   83 GB viram 13,8 GB.
+
+### O que isso ensina (de novo)
+
+É a mesma lição da entrada de 09/10, e ela se repetiu em dois dias: *"o que
+existe"*, *"onde está um registro"* e *"onde está tudo"* são três perguntas com
+três preços. Uma função que só sabe responder a mais cara faz todo chamador
+pagar por ela. Vale varrer os outros pontos que carregam índice inteiro.
+
+---
+
 ## 2026-10-09 — A lista de alvos da quebra carregava 169 milhões de posições para não usar nenhuma
 
 A execução #181 quebrou 46 EFD-Contribuições — **169.480.272 linhas** — e

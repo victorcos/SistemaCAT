@@ -163,6 +163,10 @@ class IndiceDoArquivo:
     codificacao: str
     contagens: dict[str, int] = field(default_factory=dict)
     posicoes: dict[str, array.array] = field(default_factory=dict)
+    # Quais registros TÊM posição no arquivo, mesmo que não tenham sido
+    # carregados agora. Nulo quando quem montou não disse: aí deduz de
+    # `posicoes`, que é o certo para o índice recém-feito.
+    indexados_guardados: set[str] | None = None
     cabecalho: Cabecalho = field(default_factory=Cabecalho)
     versao_do_esquema: int = VERSAO_DO_ESQUEMA
 
@@ -178,6 +182,9 @@ class IndiceDoArquivo:
 
     @property
     def indexados(self) -> set[str]:
+        """O que o arquivo tem indexado — não o que esta leitura carregou."""
+        if self.indexados_guardados is not None:
+            return self.indexados_guardados
         return {r for r, p in self.posicoes.items() if p}
 
     def como_json(self) -> dict:
@@ -390,8 +397,17 @@ def _registros_com_posicao(pasta: str) -> set[str]:
     return set(pc.unique(coluna).to_pylist())
 
 
-def buscar(pasta: str, caminho: str) -> IndiceDoArquivo | None:
+def buscar(pasta: str, caminho: str,
+           registros: Iterable[str] | None = None) -> IndiceDoArquivo | None:
     """O índice guardado **com as posições**, se ainda serve.
+
+    `registros` limita o que sai do parquet. Vale a pena medir: nos 46 índices
+    da execução #181 são 169.200.030 posições e **205 s** para carregar tudo,
+    contra **6,3 s** para um registro só — e a extração nunca precisa de mais
+    de um. Hierarquia não precisa de nenhum: ela lê o arquivo em ordem, porque
+    o vínculo do SPED *é* a ordem. Passar `()` pede exatamente isso.
+
+    `None` continua carregando tudo, que é o que a reindexação quer.
 
     Quem só precisa saber o que existe usa `resumo`, que não abre o parquet.
     """
@@ -401,11 +417,17 @@ def buscar(pasta: str, caminho: str) -> IndiceDoArquivo | None:
 
     posicoes: dict[str, array.array] = {}
     parquet = os.path.join(pasta, ARQUIVO_DAS_POSICOES)
-    if os.path.isfile(parquet):
-        tabela = pq.read_table(parquet)
+    pedidos = None if registros is None else sorted(set(registros))
+    if os.path.isfile(parquet) and pedidos != []:
+        filtro = None if pedidos is None else [("registro", "in", pedidos)]
+        tabela = pq.read_table(parquet, filters=filtro)
         for registro, posicao in zip(tabela.column("registro").to_pylist(),
                                      tabela.column("posicao").to_pylist()):
             posicoes.setdefault(registro, array.array("q")).append(posicao)
+    # `indexados` vem do JSON e não das posições: com o filtro acima, deduzir
+    # do que foi carregado diria "só existe o que você pediu" -- e é essa lista
+    # que a mensagem de registro não indexado mostra a quem está conferindo
+    indexados = bruto.get("indexados")
     cabecalho = bruto.get("cabecalho", {})
     return IndiceDoArquivo(
         caminho=bruto.get("caminho", caminho),
@@ -413,6 +435,7 @@ def buscar(pasta: str, caminho: str) -> IndiceDoArquivo | None:
         codificacao=bruto.get("codificacao", "cp1252"),
         contagens=bruto.get("contagens", {}),
         posicoes=posicoes,
+        indexados_guardados=set(indexados) if indexados is not None else None,
         cabecalho=Cabecalho(**{c: cabecalho.get(c, "") for c in ("cnpj", "nome", "inicio", "fim")}),
         versao_do_esquema=VERSAO_DO_ESQUEMA,
     )

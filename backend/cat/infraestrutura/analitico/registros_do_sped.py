@@ -335,9 +335,26 @@ def _pasta_do(destino: str, caminho_do_sped: str) -> str:
     return os.path.join(destino, PASTA_DOS_INDICES, pasta_do_indice(caminho_do_sped))
 
 
-def _indice(destino: str, caminho_do_sped: str) -> IndiceDoArquivo | None:
-    """O índice inteiro, com as posições. Só a extração precisa disto."""
-    return buscar(_pasta_do(destino, caminho_do_sped), caminho_do_sped)
+def _indice(destino: str, caminho_do_sped: str,
+            registros: Iterable[str] | None = None) -> IndiceDoArquivo | None:
+    """O índice com as posições de `registros` — e só delas.
+
+    A extração de um alvo usa as posições de **um** registro, e a de uma
+    hierarquia não usa nenhuma: ela lê o arquivo em ordem. Carregar as
+    169.200.030 posições dos 46 índices da #181 para isso custava 205 s por
+    alvo; seis alvos de bloco M viravam vinte minutos e a tela desistia.
+    """
+    return buscar(_pasta_do(destino, caminho_do_sped), caminho_do_sped, registros)
+
+
+def _posicoes_necessarias(resolvido: str | Hierarquia) -> tuple[str, ...]:
+    """O registro cujas posições a extração vai pedir ao índice.
+
+    Hierarquia devolve vazio **de propósito**: `_da_hierarquia` varre o arquivo
+    do começo porque o vínculo do SPED é a ordem — pular para as posições da
+    folha perderia o pai, que é o que se foi buscar.
+    """
+    return (resolvido,) if isinstance(resolvido, str) else ()
 
 
 def _resumo(destino: str, caminho_do_sped: str) -> ResumoDoIndice | None:
@@ -519,7 +536,7 @@ def extrair(destino: str, alvo: str, recorte: Recorte | None = None,
         for arquivo in _arquivos(destino):
             parar_se_pedirem(deve_parar)
             caminho_do_sped = arquivo.get("caminho") or ""
-            indice = _indice(destino, caminho_do_sped)
+            indice = _indice(destino, caminho_do_sped, _posicoes_necessarias(resolvido))
             if indice is None:
                 continue
             lidos += 1

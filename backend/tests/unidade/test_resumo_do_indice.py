@@ -172,3 +172,81 @@ class TestORecuoQuandoOJsonENovoDemaisOuVelhoDemais:
 
     def test_indice_que_nao_existe_devolve_nulo(self, tmp_path):
         assert resumo(str(tmp_path), str(tmp_path / "nao_existe.txt")) is None
+
+
+class TestOIndiceCarregadoSoDoQuePrecisa:
+    """A segunda metade do mesmo defeito, agora na extração.
+
+    Extrair um alvo carregava as posições de **todos** os registros de todos os
+    arquivos — 169.200.030 na #181, 205 s por alvo. A extração usa as de **um**
+    registro; a de hierarquia não usa nenhuma, porque lê o arquivo em ordem.
+    Seis alvos de bloco M viravam quarenta minutos, e o navegador desistia
+    antes com "Não foi possível baixar a planilha".
+    """
+
+    def test_pedir_um_registro_traz_as_mesmas_posicoes_daquele_registro(self, quebrado):
+        destino, caminhos = quebrado
+        pasta = _pasta_do_indice(destino, caminhos[0])
+
+        inteiro = buscar(pasta, caminhos[0])
+        filtrado = buscar(pasta, caminhos[0], ["C170"])
+
+        assert list(filtrado.posicoes["C170"]) == list(inteiro.posicoes["C170"])
+
+    def test_nao_traz_o_que_nao_foi_pedido(self, quebrado):
+        destino, caminhos = quebrado
+        pasta = _pasta_do_indice(destino, caminhos[0])
+
+        filtrado = buscar(pasta, caminhos[0], ["C170"])
+
+        assert set(filtrado.posicoes) == {"C170"}, (
+            "carregar o resto é exatamente o custo que esta mudança corta")
+
+    def test_hierarquia_pede_nada_e_nada_vem(self, quebrado):
+        """Lista vazia não é 'tudo': é 'nenhum'. A diferença são 205 s."""
+        destino, caminhos = quebrado
+        pasta = _pasta_do_indice(destino, caminhos[0])
+
+        assert buscar(pasta, caminhos[0], []).posicoes == {}
+
+    def test_sem_pedido_continua_trazendo_tudo(self, quebrado):
+        """A reindexação depende disto; só quem sabe o que quer filtra."""
+        destino, caminhos = quebrado
+        pasta = _pasta_do_indice(destino, caminhos[0])
+
+        assert set(buscar(pasta, caminhos[0]).posicoes) > {"C170"}
+
+    def test_o_filtro_nao_encolhe_a_lista_de_indexados(self, quebrado):
+        """Senão a mensagem de erro diria 'indexados: C170' para quem pediu
+        C170 e não achou — justamente a informação que ele foi buscar."""
+        destino, caminhos = quebrado
+        pasta = _pasta_do_indice(destino, caminhos[0])
+
+        assert buscar(pasta, caminhos[0], ["C170"]).indexados == \
+            buscar(pasta, caminhos[0]).indexados
+
+    def test_o_registro_ausente_ainda_lista_o_que_existe(self, quebrado):
+        """O índice filtrado não pode empobrecer o diagnóstico."""
+        from cat.infraestrutura.sped.extracao import RegistroNaoIndexado, registros
+
+        destino, caminhos = quebrado
+        pasta = _pasta_do_indice(destino, caminhos[0])
+        indice = buscar(pasta, caminhos[0], ["C500"])      # não existe na base
+
+        with pytest.raises(RegistroNaoIndexado, match="C170"):
+            next(registros(caminhos[0], indice, "C500"))
+
+
+class TestQuemDecideOQuePedir:
+    def test_registro_simples_pede_as_posicoes_dele(self):
+        from cat.infraestrutura.analitico.registros_do_sped import _posicoes_necessarias
+
+        assert _posicoes_necessarias("C170") == ("C170",)
+
+    def test_hierarquia_nao_pede_posicao_nenhuma(self):
+        from cat.infraestrutura.analitico.registros_do_sped import (
+            HIERARQUIAS,
+            _posicoes_necessarias,
+        )
+
+        assert _posicoes_necessarias(HIERARQUIAS[0]) == ()

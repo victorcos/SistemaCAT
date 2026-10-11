@@ -84,9 +84,12 @@ def registros(caminho: str, indice: IndiceDoArquivo, registro: str,
     """
     guardadas = indice.posicoes.get(registro)
     if not guardadas:
+        # `indexados` e não as posições carregadas: quem lê o índice filtrado
+        # carregou só o registro pedido, e listar isso diria "indexados:
+        # nenhum" justamente para quem está tentando descobrir o que há
         raise RegistroNaoIndexado(
             f"O registro {registro} não foi indexado neste arquivo. "
-            f"Indexados: {', '.join(sorted(r for r, p in indice.posicoes.items() if p)) or 'nenhum'}."
+            f"Indexados: {', '.join(sorted(indice.indexados)) or 'nenhum'}."
         )
     fim = len(guardadas) if quantos is None else min(de + quantos, len(guardadas))
     with open(caminho, "rb") as arquivo:
