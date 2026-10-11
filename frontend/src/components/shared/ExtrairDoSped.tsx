@@ -154,6 +154,17 @@ export function ExtrairDoSped({ execucaoId }: { execucaoId: number }) {
         </Faixa>
       )}
 
+      {(dados.sem_leiaute?.length ?? 0) > 0 && (
+        <Faixa
+          titulo={`${dados.sem_leiaute!.length} registro(s) nos arquivos que o sistema ainda não sabe ler`}
+        >
+          {dados.sem_leiaute!.map((n) => `${n.alvo} (${numero(n.quantidade)})`).join(", ")}
+          . Eles existem no SPED e foram contados, mas não há leiaute para eles aqui — sem os
+          nomes das colunas, a planilha sairia com campo sem nome. Rodar a quebra de novo{" "}
+          <strong>não</strong> resolve; peça a inclusão do registro.
+        </Faixa>
+      )}
+
       <RecorteDoSped
         recorte={recorte}
         aoMudar={setRecorte}

@@ -383,6 +383,11 @@ def disponiveis(destino: str) -> dict:
     """
     total: dict[str, int] = {}
     com_posicao: set[str] = set()
+    # contado no arquivo e sem leiaute aqui: não entra em `total`, e por isso
+    # sumia da tela **inteira** -- nem na lista de extração nem na de não
+    # extraíveis. Foi assim que o M205 ficou invisível, e só apareceu porque
+    # alguém notou a olho que faltava (11/10/2026)
+    sem_leiaute: dict[str, int] = {}
     sem_indice = 0
     for linha in _arquivos(destino):
         # `_resumo` e não `_indice`: esta função só pergunta o que existe, e
@@ -394,8 +399,12 @@ def disponiveis(destino: str) -> dict:
             sem_indice += 1
             continue
         for registro, quantos in indice.contagens.items():
-            if quantos and registro in CAMPOS:
+            if not quantos:
+                continue
+            if registro in CAMPOS:
                 total[registro] = total.get(registro, 0) + quantos
+            else:
+                sem_leiaute[registro] = sem_leiaute.get(registro, 0) + quantos
         com_posicao.update(indice.indexados)
 
     simples = [{"alvo": r, "rotulo": r, "bloco": bloco_de(r), "quantidade": q,
@@ -419,6 +428,11 @@ def disponiveis(destino: str) -> dict:
             "execucao_pasta": os.path.basename(destino),
             "registros": [n["alvo"] for n in nao_extraiveis],
             "acao": "rodar a quebra de novo para indexá-los"})
+    if sem_leiaute:
+        log.warning("registros contados sem leiaute nesta casa", extra={
+            "execucao_pasta": os.path.basename(destino),
+            "registros": sorted(sem_leiaute),
+            "acao": "declarar o leiaute em CAMPOS e o alvo em ALVOS_PADRAO"})
     return {
         "linhas": [*hierarquias, *simples],
         "blocos": sorted({l["bloco"] for l in (*hierarquias, *simples)}),
@@ -433,6 +447,12 @@ def disponiveis(destino: str) -> dict:
         # some da lista de extração sem sumir da tela. Resolve rodando a
         # quebra de novo, que reindexa com o ALVOS_PADRAO de hoje.
         "nao_extraiveis": nao_extraiveis,
+        # registro que existe nos arquivos e para o qual esta casa não tem
+        # leiaute. Rodar a quebra de novo **não** resolve — é código a
+        # escrever. Vem para a tela porque some dela seria pior: foi assim
+        # que o M205 ficou invisível até alguém notar a olho.
+        "sem_leiaute": [{"alvo": r, "quantidade": q, "bloco": bloco_de(r)}
+                        for r, q in sorted(sem_leiaute.items())],
     }
 
 

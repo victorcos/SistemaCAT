@@ -39,7 +39,11 @@ from cat.infraestrutura.sped.indice import (
 
 
 def _sped(inicio: str, fim: str) -> str:
-    """Um EFD-Contribuições mínimo, com registro indexado e registro contado."""
+    """Um EFD-Contribuições mínimo, com registro indexado e registro contado.
+
+    O `M115` entra de propósito: é contado pelo índice e **não tem leiaute**
+    nesta casa. É o caso que fazia o registro sumir da tela inteira.
+    """
     return "\n".join([
         f"|0000|005|0|{inicio}|{fim}|EMPRESA TESTE|31698759000113|MG|||0|",
         "|0140|001|EMPRESA TESTE|31698759000113|MG||||",
@@ -48,7 +52,9 @@ def _sped(inicio: str, fim: str) -> str:
         "|C170|1|ITEM-1|desc|1|UN|50,00|0,00|0|5102|",
         "|C170|2|ITEM-2|desc|1|UN|50,00|0,00|0|5102|",
         "|M200|10,00|0,00|0,00|0,00|0,00|10,00|0,00|0,00|0,00|10,00|",
-        "|9999|8|",
+        "|M205|08|691201|10,00|",
+        "|M115|01|1,00|detalhe sem leiaute aqui|",
+        "|9999|10|",
     ]) + "\n"
 
 
@@ -235,6 +241,54 @@ class TestOIndiceCarregadoSoDoQuePrecisa:
 
         with pytest.raises(RegistroNaoIndexado, match="C170"):
             next(registros(caminhos[0], indice, "C500"))
+
+
+class TestORegistroSemLeiauteNaoSomeDaTela:
+    """Como o M205 ficou invisível até alguém notar a olho (11/10/2026).
+
+    `disponiveis()` só contava registro que tem leiaute, e `nao_extraiveis` só
+    pega "tem leiaute e não foi indexado". Registro **sem leiaute** não entrava
+    em lista nenhuma: a tela não dizia que ele existe, e quem confere lia isso
+    como "não existe no SPED". No bloco M da base do Dom eram dez registros
+    escondidos, entre eles o M115 com 64.183 linhas.
+    """
+
+    def test_o_registro_sem_leiaute_aparece_com_a_contagem(self, quebrado):
+        destino, _ = quebrado
+
+        d = disponiveis(destino)
+
+        por_alvo = {n["alvo"]: n for n in d["sem_leiaute"]}
+        assert "M115" in por_alvo, "sumir da tela é pior que aparecer sem poder extrair"
+        assert por_alvo["M115"]["quantidade"] == 2      # um por arquivo
+        assert por_alvo["M115"]["bloco"] == "M"
+
+    def test_ele_nao_entra_na_lista_de_extracao(self, quebrado):
+        """Oferecer o que não se extrai é prometer trabalho, não resultado."""
+        destino, _ = quebrado
+
+        d = disponiveis(destino)
+
+        assert "M115" not in {l["alvo"] for l in d["linhas"]}
+
+    def test_nem_na_lista_dos_que_a_quebra_nao_indexou(self, quebrado):
+        """São dois problemas com saídas diferentes: um resolve reindexando,
+        o outro só com código novo. Misturar daria conselho errado na tela."""
+        destino, _ = quebrado
+
+        d = disponiveis(destino)
+
+        assert "M115" not in {n["alvo"] for n in d["nao_extraiveis"]}
+
+    def test_o_m205_agora_tem_leiaute_e_sai_na_lista(self, quebrado):
+        """O pedido que descobriu tudo isto."""
+        destino, _ = quebrado
+
+        d = disponiveis(destino)
+
+        por_alvo = {l["alvo"]: l for l in d["linhas"]}
+        assert por_alvo["M205"]["quantidade"] == 2
+        assert "M205" not in {n["alvo"] for n in d["sem_leiaute"]}
 
 
 class TestQuemDecideOQuePedir:

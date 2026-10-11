@@ -68,7 +68,11 @@ log = obter_log(__name__)
 # extração responderia "registro não indexado" para um arquivo que o tem. A
 # versão é o que força refazer — e refazer custa uma passada no arquivo
 # 5 em 29/09/2026: entraram o C175 e o bloco A, que o 047 precisa
-VERSAO_DO_ESQUEMA = 5
+# 6 em 11/10/2026: entraram o M205 e o M605 — o débito aberto por código de
+# receita da DARF. Sem subir a versão, o índice guardado continuaria sem as
+# posições deles e a extração responderia "registro não indexado" para um
+# arquivo que os tem, que é exatamente o que a versão 4 já tinha evitado
+VERSAO_DO_ESQUEMA = 6
 
 # Os registros cujas posições se guardam por padrão. Guardar de todos custaria
 # memória à toa: a contagem já responde a maior parte das perguntas, e posição
@@ -100,9 +104,11 @@ ALVOS_PADRAO: tuple[str, ...] = (
     # o F010 abre o bloco F como o A010 e o C010 abrem os seus; ficou de fora
     # por descuido, e sem ele a tela oferece o alvo e a extração não acha índice
     "D100", "D500", "F010", "F100",
-    # o bloco M: a apuração, e é dele que sai o número que o cliente pergunta
-    "M100", "M105", "M110", "M200", "M210", "M220",
-    "M500", "M505", "M510", "M600", "M610", "M620",
+    # o bloco M: a apuração, e é dele que sai o número que o cliente pergunta.
+    # O M205/M605 abre o débito por código de receita da DARF: são poucas
+    # linhas e é por elas que a contribuição apurada se amarra ao recolhido
+    "M100", "M105", "M110", "M200", "M205", "M210", "M220",
+    "M500", "M505", "M510", "M600", "M605", "M610", "M620",
 )
 
 ARQUIVO_DO_INDICE = "indice.json"

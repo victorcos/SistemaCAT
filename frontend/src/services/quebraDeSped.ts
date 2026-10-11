@@ -90,6 +90,10 @@ export interface AlvosDaQuebra {
    * do usuário, e esconder sem dizer vira "não existe no SPED".
    */
   nao_extraiveis: { alvo: string; quantidade: number; bloco: string }[];
+  // existe no SPED e o sistema não tem leiaute para ele. Separado dos não
+  // indexados porque a saída é outra: aquele resolve rodando a quebra de
+  // novo, este só resolve com código novo
+  sem_leiaute?: { alvo: string; quantidade: number; bloco: string }[];
 }
 
 /**

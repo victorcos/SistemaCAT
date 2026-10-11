@@ -5,6 +5,83 @@
 
 ---
 
+## 2026-10-11 — O M205 não estava faltando: estava invisível
+
+Pedido: *"está faltando o M205"*. Ele existe nos arquivos — 5 linhas em 59
+competências — e estava contado no índice. O que não existia era o **leiaute**.
+
+### Por que ele sumia da tela inteira
+
+`disponiveis()` monta a lista assim:
+
+```python
+if quantos and registro in CAMPOS:
+    total[registro] = total.get(registro, 0) + quantos
+```
+
+Quem não tem leiaute **não entra em `total`**. E `nao_extraiveis` é calculado
+*a partir de `total`*: ele pega "tem leiaute e não foi indexado". Registro sem
+leiaute não caía em lista nenhuma — nem na de extração, nem na de aviso.
+
+A tela ficava em silêncio, e silêncio ali se lê como *"não existe no SPED"*.
+
+Só no bloco M da base do Dom eram **dez** registros escondidos:
+
+| | linhas |
+|---|---|
+| `M115` | 64.183 |
+| `M515` | 64.217 |
+| `M410`, `M810` | 1.377 cada |
+| `M400`, `M800` | 92 cada |
+| `M205` | 5 |
+| `M605` | 6 |
+
+O M205 só apareceu porque **alguém notou a olho**. Esse é o problema: não havia
+como descobrir de outro jeito.
+
+### O leiaute, conferido na base
+
+Não escrevi de memória. Li a linha no arquivo:
+
+```
+|M205|08|691201|29650,49|
+|M605|08|585601|274418,93|
+```
+
+Três campos além do `REG`: `NUM_CAMPO`, `COD_REC`, `VL_DEBITO`. O `COD_REC` é o
+código da receita da DARF — é por ele que a contribuição apurada se amarra ao
+que foi efetivamente recolhido, que é o uso que justifica o pedido.
+
+Os dois entraram em `CAMPOS` e em `ALVOS_PADRAO`, e `VERSAO_DO_ESQUEMA` subiu
+para **6**. Sem subir, o índice guardado continuaria sem as posições deles e a
+extração responderia "registro não indexado" para um arquivo que os tem — o
+mesmo erro que a versão 4 já tinha evitado uma vez.
+
+**Quebras feitas antes precisam rodar de novo** para enxergar o M205.
+
+### O aviso novo, e por que não é o mesmo aviso
+
+Registro fora da lista tem agora duas causas, com saídas **opostas**:
+
+* **não indexado** — a quebra é anterior à entrada dele no índice. Rodar de
+  novo resolve;
+* **sem leiaute** — rodar de novo **não** resolve. É código a escrever.
+
+Dar o aviso existente aos dois mandaria o usuário gastar meia hora de leitura
+para o registro continuar faltando. Entrou `sem_leiaute` na resposta e uma
+faixa própria na tela, dizendo o que fazer.
+
+### O que isso ensina
+
+O filtro `registro in CAMPOS` estava certo sobre **o que oferecer** e errado
+sobre **o que contar**. Decidir não oferecer é uma coisa; decidir não mencionar
+é outra, e foi a segunda que escondeu o M205 por tempo indeterminado.
+
+Todo filtro que remove item de uma lista para o usuário merece a pergunta: o
+que removi aparece em algum outro lugar, ou desapareceu do mundo?
+
+---
+
 ## 2026-10-11 — A extração carregava 169 milhões de posições para usar 46 (ou nenhuma)
 
 Dois dias depois de a lista de alvos deixar de carregar as posições, o mesmo

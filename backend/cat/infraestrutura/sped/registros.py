@@ -230,6 +230,11 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "ALIQ_PIS_QUANT", "VL_CONT_APUR", "VL_AJUS_ACRES", "VL_AJUS_REDUC",
         "VL_CONT_DIFER", "VL_CONT_DIFER_ANT", "VL_CONT_PER",
     ),
+    # O débito do M200 aberto por código de receita da DARF. São poucas linhas
+    # -- cinco em 59 competências na base do Dom -- e é por elas que se amarra
+    # a contribuição apurada ao que foi efetivamente recolhido: o COD_REC é o
+    # código da DARF. Conferido na base: |M205|08|691201|29650,49|
+    "M205": ("REG", "NUM_CAMPO", "COD_REC", "VL_DEBITO"),
     "M220": ("REG", "IND_AJ", "VL_AJ", "COD_AJ", "NUM_DOC", "DESCR_AJ", "DT_REF"),
     # e o espelho, na COFINS
     "M500": (
@@ -257,6 +262,8 @@ CAMPOS: dict[str, tuple[str, ...]] = {
         "ALIQ_COFINS_QUANT", "VL_CONT_APUR", "VL_AJUS_ACRES", "VL_AJUS_REDUC",
         "VL_CONT_DIFER", "VL_CONT_DIFER_ANT", "VL_CONT_PER",
     ),
+    # o espelho do M205. Conferido na base: |M605|08|585601|274418,93|
+    "M605": ("REG", "NUM_CAMPO", "COD_REC", "VL_DEBITO"),
     "M620": ("REG", "IND_AJ", "VL_AJ", "COD_AJ", "NUM_DOC", "DESCR_AJ", "DT_REF"),
     # ---- cupom fiscal (ECF) e CF-e SAT ----
     # Entraram em 28/09/2026, com a extração de registro: são o que o varejo
