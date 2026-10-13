@@ -5,6 +5,59 @@
 
 ---
 
+## 2026-10-13 — Ligar dois códigos deixou de ser digitar de cabeça
+
+O de-para sempre aceitou o par feito à mão: `DePara.Motivos` tem `analista`
+desde o começo, e a tabela dos sem par tinha a coluna "Mesmo produto que".
+
+Só que era **um campo de texto**. Para ligar, a pessoa precisava saber o código
+de destino de cor: sem busca, sem a descrição do outro lado, e sem alcançar o
+código que **só tem entrada** — que é justamente o par que falta, porque o que
+sobra sem par é o que só tem saída. Era literalmente impossível fazer a ligação
+olhando para os dois lados; a RVZ fez isso numa planilha à parte.
+
+### O que entrou
+
+`ordenar_candidatos`, no domínio, ordena os prováveis pares de um código e diz
+**por que** cada um subiu. Ela **não propõe**: `propor` só devolve o que prova
+(GTIN, sufixo repetido, kit, metade das palavras em comum), e esta lista existe
+para o que ficou de fora dela. Quem decide continua sendo quem olha.
+
+A rota `/depara/para-ligar` é separada da `/depara/candidatos`, que devolve o
+de-para inteiro: esta é por código e tem busca, e juntar as duas faria a tela
+baixar o trabalho todo a cada tecla.
+
+### A linha que quase passou errada
+
+A primeira versão dava entrada na lista por "tem entrada e não tem saída".
+Medido no catálogo da empresa 04, isso punha um `PARAFUSO SEXTAVADO` acima do
+kit da própria castanha — porque **todo código de compra do catálogo tem
+entrada e não tem saída**. Descreve a forma do problema, não o produto.
+
+Virou **desempate**: entra na lista quem tem GTIN igual, NCM igual, descrição
+parecida ou código que começa o outro; a forma do problema só ordena entre
+esses. Quem busca pelo nome vê qualquer um, porque já disse o que quer.
+
+No dado real da empresa 04, pedindo o par de `1012           08` (o código com
+espaços do ERP, 14.208 entradas e zero saídas):
+
+| pontos | código | por quê |
+|---|---|---|
+| 205 | `1012` | mesmo código de barras; mesmo NCM; descrição 100% parecida |
+| 180 | `1111           08` | **mesmo código de barras**, sendo outro produto |
+| 82 | `1112           08` | mesmo NCM; descrição 20% parecida; entrada sem saída |
+
+O segundo é GTIN repetido no cadastro do cliente. O porquê deixa isso **visível**
+em vez de esconder num palpite — que é a diferença entre ordenar e propor.
+
+### Um teste alheio vermelho há dez dias
+
+`Criar_projeto_grava_quem_responde_o_evento_e_devolve_o_cartao` esperava 10
+etapas; são 11 desde que o combustível entrou, em 03/10. O teste foi tocado em
+02/10. Corrigido em commit separado, para ficar rastreável.
+
+---
+
 ## 2026-10-13 — A ad rem do primeiro ano do monofásico foi lida, e destravou 22% do crédito
 
 A tabela `tab_ad_rem` tinha um buraco de nove a vinte meses, conforme o produto:

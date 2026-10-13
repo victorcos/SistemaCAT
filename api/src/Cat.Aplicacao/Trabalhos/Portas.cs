@@ -188,6 +188,15 @@ public interface IMotor
     /// <exception cref="MotorRecusou">trabalho inexistente (404), sem movimentação (422), material apagado (410)</exception>
     Task<System.Text.Json.JsonElement> CandidatosDeDePara(int projetoId, CancellationToken cancelar);
 
+    /// <summary>
+    /// Com que códigos um código pode ser ligado à mão, ordenados pelo provável.
+    /// Separado de <c>CandidatosDeDePara</c>, que devolve o de-para inteiro: este
+    /// é por código e tem busca, e juntar faria a tela baixar o trabalho todo a
+    /// cada tecla digitada.
+    /// </summary>
+    Task<System.Text.Json.JsonElement> CandidatosParaLigar(int projetoId, string cnpj, string origem,
+        string busca, CancellationToken cancelar);
+
     /// <summary>Os estabelecimentos de uma entrega montada.</summary>
     /// <exception cref="MotorRecusou">não é entrega (404), não terminou (409), material apagado (410), recorte inválido (422)</exception>
     Task<System.Text.Json.JsonElement> EstabelecimentosDaEntrega(int execucaoId, PedidoDeEstabelecimentos pedido, CancellationToken cancelar);

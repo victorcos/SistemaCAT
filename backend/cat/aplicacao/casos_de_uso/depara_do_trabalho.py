@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cat.aplicacao.casos_de_uso.apurar_suportado import movimentacao_concluida
-from cat.dominio.depara.candidatos import normalizar_codigo
+from cat.dominio.depara.candidatos import normalizar_codigo, ordenar_candidatos
 from cat.infraestrutura.analitico.depara import itens_para_casar
 from cat.dominio.depara.candidatos import propor
 from cat.infraestrutura.repositorios.modelos import DeParaDB, ProjetoDB, UsuarioDB
@@ -25,6 +25,9 @@ from cat.log import obter_log
 log = obter_log(__name__)
 
 LIMITE_SEM_PAR = 5000
+# quantos candidatos a tela recebe de uma vez: o bastante para escolher sem
+# virar rolagem infinita, e o de-para da empresa 04 nunca precisou de mais
+LIMITE_DE_CANDIDATOS = 50
 
 
 class SemMovimentacao(ValueError):
@@ -109,3 +112,56 @@ def _situacao(d: DeParaDB | None, nomes: dict[int, str]) -> dict:
     return {"situacao": d.situacao, "decidido_por": nomes.get(d.decidido_por),
             "decidido_em": d.decidido_em.isoformat() if d.decidido_em else None,
             "destino_decidido": d.codigo_destino, "fator_decidido": format(d.fator.normalize(), "f")}
+
+
+class CodigoNaoEstaNaMovimentacao(LookupError):
+    """Pediram candidatos para um código que a movimentação não tem."""
+
+
+def candidatos_para_ligar(projeto_id: int, cnpj: str, origem: str, sessao: Session,
+                          busca: str = "", limite: int = LIMITE_DE_CANDIDATOS) -> dict:
+    """Os prováveis pares de um código, para quem vai ligar os dois à mão.
+
+    Existe porque a tela pedia o código de destino **digitado de cabeça**: sem
+    busca, sem a descrição do outro lado, e sem alcançar o código que só tem
+    entrada — que é justamente o par que falta. Quem decide é a pessoa; isto só
+    põe o provável na frente e diz por quê.
+
+    Lê a mesma movimentação do de-para (`itens_para_casar`), e não uma fonte
+    nova: duas leituras da mesma coisa divergem no dia em que uma mudar.
+    """
+    projeto = sessao.get(ProjetoDB, projeto_id)
+    if projeto is None:
+        raise LookupError("Trabalho não encontrado.")
+    movimentos = movimentacao_concluida(projeto_id, sessao)
+    if movimentos is None or not movimentos.pasta_de_trabalho:
+        raise SemMovimentacao("Conclua a extração de movimentos antes: é dela que saem os códigos a casar.")
+
+    itens = itens_para_casar(movimentos.pasta_de_trabalho)
+    lista = itens.get(cnpj)
+    if lista is None:
+        raise CodigoNaoEstaNaMovimentacao(
+            f"O estabelecimento {cnpj} não está nesta movimentação. "
+            f"Há {len(itens)} na extração de movimentos.")
+    procurado = normalizar_codigo(origem)
+    item = next((i for i in lista if normalizar_codigo(i.codigo) == procurado), None)
+    if item is None:
+        raise CodigoNaoEstaNaMovimentacao(
+            f"O código {origem} não está na movimentação do estabelecimento {cnpj}.")
+
+    achados = ordenar_candidatos(item, lista, busca=busca, limite=limite)
+    log.info("candidatos para ligar", extra={
+        "projeto_id": projeto_id, "cnpj": cnpj, "origem": origem,
+        "busca": busca, "candidatos": len(achados), "no_estabelecimento": len(lista)})
+    return {
+        "origem": {"codigo": item.codigo, "descricao": item.descricao, "ncm": item.ncm,
+                   "entradas": format(item.entradas.normalize(), "f"),
+                   "saidas": format(item.saidas.normalize(), "f")},
+        "candidatos": [{
+            "codigo": c.item.codigo, "descricao": c.item.descricao, "ncm": c.item.ncm,
+            "entradas": format(c.item.entradas.normalize(), "f"),
+            "saidas": format(c.item.saidas.normalize(), "f"),
+            "pontos": c.pontos, "porques": list(c.porques),
+        } for c in achados],
+        "no_estabelecimento": len(lista),
+    }

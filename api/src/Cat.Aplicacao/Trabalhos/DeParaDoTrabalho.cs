@@ -34,6 +34,20 @@ public sealed class DeParaDoTrabalho(
         return await motor.CandidatosDeDePara(projetoId, cancelar);
     }
 
+    /// <summary>
+    /// Com que códigos este pode ser ligado. Leitura: quem enxerga a empresa vê,
+    /// e só decidir exige escrever.
+    /// </summary>
+    public async Task<JsonElement> ParaLigar(int projetoId, string cnpj, string origem, string busca,
+        Usuario por, CancellationToken cancelar)
+    {
+        var projeto = await trabalhos.BuscarProjeto(projetoId, cancelar) ?? throw new ProjetoNaoEncontrado();
+        Escopo.Exigir(por, projeto.EmpresaId, log);
+        if (string.IsNullOrWhiteSpace(origem))
+            throw new DadoInvalido("Informe o código de origem para procurar com que ligá-lo.");
+        return await motor.CandidatosParaLigar(projetoId, cnpj ?? "", origem, busca ?? "", cancelar);
+    }
+
     public async Task<int> Decidir(int projetoId, IReadOnlyList<DecisaoDeDePara> decisoes, Usuario por,
         CancellationToken cancelar)
     {

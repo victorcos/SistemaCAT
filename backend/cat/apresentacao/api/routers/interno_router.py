@@ -965,11 +965,43 @@ class PedidoDeDePara(BaseModel):
     projeto_id: int
 
 
+class PedidoDeCandidatosParaLigar(BaseModel):
+    """Quem já tem o código sem par e quer ver com o que ele pode casar."""
+
+    projeto_id: int
+    cnpj: str
+    origem: str
+    busca: str = ""
+
+
 @router.post("/depara/candidatos", dependencies=[Depends(exigir_segredo)])
 def candidatos_de_depara(pedido: PedidoDeDePara, sessao: Annotated[Session, Depends(obter_sessao)]) -> dict:
     with contexto(etapa="depara", projeto_id=pedido.projeto_id):
         try:
             return depara_do_trabalho.candidatos_do_projeto(pedido.projeto_id, sessao)
+        except LookupError as erro:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, str(erro)) from erro
+        except depara_do_trabalho.SemMovimentacao as erro:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)) from erro
+        except FileNotFoundError:
+            raise HTTPException(status.HTTP_410_GONE,
+                                "Os arquivos da última movimentação não estão mais em disco. Rode de novo.") from None
+
+
+@router.post("/depara/para-ligar", dependencies=[Depends(exigir_segredo)])
+def candidatos_para_ligar(pedido: PedidoDeCandidatosParaLigar,
+                          sessao: Annotated[Session, Depends(obter_sessao)]) -> dict:
+    """Com que códigos este aqui pode ser ligado — ordenados, e com o porquê.
+
+    Rota à parte da `/depara/candidatos`, que devolve o de-para inteiro: esta é
+    por código e tem busca, e juntar as duas faria a tela baixar o trabalho
+    todo a cada tecla digitada.
+    """
+    with contexto(etapa="depara", projeto_id=pedido.projeto_id):
+        try:
+            return depara_do_trabalho.candidatos_para_ligar(
+                pedido.projeto_id, pedido.cnpj.strip(), pedido.origem.strip(),
+                sessao, busca=pedido.busca.strip())
         except LookupError as erro:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(erro)) from erro
         except depara_do_trabalho.SemMovimentacao as erro:

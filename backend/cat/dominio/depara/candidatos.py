@@ -63,6 +63,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Enum
@@ -424,3 +425,107 @@ def _pares_do_grupo(grupo: _Grupo, itens: dict[str, ItemParaCasar]) -> list[Par]
             detalhes = f"fatores em conflito no grupo ({'; '.join(grupo.conflitos[:2])}); {detalhes}"
         pares.append(Par(m.codigo, destino.codigo, fator, motivos, confianca, detalhes))
     return pares
+
+
+# ---------------------------------------------------------------------------
+# a ligação feita à mão
+# ---------------------------------------------------------------------------
+#
+# `propor` só devolve grupo que ela **prova**: GTIN igual, sufixo repetido, kit
+# ou descrição com metade das palavras em comum. É deliberado — proposta fraca
+# vira trabalho de recusar, não ajuda.
+#
+# Mas o código que sobra sem par precisa de alguém decidindo, e essa pessoa
+# estava digitando o código de destino **de cabeça**: a tela não mostrava a
+# descrição do outro lado nem deixava procurar. O que segue ordena candidatos
+# para essa escolha — não propõe nada, não decide nada, só põe o provável na
+# frente de quem vai olhar.
+
+
+@dataclass(frozen=True)
+class Candidato:
+    """Um código que talvez seja o mesmo produto, e por que ele subiu na lista."""
+
+    item: ItemParaCasar
+    pontos: int
+    porques: tuple[str, ...]
+
+
+# O código sem par tem saída e não tem entrada. O par que conserta a ficha dele
+# é, quase sempre, o espelho: entrada sem saída. Pesa mais que a descrição
+# porque é a forma do problema, não uma semelhança de texto.
+PONTOS_ESPELHO = 50
+PONTOS_GTIN = 100
+PONTOS_NCM = 20
+PONTOS_DESCRICAO = 60        # multiplicado pela fração de palavras em comum
+PONTOS_CODIGO_PARECIDO = 25
+
+
+def _semelhanca(a: str, b: str) -> float:
+    """Fração de palavras em comum, de 0 a 1. É a métrica de `descricoes_compativeis`."""
+    pa = {p for p in _descricao_sem_kit(a).split() if len(p) >= 2}
+    pb = {p for p in _descricao_sem_kit(b).split() if len(p) >= 2}
+    if not pa or not pb:
+        return 0.0
+    return len(pa & pb) / len(pa | pb)
+
+
+def ordenar_candidatos(origem: ItemParaCasar, outros: Iterable[ItemParaCasar],
+                       busca: str = "", limite: int = 50) -> list[Candidato]:
+    """Os prováveis pares de `origem`, do mais provável ao menos.
+
+    `busca` filtra por pedaço do código ou da descrição, com a mesma
+    normalização do resto do módulo — quem digita "cast esc" acha
+    "CAST. ESCURO". Sem busca, devolve os mais parecidos.
+
+    **Não é proposta.** O que `propor` devolve tem prova; isto é uma ordenação
+    para quem vai decidir olhando. Por isso entra candidato que o motor nunca
+    proporia sozinho, e por isso cada um diz por que subiu.
+    """
+    termo = normalizar_descricao(busca)
+    codigo_buscado = normalizar_codigo(busca)
+    gtins_da_origem = {g for g in origem.gtins if gtin_valido(g)}
+    achados: list[Candidato] = []
+
+    for item in outros:
+        if normalizar_codigo(item.codigo) == normalizar_codigo(origem.codigo):
+            continue
+        if termo or codigo_buscado:
+            casa = (termo and termo in normalizar_descricao(item.descricao)) or \
+                   (codigo_buscado and codigo_buscado in normalizar_codigo(item.codigo))
+            if not casa:
+                continue
+
+        pontos = 0
+        porques: list[str] = []
+        # **o que identifica o produto.** Só estes dão entrada na lista: sem
+        # nenhum deles, o que sobra vale para metade do catálogo
+        if gtins_da_origem & {g for g in item.gtins if gtin_valido(g)}:
+            pontos += PONTOS_GTIN
+            porques.append("mesmo código de barras")
+        if origem.ncm and item.ncm and origem.ncm == item.ncm:
+            pontos += PONTOS_NCM
+            porques.append("mesmo NCM")
+        parecida = _semelhanca(origem.descricao, item.descricao)
+        if parecida > 0:
+            pontos += int(PONTOS_DESCRICAO * parecida)
+            porques.append(f"descrição {parecida:.0%} parecida")
+        a, b = normalizar_codigo(origem.codigo), normalizar_codigo(item.codigo)
+        if a and b and (a.startswith(b) or b.startswith(a)):
+            pontos += PONTOS_CODIGO_PARECIDO
+            porques.append("um código começa o outro")
+        identificado = pontos > 0
+
+        # **a forma do problema**, que desempata entre os identificados. Sozinha
+        # não vale: todo código de compra do catálogo tem entrada e não tem
+        # saída, e um parafuso subiria na lista de uma castanha
+        if item.tem_origem and not item.saidas:
+            pontos += PONTOS_ESPELHO
+            porques.append("tem entrada e não tem saída")
+
+        # quem buscou pelo nome já disse o que quer ver, mesmo sem parecença
+        if identificado or termo or codigo_buscado:
+            achados.append(Candidato(item, pontos, tuple(porques)))
+
+    achados.sort(key=lambda c: (-c.pontos, -c.item.entradas, c.item.codigo))
+    return achados[:limite]

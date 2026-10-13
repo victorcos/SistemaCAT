@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useParams } from "react-router-dom";
+import { LigarCodigo } from "@/components/shared/LigarCodigo";
 import { Aviso } from "@/components/ui/Aviso";
 import { Botao } from "@/components/ui/Botao";
 import { Etiqueta, type TomDeEtiqueta } from "@/components/ui/Etiqueta";
@@ -53,6 +54,8 @@ export default function DePara() {
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const [manual, setManual] = useState<Record<string, { destino: string; fator: string }>>({});
   const [nota, setNota] = useState<string | null>(null);
+  // qual linha dos sem par está com o seletor aberto
+  const [ligando, setLigando] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -273,10 +276,37 @@ export default function DePara() {
               )}
             </div>
           </div>
+          {podeEscrever && ligando && (() => {
+            const s = dados.sem_par.find((x) => chave({ cnpj: x.cnpj, origem: x.codigo }) === ligando);
+            if (!s) return null;
+            const m = manual[ligando] ?? { destino: "", fator: "1" };
+            return (
+              <div className="mb-3">
+                <LigarCodigo
+                  projetoId={projetoId}
+                  cnpj={s.cnpj}
+                  origem={s.codigo}
+                  descricao={s.descricao}
+                  fator={m.fator}
+                  gravando={gravando}
+                  aoMudarFator={(f) => setManual({ ...manual, [ligando]: { ...m, fator: f } })}
+                  aoFechar={() => setLigando(null)}
+                  aoLigar={(destino, fator) => {
+                    gravar(
+                      [{ cnpj: s.cnpj, origem: s.codigo, destino,
+                         fator: fator.replace(",", ".") || "1",
+                         motivo: "analista", situacao: "aprovado" }],
+                      "par informado gravado",
+                    );
+                    setLigando(null);
+                  }}
+                />
+              </div>
+            );
+          })()}
           <Tabela colunas={["Código", "Descrição", "NCM", "Saídas", podeEscrever ? "Mesmo produto que" : ""]}>
             {dados.sem_par.slice(0, POR_PAGINA).map((s) => {
               const k = chave({ cnpj: s.cnpj, origem: s.codigo });
-              const m = manual[k] ?? { destino: "", fator: "1" };
               return (
                 <Linha key={k}>
                   <Celula mono nota={s.cnpj}>
@@ -287,35 +317,14 @@ export default function DePara() {
                   <Celula mono>{numero(Number(s.saidas))}</Celula>
                   <Celula>
                     {podeEscrever && (
-                      <div className="flex items-center gap-2">
-                        <input
-                          aria-label={`Código do mesmo produto que ${s.codigo}`}
-                          className="w-28 rounded border border-borda px-2 py-1 font-mono text-xs"
-                          value={m.destino}
-                          onChange={(e) => setManual({ ...manual, [k]: { ...m, destino: e.target.value } })}
-                        />
-                        <input
-                          aria-label="Unidades por item"
-                          title="Unidades por item, se for kit"
-                          className="w-12 rounded border border-borda px-2 py-1 font-mono text-xs"
-                          value={m.fator}
-                          onChange={(e) => setManual({ ...manual, [k]: { ...m, fator: e.target.value } })}
-                        />
-                        <Botao
-                          tamanho="sm"
-                          variante="fantasma"
-                          disabled={gravando || !m.destino.trim()}
-                          onClick={() =>
-                            gravar(
-                              [{ cnpj: s.cnpj, origem: s.codigo, destino: m.destino.trim(),
-                                 fator: m.fator.replace(",", ".") || "1", motivo: "analista", situacao: "aprovado" }],
-                              "par informado gravado",
-                            )
-                          }
-                        >
-                          Gravar
-                        </Botao>
-                      </div>
+                      <Botao
+                        tamanho="sm"
+                        variante="fantasma"
+                        aria-label={`Procurar o mesmo produto que ${s.codigo}`}
+                        onClick={() => setLigando(ligando === k ? null : k)}
+                      >
+                        {ligando === k ? "Fechar" : "Procurar o par"}
+                      </Botao>
                     )}
                   </Celula>
                 </Linha>

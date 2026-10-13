@@ -73,6 +73,41 @@ export async function deparaDoTrabalho(projetoId: number): Promise<DeParaDoTraba
   return chamar<DeParaDoTrabalho>(`/projetos/${projetoId}/depara`);
 }
 
+/** Um código com que o sem par pode ser ligado, e por que ele subiu na lista. */
+export interface CandidatoParaLigar {
+  codigo: string;
+  descricao: string;
+  ncm: string;
+  entradas: string;
+  saidas: string;
+  pontos: number;
+  porques: string[];
+}
+
+export interface ParaLigar {
+  origem: { codigo: string; descricao: string; ncm: string; entradas: string; saidas: string };
+  candidatos: CandidatoParaLigar[];
+  no_estabelecimento: number;
+}
+
+/**
+ * Com que códigos este pode ser ligado — ordenados pelo provável.
+ *
+ * O motor **não propõe** aqui: `propor` só devolve o que prova, e esta lista
+ * existe justamente para o que ficou de fora dela. Quem decide é quem olha, e
+ * por isso cada candidato traz o porquê de ter subido.
+ */
+export async function candidatosParaLigar(
+  projetoId: number,
+  cnpj: string,
+  origem: string,
+  busca: string,
+  sinal?: AbortSignal,
+): Promise<ParaLigar> {
+  const q = new URLSearchParams({ origem, cnpj, busca });
+  return chamar<ParaLigar>(`/projetos/${projetoId}/depara/para-ligar?${q}`, { signal: sinal });
+}
+
 export async function decidirDePara(projetoId: number, decisoes: Decisao[]): Promise<number> {
   const r = await chamar<{ gravadas: number }>(`/projetos/${projetoId}/depara`, {
     method: "POST",

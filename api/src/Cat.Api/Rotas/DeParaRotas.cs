@@ -26,6 +26,14 @@ public static class DeParaRotas
                     Results.Json(await caso.Listar(projetoId, http.UsuarioAtual(), http.RequestAborted))))
             .ExigirUsuario();
 
+        api.MapGet("/projetos/{projetoId:int}/depara/para-ligar",
+                async (int projetoId, string origem, string? cnpj, string? busca, HttpContext http,
+                       DeParaDoTrabalho caso) =>
+                    await Traduzir(async () =>
+                        Results.Json(await caso.ParaLigar(projetoId, cnpj ?? "", origem, busca ?? "",
+                            http.UsuarioAtual(), http.RequestAborted))))
+            .ExigirUsuario();
+
         api.MapPost("/projetos/{projetoId:int}/depara", async (int projetoId, HttpContext http, DeParaDoTrabalho caso) =>
                 await Traduzir(async () =>
                 {

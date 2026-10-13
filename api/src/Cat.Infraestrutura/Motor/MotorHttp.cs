@@ -293,6 +293,16 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
             ["projeto_id"] = projetoId,
         }), PrazoDePara, cancelar);
 
+    public async Task<JsonElement> CandidatosParaLigar(int projetoId, string cnpj, string origem,
+        string busca, CancellationToken cancelar) =>
+        await Chamar("interno/depara/para-ligar", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["projeto_id"] = projetoId,
+            ["cnpj"] = cnpj,
+            ["origem"] = origem,
+            ["busca"] = busca,
+        }), PrazoDePara, cancelar);
+
     public async Task<JsonElement> EstabelecimentosDaEntrega(int execucaoId, PedidoDeEstabelecimentos pedido, CancellationToken cancelar) =>
         await Chamar("interno/entrega/estabelecimentos", JsonContent.Create(new Dictionary<string, object?>
         {
