@@ -30,6 +30,7 @@ from cat.infraestrutura.sped.credito_de_combustivel import (
     Credito,
     apurar,
 )
+from cat.infraestrutura.sped.tabelas import tab_ad_rem
 from cat.infraestrutura.sped.tabelas.tab_combustivel import DIESEL, GLP
 
 NCM_DIESEL = "27101921"
@@ -154,24 +155,28 @@ class TestAViradaDeEra:
 
     @pytest.mark.parametrize("competencia", [
         "2023-05", "2023-08", "2023-10", "2023-12", "2024-01"])
-    def test_os_nove_primeiros_meses_do_monofasico_recusam(self, competencia):
-        """**O maior buraco de cobertura do motor hoje, e ele aparece.**
+    def test_os_nove_primeiros_meses_do_monofasico_agora_calculam(self, competencia):
+        """**Era o maior buraco de cobertura do motor, e foi fechado em 13/10/2026.**
 
-        O monofásico do diesel começou em 05/2023, e a vigência mais antiga
-        **conferida** no `tab_ad_rem` é de 02/2024. As nove competências do meio
-        não se calculam: a ad rem delas está em `A_CONFERIR`, com a suspeita de
-        0,9456 que ninguém leu no texto do convênio.
+        O monofásico do diesel começou em 05/2023 e a vigência mais antiga
+        **conferida** no `tab_ad_rem` era de 02/2024 — nove competências que
+        não se calculavam. Numa base real de 22.900 linhas isso recusava 693
+        delas e represava R$ 346 mil de crédito.
 
-        Não é defeito desta função — é a recusa funcionando. A empresa 06 tomou
-        crédito nesses meses, e auditá-los exige abrir a redação original da
-        cláusula sétima do Conv. 199/2022. O relatório mostra a linha, com este
-        motivo, fora do total.
+        O que destravou foi ler a redação original da cláusula sétima do
+        Convênio ICMS 199/2022 no sítio do CONFAZ: R$ 0,9456 por litro, vigente
+        de 1º/05/2023 a 31/01/2024. O valor já era suspeitado; o que faltava era
+        o texto, e essa era a regra — exemplo em resposta de consulta não é o
+        ato legal.
+
+        Este teste virou do avesso de propósito. Guardar a recusa aqui seria
+        guardar o buraco.
         """
         c = _apurar(_linha(competencia=competencia))
 
         assert c.regime == MONOFASICO
-        assert c.valor is None
-        assert "0.9456" in c.porque, "a mensagem diz qual é a suspeita"
+        assert c.ad_rem == Decimal("0.9456")
+        assert c.valor is not None and c.valor > 0
 
     def test_a_gasolina_vira_um_mes_depois_do_diesel(self):
         """05/2023 ainda é era do ST para a gasolina, e já é monofásico para o
@@ -184,8 +189,27 @@ class TestAViradaDeEra:
         assert gasolina.regime == ST
 
 
+@pytest.fixture
+def sem_a_redacao_original(monkeypatch):
+    """Reabre, só dentro do teste, o buraco de ad rem que foi fechado.
+
+    Desde 13/10/2026 o `tab_ad_rem` cobre o monofásico do diesel inteiro, de
+    05/2023 em diante, e **nenhuma competência dispara mais** a recusa por ad
+    rem não conferida: antes do monofásico a linha vai para a era do ST, e
+    depois dele a tabela sempre responde.
+
+    O mecanismo continua precisando de guarda — a próxima ad rem que aparecer
+    vai nascer sem conferência, e a recusa é o que impede um palpite de virar
+    número assinado. Tirar a vigência mais antiga é o jeito honesto de
+    exercitá-lo sem fingir que o buraco ainda existe.
+    """
+    atual = tab_ad_rem.AD_REM[DIESEL]
+    monkeypatch.setitem(tab_ad_rem.AD_REM, DIESEL,
+                        tuple(v for v in atual if v.desde != "2023-05"))
+
+
 class TestORecusadoApareceENaoSoma:
-    def test_recusa_devolve_None_e_nao_zero(self):
+    def test_recusa_devolve_None_e_nao_zero(self, sem_a_redacao_original):
         """Zero soma; `None` aparece. É a diferença entre "não havia crédito" e
         "ninguém calculou"."""
         c = _apurar(_linha(competencia="2023-09"))
@@ -194,8 +218,10 @@ class TestORecusadoApareceENaoSoma:
         assert c.cobertura == RECUSADO
         assert not c.entra_no_total
 
-    def test_ad_rem_nao_conferida_recusa_dizendo_o_que_falta(self):
-        """2023-09 é anterior à vigência mais antiga conferida do diesel."""
+    def test_ad_rem_nao_conferida_recusa_dizendo_o_que_falta(
+            self, sem_a_redacao_original):
+        """Sem a redação original na tabela, 2023-09 volta a ser anterior à
+        vigência mais antiga conferida do diesel."""
         c = _apurar(_linha(competencia="2023-09"))
 
         assert "não está conferida" in c.porque
@@ -247,7 +273,7 @@ class TestORecusadoApareceENaoSoma:
         assert c.valor is None
         assert "0000" in c.porque
 
-    def test_toda_recusa_traz_motivo_curto_e_conhecido(self):
+    def test_toda_recusa_traz_motivo_curto_e_conhecido(self, sem_a_redacao_original):
         """**A frase não serve de chave.** Ela traz a competência e a alíquota
         dentro, então agrupar por ela daria um grupo por linha. O código agrupa;
         a frase explica.
@@ -292,7 +318,7 @@ class TestORecusadoApareceENaoSoma:
         assert c.entra_no_total
         assert c.motivo == ""
 
-    def test_toda_recusa_traz_porque(self):
+    def test_toda_recusa_traz_porque(self, sem_a_redacao_original):
         """Recusa sem motivo é linha que ninguém sabe como resolver."""
         casos = [
             _linha(competencia="2023-09"),

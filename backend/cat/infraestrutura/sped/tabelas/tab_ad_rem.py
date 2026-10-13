@@ -109,6 +109,12 @@ AD_REM: dict[str, tuple[Vigencia, ...]] = {
                  "ao centavo em 2024-02, 2024-05 e 2024-06 (−0,07, +0,03 e "
                  "−0,03), o que confirma a ad rem e revela que ela não aplica o "
                  "FCV. Ver o topo do módulo"),
+        Vigencia(Decimal("0.9456"), "2023-05",
+                 "Redação ORIGINAL da cláusula sétima, inciso I, do Convênio "
+                 "ICMS 199/2022, lida no sítio do CONFAZ em 13/10/2026: vigorou de "
+                 "1º/05/2023 (início do monofásico do diesel) até 31/01/2024, "
+                 "quando o Conv. 172/23 a substituiu. **Com segunda prova:** é "
+                 "o mesmo valor do exemplo da SEFAZ-SP na RC 28013/2023"),
     ),
     GASOLINA: (
         Vigencia(Decimal("1.57"), "2026-01",
@@ -118,6 +124,18 @@ AD_REM: dict[str, tuple[Vigencia, ...]] = {
                  "Convênio ICMS 127/2024, cláusula sétima do Conv. 15/2023; "
                  "vigência de 1º/02/2025. Valor único para gasolina C e etanol "
                  "anidro"),
+        Vigencia(Decimal("1.3721"), "2024-02",
+                 "Convênio ICMS 173/2023, cláusula primeira, que deu nova "
+                 "redação à cláusula sétima do Conv. 15/2023; efeitos de "
+                 "1º/02/2024 a 31/01/2025. Lido no CONFAZ em 13/10/2026: 'em "
+                 "R$ 1,3721 por litro, para a gasolina e etanol anidro "
+                 "combustível'"),
+        Vigencia(Decimal("1.22"), "2023-06",
+                 "Redação ORIGINAL da cláusula sétima do Convênio ICMS 15/2023, "
+                 "lida no sítio do CONFAZ em 13/10/2026: vigorou até "
+                 "31/01/2024. A gasolina entrou no monofásico em 1º/06/2023, um "
+                 "mês depois do diesel — pela cláusula trigésima quinta do "
+                 "próprio 15/2023"),
     ),
     GLP: (
         Vigencia(Decimal("1.47"), "2026-01",
@@ -129,6 +147,11 @@ AD_REM: dict[str, tuple[Vigencia, ...]] = {
         Vigencia(Decimal("1.4139"), "2024-02",
                  "Convênio ICMS 172/2023, incisos I e II da cláusula sétima do "
                  "Conv. 199/2022; vigência de 1º/02/2024"),
+        Vigencia(Decimal("1.2571"), "2023-05",
+                 "Redação ORIGINAL da cláusula sétima, inciso II, do Convênio "
+                 "ICMS 199/2022, lida no sítio do CONFAZ em 13/10/2026: vigorou de "
+                 "1º/05/2023 até 31/01/2024. Por QUILO, não por litro — ver "
+                 "`UNIDADE`"),
     ),
 }
 
@@ -140,23 +163,16 @@ AD_REM: dict[str, tuple[Vigencia, ...]] = {
 # (RC 28013/2023) e bate exato com a escrituração da empresa 06 em 2024-01. Mesmo
 # assim fica aqui, porque ninguém leu a redação original da cláusula sétima — e
 # a regra desta casa é que exemplo em resposta de consulta não é o ato legal.
-A_CONFERIR: dict[tuple[str, str], tuple[Decimal, str]] = {
-    (DIESEL, "2023-05"): (Decimal("0.9456"),
-                          "redação original da cláusula sétima do Conv. ICMS "
-                          "199/2022; aparece no exemplo da RC 28013/2023, mas o "
-                          "texto do convênio não foi lido — e a escrituração do "
-                          "cliente, que antes se citava como segunda prova, não "
-                          "reproduz ad rem nenhuma (ver o topo do módulo)"),
-    (GLP, "2023-05"): (Decimal("1.2571"),
-                       "redação original do Conv. ICMS 199/2022, por quilo"),
-    (GASOLINA, "2023-06"): (Decimal("1.22"),
-                            "redação original da cláusula sétima do Conv. ICMS "
-                            "15/2023; a gasolina entrou no monofásico um mês "
-                            "depois do diesel"),
-    (GASOLINA, "2024-02"): (Decimal("1.3721"),
-                            "reajuste de fevereiro de 2024; falta localizar o "
-                            "convênio que alterou o Conv. 15/2023"),
-}
+# **Vazia desde 13/10/2026**, quando os quatro palpites que moravam aqui foram
+# lidos no texto do convênio, no sítio do CONFAZ, e passaram para `AD_REM`:
+# diesel 0,9456 e GLP 1,2571 (redação original do Conv. 199/2022, até 31/01/24),
+# gasolina 1,22 (redação original do Conv. 15/2023) e gasolina 1,3721 (Conv.
+# 173/2023, que era o convênio que faltava localizar).
+#
+# Fica no módulo porque a regra continua valendo: ad rem nova entra aqui
+# primeiro, é recusada pelo motor, e só vira cálculo depois de alguém ler o
+# convênio. Esta tabela multiplica o número inteiro.
+A_CONFERIR: dict[tuple[str, str], tuple[Decimal, str]] = {}
 
 
 class AdRemDesconhecida(LookupError):

@@ -5,6 +5,86 @@
 
 ---
 
+## 2026-10-13 — A ad rem do primeiro ano do monofásico foi lida, e destravou 22% do crédito
+
+A tabela `tab_ad_rem` tinha um buraco de nove a vinte meses, conforme o produto:
+o regime monofásico começou em **05/2023** (diesel e GLP) e **06/2023**
+(gasolina), e a vigência mais antiga **conferida** era de 02/2024. Tudo entre as
+duas datas o motor recusava, de propósito, com a ad rem suspeitada escrita em
+`A_CONFERIR` e a frase "é preciso ler o texto do convênio antes de usá-la".
+
+### Quanto custava
+
+Medido na apuração #184 — 22.900 linhas, 58 competências, SP:
+
+| | |
+|---|---|
+| crédito que ela achava | R$ 1.574.425,76 |
+| linhas recusadas por `ad_rem_nao_conferida` | **693** |
+| diesel, 2023-07 a 2024-01 | 484 linhas, 326.439,84 L |
+| gasolina, 2023-09 a 2025-01 | 209 linhas, 27.276,03 L |
+
+### O que foi lido
+
+No sítio do CONFAZ, em 13/10/2026:
+
+* **Convênio ICMS 199/2022**, cláusula sétima, **redação original**: diesel e
+  biodiesel **R$ 0,9456/litro**, GLP/GLGN **R$ 1,2571/quilo**, vigentes até
+  31/01/2024, quando o Conv. 172/23 os substituiu;
+* **Convênio ICMS 15/2023**, cláusula sétima, **redação original**: gasolina e
+  etanol anidro **R$ 1,2200/litro**, até 31/01/2024. A cláusula trigésima quinta
+  confirma o início em 1º/06/2023 — um mês depois do diesel;
+* **Convênio ICMS 173/2023**, cláusula primeira: *"em R$ 1,3721 por litro, para
+  a gasolina e etanol anidro combustível"*, efeitos de 1º/02/2024. **Era o
+  convênio que a tabela anotava como "falta localizar".**
+
+Os quatro palpites de `A_CONFERIR` estavam certos nos valores. O que faltava era
+o texto — e a regra era essa: exemplo em resposta de consulta não é o ato legal.
+`A_CONFERIR` ficou vazia, e permanece no módulo porque a regra continua valendo
+para a próxima ad rem.
+
+### O que destravou
+
+| produto | linhas | crédito |
+|---|---|---|
+| diesel | 484 | R$ 307.940,73 |
+| gasolina | 209 | R$ 36.247,13 |
+| **total** | **693** | **R$ 344.187,86** |
+
+De R$ 1.574.425,76 para **R$ 1.918.613,62** — **+21,9%** na mesma base, sem ler
+um byte a mais de SPED. Com o FCV aplicado (SP: diesel 0,9976, gasolina 0,9967);
+sem ele o número sairia R$ 860,84 maior, e errado.
+
+### Um erro que a própria tabela pegou
+
+Inseri a vigência de 2023-05 do GLP **antes** da de 2024-02. A busca em
+`da_competencia` devolve a primeira vigência que couber, e a tabela é lida da
+mais nova para a mais antiga — com a ordem trocada, qualquer competência de 2025
+devolveria a ad rem de 2023. O teste `test_as_vigencias_vem_da_mais_nova_para_a_
+mais_antiga` já existia e pegou. Vale registrar que a guarda valeu.
+
+### Testes que viraram do avesso
+
+Três testes **codificavam o buraco como comportamento esperado**, um deles
+chamado `test_os_nove_primeiros_meses_do_monofasico_recusam`. Eles passaram a
+cobrar o oposto: as mesmas competências agora calculam, com 0,9456.
+
+E a recusa por ad rem ficou **inalcançável** pelos meses normais — antes do
+monofásico a linha vai para a era do ST, depois dele a tabela sempre responde.
+O mecanismo continua precisando de guarda, porque a próxima ad rem vai nascer
+sem conferência. Entrou a fixture `sem_a_redacao_original`, que tira a vigência
+mais antiga só dentro do teste. Apagar os testes seria perder a guarda no dia
+em que ela voltar a fazer falta.
+
+### O que isso não resolve
+
+A era do **ST** (antes de 05/2023) continua saindo como **estimativa**, porque a
+base do ST não está no arquivo — medido: zero base em 5.234 linhas de CST 60/61.
+E `aliquota_nao_conferida` ainda recusa 20 linhas, que são de UF sem alíquota
+levantada em `tab_aliquota_combustivel`.
+
+---
+
 ## 2026-10-11 — O M205 não estava faltando: estava invisível
 
 Pedido: *"está faltando o M205"*. Ele existe nos arquivos — 5 linhas em 59

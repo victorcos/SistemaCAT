@@ -31,6 +31,19 @@ FCV_SP_DIESEL = Decimal("0.9976")
 
 class TestOQueEstaConferido:
     @pytest.mark.parametrize("produto, competencia, esperado", [
+        # a redação ORIGINAL, lida no CONFAZ em 13/10/2026. Vigorou do início
+        # do monofásico de cada produto até 31/01/2024, e era o buraco que
+        # recusava 693 linhas e R$ 346 mil de crédito numa base de 22.900
+        (DIESEL, "2023-05", "0.9456"),
+        (DIESEL, "2023-07", "0.9456"),
+        (DIESEL, "2024-01", "0.9456"),
+        (GLP, "2023-05", "1.2571"),
+        (GLP, "2024-01", "1.2571"),
+        (GASOLINA, "2023-06", "1.22"),
+        (GASOLINA, "2024-01", "1.22"),
+        # Conv. ICMS 173/2023: o reajuste da gasolina que faltava localizar
+        (GASOLINA, "2024-02", "1.3721"),
+        (GASOLINA, "2025-01", "1.3721"),
         (DIESEL, "2024-02", "1.0635"),
         (DIESEL, "2024-12", "1.0635"),
         (DIESEL, "2025-02", "1.12"),
@@ -64,25 +77,44 @@ class TestOQueEstaConferido:
 
 
 class TestOQueElaRecusa:
-    def test_competencia_anterior_a_mais_antiga_conferida(self):
+    def test_competencia_anterior_ao_inicio_do_monofasico(self):
+        """Abril de 2023 é era do ST: o crédito ali é percentual, e sai por
+        `tab_aliquota_combustivel`. Pedir ad rem desse mês é pergunta errada."""
         with pytest.raises(AdRemDesconhecida) as erro:
-            da_competencia(DIESEL, "2023-09")
+            da_competencia(DIESEL, "2023-04")
 
-        assert "2023-09" in str(erro.value)
-        assert "2024-02" in str(erro.value), "diz qual é a vigência mais antiga"
+        assert "2023-04" in str(erro.value)
+        assert "2023-05" in str(erro.value), "diz qual é a vigência mais antiga"
 
-    def test_recusa_mesmo_havendo_palpite_e_diz_qual_e(self):
+    def test_a_gasolina_recusa_maio_de_2023_que_o_diesel_aceita(self):
+        """**A virada é por produto, não por data única.**
+
+        O diesel entrou no monofásico em 1º/05/2023 e a gasolina em 1º/06/2023,
+        pela cláusula trigésima quinta do Conv. 15/2023. Um motor com corte
+        único erraria maio inteiro na gasolina — para mais ou para menos,
+        conforme o corte.
+        """
+        assert da_competencia(DIESEL, "2023-05") == Decimal("0.9456")
+
+        with pytest.raises(AdRemDesconhecida):
+            da_competencia(GASOLINA, "2023-05")
+
+    def test_recusa_mesmo_havendo_palpite_e_diz_qual_e(self, monkeypatch):
         """**O palpite entra na mensagem, nunca na conta.**
 
-        O diesel de 0,9456 é o caso mais forte que existe: aparece no exemplo da
-        própria SEFAZ-SP e bate exato com a escrituração da empresa 06 em 2024-01.
-        Mesmo assim recusa, porque ninguém leu a redação original da cláusula
-        sétima — e exemplo em resposta de consulta não é o ato legal.
+        `A_CONFERIR` está vazia desde 13/10/2026, quando os quatro palpites que
+        moravam lá foram lidos no convênio. A regra continua valendo para a
+        próxima ad rem que aparecer, e por isso o teste monta o palpite em vez
+        de depender de haver um: sem isto, a regra ficaria sem guarda justamente
+        no dia em que alguém precisar dela.
         """
-        with pytest.raises(AdRemDesconhecida) as erro:
-            da_competencia(DIESEL, "2024-01")
+        monkeypatch.setitem(tab_ad_rem.A_CONFERIR, (DIESEL, "2023-01"),
+                            (Decimal("0.8888"), "palpite de teste"))
 
-        assert "0.9456" in str(erro.value)
+        with pytest.raises(AdRemDesconhecida) as erro:
+            da_competencia(DIESEL, "2023-01")
+
+        assert "0.8888" in str(erro.value)
         assert "convênio" in str(erro.value).lower()
 
     def test_produto_fora_do_monofasico(self):

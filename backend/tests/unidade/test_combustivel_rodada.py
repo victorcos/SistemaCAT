@@ -31,6 +31,7 @@ from cat.infraestrutura.analitico.combustivel import (
 from cat.infraestrutura.analitico.escrita import LeituraCancelada
 from cat.infraestrutura.sped import credito_de_combustivel as credito
 from cat.infraestrutura.sped.registros_icms import CAMPOS
+from cat.infraestrutura.sped.tabelas import tab_ad_rem
 
 CNPJ = "44000003000109"
 CNPJ_FILIAL = "44000003000284"
@@ -356,8 +357,24 @@ class TestOCreditoApurado:
         assert linha["por_que_apurou"]
 
 
+@pytest.fixture
+def sem_a_redacao_original(monkeypatch):
+    """Reabre, só dentro do teste, o buraco de ad rem que foi fechado.
+
+    Desde 13/10/2026 o `tab_ad_rem` cobre o monofásico do diesel de 05/2023 em
+    diante, lido no texto do Convênio ICMS 199/2022, e 09/2023 passou a
+    calcular. A rodada precisa continuar sabendo gravar uma linha recusada —
+    com `credito` vazio e não "0,00" —, e tirar a vigência mais antiga é o jeito
+    de exercitar isso sem fingir que o buraco ainda existe.
+    """
+    atual = tab_ad_rem.AD_REM[tab_ad_rem.DIESEL]
+    monkeypatch.setitem(tab_ad_rem.AD_REM, tab_ad_rem.DIESEL,
+                        tuple(v for v in atual if v.desde != "2023-05"))
+
+
 class TestAsRecusas:
-    def test_a_linha_recusada_aparece_no_parquet_sem_credito(self, tmp_path):
+    def test_a_linha_recusada_aparece_no_parquet_sem_credito(
+            self, tmp_path, sem_a_redacao_original):
         """**Zero soma; vazio aparece.** Gravar "0,00" faria a etapa seguinte
         somar um crédito que ninguém calculou."""
         destino = str(tmp_path / "saida")
@@ -368,7 +385,8 @@ class TestAsRecusas:
         assert linha["cobertura"] == credito.RECUSADO
         assert linha["motivo_da_recusa"] == credito.AD_REM_NAO_CONFERIDA
 
-    def test_as_recusas_somam_por_motivo_com_um_exemplo(self, tmp_path):
+    def test_as_recusas_somam_por_motivo_com_um_exemplo(
+            self, tmp_path, sem_a_redacao_original):
         """A frase traz a competência dentro e não serve de chave; guardar uma
         delas é o que deixa a tela dizer "ad rem não conferida (2 linhas)" e
         abrir o porquê inteiro de uma."""
@@ -405,7 +423,8 @@ class TestAsRecusas:
 
         assert resumo.a_revisar == 1
 
-    def test_o_resumo_do_log_traz_o_credito_e_os_motivos(self, tmp_path):
+    def test_o_resumo_do_log_traz_o_credito_e_os_motivos(
+            self, tmp_path, sem_a_redacao_original):
         resumo = extrair([_efd(tmp_path, "a.txt", competencia="062024"),
                           _efd(tmp_path, "b.txt", competencia="092023")],
                          str(tmp_path / "saida"))
