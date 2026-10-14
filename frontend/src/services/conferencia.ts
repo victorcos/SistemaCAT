@@ -6,6 +6,7 @@ import {
   foiAbortado,
   gravarNoArquivo,
 } from "@/lib/download";
+import { acompanhar, type AndamentoDoDownload } from "@/lib/progressoDoDownload";
 import { ErroApi } from "@/types/erro";
 import { chamar, lerToken } from "./api";
 
@@ -161,15 +162,26 @@ export async function baixarArquivo(
   const token = lerToken();
   if (token) cabecalhos.set("Authorization", `Bearer ${token}`);
 
+  // a chave do andamento vai na URL do próprio pedido: o motor conta debaixo
+  // dela enquanto monta, e a tela pergunta por ela enquanto espera. Sem isso o
+  // servidor não conta nada, e a espera custa o que custava antes
+  const chave = chaveDeProgresso();
+  const comChave = `${endereco}${endereco.includes("?") ? "&" : "?"}progresso=${chave}`;
+  const pararDeAcompanhar = acompanhar(chave, progressoDoPedido);
+
   let r: Response;
   try {
-    r = await fetch(endereco, { headers: cabecalhos, signal: sinal });
+    r = await fetch(comChave, { headers: cabecalhos, signal: sinal });
   } catch (e) {
+    pararDeAcompanhar();
     if (destino) await descartar(destino);
     // cancelar no meio da busca não é falha de rede
     if (foiAbortado(e)) throw new DownloadCancelado();
     throw new ErroApi("Não foi possível baixar a planilha.", 0);
   }
+  // os bytes começaram a vir: o que manda daqui em diante é o gerenciador do
+  // navegador, não mais o contador do servidor
+  pararDeAcompanhar();
 
   const requisicaoId = r.headers.get("X-Request-Id") ?? undefined;
   if (!r.ok) {
@@ -219,3 +231,23 @@ function nomeDoArquivo(r: Response): string | null {
 }
 
 /** Milhar com ponto, como se escreve em português. */
+
+/**
+ * A chave que identifica este pedido para o contador do servidor.
+ *
+ * `randomUUID` só existe em contexto seguro; fora dele vale qualquer coisa
+ * suficientemente improvável, porque a chave não protege nada — ela não
+ * identifica trabalho nem cliente, e o que devolve são dois números e o nome
+ * do passo.
+ */
+function chaveDeProgresso(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** Quanto já andou o pedido desta chave. */
+async function progressoDoPedido(chave: string): Promise<AndamentoDoDownload> {
+  return chamar<AndamentoDoDownload>(`/progresso/${encodeURIComponent(chave)}`);
+}

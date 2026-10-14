@@ -76,7 +76,12 @@ describe("baixar planilha", () => {
     // a ordem é o que faz o seletor abrir: depois da rede ele seria recusado
     expect(ordem).toEqual(["seletor", "rede", "gravou"]);
     expect(buscar).toHaveBeenCalledOnce();
-    expect(buscar.mock.calls[0][0]).toBe(PLANILHA);
+
+    // a URL é a mesma de sempre, mais a chave com que o motor conta o
+    // andamento enquanto monta — ela entra como `&` porque já havia `?formato`
+    const pedida = buscar.mock.calls[0][0] as string;
+    expect(pedida.startsWith(`${PLANILHA}&progresso=`)).toBe(true);
+    expect(pedida.length).toBeGreaterThan(`${PLANILHA}&progresso=`.length);
   });
 
   it("leva o token no cabeçalho, que é o motivo de a aba buscar", async () => {

@@ -470,11 +470,24 @@ public sealed class Execucoes(
             ? v.GetString() : null;
 
     public async Task<PlanilhaPronta> Planilha(int execucaoId, string etapaDaRota, string? etapaExigida, string qual,
-        string? modelos, string? classificacoes, string formato, Usuario usuario, CancellationToken cancelar)
+        string? modelos, string? classificacoes, string formato, string? progresso, Usuario usuario,
+        CancellationToken cancelar)
     {
         var e = await Detalhar(execucaoId, etapaExigida, usuario, cancelar);
-        return await motor.GerarPlanilha(e.Id, etapaDaRota, qual, modelos, classificacoes, formato, cancelar);
+        return await motor.GerarPlanilha(e.Id, etapaDaRota, qual, modelos, classificacoes, formato, progresso, cancelar);
     }
+
+    /// <summary>
+    /// Quanto já andou o pedido que carrega esta chave.
+    ///
+    /// **Não exige escopo de empresa**, e é deliberado: a chave é inventada
+    /// pela própria tela que está esperando, não identifica trabalho nem
+    /// cliente, e o que ela devolve são dois números e um rótulo de passo.
+    /// Exigir o trabalho aqui obrigaria a carregá-lo a cada segundo de espera
+    /// para não contar nada a ninguém.
+    /// </summary>
+    public async Task<System.Text.Json.JsonElement> Progresso(string chave, CancellationToken cancelar) =>
+        await motor.Progresso(chave, cancelar);
 
     /// <summary>
     /// Autoriza um download **sem gerar nada** — é o tíquete que a navegação usa.

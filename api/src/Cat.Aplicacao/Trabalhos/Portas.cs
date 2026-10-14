@@ -95,7 +95,14 @@ public interface IMotor
     /// <summary>Gera (ou reaproveita) a planilha a partir dos parquets e diz onde está.</summary>
     /// <exception cref="MotorRecusou">planilha ou formato desconhecido (404), não terminou (409), material apagado (410)</exception>
     Task<PlanilhaPronta> GerarPlanilha(int execucaoId, string etapa, string qual, string? modelos, string? classificacoes,
-        string formato, CancellationToken cancelar);
+        string formato, string? progresso, CancellationToken cancelar);
+
+    /// <summary>
+    /// Quanto já andou o que o motor faz dentro de um pedido — montar planilha,
+    /// materializar resumo. A chave é a que foi mandada junto com o pedido; sem
+    /// ela nada é contado. Ver `backend/cat/aplicacao/progresso.py`.
+    /// </summary>
+    Task<System.Text.Json.JsonElement> Progresso(string chave, CancellationToken cancelar);
 
     /// <summary>Pede para a rodada parar. Na fila, cancela na hora.</summary>
     /// <exception cref="MotorRecusou">não existe (404), já terminou (409), etapa sem cancelamento (422)</exception>

@@ -28,6 +28,18 @@ public static class ExecucoesRotas
     public static void MapearExecucoes(this IEndpointRouteBuilder rotas)
     {
         var api = rotas.MapGroup("/api").WithTags("execuções");
+
+        // Quanto já andou o que roda **dentro** de um pedido: montar planilha,
+        // materializar resumo. A rodada de etapa conta o próprio progresso no
+        // banco; isto é para a espera que não vira execução — e que chegava a
+        // 39 minutos de girador mudo na Consulta de Entradas da empresa 24.
+        //
+        // A chave é inventada pela tela que espera. Não identifica trabalho
+        // nem cliente, e por isso basta estar autenticado para perguntar.
+        api.MapGet("/progresso/{chave}", async (string chave, HttpContext http, Execucoes caso) =>
+                await Traduzir(async () =>
+                    Results.Json(await caso.Progresso(chave, http.RequestAborted))))
+            .ExigirUsuario();
         Etapa(api, Execucoes.Conferencia, "conferencias", detalheExigeEtapa: false, "conferir documentos");
         Etapa(api, Execucoes.Movimentos, "movimentos", detalheExigeEtapa: true, "extrair movimentos");
         Etapa(api, Execucoes.Suportado, "suportado", detalheExigeEtapa: true, "apurar o ICMS suportado");
@@ -393,7 +405,8 @@ public static class ExecucoesRotas
                     }
 
                     var pronta = await caso.Planilha(execucaoId, etapa, exigida, qual, modelos,
-                        classificacoes, formato, http.UsuarioAtual(), http.RequestAborted);
+                        classificacoes, formato, q["progresso"].FirstOrDefault(),
+                        http.UsuarioAtual(), http.RequestAborted);
                     return Arquivo(pronta, config, log);
                 }))
             .ExigirUsuarioOuTiquete();

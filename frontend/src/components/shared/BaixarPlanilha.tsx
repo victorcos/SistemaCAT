@@ -1,6 +1,9 @@
+import { useEffect, useState } from "react";
+
 import { Botao } from "@/components/ui/Botao";
 import { IconeBaixar } from "@/constants/icons";
 import { motivoSemSeletor } from "@/lib/download";
+import { assinar, type AndamentoDoDownload } from "@/lib/progressoDoDownload";
 import type { Formato } from "@/services/conferencia";
 
 /**
@@ -57,6 +60,7 @@ export function BaixarPlanilha({
   // a ser inofensivo, que é o que se espera de um botão de baixar.
   const cancelavel = baixando !== null && aoCancelar !== undefined;
   const semSeletor = motivoSemSeletor();
+  const andamento = useAndamento(baixando !== null);
 
   const botoes = (
     <div className="flex flex-wrap items-center gap-2">
@@ -89,6 +93,7 @@ export function BaixarPlanilha({
           Cancelar
         </Botao>
       )}
+      {andamento && <Andando a={andamento} />}
     </div>
   );
 
@@ -117,5 +122,52 @@ export function BaixarPlanilha({
         )}
       </p>
     </div>
+  );
+}
+
+/**
+ * O andamento do que o servidor está montando, ao lado do botão.
+ *
+ * Só enquanto há download em curso: fora disso o canal é limpo, e assinar um
+ * valor que não existe mais faria o número do pedido anterior reaparecer no
+ * seguinte.
+ */
+function useAndamento(baixando: boolean): AndamentoDoDownload | null {
+  const [andamento, setAndamento] = useState<AndamentoDoDownload | null>(null);
+  useEffect(() => {
+    if (!baixando) {
+      setAndamento(null);
+      return;
+    }
+    return assinar(setAndamento);
+  }, [baixando]);
+  return baixando ? andamento : null;
+}
+
+/**
+ * A porcentagem, quando ela existe.
+ *
+ * **Passo sem contagem não ganha número inventado.** Compactar o arquivo são
+ * minutos em que não há linha a contar: mostrar "100%" ali faria a tela parecer
+ * travada no fim, que é exatamente o que se quer evitar. Nesse trecho aparece
+ * só o nome do passo.
+ */
+function Andando({ a }: { a: AndamentoDoDownload }) {
+  if (!a.passo) return null;
+  const pct = a.total > 0 ? Math.floor(a.fracao * 100) : null;
+  return (
+    <span className="font-mono text-[11px] text-texto-suave" aria-live="polite">
+      {a.passo}
+      {pct !== null && (
+        <>
+          {" · "}
+          <strong className="text-marca-laranja">{pct}%</strong>
+          <span className="text-texto-fraco">
+            {" "}
+            ({a.feito.toLocaleString("pt-BR")} de {a.total.toLocaleString("pt-BR")})
+          </span>
+        </>
+      )}
+    </span>
   );
 }

@@ -74,12 +74,13 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
     }
 
     public async Task<PlanilhaPronta> GerarPlanilha(int execucaoId, string etapa, string qual, string? modelos,
-        string? classificacoes, string formato, CancellationToken cancelar)
+        string? classificacoes, string formato, string? progresso, CancellationToken cancelar)
     {
         var json = await Chamar("interno/planilhas", JsonContent.Create(new Dictionary<string, object?>
         {
             ["execucao_id"] = execucaoId, ["etapa"] = etapa, ["qual"] = qual,
             ["modelos"] = modelos, ["classificacoes"] = classificacoes, ["formato"] = formato,
+            ["progresso"] = progresso,
         }), PrazoPlanilha, cancelar);
         return new PlanilhaPronta(json.GetProperty("caminho").GetString()!, json.GetProperty("nome").GetString()!,
             json.GetProperty("tipo").GetString()!);
@@ -310,7 +311,16 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
             ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
         }), PrazoLinhas, cancelar);
 
-    private async Task<JsonElement> Chamar(string rota, HttpContent conteudo, TimeSpan prazo,
+    /// <summary>
+    /// O andamento de um pedido em curso. Prazo curto de propósito: quem
+    /// pergunta está esperando, e uma consulta de andamento que demora é pior
+    /// do que nenhuma.
+    /// </summary>
+    public async Task<JsonElement> Progresso(string chave, CancellationToken cancelar) =>
+        await Chamar($"interno/progresso/{Uri.EscapeDataString(chave)}", null, PrazoPedirExecucao,
+            cancelar, HttpMethod.Get);
+
+    private async Task<JsonElement> Chamar(string rota, HttpContent? conteudo, TimeSpan prazo,
         CancellationToken cancelar, HttpMethod? metodo = null)
     {
         if (string.IsNullOrEmpty(config.MotorSegredo))
