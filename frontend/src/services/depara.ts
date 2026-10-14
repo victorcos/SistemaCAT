@@ -43,6 +43,10 @@ export interface DeParaDoTrabalho {
     aprovados: number;
     recusados: number;
     sem_par: number;
+    /** códigos com saída e sem entrada: os que virariam ficha negativa */
+    precisavam_de_par: number;
+    /** destes, quantos já têm par — por proposta ou por decisão */
+    resolvidos: number;
     estabelecimentos: number;
   };
   pares: ParDoDePara[];

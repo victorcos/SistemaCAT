@@ -10,7 +10,7 @@
  * problema depois de olhar 200.
  */
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -42,7 +42,8 @@ function resposta(quantos: number): DeParaDoTrabalho {
   return {
     movimentos_execucao_id: 195,
     resumo: { pares: 0, pendentes: 0, aprovados: 0, recusados: 0,
-              sem_par: quantos, estabelecimentos: 1 },
+              sem_par: quantos, precisavam_de_par: quantos, resolvidos: 0,
+              estabelecimentos: 1 },
     pares: [],
     sem_par: semPar(quantos),
   } as DeParaDoTrabalho;
@@ -76,14 +77,14 @@ describe("quantos são", () => {
     pedir.mockResolvedValue(resposta(1591));
     montar();
 
-    expect(await screen.findByText(/mostrando 200 de 1\.591/, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByText(/mostrando 200 de 1\.591/, undefined, { timeout: 4000 })).toBeTruthy();
   });
 
   it("quando tudo cabe, o aviso não assusta", async () => {
     pedir.mockResolvedValue(resposta(12));
     montar();
 
-    expect(await screen.findByText(/mostrando 12 de 12/, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByText(/mostrando 12 de 12/, undefined, { timeout: 4000 })).toBeTruthy();
   });
 });
 
@@ -91,7 +92,7 @@ describe("a busca alcança o que a página corta", () => {
   it("acha pela descrição um código que está fora das 200 primeiras", async () => {
     pedir.mockResolvedValue(resposta(1591));
     montar();
-    await screen.findByText(/mostrando 200 de 1\.591/, { timeout: 4000 });
+    await screen.findByText(/mostrando 200 de 1\.591/, undefined, { timeout: 4000 });
 
     const campo = screen.getByPlaceholderText(/Buscar por código, descrição ou NCM/i);
     fireEvent.change(campo, { target: { value: "ITEM GENERICO 900" } });
@@ -102,7 +103,7 @@ describe("a busca alcança o que a página corta", () => {
   it("acha por pedaço do código", async () => {
     pedir.mockResolvedValue(resposta(1591));
     montar();
-    await screen.findByText(/mostrando 200 de 1\.591/, { timeout: 4000 });
+    await screen.findByText(/mostrando 200 de 1\.591/, undefined, { timeout: 4000 });
 
     fireEvent.change(screen.getByPlaceholderText(/Buscar por código/i), {
       target: { value: "2500" },
@@ -114,24 +115,24 @@ describe("a busca alcança o que a página corta", () => {
   it("diz quantos casaram com o filtro, contra o total", async () => {
     pedir.mockResolvedValue(resposta(1591));
     montar();
-    await screen.findByText(/mostrando 200 de 1\.591/, { timeout: 4000 });
+    await screen.findByText(/mostrando 200 de 1\.591/, undefined, { timeout: 4000 });
 
     fireEvent.change(screen.getByPlaceholderText(/Buscar por código/i), {
       target: { value: "PREGO" },
     });
 
-    expect(await screen.findByText(/1 de 1\.591 com o filtro/, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByText(/1 de 1\.591 com o filtro/, undefined, { timeout: 4000 })).toBeTruthy();
   });
 
   it("acha pelo NCM, que é como se procura família de produto", async () => {
     pedir.mockResolvedValue(resposta(30));
     montar();
-    await screen.findByText(/mostrando 30 de 30/, { timeout: 4000 });
+    await screen.findByText(/mostrando 30 de 30/, undefined, { timeout: 4000 });
 
     fireEvent.change(screen.getByPlaceholderText(/Buscar por código/i), {
       target: { value: "73170090" },
     });
 
-    expect(await screen.findByText(/1 de 30 com o filtro/, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByText(/1 de 30 com o filtro/, undefined, { timeout: 4000 })).toBeTruthy();
   });
 });

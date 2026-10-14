@@ -170,6 +170,21 @@ export default function DePara() {
           <Etiqueta tom="sucesso">{numero(r.aprovados)} aprovados</Etiqueta>
           <Etiqueta>{numero(r.recusados)} recusados</Etiqueta>
           <Etiqueta tom="info">{numero(r.sem_par)} códigos sem par</Etiqueta>
+          {!!r.precisavam_de_par && (
+            <Etiqueta
+              tom={r.resolvidos / r.precisavam_de_par >= 0.5 ? "sucesso" : "atencao"}
+              // quantos dos códigos que virariam ficha negativa já têm par —
+              // por proposta do motor ou por decisão de quem trabalha. Sobe
+              // conforme se decide, e é o que diz se o de-para resolveu o
+              // problema ou arranhou
+            >
+              {(r.resolvidos / r.precisavam_de_par).toLocaleString("pt-BR", {
+                style: "percent",
+                maximumFractionDigits: 1,
+              })}{" "}
+              resolvidos — {numero(r.resolvidos)} de {numero(r.precisavam_de_par)}
+            </Etiqueta>
+          )}
           <span className="text-xs text-texto-fraco">
             sobre a movimentação #{dados?.movimentos_execucao_id}, {numero(r.estabelecimentos)} estabelecimento(s)
           </span>

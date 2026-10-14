@@ -58,8 +58,20 @@ def _sped(inicio: str, fim: str) -> str:
     ]) + "\n"
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def quebrado(tmp_path_factory):
+    """Uma quebra por teste, e **não** por módulo.
+
+    Era `scope="module"`, e seis testes deste arquivo apagam, reescrevem ou
+    truncam os arquivos dela — o parquet das posições, o `indice.json` e o
+    próprio SPED. Todos restauram no `finally`, mas basta um caminho de erro
+    para o estado vazar para o teste seguinte, e aí a suíte falha de vez em
+    quando num teste que passa sozinho. Foi o que aconteceu: oito falhas numa
+    rodada e zero na seguinte, sem mudar uma linha.
+
+    Refazer a quebra por teste custa milissegundos nestes dois SPED mínimos.
+    Caçar flaky custa uma tarde.
+    """
     base = tmp_path_factory.mktemp("resumo")
     caminhos = []
     for inicio, fim, nome in (("01062021", "30062021", "efd_062021.txt"),

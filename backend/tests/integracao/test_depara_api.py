@@ -98,7 +98,25 @@ class TestCandidatos:
         d = pedir(cliente, projeto_id)
         assert [s["codigo"] for s in d["sem_par"]] == ["X0046E1FBP"]
         assert d["resumo"] == {"pares": 4, "pendentes": 2, "aprovados": 1, "recusados": 1, "sem_par": 1,
+                               "precisavam_de_par": 5, "resolvidos": 4,
                                "estabelecimentos": 1}
+
+    def test_a_cobertura_fecha_a_conta(self, cliente, projeto_id):
+        """**O denominador é o problema, não o que sobrou dele.**
+
+        `precisavam_de_par` conta o código com saída e sem entrada — o que
+        viraria ficha negativa e sairia do total. Contado depois de resolver,
+        mediria o resto e diria sempre quase zero.
+
+        A soma tem de fechar: o que foi resolvido mais o que sobrou é o que
+        havia. Numa base real da empresa JK são 56 + 1.591 = 1.647, e a
+        cobertura sai 3,4% — o número que diz se o de-para resolveu o problema
+        ou arranhou.
+        """
+        r = pedir(cliente, projeto_id)["resumo"]
+
+        assert r["resolvidos"] + r["sem_par"] == r["precisavam_de_par"]
+        assert r["resolvidos"] == 4 and r["precisavam_de_par"] == 5
 
     def test_sem_movimentacao_e_recusado(self, cliente):
         with Sessao() as s:

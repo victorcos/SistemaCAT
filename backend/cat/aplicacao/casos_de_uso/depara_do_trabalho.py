@@ -54,6 +54,7 @@ def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
     pares: list[dict] = []
     sem_par: list[dict] = []
     total_sem_par = 0
+    precisavam_de_par = 0
     vistas: set[tuple[str, str]] = set()
     for cnpj, lista in sorted(itens.items()):
         propostos = propor(lista)
@@ -74,6 +75,13 @@ def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
         for item in lista:
             resolvido = (item.codigo in cobertos or item.codigo in aprovados_aqui
                          or item.codigo in destinos_aqui)
+            if item.tem_saida and not item.tem_origem:
+                # **o denominador da cobertura.** Código com saída e sem entrada
+                # é o que viraria ficha negativa e sairia do total; é esse o
+                # problema que o de-para existe para resolver. Conta antes de
+                # olhar se foi resolvido, senão a conta mede o que sobrou em
+                # vez de medir o que havia
+                precisavam_de_par += 1
             if item.tem_saida and not item.tem_origem and not resolvido:
                 total_sem_par += 1
                 if len(sem_par) < LIMITE_SEM_PAR:
@@ -97,6 +105,11 @@ def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
         "aprovados": sum(p["situacao"] == "aprovado" for p in pares),
         "recusados": sum(p["situacao"] == "recusado" for p in pares),
         "sem_par": total_sem_par,
+        # quantos códigos precisavam de par, e quantos deles já estão resolvidos
+        # — por proposta do motor ou por decisão de quem trabalha. A conta sobe
+        # conforme se decide, porque  já desconta o que foi aprovado
+        "precisavam_de_par": precisavam_de_par,
+        "resolvidos": precisavam_de_par - total_sem_par,
         "estabelecimentos": len(itens),
     }
     log.info("de-para do trabalho", extra={"projeto_id": projeto_id, "movimentos_execucao_id": movimentos.id,
