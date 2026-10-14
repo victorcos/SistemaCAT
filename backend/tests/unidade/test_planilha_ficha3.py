@@ -263,3 +263,38 @@ class TestOLimiteDoZip:
         # e o que já estava: rascunho ao lado do arquivo, não no disco do Windows
         assert opcoes["constant_memory"] is True
         assert opcoes["tmpdir"].startswith(str(tmp_path))
+
+
+
+
+class TestOArquivoQuebradoNaoViraCache:
+    """Geração que falha não pode deixar o nome final ocupado.
+
+    O cache de planilha olha a **idade**, não o conteúdo: um arquivo quebrado
+    com o nome certo passa a ser servido para sempre. Em 14/10/2026 a Consulta
+    de Entradas da empresa 24 ficou em 969 bytes — que nem zip eram — depois de
+    a geração estourar no fim, e foi baixada assim, abrindo vazia no Excel.
+    """
+
+    def test_falha_no_meio_nao_deixa_planilha_pela_metade(self, ficha3, tmp_path, monkeypatch):
+        from cat.infraestrutura.planilhas import conferencia
+
+        destino = tmp_path / "ficha3.xlsx"
+
+        def estourar(*_, **__):
+            raise RuntimeError("acabou o disco no fim")
+
+        monkeypatch.setattr(conferencia, "_gerar_xlsx", estourar)
+        with pytest.raises(RuntimeError):
+            gerar_ficha3(str(ficha3), str(destino))
+
+        assert not destino.exists()
+        assert not list(tmp_path.glob("*.parcial"))
+
+    def test_quando_dá_certo_o_nome_final_aparece_com_a_planilha_inteira(self, ficha3, tmp_path):
+        destino = tmp_path / "ficha3.xlsx"
+        gerar_ficha3(str(ficha3), str(destino))
+
+        assert destino.exists() and destino.stat().st_size > 5_000
+        assert not list(tmp_path.glob("*.parcial"))
+        openpyxl.load_workbook(destino, read_only=True).close()

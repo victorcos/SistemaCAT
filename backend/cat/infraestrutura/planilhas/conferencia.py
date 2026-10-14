@@ -43,6 +43,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import xlsxwriter
 
+from cat.infraestrutura.analitico.rascunho import materializando
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -219,11 +220,18 @@ def gerar(parquet: str, destino: str, colunas: tuple[Coluna, ...],
     """
     if formato not in FORMATOS:
         raise ValueError(f"formato desconhecido: {formato}")
-    if formato == "csv":
-        return _gerar_csv(parquet, destino, colunas, modelos, classificacoes,
-                          campo_da_classificacao)
-    return _gerar_xlsx(parquet, destino, colunas, titulo_da_aba,
-                       modelos, classificacoes, campo_da_classificacao)
+    # **nome final só no fim.** Escrevendo direto no destino, qualquer falha no
+    # meio — disco cheio, zip estourando os 4 GB, motor reiniciado, alguém
+    # cancelando — deixa um arquivo quebrado com o nome certo. E o cache olha a
+    # idade, não o conteúdo: ele passa a servir aquele arquivo para sempre.
+    # Aconteceu em 14/10/2026 com a Consulta de Entradas da empresa 24 — 969
+    # bytes que nem zip eram, baixados como planilha e abertos vazios
+    with materializando(destino) as parcial:
+        if formato == "csv":
+            return _gerar_csv(parquet, parcial, colunas, modelos, classificacoes,
+                              campo_da_classificacao)
+        return _gerar_xlsx(parquet, parcial, colunas, titulo_da_aba,
+                           modelos, classificacoes, campo_da_classificacao)
 
 
 def _arquivos_de(parquet: str) -> list[str]:
