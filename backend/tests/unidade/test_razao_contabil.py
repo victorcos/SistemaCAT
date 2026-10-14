@@ -264,3 +264,53 @@ class TestArvoreDoPlanoReferencial:
 
         assert resposta["nos"] == []
         assert resposta["total"] == 3
+
+
+class TestAArvoreChegaNaConta:
+    """Descer a árvore tem de terminar na conta — e não terminava.
+
+    Os galhos de um nível eram as referenciais **mais fundas** que ele
+    (`> nivel`), e as contas de um galho são as de referencial **igual** a ele.
+    Quem tinha exatamente o tamanho do nível caía fora das duas pontas e sumia
+    da árvore inteira.
+
+    Na empresa 24, em 14/10/2026: o galho `3.11.01.05.01` aparecia com "1 conta
+    · 54 partidas" no total, abria e dizia **"Nada neste galho"**. Eram 4.144
+    contas de referencial com cinco partes escondidas desse jeito.
+    """
+
+    def test_desce_do_galho_ate_a_conta(self, pasta):
+        caminho = []
+        pai = None
+        for _ in range(10):
+            r = contas(pasta, pai=pai, arvore=True)
+            if r["linhas"]:
+                break
+            assert r["nos"], f"galho {pai!r} não tem nem conta nem filho"
+            pai = r["nos"][0]["codigo"]
+            caminho.append(pai)
+        assert caminho == ["1", "1.01", "1.01.01", "1.01.01.01"]
+        assert [l["conta"] for l in r["linhas"]] == ["1.1.1.01", "1.1.1.01"]
+
+    def test_referencial_mais_funda_convive_com_a_do_tamanho_do_nivel(self, tmp_path):
+        """O caso da empresa 24: uma conta pendurada em `x.01` e outra em
+        `x.01.99`. A primeira só aparece se o galho aceitar o próprio nível."""
+        escritor = Escritor(str(tmp_path / ARQUIVO_DO_RAZAO), COLUNAS)
+        for conta, referencial in (("3204010046", "3.11.01.05.01"),
+                                   ("3204010099", "3.11.01.05.01.99")):
+            escritor.escrever(_linha(
+                cnpj=MATRIZ, conta=conta, descricao=f"CONTA {conta}",
+                conta_referencial=referencial, competencia="2024-01-01",
+                data="2024-01-05", numero="1", valor="10.00", debito_ou_credito="D",
+                saldo="10.00", arquivo="ecd.txt"))
+        escritor.fechar()
+
+        no_galho = contas(str(tmp_path), pai="3.11.01.05.01", arvore=True)
+        # a de cinco partes é folha daqui
+        assert [l["conta"] for l in no_galho["linhas"]] == ["3204010046"]
+        # e a de seis continua um galho abaixo
+        assert [n["codigo"] for n in no_galho["nos"]] == ["3.11.01.05.01.99"]
+
+        mais_fundo = contas(str(tmp_path), pai="3.11.01.05.01.99", arvore=True)
+        assert [l["conta"] for l in mais_fundo["linhas"]] == ["3204010099"]
+        assert mais_fundo["nos"] == []

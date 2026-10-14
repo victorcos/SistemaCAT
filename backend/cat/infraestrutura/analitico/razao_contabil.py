@@ -259,8 +259,15 @@ def _galhos(con, caminho: str, pai: str | None, nivel: int,
     if pai == SEM_REFERENCIAL:
         return []
 
+    # **`>=` e não `>`.** Com `>`, a referencial que tem exatamente o tamanho
+    # deste nível não virava galho — e, como as contas de um galho são as de
+    # referencial **igual** a ele, ela também não era folha de lugar nenhum.
+    # Sumia da árvore inteira. Na empresa 24 isso escondia as 4.144 contas de
+    # referencial com cinco partes: o galho `3.11.01.05.01` existia (porque
+    # alguém mais fundo o criava), abria e dizia "Nada neste galho", com as 54
+    # partidas da conta contadas no total logo acima.
     filtros = ["conta_referencial <> ''",
-               f"len(str_split(conta_referencial, '.')) > {nivel}"]
+               f"len(str_split(conta_referencial, '.')) >= {nivel}"]
     parametros: list[object] = []
     if pai:
         filtros.append("conta_referencial LIKE ?")
