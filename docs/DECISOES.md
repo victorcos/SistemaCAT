@@ -5,6 +5,45 @@
 
 ---
 
+## 2026-10-14 — O download voltou a escolher a pasta
+
+Em 02/10 (`08ad378`) o download de planilha passou a ser do **navegador**: um
+tíquete de vida curta na URL e um `<a download>`. O motivo era bom — sem o
+seletor de pasta, que não existe em Firefox, Safari nem fora de contexto
+seguro, o caminho antigo segurava o arquivo inteiro na memória da aba, e um 037
+de 2,93 milhões de linhas não passava.
+
+Doze dias depois o preço apareceu. O clique no link acontecia **depois** da ida
+à rede, e isso tira dele o gesto de quem clicou: Chrome e Edge liberam o
+primeiro download assim e bloqueiam os seguintes, **sem mandar requisição
+nenhuma**. O que a pessoa via era "verifique a conexão com a Internet", com o
+servidor respondendo normalmente. Sete tentativas, nenhuma chegou à API — o
+tíquete era emitido e nunca resgatado, que foi como se descobriu.
+
+Somado a isso, o navegador joga na pasta de downloads dele, e quem trabalha com
+arquivos de GB quer dizer onde eles caem.
+
+**Decisão do Victor, 14/10/2026: volta a ser como era.** O seletor nativo
+(`showSaveFilePicker`) pergunta a pasta, e a resposta é canalizada da rede
+direto para o arquivo — a memória não depende do tamanho. É o desenho de
+`d2dc4ff`, que nunca deixou de existir no código: `baixarArquivo` só deixou de
+desviar para o tíquete.
+
+**O que volta junto é o limite conhecido:** onde o seletor não existe, cai no
+`fetch` + `blob`, com o arquivo inteiro em memória. Hoje isso não morde — o
+sistema é servido por HTTPS e se usa Chromium —, mas é a mesma borda de 02/10 e
+continua valendo o aviso de `motivoSemSeletor`.
+
+A máquina do tíquete (rota, tabela, prazo) fica onde está, desligada do front.
+Removê-la é outra conversa: enquanto ela não custa nada, tirá-la custaria uma
+migração.
+
+**A quebra em abas, que motivou a pergunta, já existia**: `LIMITE_POR_ABA` corta
+em 900 mil linhas, antes do teto de 1.048.576 do Excel. A Consulta de Entradas
+da empresa 24, com 4.721.980 linhas, sai em seis abas.
+
+---
+
 ## 2026-10-14 — Quatro erros previsíveis que o sistema devolvia como falha não tratada
 
 Um download falhou com **"verifique a conexão com a Internet"**. Meia hora foi

@@ -1,27 +1,30 @@
 /**
- * Quem baixa: o navegador ou a aba.
+ * Quem baixa é a aba, e a pessoa escolhe a pasta.
  *
- * **A aba perde.** O caminho antigo busca com `fetch` e, sem o seletor de pasta
- * — que não existe fora de contexto seguro, e `http://<ip>:5173` não é —, segura
- * a resposta inteira na memória antes de gravar. Num 037 de 2,93 milhões de
- * linhas isso não passa. Investigado em 02/10/2026, depois de um "está
- * carregando há um tempo, não sei se travou".
+ * Entre 02/10 e 14/10/2026 a planilha saía por outro caminho: um tíquete e um
+ * `<a download>`, com o navegador gravando onde quisesse. Tirava o teto de
+ * memória, mas tirava junto a escolha da pasta — e trouxe um defeito próprio:
+ * o clique no link acontecia **depois** da ida à rede, e Chrome e Edge
+ * bloqueiam download que perdeu o gesto de quem clicou. O que se via era
+ * "verifique a conexão com a Internet", sem requisição nenhuma sair.
  *
- * O caminho novo pede um tíquete (um `POST` barato, que **não** gera a planilha)
- * e entrega a URL ao navegador. O gerenciador dele grava em fluxo, mostra
- * progresso, e a aba não toca nos bytes.
+ * Voltou a ser como era (decisão do Victor, 14/10/2026). O que estes testes
+ * guardam é a ordem que faz isso funcionar, e que já custou duas investigações:
  *
- * Só a rota de planilha tem tíquete. A extração da quebra e a planilha da 047
- * têm rota própria, com corpo, e seguem pelo caminho antigo — é esse desvio que
- * estes testes guardam, porque errá-lo manda um `POST` para uma rota que não
- * existe e o download morre com 404.
+ * * **o seletor vem antes da busca** — ele só abre enquanto a ativação do
+ *   clique vale, e ela não sobrevive a uma ida à rede;
+ * * **o arquivo criado é descartado quando a resposta não presta** — o seletor
+ *   cria o arquivo ao confirmar o nome, e sem o descarte fica um arquivo de
+ *   0 byte com cara de planilha;
+ * * **cancelar não é erro**, e falha de gravação não é cancelamento.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { baixarArquivo } from "./conferencia";
+import * as disco from "../lib/download";
 
-const TIQUETE = { tiquete: "abc123", vale_por_segundos: 120 };
+const PLANILHA = "/api/apuracao-piscofins/12/planilhas/entradas?formato=csv";
 
 function resposta(corpo: unknown, status = 200) {
   return {
@@ -34,156 +37,61 @@ function resposta(corpo: unknown, status = 200) {
   } as unknown as Response;
 }
 
-let cliques: HTMLAnchorElement[];
+/** O que `showSaveFilePicker` devolveria, sem tocar em disco. */
+function arquivoFalso() {
+  return { nome: "escolhido" } as unknown as FileSystemFileHandle;
+}
+
+let ordem: string[];
 
 beforeEach(() => {
-  cliques = [];
-  // jsdom não baixa nada; o que interessa é o que o link pedia
-  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
-    this: HTMLAnchorElement,
-  ) {
-    cliques.push(this);
+  ordem = [];
+  vi.spyOn(disco, "escolherOndeSalvar").mockImplementation(async () => {
+    ordem.push("seletor");
+    return arquivoFalso();
+  });
+  vi.spyOn(disco, "gravarNoArquivo").mockImplementation(async () => {
+    ordem.push("gravou");
+  });
+  vi.spyOn(disco, "descartar").mockImplementation(async () => {
+    ordem.push("descartou");
   });
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
-describe("rota de planilha", () => {
-  it("pede tíquete e entrega a URL ao navegador", async () => {
-    const buscar = vi.fn().mockResolvedValue(resposta(TIQUETE));
-    vi.stubGlobal("fetch", buscar);
-
-    await baixarArquivo(
-      "/api/apuracao-piscofins/12/planilhas/entradas?formato=csv",
-      "consulta_de_entradas.csv",
-    );
-
-    // o POST vai para o tíquete, levando o recorte
-    expect(buscar).toHaveBeenCalledOnce();
-    const [url, opcoes] = buscar.mock.calls[0];
-    expect(url).toBe("/api/apuracao-piscofins/12/planilhas/entradas/tiquete?formato=csv");
-    expect(opcoes.method).toBe("POST");
-
-    // e o download é do navegador, com o tíquete na URL
-    expect(cliques).toHaveLength(1);
-    expect(cliques[0].getAttribute("href")).toBe(
-      "/api/apuracao-piscofins/12/planilhas/entradas?formato=csv&t=abc123",
-    );
-    expect(cliques[0].getAttribute("download")).toBe("consulta_de_entradas.csv");
-  });
-
-  it("não deixa o tíquete viajar no Referer", async () => {
-    // ele anda na URL; sem `noreferrer` iria no cabeçalho de toda requisição
-    // que a página fizesse depois
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(resposta(TIQUETE)));
-
-    await baixarArquivo("/api/exclusoes/9/planilhas/pacote", "pacote.zip");
-
-    expect(cliques[0].rel).toBe("noreferrer");
-  });
-
-  it("o `?` só aparece uma vez quando não havia recorte", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(resposta(TIQUETE)));
-
-    await baixarArquivo("/api/exclusoes/9/planilhas/pacote", "pacote.zip");
-
-    expect(cliques[0].getAttribute("href")).toBe(
-      "/api/exclusoes/9/planilhas/pacote?t=abc123",
-    );
-  });
-
-  it("recusa do tíquete vira erro na tela, antes de qualquer espera", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
-      resposta({ detail: "A apuração das exclusões ainda não terminou." }, 409),
-    ));
-
-    await expect(
-      baixarArquivo("/api/exclusoes/9/planilhas/pacote", "pacote.zip"),
-    ).rejects.toThrow("ainda não terminou");
-    expect(cliques).toHaveLength(0);
-  });
-});
-
-describe("rota que não é de planilha", () => {
-  it("segue pelo caminho antigo, sem pedir tíquete", async () => {
-    // a extração da quebra tem rota própria: um POST para `/tiquete` ali
-    // bateria em 404 e o download morreria sem explicação
-    const buscar = vi.fn().mockResolvedValue(resposta({}, 200));
-    vi.stubGlobal("fetch", buscar);
-
-    await baixarArquivo("/api/quebra-de-sped/3/extracoes", "sped.zip");
-
-    const [url, opcoes] = buscar.mock.calls[0];
-    expect(url).toBe("/api/quebra-de-sped/3/extracoes");
-    expect(opcoes?.method).toBeUndefined();
-    expect(url).not.toContain("tiquete");
-  });
-
-  it("a própria rota do tíquete não pede outro tíquete", async () => {
-    const buscar = vi.fn().mockResolvedValue(resposta({}, 200));
-    vi.stubGlobal("fetch", buscar);
-
-    await baixarArquivo(
-      "/api/exclusoes/9/planilhas/pacote/tiquete", "pacote.zip",
-    );
-
-    expect(buscar.mock.calls[0][0]).not.toContain("tiquete/tiquete");
-  });
-});
-
-/**
- * A aba é reservada no gesto de quem clicou — e é isso que mantém o download
- * sendo "alguém pediu" em vez de "a página decidiu".
- *
- * Sem isso, Chrome e Edge liberam o primeiro download e bloqueiam os seguintes
- * sem mandar requisição nenhuma, e o que aparece na lista do navegador é
- * "verifique a conexão com a Internet" — com o servidor respondendo normal.
- */
-describe("o destino é reservado antes da espera", () => {
-  function abrirFalso() {
-    const janela = { location: { replace: vi.fn() }, close: vi.fn() };
-    const abrir = vi.fn().mockReturnValue(janela);
-    vi.stubGlobal("open", abrir);
-    return { janela, abrir };
-  }
-
-  it("abre a aba antes do POST do tíquete, não depois", async () => {
-    const ordem: string[] = [];
-    const { abrir, janela } = abrirFalso();
-    abrir.mockImplementation(() => {
-      ordem.push("abriu");
-      return janela;
+describe("baixar planilha", () => {
+  it("pergunta a pasta antes de ir à rede, e grava em fluxo", async () => {
+    const buscar = vi.fn().mockImplementation(async () => {
+      ordem.push("rede");
+      return resposta(null);
     });
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => {
-      ordem.push("tiquete");
-      return resposta(TIQUETE);
-    }));
+    vi.stubGlobal("fetch", buscar);
 
-    await baixarArquivo("/api/exclusoes/9/planilhas/pacote", "pacote.zip");
+    await baixarArquivo(PLANILHA, "consulta_de_entradas.csv");
 
-    expect(ordem).toEqual(["abriu", "tiquete"]);
-    expect(abrir).toHaveBeenCalledWith("", "_blank");
+    // a ordem é o que faz o seletor abrir: depois da rede ele seria recusado
+    expect(ordem).toEqual(["seletor", "rede", "gravou"]);
+    expect(buscar).toHaveBeenCalledOnce();
+    expect(buscar.mock.calls[0][0]).toBe(PLANILHA);
   });
 
-  it("aponta a aba para a URL com o tíquete, sem criar link nenhum", async () => {
-    const { janela } = abrirFalso();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(resposta(TIQUETE)));
+  it("leva o token no cabeçalho, que é o motivo de a aba buscar", async () => {
+    localStorage.setItem("cat.token", "jwt-de-teste");
+    const buscar = vi.fn().mockResolvedValue(resposta(null));
+    vi.stubGlobal("fetch", buscar);
 
-    await baixarArquivo(
-      "/api/apuracao-piscofins/12/planilhas/entradas?formato=csv",
-      "consulta_de_entradas.csv",
-    );
+    await baixarArquivo(PLANILHA, "consulta_de_entradas.csv");
 
-    expect(janela.location.replace).toHaveBeenCalledWith(
-      "/api/apuracao-piscofins/12/planilhas/entradas?formato=csv&t=abc123",
-    );
-    expect(cliques).toHaveLength(0);
+    const cabecalhos = buscar.mock.calls[0][1].headers as Headers;
+    expect(cabecalhos.get("Authorization")).toBe("Bearer jwt-de-teste");
+    localStorage.clear();
   });
 
-  it("fecha a aba quando o tíquete é recusado, para não deixar aba órfã", async () => {
-    const { janela } = abrirFalso();
+  it("recusa do servidor vira erro na tela e não deixa arquivo de 0 byte", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
       resposta({ detail: "A apuração das exclusões ainda não terminou." }, 409),
     ));
@@ -192,17 +100,25 @@ describe("o destino é reservado antes da espera", () => {
       baixarArquivo("/api/exclusoes/9/planilhas/pacote", "pacote.zip"),
     ).rejects.toThrow("ainda não terminou");
 
-    expect(janela.close).toHaveBeenCalledOnce();
-    expect(janela.location.replace).not.toHaveBeenCalled();
+    expect(ordem).toEqual(["seletor", "descartou"]);
   });
 
-  it("com o bloqueador de janelas ligado, ainda tenta pelo link", async () => {
-    vi.stubGlobal("open", vi.fn().mockReturnValue(null));
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(resposta(TIQUETE)));
+  it("sem espaço em disco, a frase do motor chega inteira à tela", async () => {
+    // é o 422 que `exigir_espaco` devolve desde a v0.162.0
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(resposta(
+      { detail: "Sem espaço em disco para montar esta planilha: ela precisa de "
+                + "cerca de 15,2 GB e restam 0,5 GB em D:." }, 422)));
 
-    await baixarArquivo("/api/exclusoes/9/planilhas/pacote", "pacote.zip");
+    await expect(baixarArquivo(PLANILHA, "entradas.xlsx"))
+      .rejects.toThrow("Sem espaço em disco");
+  });
 
-    expect(cliques).toHaveLength(1);
-    expect(cliques[0].getAttribute("href")).toBe("/api/exclusoes/9/planilhas/pacote?t=abc123");
+  it("queda de rede não deixa o arquivo escolhido para trás", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    await expect(baixarArquivo(PLANILHA, "entradas.csv"))
+      .rejects.toThrow("Não foi possível baixar");
+
+    expect(ordem).toEqual(["seletor", "descartou"]);
   });
 });
