@@ -226,6 +226,9 @@ ESQUEMA_FICHA3 = pa.schema([
     # entrada, em %, quando ela entrou no efetivo
     ("aliquota_documento", pa.decimal128(9, 4)),
     ("aliquota", pa.decimal128(9, 4)),
+    # de onde saiu a alíquota do confronto quando o 0200 não a tinha: vazio é o
+    # cadastro, e o resto diz a chave e a prova (`FONTES_DA_ALIQUOTA`)
+    ("aliquota_origem", pa.string()),
     ("reducao_base", pa.decimal128(9, 4)),
     ("saldo_quantidade", pa.decimal128(24, 6)),
     ("saldo_unitario", pa.decimal128(30, 15)),
@@ -453,8 +456,10 @@ class ResumoDaMontagem:
     # redução tirou do valor de confronto
     saidas_com_reducao: int = 0
     efetivo_reduzido: Decimal = Decimal(0)
-    # saídas cuja alíquota veio da nota de entrada, por falta de 0200
+    # saídas cuja alíquota veio da nota de entrada, por falta de 0200, e de
+    # onde ela veio em cada uma (`FONTES_DA_ALIQUOTA`)
     saidas_com_aliquota_da_entrada: int = 0
+    aliquota_por_fonte: dict = field(default_factory=dict)
     # correções à mão aplicadas nesta rodada, por campo
     correcoes: dict = field(default_factory=dict)
     saidas_indefinidas: int = 0
@@ -1156,6 +1161,96 @@ def _correcoes(con, fontes) -> dict[str, int]:
     return aplicadas
 
 
+# ---------------------------------------------------------------------------
+# a alíquota interna da mercadoria, quando o 0200 não a traz
+# ---------------------------------------------------------------------------
+# O cadastro é a fonte natural — e falha calado. Na empresa 04 eram 13.909
+# saídas de quatro códigos sem 0200 em arquivo nenhum; na empresa 26, 2.228
+# saídas **todas de CST 60**, de mercadoria que o cliente nunca comprou com
+# aquele código. Sem alíquota não há confronto, e sem confronto não há
+# ressarcimento: a linha some do pedido sem ninguém ver.
+#
+# A entrada da mesma mercadoria diz a alíquota de três jeitos, nesta ordem de
+# prova (decisão do Victor, 17/09/2026, estendida em 14/10/2026):
+#
+# * `interna` — o ICMS **destacado** numa entrada dentro do estado. É a
+#   alíquota que o fornecedor usou na operação própria. A compra de fora não
+#   serve: ela vem com 4%, 7% ou 12%, que não são a tributação interna.
+# * `st` — o `pICMSST` de uma entrada com ST retido (CST 10, 30, 70). O
+#   substituto calcula a retenção com a alíquota interna **do destino**, então
+#   esta serve mesmo quando a compra veio de outro estado — e só existe onde a
+#   mercadoria estava em ST naquela data, que é exatamente o caso que se quer.
+# * `efetiva` — o `pICMSEfet` do CST 60, que é a interna **já reduzida**. Por
+#   isso ela só entra onde a mercadoria não tem redução: com redução, o
+#   confronto reduziria a base uma segunda vez.
+FONTES_DA_ALIQUOTA = ("interna", "st", "efetiva")
+
+# a coluna do documento e a condição extra de cada fonte; `{cfop}` recebe o
+# teste de operação interna, que só a alíquota destacada exige
+_FONTES_NO_XML = {"interna": ("aliq_icms", "{cfop}"), "st": ("aliq_st", "true"),
+                  "efetiva": ("aliquota_efetiva", "true")}
+_FONTES_NA_EFD = {"interna": ("aliq_icms", "{cfop}"), "st": ("aliq_st", "true"),
+                  "efetiva": ("aliquota_efetiva_xml", "true")}
+
+# por onde se procura a mercadoria, da chave mais perto dela para a mais larga:
+# o código do item é a própria mercadoria; o NCM é a classificação, que alcança
+# o código que nunca foi comprado — e é o que resolve o CST 60 da empresa 26
+_CHAVES_DA_ALIQUOTA = (
+    ("item", "aliq_item", "a.cnpj = lancamentos.cnpj AND a.codigo = lancamentos.codigo"),
+    ("ncm", "aliq_ncm", "a.ncm = lancamentos.ncm"),
+)
+
+
+def _uniao(selects: list[str], vazia: str) -> str:
+    """As fontes somadas, ou uma relação vazia com as mesmas colunas.
+
+    A base que não traz coluna nenhuma delas precisa de uma tabela vazia, não
+    de um erro de sintaxe: ficar sem alíquota é um resultado, não uma falha.
+    """
+    if selects:
+        return " UNION ALL ".join(selects)
+    return (f"SELECT {vazia}, NULL::DATE AS data, NULL::DECIMAL(9, 4) AS aliquota, "
+            "NULL::VARCHAR AS fonte WHERE false")
+
+
+def _completar_aliquota(con) -> dict[str, int]:
+    """Preenche `lancamentos.aliquota` com o que as entradas dizem.
+
+    Duas passadas, e **a ordem entre elas é o que respeita o período**: primeiro
+    todas as fontes que têm uma entrada até a data da saída, e só no que sobrar
+    a primeira entrada que houver. Uma alíquota de 2024 numa saída de 2021 erra
+    mais do que uma alíquota mais larga do mês certo — e erra calada, porque
+    sai no relatório como qualquer outra.
+
+    Cada linha guarda em `aliquota_origem` de onde a dela veio, para a Ficha 3
+    mostrar e para ninguém confundir o que foi lido com o que foi deduzido.
+    """
+    con.execute("ALTER TABLE lancamentos ADD COLUMN aliquota_origem VARCHAR")
+    ordem = [(f"{chave}_{fonte}", tabela, liga, fonte)
+             for chave, tabela, liga in _CHAVES_DA_ALIQUOTA for fonte in FONTES_DA_ALIQUOTA]
+    for no_periodo in (True, False):
+        for nome, tabela, liga, fonte in ordem:
+            casa = f"{liga} AND a.fonte = '{fonte}'"
+            ate_a_data = " AND a.data <= lancamentos.data" if no_periodo else ""
+            ordena = "a.data DESC" if no_periodo else "a.data"
+            sem_reducao = " AND reducao_base IS NULL" if fonte == "efetiva" else ""
+            con.execute(f"""UPDATE lancamentos SET
+                    aliquota = (SELECT a.aliquota FROM {tabela} a
+                                WHERE {casa}{ate_a_data} ORDER BY {ordena} LIMIT 1),
+                    aliquota_origem = '{nome}'
+                WHERE aliquota IS NULL{sem_reducao}
+                  AND EXISTS (SELECT 1 FROM {tabela} a WHERE {casa}{ate_a_data})""")
+    con.execute("UPDATE lancamentos SET aliquota_da_entrada = aliquota_origem IS NOT NULL")
+    lidas = dict(con.execute(
+        "SELECT aliquota_origem, count(*) FROM lancamentos WHERE aliquota_origem IS NOT NULL "
+        "GROUP BY 1 ORDER BY 1").fetchall())
+    sobraram = con.execute(
+        "SELECT count(*) FROM lancamentos WHERE aliquota IS NULL").fetchone()[0]
+    log.info("alíquota lida na entrada onde falta 0200",
+             extra={"resolvidas": sum(lidas.values()), "sem_aliquota": sobraram, **lidas})
+    return lidas
+
+
 def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
     """Põe em `lancamentos.reducao_base` a redução de base da mercadoria.
 
@@ -1169,6 +1264,7 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
     cst = ", ".join(f"'{c}'" for c in sorted(CST_COM_REDUCAO))
     fontes_sql: list[str] = []
     aliq_sql: list[str] = []
+    aliq_item_sql: list[str] = []
     xml_itens = os.path.join(fontes.movimentacao, ARQUIVO_ITENS_DO_XML)
     colunas_xml = set(pq.read_schema(xml_itens).names) if os.path.isfile(xml_itens) else set()
     # o pRedBC do documento, que é o percentual de redução que vale
@@ -1193,13 +1289,27 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
               AND x.emitente NOT IN (SELECT cnpj FROM estabs)
               AND right(coalesce(x.cst_icms, ''), 2) IN ({cst}) AND x.bc_icms > 0
               AND {interna_xml}""")
-    if de_fora | {"aliq_icms"} <= colunas_xml:
+    de_estab = ("x.destinatario IN (SELECT cnpj FROM estabs) "
+                "AND x.emitente NOT IN (SELECT cnpj FROM estabs)")
+    for fonte, (col, onde) in _FONTES_NO_XML.items():
+        if not de_fora | {col} <= colunas_xml:
+            continue
         aliq_sql.append(f"""
-            SELECT nullif(x.ncm, '') AS ncm, x.emissao AS data, x.aliq_icms AS aliquota
+            SELECT nullif(x.ncm, '') AS ncm, x.emissao AS data, x.{col} AS aliquota,
+                   '{fonte}' AS fonte
             FROM read_parquet('{_escapar(xml_itens)}') x
-            WHERE x.destinatario IN (SELECT cnpj FROM estabs)
-              AND x.emitente NOT IN (SELECT cnpj FROM estabs) AND x.aliq_icms > 0
-              AND {interna_xml}""")
+            WHERE {de_estab} AND x.{col} > 0 AND {onde.format(cfop=interna_xml)}""")
+        if {"chave", "codigo"} <= colunas_xml and {"chave", "codigo_xml"} <= set(colunas_mov):
+            # o código do item no XML é o **do fornecedor**; quem o devolve ao
+            # código do cliente é a própria movimentação, que casou os dois
+            aliq_item_sql.append(f"""
+                SELECT m.cnpj, coalesce(d.codigo_destino, m.codigo) AS codigo, m.data,
+                       x.{col} AS aliquota, '{fonte}' AS fonte
+                FROM read_parquet('{_escapar(xml_itens)}') x
+                JOIN {mov} m ON m.chave = x.chave AND m.codigo_xml = x.codigo
+                 AND m.operacao = 'entrada'
+                LEFT JOIN depara d ON d.cnpj = m.cnpj AND d.codigo_origem = m.codigo
+                WHERE {de_estab} AND x.{col} > 0 AND {onde.format(cfop=interna_xml)}""")
     if {"ncm", "bc_icms", "desconto", "cfop"} <= set(colunas_mov):
         fontes_sql.append(f"""
             SELECT nullif(m.ncm, '') AS ncm, m.data, m.cst_icms, m.bc_icms, m.valor, m.desconto,
@@ -1208,11 +1318,19 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
             WHERE m.operacao = 'entrada'
               AND right(coalesce(m.cst_icms, ''), 2) IN ({cst}) AND m.bc_icms > 0
               AND {interna_efd}""")
-    if {"ncm", "aliq_icms", "cfop"} <= set(colunas_mov):
+    for fonte, (col, onde) in _FONTES_NA_EFD.items():
+        if not {"ncm", "cfop", col} <= set(colunas_mov):
+            continue
         aliq_sql.append(f"""
-            SELECT nullif(m.ncm, '') AS ncm, m.data, m.aliq_icms AS aliquota
-            FROM {mov} m WHERE m.operacao = 'entrada' AND m.aliq_icms > 0
-              AND {interna_efd}""")
+            SELECT nullif(m.ncm, '') AS ncm, m.data, m.{col} AS aliquota, '{fonte}' AS fonte
+            FROM {mov} m WHERE m.operacao = 'entrada' AND m.{col} > 0
+              AND {onde.format(cfop=interna_efd)}""")
+        aliq_item_sql.append(f"""
+            SELECT m.cnpj, coalesce(d.codigo_destino, m.codigo) AS codigo, m.data,
+                   m.{col} AS aliquota, '{fonte}' AS fonte
+            FROM {mov} m
+            LEFT JOIN depara d ON d.cnpj = m.cnpj AND d.codigo_origem = m.codigo
+            WHERE m.operacao = 'entrada' AND m.{col} > 0 AND {onde.format(cfop=interna_efd)}""")
     por_dia: dict[tuple[str, date], list[Decimal]] = {}
     if fontes_sql:
         for ncm, data, cst_item, base, valor, desconto, declarada in con.execute(
@@ -1249,34 +1367,15 @@ def _reducoes(con, fontes, mov: str, colunas_mov: list[str]) -> None:
     log.info("redução de base lida das entradas",
              extra={"mercadorias": len({n for n, _ in por_dia}), "dias": len(por_dia)})
 
-    # A alíquota interna sai do 0200. Sem cadastro — 13.909 saídas da
-    # empresa 04, de quatro códigos que não têm 0200 em arquivo nenhum —, ela
-    # vem da **nota de entrada** da mesma mercadoria (decisão do Victor,
-    # 17/09/2026): é a alíquota que o fornecedor usou na operação própria, pelo
-    # mesmo NCM e pela mesma regra de data da redução.
-    if aliq_sql:
-        con.execute(f"""CREATE OR REPLACE TABLE aliq_ncm AS
-            SELECT ncm, data, CAST(median(aliquota) AS DECIMAL(9, 4)) AS aliquota
-            FROM ({" UNION ALL ".join(aliq_sql)}) WHERE ncm IS NOT NULL AND aliquota > 0
-            GROUP BY ncm, data""")
-    else:
-        con.execute("CREATE OR REPLACE TABLE aliq_ncm (ncm VARCHAR, data DATE, aliquota DECIMAL(9, 4))")
-    faltando = con.execute(
-        "SELECT count(*) FROM lancamentos WHERE aliquota IS NULL AND ncm IS NOT NULL").fetchone()[0]
-    if faltando:
-        con.execute("""UPDATE lancamentos SET aliquota = (
-                SELECT a.aliquota FROM aliq_ncm a
-                WHERE a.ncm = lancamentos.ncm AND a.data <= lancamentos.data
-                ORDER BY a.data DESC LIMIT 1), aliquota_da_entrada = true
-            WHERE aliquota IS NULL AND ncm IS NOT NULL""")
-        con.execute("""UPDATE lancamentos SET aliquota = (
-                SELECT a.aliquota FROM aliq_ncm a
-                WHERE a.ncm = lancamentos.ncm ORDER BY a.data LIMIT 1)
-            WHERE aliquota IS NULL AND aliquota_da_entrada AND ncm IS NOT NULL""")
-        con.execute("UPDATE lancamentos SET aliquota_da_entrada = false WHERE aliquota IS NULL")
-        pegou = con.execute("SELECT count(*) FROM lancamentos WHERE aliquota_da_entrada").fetchone()[0]
-        log.info("alíquota da nota de entrada onde falta 0200",
-                 extra={"sem_cadastro": faltando, "resolvidas": pegou})
+    con.execute(f"""CREATE OR REPLACE TABLE aliq_ncm AS
+        SELECT ncm, data, fonte, CAST(median(aliquota) AS DECIMAL(9, 4)) AS aliquota
+        FROM ({_uniao(aliq_sql, "NULL::VARCHAR AS ncm")})
+        WHERE ncm IS NOT NULL AND data IS NOT NULL GROUP BY ncm, data, fonte""")
+    con.execute(f"""CREATE OR REPLACE TABLE aliq_item AS
+        SELECT cnpj, codigo, data, fonte, CAST(median(aliquota) AS DECIMAL(9, 4)) AS aliquota
+        FROM ({_uniao(aliq_item_sql, "NULL::VARCHAR AS cnpj, NULL::VARCHAR AS codigo")})
+        WHERE codigo IS NOT NULL AND data IS NOT NULL GROUP BY cnpj, codigo, data, fonte""")
+    _completar_aliquota(con)
 
     # o documento nem sempre diz a alíquota: o CST 60 não destaca nada, e nem
     # todo emitente preenche o pICMSEfet (na empresa 04, 35.448 dos 81.157
@@ -1379,6 +1478,9 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                 # o que a redução tirou do confronto: efetivo * r / (100 - r)
                 resumo.efetivo_reduzido += ((m.icms_efetivo or Decimal(0))
                                             * Decimal(d.reducao) / (Decimal(100) - Decimal(d.reducao)))
+            if d.aliquota_origem:
+                lidas = resumo.aliquota_por_fonte
+                lidas[d.aliquota_origem] = lidas.get(d.aliquota_origem, 0) + 1
             sem_fator += conversao[2]
             resumo.linhas_convertidas += conversao[1] != 1
             resumo.linhas_unidade_sem_fator += conversao[2]
@@ -1526,6 +1628,8 @@ class DadosDaLinha:
     aliquota: Decimal | None = None
     reducao: Decimal | None = None
     aliquota_da_entrada: bool = False
+    # vazio quando a alíquota é a do cadastro (`FONTES_DA_ALIQUOTA`)
+    aliquota_origem: str = ""
     cst: str = ""
     ncm: str = ""
     unidade_estoque: str = ""
@@ -1569,6 +1673,7 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
     enq, indefinido, faltou, pendente, efetivo = EnquadramentoLegal.DEMAIS_SAIDAS, False, False, False, None
     reducao = aliquota = None
     da_entrada = False
+    origem_da_aliquota = ""
     if especie is Especie.SAIDA and not linha["devolucao"]:
         classificado, indefinido = _enquadrar(linha, venda_a_consumidor)
         corrigido = linha.get("enquadramento_corrigido")
@@ -1581,6 +1686,7 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
             if efetivo is not None and enq.confronta_com_saida:
                 aliquota = linha.get("aliquota")
                 da_entrada = bool(linha.get("aliquota_da_entrada"))
+                origem_da_aliquota = linha.get("aliquota_origem") or ""
             if efetivo is not None and not enq.confronta_com_saida:
                 resumo.confronto_pela_entrada += 1
     try:
@@ -1602,7 +1708,8 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
                                                             "codigo": linha["codigo"]})
         return None, False, dados()
     return m, pendente, dados(indefinido=indefinido, faltou_aliquota=faltou, aliquota=aliquota,
-                              reducao=reducao, aliquota_da_entrada=da_entrada)
+                              reducao=reducao, aliquota_da_entrada=da_entrada,
+                              aliquota_origem=origem_da_aliquota)
 
 
 def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, dados: DadosDaLinha,
@@ -1639,6 +1746,7 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, dados: DadosDaLinha,
     lote["aliquota_documento"].append(Decimal(dados.aliquota_documento).quantize(_Q4)
                                       if dados.aliquota_documento else None)
     lote["aliquota"].append(Decimal(dados.aliquota).quantize(_Q4) if dados.aliquota else None)
+    lote["aliquota_origem"].append(dados.aliquota_origem or None)
     lote["reducao_base"].append(Decimal(dados.reducao).quantize(_Q4) if dados.reducao else None)
     lote["saldo_quantidade"].append(ln.saldo_quantidade.quantize(_Q6))
     lote["saldo_unitario"].append(ln.saldo_unitario.quantize(_Q15))
@@ -1788,6 +1896,9 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
             "efetivo_reduzido": texto(resumo.efetivo_reduzido),
         },
         "aliquota_da_entrada": resumo.saidas_com_aliquota_da_entrada,
+        # e de onde ela veio: `item`/`ncm` é a chave, `interna`/`st`/`efetiva`
+        # é a prova (`FONTES_DA_ALIQUOTA`)
+        "aliquota_por_fonte": dict(sorted(resumo.aliquota_por_fonte.items())),
         "pendencias": {
             "saidas_sem_aliquota": resumo.saidas_sem_aliquota,
             "saidas_indefinidas": resumo.saidas_indefinidas,

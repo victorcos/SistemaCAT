@@ -113,6 +113,9 @@ COLUNAS_FICHA3 = (
     Coluna("confronto_entrada", "ICMS Efetivo da Entrada nas Demais Hipóteses",
            "numero", 15, CONFRONTO, "21"),
     Coluna("aliquota", "Alíquota do Confronto (%)", "quantidade", 12, CONFRONTO),
+    # vazio é o 0200 do cliente; o resto diz onde a alíquota foi buscada e com
+    # que prova, para o revisor ver o que foi lido e o que foi deduzido
+    Coluna("aliquota_origem", "Origem da Alíquota", "texto", 14, CONFRONTO),
     Coluna("reducao_base", "Redução de Base (%)", "quantidade", 12, CONFRONTO),
 
     Coluna("saldo_quantidade", "Quantidade", "quantidade", 13, SALDO, "22"),

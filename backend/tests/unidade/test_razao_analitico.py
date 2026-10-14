@@ -74,13 +74,16 @@ def fontes(tmp_path):
         ("valor", pa.decimal128(18, 2)), ("valor_icms", pa.decimal128(18, 2)),
         ("valor_st", pa.decimal128(18, 2)), ("chave", pa.string()), ("numero_documento", pa.string()),
         ("participante", pa.string()),
+        # o código com que o fornecedor chamou o item, que casa a linha com o
+        # XML dela — é por ele que a alíquota da entrada volta ao código da casa
+        ("codigo_xml", pa.string()),
     ], [
         # entrada: aparece também aqui, mas o razão lê a da apuração
         {"cnpj": A, "competencia": date(2021, 1, 1), "operacao": "entrada", "codigo": "X",
          "data": date(2021, 1, 5), "cfop": "1403", "cst_icms": "060", "modelo": "55",
          "unidade": "UN", "numero_item": 1,
          "quantidade": d(10), "valor": d(100), "valor_icms": d(0), "valor_st": d(0),
-         "chave": "4" * 44, "numero_documento": "1"},
+         "chave": "4" * 44, "numero_documento": "1", "codigo_xml": "FORN-X"},
         {"cnpj": A, "competencia": date(2021, 1, 1), "operacao": "saida", "codigo": "X",
          "data": date(2021, 1, 6), "cfop": "5152", "cst_icms": "060", "modelo": "55",
          "unidade": "UN", "numero_item": 1,
@@ -917,6 +920,143 @@ class TestReducaoDeBase:
         assert venda["aliquota"] is None and venda["reducao_base"] is None
         assert venda["icms_efetivo"] is None
         assert r.saidas_com_aliquota_da_entrada == 0 and r.saidas_sem_aliquota == 1
+
+    def _so_com_0200_vazio(self, tmp_path, itens_do_xml: list[dict],
+                           colunas: list[tuple] | None = None) -> None:
+        """O cadastro sem alíquota, e as entradas que o teste quiser."""
+        mov = tmp_path / "movimentacao"
+        gravar(mov / ARQUIVO_ITENS, [
+            ("cnpj", pa.string()), ("codigo", pa.string()), ("descricao", pa.string()),
+            ("unidade", pa.string()), ("aliq_icms", pa.decimal128(9, 4)), ("ncm", pa.string()),
+        ], [{"cnpj": A, "codigo": "X", "descricao": "Refrigerante cola 2L", "unidade": "UN",
+             "aliq_icms": None, "ncm": "33059000"}])
+        gravar(mov / ARQUIVO_ITENS_DO_XML, [
+            ("chave", pa.string()), ("numero_item", pa.int32()), ("codigo", pa.string()),
+            ("emitente", pa.string()), ("destinatario", pa.string()), ("emissao", pa.date32()),
+            ("ncm", pa.string()), ("cst_icms", pa.string()), ("bc_icms", pa.decimal128(18, 2)),
+            ("valor", pa.decimal128(18, 2)), ("desconto", pa.decimal128(18, 2)),
+            ("aliq_icms", pa.decimal128(9, 4)), ("aliq_st", pa.decimal128(9, 4)),
+            ("aliquota_efetiva", pa.decimal128(9, 4)), ("cfop", pa.string()),
+            *(colunas or []),
+        ], itens_do_xml)
+
+    def test_a_st_da_entrada_de_fora_diz_a_interna_do_destino(self, fontes, tmp_path):
+        """A compra interestadual não empresta o ICMS que ela destaca — mas
+        empresta o **pICMSST**.
+
+        São coisas diferentes: o destaque é a operação própria do fornecedor, a
+        12%; a retenção é calculada com a alíquota interna **do destino**, que é
+        o que o confronto da saída pede. Na empresa 26 são 754 linhas que só
+        esta fonte alcança, todas de mercadoria que entra com ST retido e sai
+        com CST 60 — sem ela, nenhuma delas tem confronto.
+        """
+        # a compra é de outra mercadoria do mesmo NCM: é o caso da empresa 26,
+        # onde o código que vende nunca foi comprado com aquele código
+        self._so_com_0200_vazio(tmp_path, [
+            {"chave": "9" * 44, "numero_item": 1, "codigo": "FORN-OUTRO",
+             "emitente": "99999999000191", "destinatario": A, "emissao": date(2021, 1, 5),
+             "ncm": "33059000", "cst_icms": "510", "bc_icms": d(100), "valor": d(100),
+             "desconto": d(0), "aliq_icms": d(12), "aliq_st": d(18), "cfop": "6401"}])
+        destino = tmp_path / "st_da_entrada"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+        venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
+        assert venda["aliquota"] == d("18.0000") and venda["aliquota_origem"] == "ncm_st"
+        assert venda["icms_efetivo"] == d("3.60")           # 20 x 18%, sem redução
+        assert r.saidas_sem_aliquota == 0
+        assert serializar(r)["aliquota_por_fonte"] == {"ncm_st": 1}
+
+    def test_a_entrada_do_proprio_codigo_vence_a_do_NCM(self, fontes, tmp_path):
+        """Duas mercadorias com o mesmo NCM não têm de ter a mesma alíquota.
+
+        A do próprio código é a mercadoria; a do NCM é a classificação, que
+        serve quando o código nunca foi comprado. Por isso o código vem antes.
+        """
+        self._so_com_0200_vazio(tmp_path, [
+            # a entrada do próprio X, que a movimentação casou pelo código do fornecedor
+            {"chave": "4" * 44, "numero_item": 1, "codigo": "FORN-X",
+             "emitente": "99999999000191", "destinatario": A, "emissao": date(2021, 1, 4),
+             "ncm": "33059000", "cst_icms": "510", "bc_icms": d(100), "valor": d(100),
+             "desconto": d(0), "aliq_icms": d(0), "aliq_st": d(25), "cfop": "6401"},
+            # outra mercadoria do mesmo NCM, comprada depois e a 12%
+            {"chave": "9" * 44, "numero_item": 1, "codigo": "FORN-OUTRO",
+             "emitente": "99999999000191", "destinatario": A, "emissao": date(2021, 1, 5),
+             "ncm": "33059000", "cst_icms": "510", "bc_icms": d(100), "valor": d(100),
+             "desconto": d(0), "aliq_icms": d(0), "aliq_st": d(12), "cfop": "6401"}])
+        destino = tmp_path / "item_vence_ncm"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+        venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
+        assert venda["aliquota"] == d("25.0000") and venda["aliquota_origem"] == "item_st"
+        assert r.saidas_sem_aliquota == 0
+
+    def test_a_alíquota_do_periodo_vence_a_fonte_mais_perto(self, fontes, tmp_path):
+        """Primeiro o que tem data, depois o que tem prova melhor.
+
+        A saída é de 06/01. A ST de 05/01 é do período; o destaque interno é de
+        10/01, posterior à venda. Sem esta ordem a linha ficaria com 25% de um
+        documento que ainda não existia — e erraria calada, porque sai no
+        relatório como qualquer outra.
+        """
+        self._so_com_0200_vazio(tmp_path, [
+            {"chave": "4" * 44, "numero_item": 1, "codigo": "FORN-OUTRO",
+             "emitente": "99999999000191", "destinatario": A, "emissao": date(2021, 1, 5),
+             "ncm": "33059000", "cst_icms": "510", "bc_icms": d(100), "valor": d(100),
+             "desconto": d(0), "aliq_icms": d(0), "aliq_st": d(18), "cfop": "6401"},
+            {"chave": "9" * 44, "numero_item": 1, "codigo": "FORN-OUTRO",
+             "emitente": "99999999000191", "destinatario": A, "emissao": date(2021, 1, 10),
+             "ncm": "33059000", "cst_icms": "500", "bc_icms": d(100), "valor": d(100),
+             "desconto": d(0), "aliq_icms": d(25), "aliq_st": d(0), "cfop": "5401"}])
+        destino = tmp_path / "periodo_vence"
+        destino.mkdir()
+        montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+        venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
+        assert venda["aliquota"] == d("18.0000") and venda["aliquota_origem"] == "ncm_st"
+
+    def test_o_pICMSEfet_nao_entra_onde_a_mercadoria_tem_reducao(self, fontes, tmp_path):
+        """O pICMSEfet do CST 60 já é a interna **reduzida**.
+
+        Onde a mercadoria tem redução, usá-lo reduziria a base duas vezes e o
+        confronto sairia menor do que é — então ali ele não vale, e a linha
+        prefere ficar contada como pendência a sair com um número errado.
+        """
+        self._so_com_0200_vazio(tmp_path, [
+            # declara redução de 52% e não destaca alíquota nenhuma
+            {"chave": "4" * 44, "numero_item": 1, "codigo": "FORN-OUTRO",
+             "emitente": "99999999000191", "destinatario": A, "emissao": date(2021, 1, 5),
+             "ncm": "33059000", "cst_icms": "570", "bc_icms": d(48), "valor": d(100),
+             "desconto": d(0), "aliq_icms": d(0), "aliq_st": d(0), "cfop": "5401"},
+            # e o CST 60 que informa a efetiva de 12%
+            {"chave": "9" * 44, "numero_item": 1, "codigo": "FORN-OUTRO",
+             "emitente": "99999999000191", "destinatario": A, "emissao": date(2021, 1, 5),
+             "ncm": "33059000", "cst_icms": "560", "bc_icms": d(0), "valor": d(100),
+             "desconto": d(0), "aliq_icms": d(0), "aliq_st": d(0),
+             "aliquota_efetiva": d(12), "cfop": "5405"}])
+        destino = tmp_path / "efetiva_com_reducao"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+        venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
+        assert venda["aliquota"] is None and venda["aliquota_origem"] is None
+        assert r.saidas_sem_aliquota == 1
+
+    def test_o_pICMSEfet_vale_onde_nao_ha_reducao(self, fontes, tmp_path):
+        """A mesma entrada, sem a redução: aí a efetiva **é** a interna.
+
+        É o par do teste de cima — junto com ele, mostra que quem barra o
+        pICMSEfet é a redução da mercadoria, e não a fonte em si.
+        """
+        self._so_com_0200_vazio(tmp_path, [
+            {"chave": "9" * 44, "numero_item": 1, "codigo": "FORN-OUTRO",
+             "emitente": "99999999000191", "destinatario": A, "emissao": date(2021, 1, 5),
+             "ncm": "33059000", "cst_icms": "560", "bc_icms": d(0), "valor": d(100),
+             "desconto": d(0), "aliq_icms": d(0), "aliq_st": d(0),
+             "aliquota_efetiva": d(12), "cfop": "5405"}])
+        destino = tmp_path / "efetiva_sem_reducao"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+        venda = next(l for l in ficha(destino) if l["origem"] == "relatorio")
+        assert venda["aliquota"] == d("12.0000") and venda["aliquota_origem"] == "ncm_efetiva"
+        assert r.saidas_sem_aliquota == 0
 
     def test_o_0200_vence_a_nota_de_entrada(self, com_reducao):
         """Com cadastro, a alíquota é a dele: 18% do 0200, não os 25% da entrada."""

@@ -76,6 +76,8 @@ export interface ResumoDoRazao {
   reducao_de_base?: { saidas: number; efetivo_reduzido: string };
   /** v0.58: saídas cuja alíquota veio da nota de entrada, por falta de 0200. */
   aliquota_da_entrada?: number;
+  /** v0.160: e de onde ela veio — a chave da busca e a prova. */
+  aliquota_por_fonte?: Record<string, number>;
   por_enquadramento?: PorEnquadramento[];
   por_competencia?: { competencia: string; linhas: number; ressarcimento: string; complemento: string }[];
   saidas_por_origem?: Record<string, number>;
@@ -223,4 +225,31 @@ export function baixarPlanilhaDoRazao(
 ): Promise<void> {
   const filtro = formato !== "xlsx" ? `?formato=${formato}` : "";
   return baixarArquivo(`/api/razao/${execucaoId}/planilhas/${qual}${filtro}`, `${NOME[qual]}.${formato}`, sinal);
+}
+
+/**
+ * De onde a alíquota interna foi buscada quando o 0200 não a trazia.
+ *
+ * A chave diz **por onde** se procurou — o próprio código da mercadoria ou o
+ * NCM dela — e a prova diz **o que** disse a alíquota: o ICMS destacado numa
+ * entrada interna, o pICMSST de uma entrada com ST retido, ou o pICMSEfet do
+ * CST 60. Quem revisa precisa dos dois para saber o quanto confiar no número.
+ */
+export const ROTULO_DA_FONTE_DA_ALIQUOTA: Record<string, string> = {
+  item_interna: "pelo código, ICMS destacado na entrada",
+  item_st: "pelo código, ST retido na entrada",
+  item_efetiva: "pelo código, alíquota efetiva do CST 60",
+  ncm_interna: "pelo NCM, ICMS destacado na entrada",
+  ncm_st: "pelo NCM, ST retido na entrada",
+  ncm_efetiva: "pelo NCM, alíquota efetiva do CST 60",
+};
+
+/** "7.555 pelo NCM, ICMS destacado na entrada; 949 pelo NCM, ST retido…" */
+export function ondeAAliquotaFoiBuscada(porFonte?: Record<string, number>): string {
+  const ptBR = (n: number) => n.toLocaleString("pt-BR");
+  return Object.entries(porFonte ?? {})
+    .filter(([, n]) => n > 0)
+    .sort(([, a], [, b]) => b - a)
+    .map(([fonte, n]) => `${ptBR(n)} ${ROTULO_DA_FONTE_DA_ALIQUOTA[fonte] ?? fonte}`)
+    .join("; ");
 }

@@ -286,6 +286,7 @@ class TestCorrecoesPelaPlanilha:
             "quantidade": Decimal(-2), "valor_item": Decimal(30), "icms_suportado": Decimal(-4),
             "valor_unitario_usado": Decimal(2), "icms_efetivo": Decimal("2.88"),
             "aliquota": Decimal(18), "aliquota_documento": Decimal(18),
+            "aliquota_origem": None,
             "reducao_base": Decimal(0), "saldo_quantidade": Decimal(8),
             "saldo_unitario": Decimal(2), "saldo_valor": Decimal(16),
             "ressarcimento": Decimal("1.12"), "complemento": Decimal(0), "chave": "7" * 44,

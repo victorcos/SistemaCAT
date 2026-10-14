@@ -5,6 +5,74 @@
 
 ---
 
+## 2026-10-14 — A alíquota interna: duas chaves, três provas, e o período na frente
+
+Sem alíquota interna não há confronto, e sem confronto a saída some do pedido
+**sem aparecer em lugar nenhum** — vira só um número menor. Na empresa 26 eram
+**2.228 saídas**, todas de CST 60, de mercadoria que o cliente nunca comprou
+com aquele código.
+
+O cadastro (`0200`) é a fonte natural e falha calado. Desde 17/09/2026 o razão
+buscava a alíquota na **nota de entrada da mesma mercadoria**, pelo NCM, com o
+ICMS destacado numa entrada interna. Nessa base isso não alcançava nada: das
+entradas desses NCM, **1.244 são CST 60** — ST já retido, que não destaca ICMS
+nenhum — e das 56 com destaque, 52 vieram de outro estado, a 4% ou 12%, que não
+são a tributação interna e continuam recusadas.
+
+### O que entrou (pedido do Victor, 14/10/2026)
+
+Duas **chaves**, da mais perto da mercadoria para a mais larga: o **código** do
+item e, sem ele, o **NCM**. O código é a mercadoria; o NCM é a classificação, e
+é ele que alcança o código que nunca foi comprado.
+
+Três **provas**, em ordem:
+
+| prova | de onde | por que vale |
+|---|---|---|
+| `interna` | ICMS destacado numa entrada **dentro do estado** | é a alíquota que o fornecedor usou na operação própria |
+| `st` | `pICMSST` de entrada com ST retido (CST 10, 30, 70) | o substituto retém com a interna **do destino** — serve mesmo comprando de fora, e só existe onde a mercadoria estava em ST naquela data |
+| `efetiva` | `pICMSEfet` do CST 60 | é a interna **já reduzida**: só entra onde a mercadoria não tem redução, senão o confronto reduz duas vezes |
+
+**O período vem antes da proximidade.** Primeiro todas as fontes que têm uma
+entrada até a data da saída; só no que sobrar, a primeira entrada que houver.
+Uma alíquota de 2024 numa saída de 2021 erra mais do que uma fonte mais larga
+do mês certo — e erra calada. Isso mudou 59 linhas da empresa 26 de 12% para
+18%: antes pegavam o primeiro destaque interno que existisse, mesmo posterior à
+venda; agora pegam a ST que de fato a precedeu.
+
+Cada linha guarda `aliquota_origem` (`item_st`, `ncm_interna`, …), que vai para
+a Ficha 3 e para a tela. Sem isso não dá para separar o que foi **lido** do que
+foi **deduzido**, e o revisor precisa dos dois para saber o quanto confiar.
+
+### Medido na empresa 26, com as mesmas fontes da execução 197
+
+| | antes | depois |
+|---|---|---|
+| saídas sem alíquota | 2.228 | **1.391** |
+| alíquota lida na entrada | 7.750 | 8.587 |
+| complemento apurado | R$ 74.249,98 | R$ 107.542,88 |
+
+As 837 novas vieram de `ncm_st` (754) e `ncm_efetiva` (83), **todas a 18%**, o
+que é a interna do estado da empresa. Nenhuma veio por código: naquela base os
+349 códigos sem alíquota são exatamente os que nunca entraram — é o mesmo
+buraco que o de-para existe para fechar, e a chave por item passa a valer
+sozinha assim que ele for aplicado.
+
+**E o número subiu para o lado do fisco.** O ressarcimento continua zero e o
+complemento cresceu R$ 33 mil, porque o ICMS suportado dessa base é de R$ 60,52
+em 10.001 saídas: as entradas não estão lá. Preencher a alíquota não inventa
+crédito — revela que o confronto existe e que falta o outro lado dele.
+
+### O teto desta abordagem
+
+Das 1.391 que sobraram, **1.062 são de mercadoria sem entrada nenhuma na base**
+e as outras 329 só têm entradas CST 60 sem `pICMSEfet`. Nenhum documento diz a
+alíquota delas. Fechar esse resto exige o 0200 do cliente ou a regra do estado
+por competência (`tab_aliquota_icms`) — que é cadastro, não prova, e por isso
+não entrou sem alguém decidir.
+
+---
+
 ## 2026-10-13 — Ligar dois códigos deixou de ser digitar de cabeça
 
 O de-para sempre aceitou o par feito à mão: `DePara.Motivos` tem `analista`
