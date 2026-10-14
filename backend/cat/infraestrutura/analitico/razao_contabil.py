@@ -32,7 +32,7 @@ import time
 from decimal import Decimal
 
 from cat.infraestrutura.analitico.confronto import _escapar
-from cat.infraestrutura.analitico.rascunho import materializando
+from cat.infraestrutura.analitico.rascunho import ja_vale, materializando
 from cat.infraestrutura.analitico.piscofins import (
     ARQUIVO_DO_RAZAO,
     fonte_do_razao,
@@ -107,7 +107,7 @@ def _resumo(destino: str) -> str:
     """
     origem = _arquivo(destino)
     caminho = os.path.join(destino, ARQUIVO_DO_RESUMO)
-    if os.path.isfile(caminho) and os.path.getmtime(caminho) >= os.path.getmtime(origem):
+    if ja_vale(caminho, origem):
         return caminho
 
     comeco = time.monotonic()

@@ -63,7 +63,7 @@ from cat.infraestrutura.analitico.exclusao_piscofins_na_base import (
 )
 from cat.infraestrutura.analitico.exclusoes import ARQUIVO_DAS_EXCLUSOES
 from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML
-from cat.infraestrutura.analitico.rascunho import materializando
+from cat.infraestrutura.analitico.rascunho import ja_vale, materializando
 from cat.infraestrutura.analitico.gestao import ARQUIVO_DOS_QUADROS
 from cat.infraestrutura.analitico import consulta_de_saidas as saidas_na_tela
 from cat.infraestrutura.analitico import registros_do_sped as extracao_de_registro
@@ -462,13 +462,14 @@ def precisa_gerar(planilha: str, parquet: str) -> bool:
     Guardar por nome e nunca conferir a idade servia planilha velha depois de a
     conferência rodar de novo: um download real veio com o conteúdo de uma
     execução anterior, e o número na tela não batia com o do arquivo.
+
+    **A origem pode ser uma pasta de partes**, e era aí que o cache sumia sem
+    ninguém ver: o razão da apuração de PIS/COFINS é `razao/*.parquet` desde
+    07/10/2026, `getmtime` não aceita glob, e o `except OSError` de antes
+    respondia "precisa gerar" a toda pergunta. Uma planilha de 227 milhões de
+    linhas era remontada **a cada clique** — o cache existia e nunca pegava.
     """
-    if not os.path.isfile(planilha):
-        return True
-    try:
-        return os.path.getmtime(planilha) < os.path.getmtime(parquet)
-    except OSError:
-        return True
+    return not ja_vale(planilha, parquet)
 
 
 # ---------------------------------------------------------------------------

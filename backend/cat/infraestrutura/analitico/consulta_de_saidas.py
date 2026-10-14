@@ -51,7 +51,7 @@ from decimal import Decimal
 from cat.infraestrutura.analitico.confronto import _escapar
 from cat.infraestrutura.analitico.piscofins import ARQUIVO_DAS_SAIDAS
 from cat.infraestrutura.analitico.suportado import _leitura
-from cat.infraestrutura.analitico.rascunho import materializando
+from cat.infraestrutura.analitico.rascunho import ja_vale, materializando
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -175,7 +175,7 @@ def _resumo(destino: str) -> str:
     """Uma linha por combinação de recorte, escrita na primeira leitura."""
     origem = _arquivo(destino)
     caminho = os.path.join(destino, ARQUIVO_DO_RESUMO)
-    if os.path.isfile(caminho) and os.path.getmtime(caminho) >= os.path.getmtime(origem):
+    if ja_vale(caminho, origem):
         return caminho
 
     comeco = time.monotonic()
@@ -347,7 +347,7 @@ def parquet_do_recorte(destino: str, recorte: Recorte) -> str:
         return origem
     marca = impressao_do_recorte(recorte)
     caminho = os.path.join(destino, ARQUIVO_RECORTADO.format(marca=marca))
-    if os.path.isfile(caminho) and os.path.getmtime(caminho) >= os.path.getmtime(origem):
+    if ja_vale(caminho, origem):
         return caminho
 
     onde, parametros = _onde(recorte)

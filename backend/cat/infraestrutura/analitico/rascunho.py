@@ -31,6 +31,7 @@ onde o `PermissionError` da limpeza apagou do log o erro que o causou.
 from __future__ import annotations
 
 import contextlib
+import glob
 import os
 import time
 from collections.abc import Iterator
@@ -46,6 +47,46 @@ def apagar(caminho: str) -> None:
     """Remove o arquivo se der, e nunca estraga o motivo real da falha."""
     with contextlib.suppress(OSError):
         os.remove(caminho)
+
+
+def modificado_em(origem: str) -> float:
+    """Quando a origem mudou pela última vez — arquivo único **ou glob**.
+
+    A apuração de PIS/COFINS gravava um `razao.parquet`; desde 07/10/2026 grava
+    uma pasta `razao/` com uma parte por ECD, e `fonte_do_razao` devolve
+    `razao/*.parquet`. Quem herdou isso continuou perguntando a data ao caminho
+    como se fosse arquivo:
+
+        OSError: [WinError 123] A sintaxe do nome do arquivo ... está incorreta:
+        'D:\\cat-trabalho\\execucao-198\\razao\\*.parquet'
+
+    O erro ficou escondido por um curto-circuito: só se pergunta a data da
+    origem **depois** de confirmar que o derivado existe, e enquanto ninguém
+    tinha materializado o resumo a conta nunca chegava ali. Bastou a primeira
+    materialização dar certo, em 14/10/2026, para a tela do razão contábil
+    passar a devolver "o motor não respondeu" a cada abertura.
+    """
+    if "*" not in origem:
+        return os.path.getmtime(origem)
+    partes = glob.glob(origem)
+    if not partes:
+        raise FileNotFoundError(origem)
+    # a mais nova manda: uma parte reescrita invalida o derivado inteiro
+    return max(os.path.getmtime(p) for p in partes)
+
+
+def ja_vale(derivado: str, origem: str) -> bool:
+    """O derivado existe e é mais novo que a origem?
+
+    Origem ilegível responde **não**: refazer custa tempo, servir material
+    velho custa número errado, e entre os dois não há dúvida.
+    """
+    if not os.path.isfile(derivado):
+        return False
+    try:
+        return os.path.getmtime(derivado) >= modificado_em(origem)
+    except OSError:
+        return False
 
 
 def nome_provisorio(caminho: str) -> str:

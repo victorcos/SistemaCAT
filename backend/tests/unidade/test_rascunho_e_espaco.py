@@ -18,6 +18,7 @@ cheguem à tela com o próprio nome.
 from __future__ import annotations
 
 import errno
+import glob
 import os
 from unittest.mock import patch
 
@@ -32,7 +33,13 @@ from cat.aplicacao.casos_de_uso.planilhas import (
     espaco_que_acaba,
     exigir_espaco,
 )
-from cat.infraestrutura.analitico.rascunho import apagar, materializando, nome_provisorio
+from cat.infraestrutura.analitico.rascunho import (
+    apagar,
+    ja_vale,
+    materializando,
+    modificado_em,
+    nome_provisorio,
+)
 
 GB = 1024**3
 
@@ -185,3 +192,70 @@ class TestDoisPedidosAoMesmoTempo:
             with materializando(alvo) as meu:
                 with open(meu, "w", encoding="utf-8") as f:
                     f.write("o meu")
+
+
+class TestOCacheQueOlhaAIdade:
+    """A origem pode ser **uma pasta de partes**, e era aí que o cache sumia.
+
+    O razão da apuração de PIS/COFINS é `razao/*.parquet` desde 07/10/2026.
+    `os.path.getmtime` não aceita glob, e quem herdou isso perguntava a data ao
+    caminho como se fosse arquivo. Dois estragos diferentes pelo mesmo motivo:
+
+    * em `planilhas.precisa_gerar`, o `except OSError` respondia "precisa
+      gerar" sempre — uma planilha de 227 milhões de linhas remontada a cada
+      clique, com o cache existindo e nunca pegando;
+    * em `razao_contabil._resumo`, não havia `except`, e a tela passou a
+      devolver "o motor não respondeu" assim que o resumo foi materializado
+      pela primeira vez (14/10/2026).
+    """
+
+    def _partes(self, tmp_path, quantas: int = 3) -> str:
+        pasta = tmp_path / "razao"
+        pasta.mkdir()
+        for i in range(quantas):
+            (pasta / f"parte-{i}.parquet").write_text("x", encoding="utf-8")
+        return str(pasta / "*.parquet")
+
+    def test_a_data_de_um_glob_e_a_da_parte_mais_nova(self, tmp_path):
+        origem = self._partes(tmp_path)
+        partes = sorted(glob.glob(origem))
+        for parte in partes:
+            os.utime(parte, (1_000, 1_000))
+        os.utime(partes[1], (9_000, 9_000))     # a do meio é a mais nova
+        assert modificado_em(origem) == 9_000
+
+    def test_derivado_mais_novo_que_todas_as_partes_vale(self, tmp_path):
+        origem = self._partes(tmp_path)
+        for p in glob.glob(origem):
+            os.utime(p, (1_000, 1_000))
+        derivado = tmp_path / "resumo.parquet"
+        derivado.write_text("pronto", encoding="utf-8")
+        os.utime(derivado, (2_000, 2_000))
+        assert ja_vale(str(derivado), origem)
+
+    def test_uma_parte_reescrita_invalida_o_derivado_inteiro(self, tmp_path):
+        origem = self._partes(tmp_path)
+        derivado = tmp_path / "resumo.parquet"
+        derivado.write_text("pronto", encoding="utf-8")
+        os.utime(derivado, (2_000, 2_000))
+        os.utime(sorted(glob.glob(origem))[1], (3_000, 3_000))
+        assert not ja_vale(str(derivado), origem)
+
+    def test_glob_sem_nenhuma_parte_nao_vale(self, tmp_path):
+        """Origem ilegível responde não: refazer custa tempo, servir material
+        velho custa número errado."""
+        derivado = tmp_path / "resumo.parquet"
+        derivado.write_text("pronto", encoding="utf-8")
+        assert not ja_vale(str(derivado), str(tmp_path / "vazio" / "*.parquet"))
+
+    def test_arquivo_unico_continua_funcionando(self, tmp_path):
+        """A forma antiga não pode ter regredido: execução velha não se regrava."""
+        origem = tmp_path / "razao.parquet"
+        origem.write_text("x", encoding="utf-8")
+        os.utime(origem, (1_000, 1_000))
+        derivado = tmp_path / "resumo.parquet"
+        derivado.write_text("pronto", encoding="utf-8")
+        os.utime(derivado, (2_000, 2_000))
+        assert ja_vale(str(derivado), str(origem))
+        os.utime(origem, (3_000, 3_000))
+        assert not ja_vale(str(derivado), str(origem))
