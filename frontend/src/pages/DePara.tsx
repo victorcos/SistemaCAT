@@ -56,6 +56,9 @@ export default function DePara() {
   const [nota, setNota] = useState<string | null>(null);
   // qual linha dos sem par está com o seletor aberto
   const [ligando, setLigando] = useState<string | null>(null);
+  // busca da seção "Códigos sem par". Sem ela, a tabela corta em POR_PAGINA e
+  // o resto fica inalcançável: numa base real são 1.591 códigos para 200 linhas
+  const [buscaSemPar, setBuscaSemPar] = useState("");
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -72,6 +75,18 @@ export default function DePara() {
   useEffect(() => {
     if (projetoId) void carregar();
   }, [projetoId, carregar]);
+
+  const semParVisiveis = useMemo(() => {
+    const termo = buscaSemPar.trim().toLocaleUpperCase("pt-BR");
+    const lista = dados?.sem_par ?? [];
+    if (!termo) return lista;
+    return lista.filter(
+      (s) =>
+        s.codigo.toLocaleUpperCase("pt-BR").includes(termo) ||
+        s.descricao.toLocaleUpperCase("pt-BR").includes(termo) ||
+        s.ncm.includes(termo),
+    );
+  }, [dados, buscaSemPar]);
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -258,7 +273,12 @@ export default function DePara() {
         <section className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="m-0 text-base font-bold">Códigos sem par</h2>
+              <h2 className="m-0 text-base font-bold">
+                Códigos sem par{" "}
+                <span className="font-normal text-texto-suave">
+                  · {numero(dados.sem_par.length)}
+                </span>
+              </h2>
               <p className="m-0 text-[13px] text-texto-suave">
                 Têm saída e não têm entrada nem estoque, e nenhuma proposta os explica: são as fichas que ficam
                 negativas. Informe o código do mesmo produto, ou mande a planilha para o cliente preencher.
@@ -304,8 +324,22 @@ export default function DePara() {
               </div>
             );
           })()}
+          <div className="mb-2 flex flex-wrap items-center gap-3">
+            <Busca
+              valor={buscaSemPar}
+              aoMudar={setBuscaSemPar}
+              placeholder="Buscar por código, descrição ou NCM"
+            />
+            <span className="text-xs text-texto-suave">
+              {semParVisiveis.length === dados.sem_par.length
+                ? `mostrando ${numero(Math.min(semParVisiveis.length, POR_PAGINA))} de ${numero(dados.sem_par.length)}`
+                : `${numero(semParVisiveis.length)} de ${numero(dados.sem_par.length)} com o filtro${
+                    semParVisiveis.length > POR_PAGINA ? `, mostrando ${numero(POR_PAGINA)}` : ""
+                  }`}
+            </span>
+          </div>
           <Tabela colunas={["Código", "Descrição", "NCM", "Saídas", podeEscrever ? "Mesmo produto que" : ""]}>
-            {dados.sem_par.slice(0, POR_PAGINA).map((s) => {
+            {semParVisiveis.slice(0, POR_PAGINA).map((s) => {
               const k = chave({ cnpj: s.cnpj, origem: s.codigo });
               return (
                 <Linha key={k}>
