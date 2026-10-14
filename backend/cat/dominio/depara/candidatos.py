@@ -54,9 +54,23 @@ vende); os outros viram pares `origem → destino` com o fator acumulado.
 * quando dois caminhos do grupo dão fatores diferentes para o mesmo código, o
   grupo inteiro cai para confiança média, com o conflito escrito.
 
-Nada aqui é aplicado sozinho: é proposta, com o motivo escrito, para o analista
-aprovar (decisão do Victor, 16/09/2026). O que não casar vai para o cliente
-preencher.
+## O que vale sozinho, e o que espera alguém
+
+Até 14/10/2026 nada era aplicado sozinho: tudo ia à revisão (decisão do Victor,
+16/09/2026). Medido na empresa 26, isso virou 57 pares — **todos de GTIN** —
+aprovados um a um, sem ninguém discordar de nenhum: trabalho que não decide
+nada.
+
+Agora o par de **GTIN** ou de **sufixo que se repete** vale por padrão, e a
+decisão só é gravada quando alguém **discorda** dele (`vale_sozinho`). As duas
+provas identificam o mesmo produto e ligam sempre com fator 1, então aceitá-las
+não muda quantidade nenhuma — só junta duas fichas do mesmo produto, que é o
+que o razão erraria sem elas.
+
+O **kit** fica de fora mesmo com confiança alta: é ele que traz fator diferente
+de 1, e fator errado erra a quantidade da ficha, não só o agrupamento. A
+**descrição** fica de fora por ser a prova mais fraca. Essas duas continuam
+esperando alguém olhar, e o que não casar vai para o cliente preencher.
 """
 
 from __future__ import annotations
@@ -143,6 +157,27 @@ class Par:
     motivos: tuple[Motivo, ...]
     confianca: Confianca
     explicacao: str
+
+
+# as provas que valem sem ninguém aprovar: identificam o mesmo produto e ligam
+# com fator 1. O kit não entra — é ele que traz fator, e fator errado erra a
+# quantidade da ficha
+MOTIVOS_QUE_VALEM_SOZINHOS = frozenset({Motivo.GTIN, Motivo.SUFIXO})
+
+
+def vale_sozinho(par: Par) -> bool:
+    """O par entra na montagem sem ninguém aprovar?
+
+    Quatro exigências, e as três últimas são o cinto depois do suspensório: o
+    grupo pode ter sido ligado por mais de um caminho, e basta um kit no meio
+    para o fator deixar de ser 1. Aceitar fator sem alguém olhar mudaria a
+    quantidade da ficha, que é coisa diferente de juntar duas fichas do mesmo
+    produto.
+    """
+    return (par.confianca is Confianca.ALTA
+            and bool(MOTIVOS_QUE_VALEM_SOZINHOS & set(par.motivos))
+            and Motivo.KIT not in par.motivos
+            and par.fator == UM)
 
 
 @dataclass

@@ -12,13 +12,19 @@ RVZ fez na empresa 04 com os códigos de marketplace.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cat.aplicacao.casos_de_uso.apurar_suportado import movimentacao_concluida
-from cat.dominio.depara.candidatos import normalizar_codigo, ordenar_candidatos
+from cat.dominio.depara.candidatos import (
+    normalizar_codigo,
+    ordenar_candidatos,
+    propor,
+    vale_sozinho,
+)
 from cat.infraestrutura.analitico.depara import itens_para_casar
-from cat.dominio.depara.candidatos import propor
 from cat.infraestrutura.repositorios.modelos import DeParaDB, ProjetoDB, UsuarioDB
 from cat.log import obter_log
 
@@ -55,6 +61,7 @@ def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
     sem_par: list[dict] = []
     total_sem_par = 0
     precisavam_de_par = 0
+    automaticos = 0
     vistas: set[tuple[str, str]] = set()
     for cnpj, lista in sorted(itens.items()):
         propostos = propor(lista)
@@ -63,10 +70,15 @@ def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
             d = decisao(cnpj, p.origem)
             vistas.add((d.cnpj, d.codigo_origem) if d else (cnpj, p.origem))
             cobertos |= {p.origem, p.destino}
+            # GTIN e sufixo valem por padrão: só há decisão gravada quando
+            # alguém discorda, e discordar vence
+            sozinho = d is None and vale_sozinho(p)
+            automaticos += sozinho
             pares.append({
                 "cnpj": cnpj, "origem": p.origem, "destino": p.destino, "fator": format(p.fator, "f"),
                 "motivos": [m.value for m in p.motivos], "confianca": p.confianca.value,
-                "explicacao": p.explicacao, "proposto": True, **_situacao(d, nomes),
+                "explicacao": p.explicacao, "proposto": True, "automatico": sozinho,
+                **_situacao(d, nomes, automatico=sozinho),
             })
         aprovados_aqui = {o for (c, o), d in decisoes.items()
                           if d.situacao == "aprovado" and c in ("", cnpj)}
@@ -96,13 +108,16 @@ def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
         pares.append({
             "cnpj": cnpj, "origem": origem, "destino": d.codigo_destino, "fator": format(d.fator.normalize(), "f"),
             "motivos": [d.motivo], "confianca": d.confianca, "explicacao": d.explicacao or "",
-            "proposto": False, **_situacao(d, nomes),
+            # é decisão gravada: por definição alguém a tomou
+            "proposto": False, "automatico": False, **_situacao(d, nomes),
         })
 
     resumo = {
         "pares": len(pares),
         "pendentes": sum(p["situacao"] == "pendente" for p in pares),
         "aprovados": sum(p["situacao"] == "aprovado" for p in pares),
+        # destes, os que valeram pela prova, sem ninguém decidir
+        "automaticos": automaticos,
         "recusados": sum(p["situacao"] == "recusado" for p in pares),
         "sem_par": total_sem_par,
         # quantos códigos precisavam de par, e quantos deles já estão resolvidos
@@ -118,10 +133,35 @@ def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
             "resumo": resumo, "pares": pares, "sem_par": sem_par}
 
 
-def _situacao(d: DeParaDB | None, nomes: dict[int, str]) -> dict:
+def pares_que_valem_sozinhos(empresa_id: int, pasta_movimentos: str,
+                             sessao: Session) -> list[tuple[str, str, str, Decimal]]:
+    """Os pares de prova forte que entram na montagem sem ninguém aprovar.
+
+    `(cnpj, origem, destino, fator)`. Deriva da movimentação a cada rodada, e
+    não de linha gravada: a proposta nunca ficou guardada, e congelá-la agora
+    faria o de-para envelhecer calado quando a base mudasse. O que fica
+    gravado é a **discordância** — e qualquer decisão sobre o código, aprovada
+    ou recusada, tira o par daqui: quem olhou manda.
+    """
+    decididos = {(d.cnpj, d.codigo_origem) for d in sessao.scalars(
+        select(DeParaDB).where(DeParaDB.empresa_id == empresa_id))}
+    achados: list[tuple[str, str, str, Decimal]] = []
+    for cnpj, lista in sorted(itens_para_casar(pasta_movimentos).items()):
+        for p in propor(lista):
+            if vale_sozinho(p) and not {(cnpj, p.origem), ("", p.origem)} & decididos:
+                achados.append((cnpj, p.origem, p.destino, p.fator))
+    log.info("pares de de-para que valem sozinhos", extra={
+        "empresa_id": empresa_id, "pares": len(achados), "decididos": len(decididos)})
+    return achados
+
+
+def _situacao(d: DeParaDB | None, nomes: dict[int, str], automatico: bool = False) -> dict:
     if d is None:
-        return {"situacao": "pendente", "decidido_por": None, "decidido_em": None, "destino_decidido": None,
-                "fator_decidido": None}
+        # sem decisão: o par de prova forte já vale; o resto espera alguém. Em
+        # nenhum dos dois casos há pessoa a creditar, e dizer que há seria
+        # mentir no rastro de quem respondeu pelo número
+        return {"situacao": "aprovado" if automatico else "pendente", "decidido_por": None,
+                "decidido_em": None, "destino_decidido": None, "fator_decidido": None}
     return {"situacao": d.situacao, "decidido_por": nomes.get(d.decidido_por),
             "decidido_em": d.decidido_em.isoformat() if d.decidido_em else None,
             "destino_decidido": d.codigo_destino, "fator_decidido": format(d.fator.normalize(), "f")}

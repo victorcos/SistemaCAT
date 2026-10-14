@@ -41,7 +41,7 @@ function semPar(quantos: number) {
 function resposta(quantos: number): DeParaDoTrabalho {
   return {
     movimentos_execucao_id: 195,
-    resumo: { pares: 0, pendentes: 0, aprovados: 0, recusados: 0,
+    resumo: { pares: 0, pendentes: 0, aprovados: 0, automaticos: 0, recusados: 0,
               sem_par: quantos, precisavam_de_par: quantos, resolvidos: 0,
               estabelecimentos: 1 },
     pares: [],

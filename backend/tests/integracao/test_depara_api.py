@@ -14,7 +14,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from cat.apresentacao.api.app import app
@@ -86,10 +86,24 @@ class TestCandidatos:
     def test_propoe_pelo_sufixo_e_respeita_o_que_ja_foi_decidido(self, cliente, projeto_id):
         d = pedir(cliente, projeto_id)
         pares = {p["origem"]: p for p in d["pares"]}
-        assert (pares["101208"]["destino"], pares["101208"]["situacao"], pares["101208"]["proposto"]) == (
-            "1012", "pendente", True)
+        # sufixo é prova forte: vale sozinho, e ninguém é creditado por ele
+        assert (pares["101208"]["destino"], pares["101208"]["situacao"], pares["101208"]["proposto"],
+                pares["101208"]["automatico"], pares["101208"]["decidido_por"]) == (
+            "1012", "aprovado", True, True, None)
         assert pares["313308"]["motivos"] == ["sufixo", "descricao"] and pares["313308"]["confianca"] == "alta"
         assert pares["400108"]["situacao"] == "recusado"
+
+    def test_quem_discordou_vence_a_prova(self, cliente, projeto_id):
+        """`400108 → 4001` é sufixo como os outros, e foi **recusado**.
+
+        Se a regra passasse por cima da recusa, o par voltaria toda vez que a
+        tela fosse aberta e não haveria como tirá-lo da apuração. A decisão
+        gravada é a única coisa que existe no banco justamente porque ela é a
+        discordância: quem olhou manda.
+        """
+        pares = {p["origem"]: p for p in pedir(cliente, projeto_id)["pares"]}
+        assert "sufixo" in pares["400108"]["motivos"] and pares["400108"]["confianca"] == "alta"
+        assert pares["400108"]["situacao"] == "recusado" and pares["400108"]["automatico"] is False
         cliente_ = pares["CB1427"]
         assert (cliente_["destino"], cliente_["situacao"], cliente_["proposto"], cliente_["motivos"]) == (
             "1427", "aprovado", False, ["cliente"])
@@ -97,7 +111,8 @@ class TestCandidatos:
     def test_o_que_sobra_vai_para_o_cliente(self, cliente, projeto_id):
         d = pedir(cliente, projeto_id)
         assert [s["codigo"] for s in d["sem_par"]] == ["X0046E1FBP"]
-        assert d["resumo"] == {"pares": 4, "pendentes": 2, "aprovados": 1, "recusados": 1, "sem_par": 1,
+        assert d["resumo"] == {"pares": 4, "pendentes": 0, "aprovados": 3, "automaticos": 2,
+                               "recusados": 1, "sem_par": 1,
                                "precisavam_de_par": 5, "resolvidos": 4,
                                "estabelecimentos": 1}
 
@@ -129,3 +144,43 @@ class TestCandidatos:
         assert cliente.post("/interno/depara/candidatos", headers=SEGREDO,
                             json={"projeto_id": 999999}).status_code == 404
         assert cliente.post("/interno/depara/candidatos", json={"projeto_id": vazio}).status_code == 403
+
+
+class TestOQueEntraNaMontagem:
+    """O razão não lê a tela: ele monta o parquet do de-para do banco.
+
+    Por isso a aprovação automática tem de valer **aqui** também, ou a tela
+    diria "aprovado" e a apuração sairia sem o par — o pior dos dois mundos,
+    porque ninguém veria a diferença até conferir ficha por ficha.
+    """
+
+    def _gravar(self, projeto_id, tmp_path, com_movimentacao: bool = True):
+        from cat.aplicacao.casos_de_uso.montar_razao import gravar_depara  # noqa: PLC0415
+
+        with Sessao() as s:
+            projeto = s.get(ProjetoDB, projeto_id)
+            pasta = s.scalars(select(ExecucaoDB).where(
+                ExecucaoDB.projeto_id == projeto_id, ExecucaoDB.etapa == "movimentos")).first().pasta_de_trabalho
+            destino = str(tmp_path / f"depara_{com_movimentacao}.parquet")
+            total, sozinhos = gravar_depara(projeto.empresa_id, [CNPJ], destino, s,
+                                            movimentacao=pasta if com_movimentacao else None)
+        lidos = {l["codigo_origem"]: l for l in pq.read_table(destino).to_pylist()} if total else {}
+        return lidos, total, sozinhos
+
+    def test_o_par_de_prova_forte_entra_sem_ninguem_aprovar(self, cliente, projeto_id, tmp_path):
+        lidos, total, sozinhos = self._gravar(projeto_id, tmp_path)
+        assert lidos["101208"]["codigo_destino"] == "1012"
+        assert lidos["313308"]["codigo_destino"] == "3133"
+        assert lidos["101208"]["fator"] == D(1)
+        assert (total, sozinhos) == (3, 2)
+
+    def test_o_recusado_fica_de_fora_e_o_aprovado_do_cliente_entra(self, cliente, projeto_id, tmp_path):
+        lidos, _, _ = self._gravar(projeto_id, tmp_path)
+        assert "400108" not in lidos           # sufixo, mas alguém recusou
+        assert lidos["CB1427"]["codigo_destino"] == "1427"
+
+    def test_sem_a_movimentacao_so_a_decisao_entra(self, cliente, projeto_id, tmp_path):
+        """Reprocessar uma rodada antiga não inventa par: sem a movimentação
+        não há de onde derivar a proposta, e o que foi decidido continua valendo."""
+        lidos, total, sozinhos = self._gravar(projeto_id, tmp_path, com_movimentacao=False)
+        assert set(lidos) == {"CB1427"} and (total, sozinhos) == (1, 0)

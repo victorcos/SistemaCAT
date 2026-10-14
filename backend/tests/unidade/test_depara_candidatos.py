@@ -16,6 +16,7 @@ from cat.dominio.depara.candidatos import (
     normalizar_codigo,
     normalizar_descricao,
     propor,
+    vale_sozinho,
 )
 
 D = Decimal
@@ -197,3 +198,44 @@ class TestPares:
             item("V1-ANTIGO", estoque=10, gtins=["7891653040016"]),
         ])
         assert pares["V1-ANTIGO"].destino == "V1"
+
+
+class TestOQueValeSozinho:
+    """Desde 14/10/2026, GTIN e sufixo entram na montagem sem ninguém aprovar.
+
+    A linha que separa não é a confiança: é o **fator**. GTIN e sufixo dizem
+    que dois códigos são o mesmo produto e ligam sempre 1 para 1 — aceitá-los
+    junta duas fichas e não mexe em quantidade nenhuma. O kit tem confiança
+    igualmente alta e mexe: 1 caixa vira 3 unidades, e um fator errado erra o
+    estoque da ficha, não só o agrupamento.
+    """
+
+    def test_o_sufixo_e_o_gtin_valem(self):
+        pares = pares_por_origem(BASE)
+        assert vale_sozinho(pares["1012           08"])
+        assert vale_sozinho(pares["313308"])
+        gtin = pares_por_origem([
+            item("50", saidas=9, descricao="GRECIN TONS DE GRISALHO", gtins={"7896014714025"}),
+            item("5008", entradas=3, descricao="GRECIN TONS DE GRISALHO", gtins={"7896014714025"}),
+        ])["5008"]
+        assert Motivo.GTIN in gtin.motivos and vale_sozinho(gtin)
+
+    def test_o_kit_nao_vale_mesmo_com_o_sufixo_junto_e_confianca_alta(self):
+        compra = pares_por_origem(BASE)["1111K3         08"]
+        assert compra.confianca is Confianca.ALTA and Motivo.SUFIXO in compra.motivos
+        assert compra.fator == D(3)
+        assert not vale_sozinho(compra)
+
+    def test_a_descricao_sozinha_nao_vale(self):
+        par = pares_por_origem([
+            item("AAA", saidas=10, descricao="SABONETE AZUL 90G"),
+            item("ZZZ", entradas=5, descricao="SABONETE AZUL 90G"),
+        ])["ZZZ"]
+        assert par.motivos == (Motivo.DESCRICAO,) and par.confianca is Confianca.MEDIA
+        assert not vale_sozinho(par)
+
+    def test_fator_em_conflito_derruba_a_confianca_e_com_ela_o_automatico(self):
+        """Confiança média nunca vale sozinha, qualquer que seja o motivo."""
+        for par in propor(BASE):
+            if par.confianca is Confianca.MEDIA:
+                assert not vale_sozinho(par)

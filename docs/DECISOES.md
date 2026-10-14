@@ -5,6 +5,58 @@
 
 ---
 
+## 2026-10-14 — O par de prova forte passou a valer sem ninguém aprovar
+
+Em 16/09/2026 ficou decidido que **nada** do de-para seria aplicado sozinho:
+tudo ia à revisão. Medido um mês depois, na empresa 26, isso virou **57 pares,
+todos de GTIN, aprovados um a um — e nenhum recusado**. Revisão que nunca
+discorda não é controle, é digitação.
+
+### O que mudou (decisão do Victor, 14/10/2026)
+
+O par de **GTIN** ou de **sufixo que se repete** vale por padrão. A linha que
+separa o que vale sozinho do que espera alguém **não é a confiança: é o
+fator.** GTIN e sufixo dizem que dois códigos são o mesmo produto e ligam
+sempre 1 para 1 — aceitá-los junta duas fichas e não mexe em quantidade
+nenhuma. O **kit** tem confiança igualmente alta e mexe: 1 caixa vira 3
+unidades, e fator errado erra o estoque da ficha, não só o agrupamento. A
+**descrição** fica de fora por ser a prova mais fraca.
+
+`vale_sozinho` exige as quatro coisas: confiança alta, GTIN ou sufixo entre os
+motivos, **nenhum kit** no grupo e **fator igual a 1**. As duas últimas são
+redundantes de propósito — um grupo se liga por vários caminhos, e basta um kit
+no meio para o fator deixar de ser 1.
+
+**Não é zelo teórico.** Na empresa 04, 32 pares carregam GTIN ou sufixo **e**
+kit; **18 deles têm fator 3**. Uma regra ingênua de "tem GTIN, aplica" teria
+triplicado a quantidade de 18 fichas sem ninguém olhar.
+
+### O que fica gravado é a discordância
+
+Nenhuma linha nova é escrita no banco quando o par vale sozinho — ele é
+derivado da movimentação a cada rodada, como a proposta sempre foi. O que vira
+registro é **discordar**: recusar (ou mudar o destino) grava a decisão, e a
+decisão vence a regra para sempre. Congelar a aprovação em linha gravada faria
+o contrário disso: o de-para envelheceria calado quando a base mudasse.
+
+Por isso também não há pessoa a creditar. `decidido_por` fica vazio e a tela
+diz "aprovado pela prova", em vez de pôr no rastro o nome de quem só abriu a
+página. Quem quiser assumir o par clica em **Confirmar**, e aí sim o nome entra.
+
+O razão aplica os dois na mesma montagem (`gravar_depara`), com a decisão
+primeiro. Sem a movimentação — reprocessando uma rodada antiga — só a decisão
+entra: não se inventa par sobre base que não está mais ali.
+
+### Quanto isso poupa, medido
+
+| | propostas | valem sozinhas |
+|---|---|---|
+| empresa 26 | 57 | **57 (100%)** — todas de GTIN |
+| empresa 04 | 50 | **18 (36%)** — o resto é kit e descrição |
+| empresa 01 | 2 | 0 — as duas são só descrição |
+
+---
+
 ## 2026-10-14 — A alíquota interna: duas chaves, três provas, e o período na frente
 
 Sem alíquota interna não há confronto, e sem confronto a saída some do pedido

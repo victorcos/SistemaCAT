@@ -20,6 +20,11 @@ export interface ParDoDePara {
   explicacao: string;
   /** falso quando o par veio de decisão (cliente, analista) e não de proposta */
   proposto: boolean;
+  /**
+   * v0.161: vale aprovado **pela prova** (GTIN ou sufixo), sem ninguém decidir.
+   * Recusar grava a discordância, e a discordância vence.
+   */
+  automatico: boolean;
   situacao: SituacaoDoPar;
   decidido_por: string | null;
   decidido_em: string | null;
@@ -41,6 +46,8 @@ export interface DeParaDoTrabalho {
     pares: number;
     pendentes: number;
     aprovados: number;
+    /** destes, os que valeram pela prova, sem ninguém decidir */
+    automaticos: number;
     recusados: number;
     sem_par: number;
     /** códigos com saída e sem entrada: os que virariam ficha negativa */

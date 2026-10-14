@@ -168,6 +168,11 @@ export default function DePara() {
         <div className="flex flex-wrap gap-2">
           <Etiqueta tom="atencao">{numero(r.pendentes)} pendentes</Etiqueta>
           <Etiqueta tom="sucesso">{numero(r.aprovados)} aprovados</Etiqueta>
+          {/* dos aprovados, os que valeram pela prova: quem lê precisa saber
+              quanto do número ninguém olhou */}
+          {!!r.automaticos && (
+            <Etiqueta tom="info">{numero(r.automaticos)} pela prova (GTIN ou sufixo)</Etiqueta>
+          )}
           <Etiqueta>{numero(r.recusados)} recusados</Etiqueta>
           <Etiqueta tom="info">{numero(r.sem_par)} códigos sem par</Etiqueta>
           {!!r.precisavam_de_par && (
@@ -430,9 +435,17 @@ function LinhaDoPar({
           ))}
         </div>
       </Celula>
-      <Celula nota={par.decidido_por ? `${par.decidido_por}` : undefined}>
+      <Celula nota={par.decidido_por ?? (par.automatico ? "pela prova, ninguém precisou decidir" : undefined)}>
         <div className="flex items-center gap-2">
-          <Etiqueta tom={TOM[par.situacao]}>{par.situacao}</Etiqueta>
+          <Etiqueta tom={TOM[par.situacao]}>
+            {par.automatico ? "aprovado pela prova" : par.situacao}
+          </Etiqueta>
+          {/* o automático já vale: o que falta é poder discordar dele */}
+          {podeEscrever && par.automatico && (
+            <Botao tamanho="sm" variante="fantasma" disabled={ocupado} onClick={() => aoDecidir("aprovado")}>
+              Confirmar
+            </Botao>
+          )}
           {podeEscrever && par.situacao !== "aprovado" && (
             <Botao tamanho="sm" variante="fantasma" disabled={ocupado} onClick={() => aoDecidir("aprovado")}>
               Aprovar

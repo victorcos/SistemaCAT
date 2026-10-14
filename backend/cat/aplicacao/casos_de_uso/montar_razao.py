@@ -34,6 +34,7 @@ from cat.aplicacao.casos_de_uso.conferir_documentos import (
     caminhos_do_projeto,
     pasta_da_execucao,
 )
+from cat.aplicacao.casos_de_uso.depara_do_trabalho import pares_que_valem_sozinhos
 from cat.aplicacao.casos_de_uso.historico_do_projeto import (
     exigir_que_ande,
     registrar_de_etapa,
@@ -221,9 +222,13 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     projeto = sessao.get(ProjetoDB, execucao.projeto_id)
     periodo = (projeto.competencia_ini, projeto.competencia_fim) if projeto is not None else None
     ufs = _ufs(execucao.projeto_id, sessao)
-    depara = gravar_depara(projeto.empresa_id, list(ufs), os.path.join(destino, ARQUIVO_DEPARA), sessao)         if projeto is not None else 0
+    depara, sozinhos = gravar_depara(
+        projeto.empresa_id, list(ufs), os.path.join(destino, ARQUIVO_DEPARA), sessao,
+        movimentacao=movimentos.pasta_de_trabalho) if projeto is not None else (0, 0)
     if depara:
-        diario.anotar("info", f"{milhar(depara)} pares de de-para aprovados entram na montagem.")
+        pela_regra = (f" — {milhar(sozinhos)} deles pela prova, sem ninguém discordar"
+                      if sozinhos else "")
+        diario.anotar("info", f"{milhar(depara)} pares de de-para entram na montagem{pela_regra}.")
     correcoes = gravar_correcoes(execucao.projeto_id, os.path.join(destino, ARQUIVO_CORRECOES), sessao)
     if correcoes:
         diario.anotar("info", f"{milhar(correcoes)} correções à mão do trabalho entram na montagem.")
@@ -260,8 +265,18 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
         autor_id=execucao.criada_por)
 
 
-def gravar_depara(empresa_id: int, cnpjs: list[str], destino: str, sessao: Session) -> int:
-    """Os pares aprovados da empresa, por estabelecimento, num parquet. Devolve quantos.
+def gravar_depara(empresa_id: int, cnpjs: list[str], destino: str, sessao: Session,
+                  movimentacao: str | None = None) -> tuple[int, int]:
+    """Os pares que valem na empresa, por estabelecimento, num parquet.
+
+    Devolve `(total, quantos valeram sozinhos)`. São duas procedências:
+
+    * a **decisão** gravada, de quem aprovou — e ela vem primeiro, porque quem
+      olhou manda sobre o que a regra deduziu;
+    * o par de **prova forte** (GTIN, sufixo) de que ninguém discordou, que
+      desde 14/10/2026 vale por padrão. Sem `movimentacao` não há de onde
+      derivá-lo, e só a decisão entra — é o que acontece ao reprocessar uma
+      rodada antiga.
 
     O par sem CNPJ vale para todos; o do estabelecimento, quando há, vence.
     """
@@ -272,14 +287,20 @@ def gravar_depara(empresa_id: int, cnpjs: list[str], destino: str, sessao: Sessi
     for cnpj, origem, destino_, fator in sorted(aprovados, key=lambda p: p[0] != ""):
         for alvo in (cnpjs if cnpj == "" else [cnpj]):
             pares[(alvo, origem)] = (destino_, fator)
+    decididos = len(pares)
+    if movimentacao:
+        for cnpj, origem, destino_, fator in pares_que_valem_sozinhos(empresa_id, movimentacao, sessao):
+            pares.setdefault((cnpj, origem), (destino_, fator))
+    sozinhos = len(pares) - decididos
     if not pares:
-        return 0
+        return 0, 0
     pq.write_table(pa.Table.from_pylist(
         [{"cnpj": c, "codigo_origem": o, "codigo_destino": d, "fator": f} for (c, o), (d, f) in sorted(pares.items())],
         schema=pa.schema([("cnpj", pa.string()), ("codigo_origem", pa.string()),
                           ("codigo_destino", pa.string()), ("fator", pa.decimal128(24, 9))])), destino)
-    log.info("de-para aplicado na montagem", extra={"empresa_id": empresa_id, "pares": len(pares)})
-    return len(pares)
+    log.info("de-para aplicado na montagem",
+             extra={"empresa_id": empresa_id, "pares": len(pares), "sozinhos": sozinhos})
+    return len(pares), sozinhos
 
 
 def gravar_correcoes(projeto_id: int, destino: str, sessao: Session) -> int:
