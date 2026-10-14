@@ -298,3 +298,32 @@ class TestOArquivoQuebradoNaoViraCache:
         assert destino.exists() and destino.stat().st_size > 5_000
         assert not list(tmp_path.glob("*.parcial"))
         openpyxl.load_workbook(destino, read_only=True).close()
+
+
+class TestOAndamentoDaGeracao:
+    """Montar planilha grande é a espera mais longa do sistema — 35 minutos na
+    Consulta de Entradas da empresa 24 — e era a única sem nenhum sinal de vida.
+    """
+
+    def test_a_geracao_conta_as_linhas_e_depois_diz_que_esta_compactando(
+            self, ficha3, tmp_path, monkeypatch):
+        from cat.aplicacao import progresso
+
+        monkeypatch.setattr(progresso, "INTERVALO_DE_PUBLICACAO", 0.0)
+        passos = []
+        with progresso.relatando("ficha3-teste") as r:
+            original = r.passo
+            monkeypatch.setattr(r, "passo", lambda t, total=0: (passos.append((t, total)),
+                                                               original(t, total))[1])
+            gerar_ficha3(str(ficha3), str(tmp_path / "ficha3.xlsx"))
+
+        assert passos[0][0] == "Montando a planilha"
+        assert passos[0][1] == 3           # as três linhas da ficha de teste
+        assert passos[-1][0] == "Compactando o arquivo"
+        assert progresso.ler("ficha3-teste").terminado
+
+    def test_sem_chave_a_geracao_e_a_mesma_de_sempre(self, ficha3, tmp_path):
+        """O contador não pode ser condição para gerar: sem ninguém olhando,
+        tudo funciona igual."""
+        linhas = gerar_ficha3(str(ficha3), str(tmp_path / "ficha3.xlsx"))
+        assert linhas == 3

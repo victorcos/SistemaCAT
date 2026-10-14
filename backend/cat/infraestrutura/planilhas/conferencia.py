@@ -43,6 +43,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import xlsxwriter
 
+from cat.aplicacao import progresso
 from cat.infraestrutura.analitico.rascunho import materializando
 from cat.log import obter_log
 
@@ -245,6 +246,19 @@ def _arquivos_de(parquet: str) -> list[str]:
     return sorted(glob.glob(parquet)) if "*" in parquet else [parquet]
 
 
+def _linhas_do_parquet(parquet: str) -> int:
+    """Quantas linhas a origem tem, pelo metadado — sem ler uma só.
+
+    Serve de denominador da barra de progresso. Origem ilegível não pode
+    derrubar a geração por causa de um contador: devolve zero, e a tela mostra
+    o passo sem porcentagem.
+    """
+    try:
+        return sum(pq.read_metadata(a).num_rows for a in _arquivos_de(parquet))
+    except (OSError, pa.ArrowInvalid):
+        return 0
+
+
 def _filtradas(parquet: str, modelos: frozenset[str] | None,
                classificacoes: frozenset[str] | None,
                campo: str = "classificacao") -> Iterator[dict]:
@@ -442,6 +456,10 @@ def _gerar_xlsx(parquet: str, destino: str, colunas: tuple[Coluna, ...],
     na_aba = 0
     abas = 1
 
+    # o total sai do metadado do parquet, que é instantâneo; com filtro ele é
+    # um teto, e a barra chega ao fim antes de 100% em vez de passar disso
+    relator = progresso.atual()
+    relator.passo("Montando a planilha", _linhas_do_parquet(parquet))
     for r in _filtradas(parquet, modelos, classificacoes, campo):
         if na_aba >= LIMITE_POR_ABA:
             abas += 1
@@ -450,7 +468,12 @@ def _gerar_xlsx(parquet: str, destino: str, colunas: tuple[Coluna, ...],
         _escrever(aba, primeira + na_aba, r, colunas, formatos)
         na_aba += 1
         escritas += 1
+        relator.avancar()
 
+    # fechar não é detalhe: é aqui que o xlsxwriter junta as abas e compacta o
+    # zip, e numa planilha de GB isso são minutos em que o contador de linhas
+    # já parou. Sem dizer, a barra ficaria cheia e a tela parecendo travada
+    relator.passo("Compactando o arquivo")
     livro.close()
     log.info("planilha gerada",
              extra={"arquivo": os.path.basename(destino), "linhas": escritas,

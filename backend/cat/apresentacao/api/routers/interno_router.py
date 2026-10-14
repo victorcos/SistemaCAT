@@ -35,6 +35,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from cat.aplicacao import progresso
 from cat.aplicacao.casos_de_uso import (
     apurar_contribuicoes,
     apurar_combustivel,
@@ -1143,6 +1144,9 @@ class PedidoDePlanilha(BaseModel):
     modelos: str | None = None
     classificacoes: str | None = None
     formato: str = "xlsx"
+    # a chave que a tela inventou para acompanhar o andamento. Sem ela nada é
+    # contado, e a geração custa exatamente o que custava antes
+    progresso: str | None = None
 
 
 class PlanilhaDto(BaseModel):
@@ -1160,8 +1164,9 @@ def gerar_planilha(
     if execucao is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Execução não encontrada.")
     try:
-        pronta = planilhas.gerar(execucao, pedido.etapa, pedido.qual, pedido.modelos,
-                                 pedido.classificacoes, pedido.formato)
+        with progresso.relatando(pedido.progresso):
+            pronta = planilhas.gerar(execucao, pedido.etapa, pedido.qual, pedido.modelos,
+                                     pedido.classificacoes, pedido.formato)
     except planilhas.PlanilhaRecusada as erro:
         raise HTTPException(erro.status, str(erro)) from erro
     return PlanilhaDto(caminho=pronta.caminho, nome=pronta.nome, tipo=pronta.tipo)
@@ -1322,3 +1327,30 @@ def extrair_da_quebra(
         except planilhas.PlanilhaRecusada as erro:
             raise HTTPException(erro.status, str(erro)) from erro
     return PlanilhaDto(caminho=pronta.caminho, nome=pronta.nome, tipo=pronta.tipo)
+
+
+# ---------------------------------------------------------------------------
+# Andamento do que roda dentro de uma requisição
+#
+# A rodada de etapa já conta o próprio progresso no banco, e a tela lê de lá.
+# O que o motor faz dentro de um pedido — montar planilha, materializar resumo
+# — não tinha onde contar: eram minutos de girador. Agora quem pede manda uma
+# chave e pergunta por ela aqui, enquanto espera. Ver `aplicacao/progresso.py`.
+# ---------------------------------------------------------------------------
+class AndamentoDto(BaseModel):
+    passo: str
+    feito: int
+    total: int
+    fracao: float
+    terminado: bool
+
+
+@router.get("/progresso/{chave}", response_model=AndamentoDto,
+            dependencies=[Depends(exigir_segredo)])
+def andamento_do_pedido(chave: str) -> AndamentoDto:
+    andamento = progresso.ler(chave)
+    if andamento is None:
+        # ainda não começou, ou já venceu. Não é erro: quem pergunta cedo
+        # demais recebe zero e pergunta de novo
+        return AndamentoDto(passo="", feito=0, total=0, fracao=0.0, terminado=False)
+    return AndamentoDto(**andamento.como_dicionario())
