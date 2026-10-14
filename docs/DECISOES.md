@@ -5,7 +5,7 @@
 
 ---
 
-## 2026-10-14 — Três erros previsíveis que o sistema devolvia como falha não tratada
+## 2026-10-14 — Quatro erros previsíveis que o sistema devolvia como falha não tratada
 
 Um download falhou com **"verifique a conexão com a Internet"**. Meia hora foi
 gasta procurando defeito de rede — certificado, proxy, antivírus, a máquina do
@@ -71,9 +71,23 @@ enquanto o servidor monta o arquivo e o navegador a fecha sozinha quando a
 resposta vem como download — por isso nada é escrito nela, que é o que a
 manteria aberta. Com bloqueador de janelas, cai no `<a download>` de antes.
 
-### O que liga os três
+### 4. O xlsx que passa de 4 GB só falhava no fim
 
-Nos três, o sistema sabia o que tinha acontecido e **não disse**. O resultado
+```
+xlsxwriter.exceptions.FileSizeError: Filesize would require ZIP64 extensions.
+```
+
+Apareceu depois dos outros três, quando a Consulta de Entradas finalmente teve
+disco para rodar: **35 minutos de trabalho** para estourar no `close()`, que é
+onde o xlsxwriter fecha o zip. O arquivo é um zip, e o zip comum para em 4 GB.
+
+`use_zip64` passa a ser padrão. É o mesmo formato com cabeçalho maior, lido
+pelo Excel desde 2016, e não muda nada para as planilhas pequenas — que são
+quase todas.
+
+### O que liga os quatro
+
+Nos quatro, o sistema sabia o que tinha acontecido e **não disse**. O resultado
 não foi um erro feio na tela: foi uma explicação errada, dada por quem não
 tinha como saber — o navegador. Erro previsível tem de chegar à tela com o
 próprio nome, e é mais barato escrever a mensagem do que pagar a próxima meia

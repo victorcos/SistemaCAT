@@ -409,6 +409,14 @@ def _gerar_xlsx(parquet: str, destino: str, colunas: tuple[Coluna, ...],
         # cai na pasta de trabalho, que é onde o volume foi dimensionado — a
         # mesma escolha que o DuckDB já faz com `temp_directory`.
         "tmpdir": _pasta_de_rascunho(destino),
+        # O zip comum para em 4 GB. Sem isto, o xlsxwriter só descobre o
+        # estouro no `close()` — ou seja, **depois de montar a planilha
+        # inteira**: a Consulta de Entradas da empresa 24 (4.721.980 linhas)
+        # trabalhou 35 minutos para terminar em
+        # `FileSizeError: Filesize would require ZIP64 extensions`, e o que a
+        # pessoa viu foi o download falhando sem explicação nenhuma.
+        # ZIP64 é o mesmo formato com cabeçalho maior, e o Excel lê desde 2016.
+        "use_zip64": True,
     })
     cabecalho = livro.add_format(ESTILO_DO_CABECALHO)
     corpo = {"font_name": FONTE_DA_PLANILHA, "font_size": CORPO_DA_FONTE}

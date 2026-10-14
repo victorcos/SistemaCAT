@@ -229,3 +229,37 @@ class TestCompatibilidade:
             cabecalho = next(csv.reader(f, delimiter=";"))
         assert "Chave (3)" in cabecalho and "Valor do Ressarcimento (25)" in cabecalho
         assert "Período" in cabecalho          # sem número, fica só o título
+
+
+class TestOLimiteDoZip:
+    """O xlsx é um zip, e o zip comum para em 4 GB.
+
+    Sem ZIP64 o xlsxwriter só descobre o estouro no `close()` — depois de
+    montar a planilha inteira. A Consulta de Entradas da empresa 24, com
+    4.721.980 linhas, trabalhou **35 minutos** para terminar em
+    `FileSizeError: Filesize would require ZIP64 extensions`, e quem pediu viu
+    só o download falhando sem explicação.
+
+    O teste olha a configuração e não o arquivo: gerar 4 GB para conferir
+    custaria meia hora por rodada.
+    """
+
+    def test_o_livro_e_aberto_com_zip64(self, ficha3, tmp_path, monkeypatch):
+        import xlsxwriter
+
+        from cat.infraestrutura.planilhas import conferencia
+
+        opcoes = {}
+        original = xlsxwriter.Workbook
+
+        def espiar(destino, config=None, *args, **kwargs):
+            opcoes.update(config or {})
+            return original(destino, config, *args, **kwargs)
+
+        monkeypatch.setattr(conferencia.xlsxwriter, "Workbook", espiar)
+        gerar_ficha3(str(ficha3), str(tmp_path / "ficha3.xlsx"))
+
+        assert opcoes["use_zip64"] is True
+        # e o que já estava: rascunho ao lado do arquivo, não no disco do Windows
+        assert opcoes["constant_memory"] is True
+        assert opcoes["tmpdir"].startswith(str(tmp_path))
