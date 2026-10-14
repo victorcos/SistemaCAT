@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from uuid import uuid4
@@ -65,9 +66,28 @@ def materializando(caminho: str) -> Iterator[str]:
     acontece depois do `finally` de quem chamou.
     """
     provisorio = f"{caminho}.{uuid4().hex}.parcial"
+    comeco = time.time()
     try:
         yield provisorio
     except BaseException:
         apagar(provisorio)
         raise
-    os.replace(provisorio, caminho)
+    try:
+        os.replace(provisorio, caminho)
+    except OSError:
+        # **No Windows não se renomeia por cima de arquivo que outra thread já
+        # está lendo.** Nome exclusivo resolveu a colisão na escrita e deixou
+        # esta: três pedidos do razão contábil da empresa 24 materializaram o
+        # mesmo resumo ao mesmo tempo, dois trocaram o nome e começaram a ler,
+        # e o terceiro levou `PermissionError [WinError 5]` na troca — depois
+        # de 149 segundos de trabalho que já não eram necessários.
+        #
+        # Destino escrito **durante** o nosso bloco é de quem chegou primeiro
+        # com o mesmo conteúdo: o dele serve, e o nosso vai fora. Qualquer
+        # outra falha sobe, porque aí ninguém produziu o arquivo e esconder
+        # isso entregaria ao chamador um caminho que não existe.
+        apagar(provisorio)
+        if not (os.path.isfile(caminho) and os.path.getmtime(caminho) >= comeco):
+            raise
+        log.info("outro pedido materializou primeiro; o nosso rascunho foi descartado",
+                 extra={"arquivo": os.path.basename(caminho)})

@@ -138,3 +138,50 @@ class TestOEspacoEmDisco:
         with pytest.raises(PermissionError):
             with espaco_que_acaba(str(tmp_path)):
                 raise PermissionError(errno.EACCES, "Acesso negado")
+
+
+class TestDoisPedidosAoMesmoTempo:
+    """O caso real: três pedidos do razão contábil da empresa 24, às 19:30 de
+    14/10/2026, materializando o mesmo resumo ao mesmo tempo.
+
+    Nome exclusivo resolveu a colisão na **escrita**. Sobrou a da **troca de
+    nome**: no Windows não se renomeia por cima de arquivo que outra thread já
+    está lendo, e o terceiro pedido levou `PermissionError [WinError 5]` depois
+    de 149 segundos de trabalho.
+    """
+
+    def test_a_troca_recusada_com_destino_novo_nao_derruba_o_pedido(self, tmp_path):
+        alvo = str(tmp_path / "resumo.parquet")
+        with patch("os.replace", side_effect=PermissionError("WinError 5")):
+            with materializando(alvo) as meu:
+                with open(meu, "w", encoding="utf-8") as f:
+                    f.write("o meu")
+                # quem chegou antes: destino escrito durante o nosso bloco
+                with open(alvo, "w", encoding="utf-8") as f:
+                    f.write("o dele")
+        assert open(alvo, encoding="utf-8").read() == "o dele"
+        assert not list(tmp_path.glob("*.parcial"))
+
+    def test_a_troca_recusada_sem_destino_continua_sendo_erro(self, tmp_path):
+        """Esconder isso entregaria ao chamador um caminho que não existe."""
+        alvo = str(tmp_path / "resumo.parquet")
+        with pytest.raises(PermissionError), \
+                patch("os.replace", side_effect=PermissionError("WinError 5")):
+            with materializando(alvo) as meu:
+                with open(meu, "w", encoding="utf-8") as f:
+                    f.write("o meu")
+        assert not os.path.exists(alvo)
+        assert not list(tmp_path.glob("*.parcial"))
+
+    def test_destino_velho_nao_serve_de_desculpa(self, tmp_path):
+        """Arquivo que já estava lá antes do bloco não é de ninguém chegando
+        primeiro — é o que se queria substituir."""
+        alvo = str(tmp_path / "resumo.parquet")
+        with open(alvo, "w", encoding="utf-8") as f:
+            f.write("velho")
+        os.utime(alvo, (0, 0))                     # bem anterior ao bloco
+        with pytest.raises(PermissionError), \
+                patch("os.replace", side_effect=PermissionError("WinError 5")):
+            with materializando(alvo) as meu:
+                with open(meu, "w", encoding="utf-8") as f:
+                    f.write("o meu")
