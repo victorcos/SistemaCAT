@@ -57,6 +57,7 @@ from cat.infraestrutura.sped.indice import (
 )
 from cat.infraestrutura.sped.leitor import campos_da_linha
 from cat.infraestrutura.sped.registros import CAMPOS, campos_de
+from cat.infraestrutura.analitico.rascunho import apagar, nome_provisorio
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -512,7 +513,7 @@ def extrair(destino: str, alvo: str, recorte: Recorte | None = None,
     # nome provisório: duas telas pedindo o mesmo alvo ao mesmo tempo leriam um
     # parquet pela metade, e isso não aparece como erro — aparece como linha
     # faltando na conferência
-    parcial = f"{caminho}.{os.getpid()}.parcial"
+    parcial = nome_provisorio(caminho)
 
     escritor = pq.ParquetWriter(parcial, esquema, compression="zstd")
     lote: dict[str, list[str]] = {c: [] for c in colunas}
@@ -599,8 +600,7 @@ def extrair(destino: str, alvo: str, recorte: Recorte | None = None,
         escritor.close()
     except BaseException:
         escritor.close()
-        if os.path.isfile(parcial):
-            os.remove(parcial)
+        apagar(parcial)
         raise
     os.replace(parcial, caminho)
 

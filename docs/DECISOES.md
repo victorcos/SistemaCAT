@@ -5,6 +5,82 @@
 
 ---
 
+## 2026-10-14 — Três erros previsíveis que o sistema devolvia como falha não tratada
+
+Um download falhou com **"verifique a conexão com a Internet"**. Meia hora foi
+gasta procurando defeito de rede — certificado, proxy, antivírus, a máquina do
+outro lado da sala — com o servidor respondendo normalmente o tempo todo. A
+causa era o disco de trabalho em zero byte.
+
+Os três defeitos abaixo apareceram nessa caçada. Nenhum deles é exceção
+inesperada; os três viravam 500 cru ou silêncio, e deixavam o navegador
+inventar a explicação.
+
+### 1. Disco cheio não é exceção, é condição
+
+```
+File "...xlsxwriter/xmlwriter.py", line 173, in _xml_inline_string
+OSError: [Errno 28] No space left on device
+```
+
+Agora há **duas** guardas, e a ordem entre elas é deliberada:
+
+* `exigir_espaco` recusa **antes de escrever**, dizendo quanto precisa e quanto
+  restou. A conta é por **linha**, não por célula do parquet de origem: a
+  planilha tem as colunas do leiaute, que são bem menos — medir pela origem
+  superestimava três vezes e recusaria trabalho que caberia. Medido na empresa
+  24, 4.721.980 linhas: rascunho do xlsx ~8,7 GB (≈1.850 B/linha) e CSV 2,3 GB
+  (≈490 B/linha); as constantes têm ~60% de folga sobre isso;
+* `espaco_que_acaba` traduz o `ENOSPC` que acontece **durante**. A estimativa
+  erra para os dois lados e outro processo pode encher o disco no meio — esta é
+  a rede que não depende de adivinhação.
+
+A recusa sai como **422**, e não 507, porque é o que a API em C# relaia com a
+mensagem: `codigo is 404 or 409 or 410 or 422`. Status fora dessa lista vira
+"motor indisponível" e a frase se perde no caminho.
+
+### 2. O rascunho pelo PID colidia consigo mesmo
+
+```
+IOException: Cannot open file "...razao_por_conta.parquet.33192.parcial"
+PermissionError: [WinError 5] Acesso negado
+```
+
+Cinco lugares nomeavam o arquivo provisório com `os.getpid()`. O motor atende
+vários pedidos **no mesmo processo**: duas telas abertas ao mesmo tempo
+escolhiam o mesmo nome. Pior, a limpeza também estourava — e o
+`PermissionError` dela apagava do log o erro que a causou.
+
+`infraestrutura/analitico/rascunho.py` passa a ser o único lugar que nomeia:
+identificador por **chamada**, `materializando` para promover ao nome final só
+no fim, e `apagar` sempre tolerante. Rascunho preso é lixo, não defeito.
+
+### 3. O download perdia o gesto de quem clicou
+
+O front pedia o tíquete e **só depois** criava o `<a download>` e clicava nele
+por código. Entre o clique da pessoa e o download havia um `await`, e para o
+navegador aquilo deixava de ser "alguém clicou" e virava "a página decidiu
+baixar". Chrome e Edge liberam o primeiro e **bloqueiam os seguintes** até
+alguém conceder a permissão de downloads automáticos — sem requisição nenhuma
+sair. Sete tentativas, nenhuma chegou à API; o tíquete era emitido e nunca
+resgatado, que foi como se achou.
+
+Agora `reservarDestino` abre a aba de destino **dentro do gesto**, antes de
+qualquer espera, e só aponta a URL quando o tíquete chega. A aba fica em branco
+enquanto o servidor monta o arquivo e o navegador a fecha sozinha quando a
+resposta vem como download — por isso nada é escrito nela, que é o que a
+manteria aberta. Com bloqueador de janelas, cai no `<a download>` de antes.
+
+### O que liga os três
+
+Nos três, o sistema sabia o que tinha acontecido e **não disse**. O resultado
+não foi um erro feio na tela: foi uma explicação errada, dada por quem não
+tinha como saber — o navegador. Erro previsível tem de chegar à tela com o
+próprio nome, e é mais barato escrever a mensagem do que pagar a próxima meia
+hora de investigação.
+
+---
+
 ## 2026-10-14 — O par de prova forte passou a valer sem ninguém aprovar
 
 Em 16/09/2026 ficou decidido que **nada** do de-para seria aplicado sozinho:

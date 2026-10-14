@@ -51,6 +51,7 @@ from decimal import Decimal
 from cat.infraestrutura.analitico.confronto import _escapar
 from cat.infraestrutura.analitico.piscofins import ARQUIVO_DAS_SAIDAS
 from cat.infraestrutura.analitico.suportado import _leitura
+from cat.infraestrutura.analitico.rascunho import materializando
 from cat.log import obter_log
 
 log = obter_log(__name__)
@@ -177,35 +178,30 @@ def _resumo(destino: str) -> str:
     if os.path.isfile(caminho) and os.path.getmtime(caminho) >= os.path.getmtime(origem):
         return caminho
 
-    parcial = f"{caminho}.{os.getpid()}.parcial"
     comeco = time.monotonic()
-    con = _leitura(destino)
-    try:
-        con.execute(f"""
-            COPY (
-                SELECT cnpj, periodo, registros, cfop, cst_pis,
-                       -- `max` e não `any_value`: quando as linhas daquele CFOP
-                       -- discordam — uma com descrição, outra sem —, `any_value`
-                       -- pode devolver a vazia, e o chip da tela sai sem rótulo
-                       -- de forma aleatória. `max` sobre texto prefere o não
-                       -- vazio, e é determinístico
-                       max(natureza)                AS natureza,
-                       max(descricao_do_cfop)       AS descricao_do_cfop,
-                       count(*)                     AS linhas,
-                       sum({_VALOR})                AS valor,
-                       sum({_PIS})                  AS pis,
-                       sum({_COFINS})               AS cofins
-                FROM read_parquet('{_escapar(origem)}')
-                GROUP BY cnpj, periodo, registros, cfop, cst_pis
-            ) TO '{_escapar(parcial)}' (FORMAT PARQUET)
-        """)
-    except BaseException:
-        if os.path.isfile(parcial):
-            os.remove(parcial)
-        raise
-    finally:
-        con.close()
-    os.replace(parcial, caminho)
+    with materializando(caminho) as parcial:
+        con = _leitura(destino)
+        try:
+            con.execute(f"""
+                COPY (
+                    SELECT cnpj, periodo, registros, cfop, cst_pis,
+                           -- `max` e não `any_value`: quando as linhas daquele CFOP
+                           -- discordam — uma com descrição, outra sem —, `any_value`
+                           -- pode devolver a vazia, e o chip da tela sai sem rótulo
+                           -- de forma aleatória. `max` sobre texto prefere o não
+                           -- vazio, e é determinístico
+                           max(natureza)                AS natureza,
+                           max(descricao_do_cfop)       AS descricao_do_cfop,
+                           count(*)                     AS linhas,
+                           sum({_VALOR})                AS valor,
+                           sum({_PIS})                  AS pis,
+                           sum({_COFINS})               AS cofins
+                    FROM read_parquet('{_escapar(origem)}')
+                    GROUP BY cnpj, periodo, registros, cfop, cst_pis
+                ) TO '{_escapar(parcial)}' (FORMAT PARQUET)
+            """)
+        finally:
+            con.close()
 
     log.info("resumo da 047 materializado", extra={
         "execucao_pasta": os.path.basename(destino),
@@ -355,20 +351,15 @@ def parquet_do_recorte(destino: str, recorte: Recorte) -> str:
         return caminho
 
     onde, parametros = _onde(recorte)
-    parcial = f"{caminho}.{os.getpid()}.parcial"
-    con = _leitura(destino)
-    try:
-        con.execute(f"""
-            COPY (SELECT * FROM read_parquet('{_escapar(origem)}') WHERE {onde})
-            TO '{_escapar(parcial)}' (FORMAT PARQUET)
-        """, parametros)
-    except BaseException:
-        if os.path.isfile(parcial):
-            os.remove(parcial)
-        raise
-    finally:
-        con.close()
-    os.replace(parcial, caminho)
+    with materializando(caminho) as parcial:
+        con = _leitura(destino)
+        try:
+            con.execute(f"""
+                COPY (SELECT * FROM read_parquet('{_escapar(origem)}') WHERE {onde})
+                TO '{_escapar(parcial)}' (FORMAT PARQUET)
+            """, parametros)
+        finally:
+            con.close()
     log.info("recorte da 047 materializado", extra={
         "execucao_pasta": os.path.basename(destino), "filtros": recorte.quantos_filtros,
     })

@@ -7,10 +7,17 @@ motivo de cada recusa ficaram aqui, num lugar só.
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import os
+import shutil
 import zipfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
+
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from cat.aplicacao.casos_de_uso import (
     apurar_contribuicoes,
@@ -56,6 +63,7 @@ from cat.infraestrutura.analitico.exclusao_piscofins_na_base import (
 )
 from cat.infraestrutura.analitico.exclusoes import ARQUIVO_DAS_EXCLUSOES
 from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML
+from cat.infraestrutura.analitico.rascunho import materializando
 from cat.infraestrutura.analitico.gestao import ARQUIVO_DOS_QUADROS
 from cat.infraestrutura.analitico import consulta_de_saidas as saidas_na_tela
 from cat.infraestrutura.analitico import registros_do_sped as extracao_de_registro
@@ -287,6 +295,89 @@ class PlanilhaPronta:
     tipo: str
 
 
+# ---------------------------------------------------------------------------
+# espaço em disco: o erro que o navegador traduzia errado
+# ---------------------------------------------------------------------------
+# Em 14/10/2026 o disco de trabalho da máquina chegou a zero byte e o motor
+# estourou no meio da escrita:
+#
+#     File "...xlsxwriter/xmlwriter.py", line 173, in _xml_inline_string
+#     OSError: [Errno 28] No space left on device
+#
+# Virou um 500 sem mensagem, a conexão do download caiu, e o navegador anunciou
+# **"verifique a conexão com a Internet"**. Meia hora foi gasta procurando
+# problema de rede que não existia. Disco cheio é condição previsível e tem de
+# aparecer com esse nome, na tela de quem pediu.
+#
+# A conta de quanto cabe é grosseira de propósito — o que ela acerta é a ordem
+# de grandeza, e é só isso que se precisa para recusar antes de começar.
+#
+# **Por linha, não por célula do parquet.** A planilha tem as colunas do
+# leiaute, que são bem menos do que as do parquet de origem: na empresa 24 a
+# Consulta de Entradas sai de um parquet de 49 colunas e escreve 20. Medir pela
+# origem superestimava três vezes, e recusaria trabalho que caberia.
+#
+# Medido naquela planilha, 4.721.980 linhas: o rascunho do xlsx chegou a ~8,7 GB
+# (≈1.850 bytes por linha) e o CSV a 2,3 GB (≈490). Os números abaixo têm ~60%
+# de folga sobre isso, porque uma Ficha 3 tem o dobro de colunas.
+BYTES_POR_LINHA = {"xlsx": 3_000, "csv": 800, "zip": 800}
+
+# o chão: abaixo disto não se começa nem planilha pequena. O sistema todo grava
+# no mesmo disco — índice, rascunho do DuckDB, banco — e raspar o fundo quebra
+# mais coisa do que a planilha que se queria
+FOLGA_MINIMA = 2 * 1024**3
+
+
+def espaco_necessario(origem: str, formato: str) -> int:
+    """Quantos bytes a geração deve pedir ao disco, com folga."""
+    try:
+        linhas = pq.read_metadata(origem).num_rows
+    except (OSError, pa.ArrowInvalid):
+        # sem metadado legível não se adivinha: fica só o chão, e quem decide
+        # de verdade é o erro de escrita traduzido em `espaco_que_acaba`
+        return FOLGA_MINIMA
+    return FOLGA_MINIMA + linhas * BYTES_POR_LINHA.get(formato, 800)
+
+
+def exigir_espaco(origem: str, pasta: str, formato: str) -> None:
+    """Recusa antes de escrever quando o disco não comporta a planilha."""
+    precisa = espaco_necessario(origem, formato)
+    livre = shutil.disk_usage(pasta).free
+    if livre >= precisa:
+        return
+    log.warning("planilha recusada por falta de espaço",
+                extra={"pasta": pasta, "formato": formato, "livre": livre, "precisa": precisa})
+    raise PlanilhaRecusada(
+        422, f"Sem espaço em disco para montar esta planilha: ela precisa de cerca de "
+             f"{_gb(precisa)} e restam {_gb(livre)} em {os.path.splitdrive(pasta)[0] or pasta}. "
+             f"Libere espaço e peça de novo.")
+
+
+@contextmanager
+def espaco_que_acaba(pasta: str) -> Iterator[None]:
+    """Traduz o disco que acaba **durante** a escrita.
+
+    A estimativa de `exigir_espaco` erra para os dois lados, e outro processo
+    pode encher o disco no meio do caminho. Esta é a rede que não depende de
+    adivinhação: o erro do sistema operacional vira a mesma frase.
+    """
+    try:
+        yield
+    except OSError as erro:
+        if erro.errno != errno.ENOSPC:
+            raise
+        livre = shutil.disk_usage(pasta).free
+        log.warning("disco acabou no meio da planilha", extra={"pasta": pasta, "livre": livre})
+        raise PlanilhaRecusada(
+            422, f"O disco acabou enquanto a planilha era montada: restam {_gb(livre)} em "
+                 f"{os.path.splitdrive(pasta)[0] or pasta}. Libere espaço e peça de novo."
+        ) from erro
+
+
+def _gb(bytes_: int) -> str:
+    return f"{bytes_ / 1024**3:.1f} GB".replace(".", ",")
+
+
 def gerar(execucao: ExecucaoDB, etapa_da_rota: str, qual: str,
           modelos: str | None, classificacoes: str | None, formato: str) -> PlanilhaPronta:
     """Gera (ou reaproveita) a planilha e diz onde ela está.
@@ -347,7 +438,9 @@ def gerar(execucao: ExecucaoDB, etapa_da_rota: str, qual: str,
     destino = os.path.join(pasta, f"{raiz}{sufixo}.{formato}")
     if precisa_gerar(destino, origem):
         with contexto(etapa=etapa_da_rota, execucao_id=execucao.id, planilha=qual):
-            linhas = gerador(origem, destino, escolhidos, classes, formato=formato)
+            exigir_espaco(origem, pasta, formato)
+            with espaco_que_acaba(pasta):
+                linhas = gerador(origem, destino, escolhidos, classes, formato=formato)
             log.info("planilha gerada",
                      extra={"planilha": qual, "linhas": linhas, "formato": formato,
                             "modelos": sorted(escolhidos) if escolhidos else "todos",
@@ -491,11 +584,10 @@ def extrair_registros_em_zip(execucao: ExecucaoDB, alvos: list[str], formato: st
         recorte or extracao_de_registro.Recorte())
     nome = f"sped_extracoes{marca}.zip"
     destino = os.path.join(pasta, nome)
-    provisorio = f"{destino}.{os.getpid()}.tmp"
-    with zipfile.ZipFile(provisorio, "w", compression=zipfile.ZIP_DEFLATED) as z:
-        for pronta in prontas:
-            z.write(pronta.caminho, arcname=pronta.nome)
-    os.replace(provisorio, destino)
+    with materializando(destino) as provisorio:
+        with zipfile.ZipFile(provisorio, "w", compression=zipfile.ZIP_DEFLATED) as z:
+            for pronta in prontas:
+                z.write(pronta.caminho, arcname=pronta.nome)
 
     log.info("extrações empacotadas", extra={
         "execucao_id": execucao.id, "alvos": len(prontas), "formato": formato,

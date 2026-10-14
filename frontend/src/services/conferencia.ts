@@ -165,6 +165,54 @@ function entregarAoNavegador(url: string, nome: string): void {
   link.remove();
 }
 
+/** Para onde o arquivo vai, reservado antes da espera e apontado depois. */
+interface Destino {
+  apontar: (url: string) => void;
+  desistir: () => void;
+}
+
+/**
+ * Reserva o destino **dentro do gesto da pessoa**, antes de qualquer `await`.
+ *
+ * ## O que quebrava
+ *
+ * O caminho antigo pedia o tíquete e **só então** criava o `<a download>` e
+ * clicava nele por código. Entre o clique da pessoa e o download havia uma
+ * espera, e para o navegador aquilo deixava de ser "alguém clicou" para virar
+ * "a página decidiu baixar". Chrome e Edge liberam o primeiro download assim e
+ * **bloqueiam os seguintes** até alguém conceder a permissão de downloads
+ * automáticos — sem requisição nenhuma sair.
+ *
+ * O que se via era pior do que um erro: o download aparecia na lista do
+ * navegador como *"verifique a conexão com a Internet"*. Em 14/10/2026 isso
+ * custou meia hora procurando defeito de rede que não existia, com o servidor
+ * respondendo normalmente o tempo todo. Sete tentativas, nenhuma chegou à API.
+ *
+ * ## O que se faz
+ *
+ * `window.open` acontece **no gesto**, e é a aba aberta ali que depois recebe a
+ * URL. O download continua preso ao clique de quem pediu, em qualquer máquina,
+ * sem depender de permissão concedida uma a uma.
+ *
+ * A aba fica em branco enquanto o servidor monta o arquivo — e o navegador a
+ * fecha sozinha quando a resposta vem como download. Deixá-la em branco é
+ * deliberado: escrever qualquer coisa nela tira dela a condição de aba recém
+ * aberta, que é justamente o que faz o navegador fechá-la depois.
+ *
+ * Se o bloqueador de janelas recusar, resta o `<a download>` de antes — que
+ * pode ser bloqueado, mas é melhor do que não tentar.
+ */
+function reservarDestino(nome: string): Destino {
+  const janela = window.open("", "_blank");
+  if (!janela) {
+    return { apontar: (url) => entregarAoNavegador(url, nome), desistir: () => {} };
+  }
+  return {
+    apontar: (url) => janela.location.replace(url),
+    desistir: () => janela.close(),
+  };
+}
+
 /**
  * Pede a autorização de download e deixa o navegador baixar.
  *
@@ -187,6 +235,8 @@ async function baixarPorTiquete(
   nomePadrao: string,
   sinal?: AbortSignal,
 ): Promise<void> {
+  // antes de qualquer espera: é o que mantém o download preso ao clique
+  const destino = reservarDestino(nomePadrao);
   const [caminho, query] = endereco.split("?");
   const cabecalhos = new Headers();
   const token = lerToken();
@@ -197,12 +247,14 @@ async function baixarPorTiquete(
     r = await fetch(`${caminho}/tiquete${query ? `?${query}` : ""}`,
       { method: "POST", headers: cabecalhos, signal: sinal });
   } catch (e) {
+    destino.desistir();
     if (foiAbortado(e)) throw new DownloadCancelado();
     throw new ErroApi("Não foi possível baixar a planilha.", 0);
   }
 
   const requisicaoId = r.headers.get("X-Request-Id") ?? undefined;
   if (!r.ok) {
+    destino.desistir();
     let detalhe = "Não foi possível gerar a planilha.";
     try {
       const corpo = await r.json();
@@ -215,8 +267,7 @@ async function baixarPorTiquete(
 
   const { tiquete } = (await r.json()) as { tiquete: string };
   const separador = query ? "&" : "?";
-  entregarAoNavegador(
-    `${endereco}${separador}t=${encodeURIComponent(tiquete)}`, nomePadrao);
+  destino.apontar(`${endereco}${separador}t=${encodeURIComponent(tiquete)}`);
 }
 
 /**

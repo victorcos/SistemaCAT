@@ -39,6 +39,7 @@ from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wai
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
+from uuid import uuid4
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -181,7 +182,10 @@ def _do_zip(z: zipfile.ZipFile, origem: str, caminho_do_zip: str, resumo: Resumo
         elif nome.lower().endswith(".zip") and nivel == 0:
             # zip dentro de zip não se lê por dentro: cada membro faria descomprimir
             # o de fora desde o começo. Vai compactado ao disco local e volta a ser zip
-            local = os.path.join(rascunho, f".aninhado-{os.getpid()}-{abs(hash(origem + nome))}.zip")
+            # identificador por chamada, não por processo: o motor lê vários
+            # lotes no mesmo processo, e dois pedidos do mesmo zip aninhado
+            # escolhiam o mesmo nome e liam um arquivo que o outro ainda escrevia
+            local = os.path.join(rascunho, f".aninhado-{uuid4().hex}.zip")
             if aninhados is not None:
                 aninhados.append(local)
             try:

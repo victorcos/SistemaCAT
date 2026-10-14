@@ -132,3 +132,77 @@ describe("rota que não é de planilha", () => {
     expect(buscar.mock.calls[0][0]).not.toContain("tiquete/tiquete");
   });
 });
+
+/**
+ * A aba é reservada no gesto de quem clicou — e é isso que mantém o download
+ * sendo "alguém pediu" em vez de "a página decidiu".
+ *
+ * Sem isso, Chrome e Edge liberam o primeiro download e bloqueiam os seguintes
+ * sem mandar requisição nenhuma, e o que aparece na lista do navegador é
+ * "verifique a conexão com a Internet" — com o servidor respondendo normal.
+ */
+describe("o destino é reservado antes da espera", () => {
+  function abrirFalso() {
+    const janela = { location: { replace: vi.fn() }, close: vi.fn() };
+    const abrir = vi.fn().mockReturnValue(janela);
+    vi.stubGlobal("open", abrir);
+    return { janela, abrir };
+  }
+
+  it("abre a aba antes do POST do tíquete, não depois", async () => {
+    const ordem: string[] = [];
+    const { abrir, janela } = abrirFalso();
+    abrir.mockImplementation(() => {
+      ordem.push("abriu");
+      return janela;
+    });
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => {
+      ordem.push("tiquete");
+      return resposta(TIQUETE);
+    }));
+
+    await baixarArquivo("/api/exclusoes/9/planilhas/pacote", "pacote.zip");
+
+    expect(ordem).toEqual(["abriu", "tiquete"]);
+    expect(abrir).toHaveBeenCalledWith("", "_blank");
+  });
+
+  it("aponta a aba para a URL com o tíquete, sem criar link nenhum", async () => {
+    const { janela } = abrirFalso();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(resposta(TIQUETE)));
+
+    await baixarArquivo(
+      "/api/apuracao-piscofins/12/planilhas/entradas?formato=csv",
+      "consulta_de_entradas.csv",
+    );
+
+    expect(janela.location.replace).toHaveBeenCalledWith(
+      "/api/apuracao-piscofins/12/planilhas/entradas?formato=csv&t=abc123",
+    );
+    expect(cliques).toHaveLength(0);
+  });
+
+  it("fecha a aba quando o tíquete é recusado, para não deixar aba órfã", async () => {
+    const { janela } = abrirFalso();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      resposta({ detail: "A apuração das exclusões ainda não terminou." }, 409),
+    ));
+
+    await expect(
+      baixarArquivo("/api/exclusoes/9/planilhas/pacote", "pacote.zip"),
+    ).rejects.toThrow("ainda não terminou");
+
+    expect(janela.close).toHaveBeenCalledOnce();
+    expect(janela.location.replace).not.toHaveBeenCalled();
+  });
+
+  it("com o bloqueador de janelas ligado, ainda tenta pelo link", async () => {
+    vi.stubGlobal("open", vi.fn().mockReturnValue(null));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(resposta(TIQUETE)));
+
+    await baixarArquivo("/api/exclusoes/9/planilhas/pacote", "pacote.zip");
+
+    expect(cliques).toHaveLength(1);
+    expect(cliques[0].getAttribute("href")).toBe("/api/exclusoes/9/planilhas/pacote?t=abc123");
+  });
+});

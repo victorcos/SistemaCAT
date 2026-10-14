@@ -32,6 +32,7 @@ import time
 from decimal import Decimal
 
 from cat.infraestrutura.analitico.confronto import _escapar
+from cat.infraestrutura.analitico.rascunho import materializando
 from cat.infraestrutura.analitico.piscofins import (
     ARQUIVO_DO_RAZAO,
     fonte_do_razao,
@@ -109,33 +110,28 @@ def _resumo(destino: str) -> str:
     if os.path.isfile(caminho) and os.path.getmtime(caminho) >= os.path.getmtime(origem):
         return caminho
 
-    parcial = f"{caminho}.{os.getpid()}.parcial"
     comeco = time.monotonic()
-    con = _leitura(destino)
-    try:
-        con.execute(f"""
-            COPY (
-                SELECT cnpj, conta,
-                       any_value(descricao)             AS descricao,
-                       any_value(conta_referencial)     AS conta_referencial,
-                       count(*)                         AS lancamentos,
-                       sum({_DEBITO})                   AS debitos,
-                       sum({_CREDITO})                  AS creditos,
-                       sum({_DEBITO}) - sum({_CREDITO}) AS saldo,
-                       min(data)                        AS de,
-                       max(data)                        AS ate,
-                       count(DISTINCT arquivo)          AS arquivos
-                FROM read_parquet('{_escapar(origem)}')
-                GROUP BY cnpj, conta
-            ) TO '{_escapar(parcial)}' (FORMAT PARQUET)
-        """)
-    except BaseException:
-        if os.path.isfile(parcial):
-            os.remove(parcial)
-        raise
-    finally:
-        con.close()
-    os.replace(parcial, caminho)
+    with materializando(caminho) as parcial:
+        con = _leitura(destino)
+        try:
+            con.execute(f"""
+                COPY (
+                    SELECT cnpj, conta,
+                           any_value(descricao)             AS descricao,
+                           any_value(conta_referencial)     AS conta_referencial,
+                           count(*)                         AS lancamentos,
+                           sum({_DEBITO})                   AS debitos,
+                           sum({_CREDITO})                  AS creditos,
+                           sum({_DEBITO}) - sum({_CREDITO}) AS saldo,
+                           min(data)                        AS de,
+                           max(data)                        AS ate,
+                           count(DISTINCT arquivo)          AS arquivos
+                    FROM read_parquet('{_escapar(origem)}')
+                    GROUP BY cnpj, conta
+                ) TO '{_escapar(parcial)}' (FORMAT PARQUET)
+            """)
+        finally:
+            con.close()
 
     log.info("resumo do razão por conta materializado", extra={
         "execucao_pasta": os.path.basename(destino),
