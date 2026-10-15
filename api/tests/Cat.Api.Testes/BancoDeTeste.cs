@@ -15,7 +15,16 @@ public class BancoDeTeste : IAsyncLifetime
     public const string Segredo = "segredo-de-teste-com-mais-de-trinta-e-dois-bytes-nao-e-segredo";
     public const string SenhaPadrao = "Senha-Certa-2026";
 
-    protected virtual string Nome => "cat_testes_csharp";
+    protected virtual string NomeBase => "cat_testes_csharp";
+
+    // Cada pasta do repositório (worktree) testa no seu banco: o InitializeAsync
+    // dá DROP ... WITH (FORCE), e duas pastas rodando ao mesmo tempo com o mesmo
+    // nome derrubavam a bateria uma da outra (docs/TRABALHO_EM_PARALELO.md)
+    private string Nome => NomeBase + SufixoDaPasta;
+
+    public static readonly string SufixoDaPasta = "_" + new string(
+        Path.GetFileName(Path.GetDirectoryName(RaizDoRepositorio.Backend()))!
+            .ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '_').ToArray());
 
     // mesmo contêiner do desenvolvimento; banco próprio para nunca tocar em dado de trabalho
     private static readonly string Servidor =
@@ -121,7 +130,11 @@ public class BancoDeTeste : IAsyncLifetime
     private async Task MigrarComAlembic()
     {
         var backend = RaizDoRepositorio.Backend();
-        var inicio = new ProcessStartInfo(Path.Combine(backend, ".venv", "Scripts", "python.exe"))
+        // Scripts\python.exe no Windows, bin/python no Linux do CI (.github/workflows)
+        var python = OperatingSystem.IsWindows()
+            ? Path.Combine(backend, ".venv", "Scripts", "python.exe")
+            : Path.Combine(backend, ".venv", "bin", "python");
+        var inicio = new ProcessStartInfo(python)
         {
             WorkingDirectory = backend,
             RedirectStandardOutput = true,
@@ -163,5 +176,5 @@ public sealed class ColecaoDoBanco : ICollectionFixture<BancoDeTeste>
 /// <summary>Migrado e sem usuário nenhum: o único estado em que semear faz algo.</summary>
 public sealed class BancoVazio : BancoDeTeste
 {
-    protected override string Nome => "cat_testes_csharp_vazio";
+    protected override string NomeBase => "cat_testes_csharp_vazio";
 }
