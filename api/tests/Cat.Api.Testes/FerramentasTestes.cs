@@ -118,7 +118,7 @@ public sealed class FerramentasTestes(BancoVazio banco) : IClassFixture<BancoVaz
     [Fact]
     public async Task Banco_sem_esquema_manda_rodar_as_migracoes_em_vez_de_criar_tabela()
     {
-        const string nome = "cat_testes_csharp_sem_esquema";
+        var nome = "cat_testes_csharp_sem_esquema" + BancoDeTeste.SufixoDaPasta;
         await using (var admin = new NpgsqlConnection("Host=127.0.0.1;Port=55432;Username=cat;Password=cat;Database=postgres"))
         {
             await admin.OpenAsync();
