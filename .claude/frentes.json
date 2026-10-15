@@ -1,0 +1,73 @@
+{
+  "_leia": "Mapa de dono de cada arquivo entre as sessoes que trabalham em paralelo. Regra completa em docs/TRABALHO_EM_PARALELO.md. Quem le: .claude/hooks/guarda-da-frente.mjs. A ordem importa: compartilhado vence, depois as frentes na ordem em que aparecem. Arquivo que nao casa com nada e livre. Padroes: * nao cruza pasta, ** cruza, {a,b} e alternativa.",
+
+  "so_na_integracao": ["VERSAO"],
+
+  "compartilhado": [
+    "CLAUDE.md",
+    ".git{ignore,attributes}",
+    ".claude/**",
+    ".github/**",
+    "scripts/**",
+    "docker/**",
+    "docs/{TRABALHO_EM_PARALELO,CONTRATOS,ARQUITETURA,VERSIONAMENTO}.md",
+
+    "backend/cat/{config,log,versao}.py",
+    "backend/cat/apresentacao/**",
+    "backend/cat/aplicacao/progresso.py",
+    "backend/cat/aplicacao/casos_de_uso/{rodada,planilhas,quebrar_xml,inspecionar_lote,analisar_remessa,historico_do_projeto}.py",
+    "backend/cat/dominio/{lote.py,comum/**,sped/**,notafiscal/**,projeto/**}",
+    "backend/cat/infraestrutura/repositorios/**",
+    "backend/cat/infraestrutura/arquivos/{classificador,remessa,xml_compactado}.py",
+    "backend/cat/infraestrutura/sped/{leitor,indice,registros,extracao,cadastro,consolidado,entradas,saidas,apuracao}.py",
+    "backend/cat/infraestrutura/analitico/{confronto,escrita,extracao,itens_do_xml,rascunho}.py",
+    "backend/cat/infraestrutura/planilhas/{conferencia,itens_do_xml}.py",
+    "backend/cat/infraestrutura/selic/**",
+    "backend/migracoes/**",
+    "backend/workers/**",
+    "backend/pyproject.toml",
+    "backend/tests/conftest.py",
+
+    "api/src/Cat.Api/Program.cs",
+    "api/src/Cat.Dominio/Acesso/Segmento.cs",
+    "api/src/Cat.Dominio/Projeto/{Etapas,Trabalho}.cs",
+    "api/src/Cat.Dominio/Lote/**",
+    "api/src/Cat.Infraestrutura/Banco/CatDbContext.cs",
+    "api/src/Cat.Infraestrutura/Motor/**",
+    "api/tests/Cat.Api.Testes/BancoDeTeste.cs",
+
+    "frontend/package.json",
+    "frontend/vite.config.*",
+    "frontend/src/{App.tsx,main.tsx}",
+    "frontend/src/{routers,layout,constants,providers}/**",
+    "frontend/src/services/api.ts"
+  ],
+
+  "frentes": {
+    "piscofins": {
+      "rotulo": "PIS/COFINS",
+      "branch": "frente/piscofins",
+      "pasta": "SistemaCAT-piscofins",
+      "arquivos": [
+        "{backend,api,frontend}/**/*{piscofins,PisCofins,contribuicoes,exclus,Exclus,gestao,Gestao,quebra_de_sped,quebrar_sped,sped_quebra,QuebraDeSped,quebraDeSped,razao_contabil,RazaoContabil,consulta_de_saidas,ConsultaDeSaidas,prescricao,registros_do_sped,sped_ecd,irpj_csll}*",
+        "backend/cat/dominio/piscofins/**",
+        "backend/cat/infraestrutura/{exclusoes,gestao}/**",
+        "backend/cat/infraestrutura/sped/ecd.py",
+        "backend/cat/infraestrutura/sped/tabelas/tab_{cst_piscofins,cfop_natureza_credito,cfop_receita,ind_escrit}.py",
+        "backend/tests/integracao/test_quebra_extracao_api.py",
+        "docs/DOMINIO_PISCOFINS*.md"
+      ]
+    },
+    "icms": {
+      "rotulo": "ICMS",
+      "branch": "frente/icms",
+      "pasta": "SistemaCAT",
+      "arquivos": [
+        "{backend,api,frontend}/**/*{icms,Icms,cat42,combustivel,Combustivel,credito_outorgado,CreditoOutorgado,creditoOutorgado,depara,DePara,suportado,Suportado,razao,Razao,moviment,Moviment,conferencia,Conferencia,conferir,arquivo_digital,ArquivoDigital,arquivoDigital,entrega,Entrega,correc,Correc,pre_valid,PreValid,preValid,canceladas,contingencia,reducao,enquadramento,ficha3,tab_437,tab_ad_rem,tab_fcv,tab_aliquota,gerencial,VendaAConsumidor,LigarCodigo,apurar_periodo,apuracao,Apuracao}*",
+        "backend/cat/dominio/{icms,depara,gerencial}/**",
+        "backend/cat/infraestrutura/aliquotas/**",
+        "docs/{DOMINIO,DOMINIO_COMBUSTIVEL,LEIAUTE_ARQUIVO_DIGITAL}.md"
+      ]
+    }
+  }
+}
