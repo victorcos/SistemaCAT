@@ -1,0 +1,3 @@
+# Scripts de shell precisam de LF. Com core.autocrlf=true no Windows, o git
+# entregaria o scripts/integrar.sh com CRLF, e o bash quebra no \r do fim da linha
+*.sh text eol=lf
