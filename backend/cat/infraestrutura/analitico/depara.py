@@ -42,6 +42,14 @@ def itens_para_casar(pasta_movimentos: str) -> dict[str, list[ItemParaCasar]]:
     # o código de barras do 0200; sem cadastro, o que o consolidar trouxe do XML — só vale na linha do próprio XML
     gtins = (f"list(codigo_barras) FILTER (WHERE {proprio} OR fonte_item = 'xml')" if tem_xml
              else "list(codigo_barras)")
+    # **o GTIN que o documento declarou, separado do que o cadastro diz.** São
+    # provas de força diferente: o do cadastro é um campo que alguém digitou
+    # uma vez — na empresa 04 ele apontava o GTIN de outro produto, e um GTIN
+    # sozinho juntava seis itens num. O do XML é o fornecedor dizendo, na nota,
+    # qual é o código de barras daquele item. Quando o mesmo GTIN aparece no
+    # XML dos dois lados, são dois documentos independentes concordando.
+    gtins_do_xml = ("list(ltrim(gtin_xml, '0'))" if "gtin_xml" in colunas
+                    else "[]::VARCHAR[]")
     devolucoes = ", ".join(f"'{c}'" for c in sorted(CFOP_DEVOLUCAO))
     inventario = os.path.join(pasta_movimentos, ARQUIVO_INVENTARIO)
     itens = os.path.join(pasta_movimentos, ARQUIVO_ITENS)
@@ -60,7 +68,8 @@ def itens_para_casar(pasta_movimentos: str) -> dict[str, list[ItemParaCasar]]:
                    sum(quantidade) FILTER (WHERE operacao = 'saida'
                         AND replace(cfop, '.', '') IN ({devolucoes})) AS devolucoes_de_compra,
                    any_value(descricao) AS descricao, any_value(ncm) AS ncm,
-                   list_distinct({gtins}) AS gtins
+                   list_distinct({gtins}) AS gtins,
+                   list_distinct({gtins_do_xml}) AS gtins_do_xml
             FROM read_parquet('{_escapar(movimentos)}')
             GROUP BY cnpj, codigo
         """)
@@ -80,7 +89,8 @@ def itens_para_casar(pasta_movimentos: str) -> dict[str, list[ItemParaCasar]]:
             SELECT coalesce(m.cnpj, e.cnpj), coalesce(m.codigo, e.codigo),
                    coalesce({"i.descricao, " if cadastro else ""}m.descricao, ''),
                    coalesce({"i.ncm, " if cadastro else ""}m.ncm, ''),
-                   coalesce(m.gtins, []), coalesce(m.entradas, 0), coalesce(m.saidas, 0),
+                   coalesce(m.gtins, []), coalesce(m.gtins_do_xml, []),
+                   coalesce(m.entradas, 0), coalesce(m.saidas, 0),
                    coalesce(e.quantidade, 0), coalesce(m.devolucoes_de_venda, 0),
                    coalesce(m.devolucoes_de_compra, 0)
             FROM mov m
@@ -92,10 +102,13 @@ def itens_para_casar(pasta_movimentos: str) -> dict[str, list[ItemParaCasar]]:
         con.close()
 
     por_estabelecimento: dict[str, list[ItemParaCasar]] = {}
-    for cnpj, codigo, descricao, ncm, gtins, entradas, saidas, estoque, dev_venda, dev_compra in linhas:
+    for (cnpj, codigo, descricao, ncm, gtins, gtins_do_xml, entradas, saidas,
+         estoque, dev_venda, dev_compra) in linhas:
         por_estabelecimento.setdefault(cnpj, []).append(ItemParaCasar(
             codigo=codigo, descricao=descricao, ncm=ncm,
-            gtins=frozenset(g for g in gtins if g), entradas=Decimal(entradas or 0),
+            gtins=frozenset(g for g in gtins if g),
+            gtins_do_xml=frozenset(g for g in gtins_do_xml if g),
+            entradas=Decimal(entradas or 0),
             saidas=Decimal(saidas or 0), estoque_inicial=Decimal(estoque or 0),
             devolucoes_de_venda=Decimal(dev_venda or 0), devolucoes_de_compra=Decimal(dev_compra or 0)))
     return por_estabelecimento

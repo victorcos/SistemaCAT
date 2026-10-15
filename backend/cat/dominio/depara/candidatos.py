@@ -122,6 +122,8 @@ class ItemParaCasar:
     descricao: str = ""
     ncm: str = ""
     gtins: frozenset[str] = frozenset()
+    # os que o **documento** declarou, não o cadastro. Ver `_por_gtin`
+    gtins_do_xml: frozenset[str] = frozenset()
     entradas: Decimal = ZERO        # quantidade entrada no período, sem devolução
     saidas: Decimal = ZERO          # quantidade saída no período, sem devolução
     estoque_inicial: Decimal = ZERO  # abertura do inventário
@@ -261,22 +263,60 @@ def _descricao_sem_kit(descricao: str) -> str:
 # as ligações
 # ---------------------------------------------------------------------------
 def _por_gtin(itens: dict[str, ItemParaCasar]) -> list[_Ligacao]:
+    """Mesmo código de barras.
+
+    ## Dois GTIN de força diferente
+
+    O do **cadastro** (0200) é um campo que alguém digitou uma vez. Na empresa
+    04 ele trazia no `1114` ("GRECIN 5 PRETO") o GTIN do `1050` ("GRECIN TONS
+    DE GRISALHO"), e sozinho juntava seis produtos num. Por isso ele só liga
+    descrições compatíveis — metade das palavras em comum.
+
+    O do **documento** é o fornecedor declarando, na nota, qual é o código de
+    barras daquele item. Quando o mesmo GTIN aparece no XML dos **dois** lados,
+    são dois documentos independentes concordando, e a descrição não tem o que
+    acrescentar — nem o que vetar.
+
+    E vetava. Na empresa 26 eram **305 pares** recusados porque o fornecedor
+    abreviou o que o cliente escreveu por extenso, com NCM igual nos dois:
+
+        MARRETA 1,5 KG C/CABO TRAMONTINA  ↔  MARRETA C/CAB 1,5KG FORJ.OIT.TRAMO
+        LUVA PVC SOLDA REDUC AMANCO 50X25MM  ↔  AMANCO PR - LUVA RED SOLD 50X25MM
+
+    São o mesmo produto, e a regra escrita para proteger de um cadastro errado
+    estava reprovando o que dois documentos afirmavam. Medido nessa base: o
+    GTIN do cadastro e o do XML concordam em 7.381 linhas e divergem em 39 —
+    as 39 são exatamente o risco que a exigência de descrição cobre, e ela
+    continua cobrindo.
+
+    O kit segue de fora nos dois casos: embalagens diferentes do mesmo produto
+    compartilham código de barras, e o fator não sai daqui.
+    """
     por_gtin: dict[str, list[str]] = {}
     for codigo, item in itens.items():
-        for g in item.gtins:
+        for g in item.gtins | item.gtins_do_xml:
             if gtin_valido(g):
                 por_gtin.setdefault(g.lstrip("0"), []).append(codigo)
     ligacoes = []
     for gtin, codigos in por_gtin.items():
         codigos = sorted(set(codigos))
+        raiz = itens[codigos[0]]
         for outro in codigos[1:]:
+            item = itens[outro]
             # kit e unidade com o mesmo GTIN: o fator não sai daqui
-            if (fator_do_kit(itens[outro]) is None) != (fator_do_kit(itens[codigos[0]]) is None):
+            if (fator_do_kit(item) is None) != (fator_do_kit(raiz) is None):
                 continue
-            if not descricoes_compativeis(itens[outro].descricao, itens[codigos[0]].descricao):
+            nos_documentos = _declarado_no_xml(item, gtin) and _declarado_no_xml(raiz, gtin)
+            if not nos_documentos and not descricoes_compativeis(item.descricao, raiz.descricao):
                 continue
-            ligacoes.append(_Ligacao(outro, codigos[0], UM, Motivo.GTIN, f"GTIN {gtin}"))
+            detalhe = f"GTIN {gtin}" + (" nos dois documentos" if nos_documentos else "")
+            ligacoes.append(_Ligacao(outro, codigos[0], UM, Motivo.GTIN, detalhe))
     return ligacoes
+
+
+def _declarado_no_xml(item: ItemParaCasar, gtin: str) -> bool:
+    """Este GTIN veio do documento deste item, e não só do cadastro dele?"""
+    return any(gtin_valido(g) and g.lstrip("0") == gtin for g in item.gtins_do_xml)
 
 
 def _por_sufixo(itens: dict[str, ItemParaCasar]) -> list[_Ligacao]:

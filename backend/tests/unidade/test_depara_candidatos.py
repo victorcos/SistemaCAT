@@ -11,6 +11,7 @@ from cat.dominio.depara.candidatos import (
     Confianca,
     ItemParaCasar,
     Motivo,
+    descricoes_compativeis,
     fator_do_kit,
     gtin_valido,
     normalizar_codigo,
@@ -23,8 +24,9 @@ D = Decimal
 
 
 def item(codigo, entradas=0, saidas=0, descricao="", ncm="33059000", gtins=(), estoque=0,
-         dev_venda=0, dev_compra=0):
+         dev_venda=0, dev_compra=0, gtins_do_xml=()):
     return ItemParaCasar(codigo=codigo, descricao=descricao, ncm=ncm, gtins=frozenset(gtins),
+                         gtins_do_xml=frozenset(gtins_do_xml),
                          entradas=D(entradas), saidas=D(saidas), estoque_inicial=D(estoque),
                          devolucoes_de_venda=D(dev_venda), devolucoes_de_compra=D(dev_compra))
 
@@ -239,3 +241,68 @@ class TestOQueValeSozinho:
         for par in propor(BASE):
             if par.confianca is Confianca.MEDIA:
                 assert not vale_sozinho(par)
+
+
+class TestOGtinDoDocumentoValeMaisQueODoCadastro:
+    """Dois GTIN de força diferente, e a descrição só vigia um deles.
+
+    O do **cadastro** (0200) é um campo digitado uma vez: na empresa 04 ele
+    trazia no `1114` o GTIN do `1050`, e sozinho juntava seis produtos num. Por
+    isso ele continua só ligando descrições compatíveis.
+
+    O do **documento** é o fornecedor declarando na nota qual é o código de
+    barras do item. Com o mesmo GTIN no XML dos dois lados, são dois
+    documentos independentes concordando — e a exigência de descrição estava
+    reprovando 305 pares da empresa 26 porque o fornecedor abrevia o que o
+    cliente escreve por extenso.
+    """
+
+    MARRETA_SAIDA = "MARRETA 1,5 KG C/CABO TRAMONTINA UN"
+    MARRETA_ENTRADA = "MARRETA C/CAB 1,5KG FORJ.OIT.TRAMO"
+
+    def test_descricao_abreviada_nao_barra_quando_os_dois_documentos_dizem(self):
+        gtin = "7891114077087"
+        pares = pares_por_origem([
+            item("10057", saidas=9, descricao=self.MARRETA_SAIDA, ncm="82052000",
+                 gtins_do_xml={gtin}),
+            item("75375", entradas=4, descricao=self.MARRETA_ENTRADA, ncm="82052000",
+                 gtins_do_xml={gtin}),
+        ])
+        # o destino é onde se vende: o código da saída fica, o da compra é
+        # que vira origem
+        par = pares["75375"]
+        assert (par.destino, par.fator) == ("10057", D(1))
+        assert Motivo.GTIN in par.motivos
+        assert "nos dois documentos" in par.explicacao
+        # e a descrição realmente não passaria na exigência
+        assert not descricoes_compativeis(self.MARRETA_SAIDA, self.MARRETA_ENTRADA)
+
+    def test_gtin_so_do_cadastro_continua_exigindo_descricao(self):
+        """O caso da empresa 04: cadastro com o GTIN de outro produto."""
+        gtin = "7896014714025"
+        pares = pares_por_origem([
+            item("1114", saidas=9, descricao="GRECIN 5 PRETO", gtins={gtin}),
+            item("1050", entradas=3, descricao="GRECIN TONS DE GRISALHO", gtins={gtin}),
+        ])
+        assert "1114" not in pares and "1050" not in pares
+
+    def test_um_lado_so_no_cadastro_nao_basta(self):
+        """Dois documentos ou nenhum: um XML e um cadastro ainda é a palavra
+        de um documento contra um campo digitado."""
+        gtin = "7891114077087"
+        pares = pares_por_origem([
+            item("10057", saidas=9, descricao=self.MARRETA_SAIDA, gtins_do_xml={gtin}),
+            item("75375", entradas=4, descricao=self.MARRETA_ENTRADA, gtins={gtin}),
+        ])
+        assert pares == {}
+
+    def test_kit_continua_de_fora_mesmo_com_os_dois_documentos(self):
+        """Embalagens diferentes do mesmo produto dividem código de barras, e o
+        fator não sai do GTIN."""
+        gtin = "7891114077087"
+        pares = pares_por_origem([
+            item("1111", saidas=50, descricao="GRECIN 5 CAST. CLARO", gtins_do_xml={gtin}),
+            item("1111K3", entradas=8, descricao="GRECIN 5 CAST. CLARO KIT 3X",
+                 gtins_do_xml={gtin}),
+        ])
+        assert "gtin" not in [m.value for p in pares.values() for m in p.motivos]
