@@ -40,6 +40,7 @@ from cat.infraestrutura.analitico.confronto import (
 )
 from cat.infraestrutura.analitico.extracao import (
     Progresso,
+    arquivos_ausentes,
     extrair_efd,
     extrair_pasta,
 )
@@ -67,6 +68,27 @@ SEGUNDOS_ENTRE_AVISOS = 2.0
 
 class NadaParaConferir(ValueError):
     """O lote não tem o que confrontar."""
+
+
+class ArquivosDoLoteAusentes(RuntimeError):
+    """Arquivo registrado no lote não está mais no caminho gravado.
+
+    Por que isto interrompe a rodada em vez de seguir sem o arquivo: o
+    confronto responde "o que o cliente ainda não entregou", e essa resposta é
+    uma subtração. Quando parte do que ele entregou não é lida, a subtração não
+    dá um resultado parcial — dá um resultado **errado para o lado de cobrar a
+    mais**, e que parece bom, porque a lista fica maior e nada falha.
+
+    Aconteceu: no Amigão a pasta dos 94 relatórios de entrada saiu do
+    servidor. Cada leitura falhou, as falhas foram para `recusados`, e o resumo
+    guardava só as 20 primeiras, sem total. A rodada terminou "concluída" com
+    2,6 milhões de chaves a menos, e a lista cresceu 881.185 documentos que o
+    relatório do próprio cliente já cobria — uma planilha de 9 GB com cara de
+    certa.
+
+    O conserto é repor o arquivo ou tirar do trabalho o lote que morreu. As
+    duas coisas são decisão de quem conduz, não do sistema.
+    """
 
 
 def caminhos_do_projeto(
@@ -217,6 +239,42 @@ def executar(execucao_id: int) -> None:
                 )
 
 
+def _exigir_presenca(efd: list[str], relatorios: list[str]) -> None:
+    """Interrompe a rodada se um arquivo do lote sumiu do caminho registrado.
+
+    A mensagem diz **quantos, de que tipo e em que pasta** — porque "arquivo
+    não encontrado" sozinho não ajuda quem precisa decidir entre repor a pasta
+    e tirar o lote do trabalho.
+    """
+    faltando = {"EFD": arquivos_ausentes(efd),
+                "relatório gerencial": arquivos_ausentes(relatorios)}
+    total = sum(len(v) for v in faltando.values())
+    if not total:
+        return
+
+    partes: list[str] = []
+    for rotulo, lista in faltando.items():
+        if not lista:
+            continue
+        pastas = sorted({os.path.dirname(c) for c in lista})
+        partes.append(
+            f"{len(lista)} de {rotulo} em {len(pastas)} pasta(s): "
+            + "; ".join(pastas[:3]) + ("; ..." if len(pastas) > 3 else ""))
+    detalhe = " | ".join(partes)
+    log.error("arquivos do lote ausentes do disco",
+              extra={"total": total,
+                     "efd": len(faltando["EFD"]),
+                     "relatorios": len(faltando["relatório gerencial"]),
+                     "amostra": [os.path.basename(c)
+                                 for lista in faltando.values() for c in lista][:10]})
+    raise ArquivosDoLoteAusentes(
+        f"{total} arquivo(s) do lote não estão mais no caminho registrado "
+        f"({detalhe}). Sem eles o confronto cobraria do cliente documento que "
+        "ele já entregou. Reponha os arquivos ou remova do trabalho o lote que "
+        "aponta para eles, e rode de novo."
+    )
+
+
 def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     os.makedirs(destino, exist_ok=True)
     execucao.situacao = "rodando"
@@ -229,6 +287,13 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     xmls = caminhos_do_projeto(projeto_id, (TipoDeArquivo.XML_NFE, TipoDeArquivo.XML_COMPACTADO), sessao)
     relatorios = caminhos_do_projeto(
         projeto_id, (TipoDeArquivo.GERENCIAL_MOVIMENTO,), sessao)
+
+    # Antes de qualquer leitura: o que o lote promete ainda está no disco?
+    # Aqui, e não no fim, porque a resposta não melhora depois de 20 minutos de
+    # trabalho e o usuário merece saber antes de esperar por um resultado que
+    # não vai poder usar. Só EFD e relatório (centenas de arquivos); XML é
+    # conferido durante a leitura.
+    _exigir_presenca(efd, relatorios)
 
     execucao.arquivos_totais = len(efd) + contar_xml(xmls) + len(relatorios)
     sessao.commit()
@@ -331,8 +396,21 @@ def _serializar(resumo: ResumoDaConferencia, efd: Progresso,
     dados["cobertura"] = round(resumo.cobertura, 4)
     dados["avisos"] = resumo.avisos
     dados["andou"] = resumo.andou
-    dados["recusados"] = (efd.recusados + pasta.recusados)[:20]
+    recusados = efd.recusados + pasta.recusados
+    ausentes = efd.ausentes + pasta.ausentes
+    dados["recusados"] = recusados[:20]
     dados["observacoes"] = (efd.observacoes + pasta.observacoes)[:20]
+    # O TOTAL, e não só a amostra. Era o que faltava: 94 relatórios ilegíveis
+    # viraram 20 linhas sem contagem, e ninguém tinha como saber que eram 94.
+    dados["recusados_total"] = len(recusados)
+    dados["ausentes"] = ausentes[:20]
+    dados["ausentes_total"] = len(ausentes)
+    if ausentes:
+        dados["avisos"] = [
+            f"{len(ausentes)} arquivo(s) do lote não estavam mais no disco e "
+            "ficaram de fora — o que falta cobrar está SUPERESTIMADO.",
+            *dados["avisos"],
+        ]
     return dados
 
 

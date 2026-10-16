@@ -90,6 +90,15 @@ class Progresso:
     # `recusados` porque misturar as duas coisas transforma o bloco de erro
     # em ruído e esconde o arquivo que falhou de verdade
     observacoes: list[str] = field(default_factory=list)
+    # arquivo que está no lote mas não está mais no caminho registrado. Também
+    # separado, e pelo motivo mais duro de todos: no Amigão a pasta dos 94
+    # relatórios de entrada saiu do servidor, cada leitura falhou, as falhas
+    # foram para `recusados`, e o resumo guardava só as 20 primeiras — sem
+    # total. A rodada terminou "concluída" com 2,6 milhões de chaves a menos e
+    # cobrou do cliente 881.185 documentos que o relatório dele já cobria.
+    # Arquivo que desapareceu não é conteúdo ruim: é base incompleta, e muda o
+    # que o resultado significa.
+    ausentes: list[str] = field(default_factory=list)
 
     @property
     def fracao(self) -> float:
@@ -177,6 +186,18 @@ def _identificacao(caminho: str) -> tuple[str, date | None]:
     except (OSError, ArquivoNaoReconhecido):
         return "", None
     return (cabecalho.cnpj.valor if cabecalho.cnpj else ""), cabecalho.inicio
+
+
+def arquivos_ausentes(caminhos: list[str]) -> list[str]:
+    """Dos caminhos registrados no lote, os que não estão mais no disco.
+
+    Um `stat` por arquivo. Serve para os poucos e grandes — EFD e relatório
+    gerencial, da ordem de centenas —, não para as centenas de milhares de XML:
+    no `Z:` cada caminho novo custa 4 a 8 segundos, e varrer 100 mil arquivos
+    só para conferir presença levaria mais que a própria leitura. A ausência de
+    XML aparece durante a leitura, que os abre de todo jeito.
+    """
+    return [c for c in caminhos if not os.path.exists(c)]
 
 
 def extrair_efd(caminhos: list[str], destino: str,
@@ -332,6 +353,16 @@ def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
     for caminho in relatorios:
         nome = os.path.basename(caminho)
         motivos: Counter[SemChave] = Counter()
+        if not os.path.exists(caminho):
+            # não é "ilegível": é base incompleta. Vai para `ausentes`, que o
+            # caso de uso transforma em falha em vez de deixar passar.
+            progresso.ausentes.append(nome)
+            log.error("relatório do lote não está mais no caminho registrado",
+                      extra={"arquivo": nome, "caminho": caminho})
+            progresso.arquivos_lidos += 1
+            if avisar is not None:
+                avisar(progresso)
+            continue
         try:
             leitura = Leitura(caminho)
             # inventário e resumo não têm documento nem chave; passar por
