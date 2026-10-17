@@ -439,15 +439,39 @@ function Fato({
 /* ------------------------------------------------------------------ */
 
 /**
+ * A frente que **fixa** o tributo, quando ela o fixa.
+ *
+ * A CAT 42 é um instrumento de ICMS: não existe CAT 42 de IRPJ nem de
+ * PIS/COFINS. As outras frentes atravessam tributos — quebra de SPED serve aos
+ * quatro —, e lá a escolha continua de quem cria.
+ */
+export const MODULO_FIXO_DA_FRENTE: Partial<Record<Frente, string>> = {
+  cat42: "icms",
+};
+
+/**
  * O tributo que os próprios arquivos indicam, entre os que a pessoa enxerga.
  *
  * Antes vinha sempre ICMS, e quem enviava uma EFD-Contribuições para abrir um
  * trabalho de PIS/COFINS precisava trocar na mão — logo depois de ler na tela
  * que o arquivo "não serve". Sem indicação utilizável, mantém o ICMS, que é o
  * trabalho de todo projeto anterior a esta divisão.
+ *
+ * **A frente vem antes dos arquivos.** Em 17/10/2026 abriu-se um trabalho de
+ * CAT 42 e ele nasceu com módulo `irpj_csll`: a remessa tinha uma ECD, que
+ * atende PIS/COFINS e IRPJ/CSLL (`TiposDeArquivo`), e o primeiro da lista
+ * virou o padrão sem ninguém olhar a frente escolhida ao lado. O módulo decide
+ * as **etapas** (`Etapas.TrilhasDo`), então aquele trabalho nasceu sem razão
+ * dos itens, sem ST suportado e sem arquivo digital — a CAT 42 inteira.
  */
-function moduloPadrao(segmentos: Segmento[], atendidos: string[]): string {
+export function moduloPadrao(
+  segmentos: Segmento[],
+  atendidos: string[],
+  frente: Frente,
+): string {
   const meus = segmentos.flatMap((s) => s.modulos).map((m) => m.chave);
+  const fixo = MODULO_FIXO_DA_FRENTE[frente];
+  if (fixo && meus.includes(fixo)) return fixo;
   return (
     atendidos.find((m) => meus.includes(m)) ??
     (meus.includes("icms") ? "icms" : (meus[0] ?? "icms"))
@@ -499,7 +523,7 @@ function FormularioDeProjeto({
       .then((s) => {
         if (!vivo) return;
         setSegmentos(s);
-        const padrao = moduloPadrao(s, remessa.modulos_atendidos);
+        const padrao = moduloPadrao(s, remessa.modulos_atendidos, frente);
         setModulo(padrao);
         setNome((atual) => (nomeDigitado ? atual : nomeSugerido(padrao, ano)));
       })
@@ -515,6 +539,24 @@ function FormularioDeProjeto({
     setModulo(chave);
     if (!nomeDigitado) setNome(nomeSugerido(chave, ano));
   }
+
+  /**
+   * Trocar a frente arrasta o tributo quando a frente o fixa.
+   *
+   * A ordem natural é escolher a frente e depois olhar o resto — e era aí que
+   * o trabalho de CAT 42 saía com o tributo que os arquivos tinham sugerido na
+   * montagem da tela. Quem escolheu "CAT 42" não tinha como saber que o campo
+   * ao lado era independente.
+   */
+  function escolherFrente(nova: Frente) {
+    setFrente(nova);
+    const fixo = MODULO_FIXO_DA_FRENTE[nova];
+    if (fixo && fixo !== modulo && moduloDisponivel(fixo)) escolherModulo(fixo);
+  }
+
+  const moduloDisponivel = (chave: string) =>
+    segmentos.some((s) => s.modulos.some((m) => m.chave === chave));
+  const moduloEstaFixo = MODULO_FIXO_DA_FRENTE[frente] !== undefined;
   // as competências já vêm dos arquivos: é o período que existe de fato
   const [ini, setIni] = useState(paraTextoOuVazio(remessa.primeira_competencia));
   const [fim, setFim] = useState(paraTextoOuVazio(remessa.ultima_competencia));
@@ -569,7 +611,11 @@ function FormularioDeProjeto({
       >
         <Campo
           rotulo="Tributo"
-          dica="Decide as etapas do trabalho: ICMS percorre a CAT 42; PIS/COFINS, a quebra de SPED."
+          dica={
+            moduloEstaFixo
+              ? `A ${FRENTES[frente].split(" —")[0]} é um instrumento de ICMS: o tributo vem dela.`
+              : "Decide as etapas do trabalho: ICMS percorre a CAT 42; PIS/COFINS, a quebra de SPED."
+          }
         >
           {(props) => (
             <Combobox
@@ -579,13 +625,13 @@ function FormularioDeProjeto({
                 s.modulos.map((m) => ({ valor: m.chave, rotulo: m.rotulo })),
               )}
               aoMudar={escolherModulo}
-              disabled={segmentos.length === 0}
+              disabled={segmentos.length === 0 || moduloEstaFixo}
             />
           )}
         </Campo>
         <Campo rotulo="Frente de trabalho">
           {(props) => (
-            <Combobox {...props} valor={frente} opcoes={OPCOES_DE_FRENTE} aoMudar={setFrente} />
+            <Combobox {...props} valor={frente} opcoes={OPCOES_DE_FRENTE} aoMudar={escolherFrente} />
           )}
         </Campo>
         <Campo rotulo="Nome do trabalho">
