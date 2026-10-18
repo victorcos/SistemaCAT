@@ -99,16 +99,42 @@ _CLASSIFICACAO = {
 
 # o que o XML acrescenta a cada movimento. Vazio quando não há XML do documento
 # ou quando o item do XML não é o mesmo do C170
-_COLUNAS_DO_XML = """
-    x.arquivo AS arquivo_xml, x.codigo AS codigo_xml, x.gtin AS gtin_xml,
-    x.descricao AS descricao_xml, x.ncm AS ncm_xml, x.cest AS cest_xml,
-    x.unidade AS unidade_xml, x.quantidade AS quantidade_xml,
-    x.valor_icms AS valor_icms_xml, x.bc_st AS bc_st_xml, x.valor_st AS valor_st_xml,
-    x.base_do_item AS base_do_item_xml, x.aliquota_efetiva AS aliquota_efetiva_xml,
-    x.reducao_declarada AS reducao_declarada_xml,
-    x.fcp_st AS fcp_st_xml, x.retido_informado AS retido_xml,
-    x.consumidor_final AS consumidor_final_xml
-"""
+# (coluna em `xml_itens`, nome na saída). É uma lista e não SQL escrito à mão
+# porque as colunas saem de duas formas — cruas na perna do XML e condicionais
+# na perna da EFD —, e duas listas escritas à mão divergiriam no dia em que
+# alguém acrescentasse uma coluna numa só.
+_DO_XML = (
+    ("arquivo", "arquivo_xml"), ("codigo", "codigo_xml"), ("gtin", "gtin_xml"),
+    ("descricao", "descricao_xml"), ("ncm", "ncm_xml"), ("cest", "cest_xml"),
+    ("unidade", "unidade_xml"), ("quantidade", "quantidade_xml"),
+    ("valor_icms", "valor_icms_xml"), ("bc_st", "bc_st_xml"), ("valor_st", "valor_st_xml"),
+    ("base_do_item", "base_do_item_xml"), ("aliquota_efetiva", "aliquota_efetiva_xml"),
+    ("reducao_declarada", "reducao_declarada_xml"),
+    ("fcp_st", "fcp_st_xml"), ("retido_informado", "retido_xml"),
+    ("consumidor_final", "consumidor_final_xml"),
+)
+_COLUNAS_DO_XML = ",\n    ".join(f"x.{coluna} AS {nome}" for coluna, nome in _DO_XML)
+
+# O que decide se o item do XML cola no C170: o número do item casa, e a
+# quantidade ou o valor confirmam — ou, sem nenhum dos dois, a nota tem um item
+# só nos dois lados.
+#
+# **Isto fica FORA da cláusula ON, de propósito.** O DuckDB não extrai as
+# igualdades quando o ON é `(eq AND eq) AND (OR ...)`: o EXPLAIN mostrava
+# `BLOCKWISE_NL_JOIN` de 10.107.934 x 1.053.058 linhas — laço aninhado, 10¹³
+# comparações, que na empresa 12 não terminou em 3h19 a 400% de CPU e sem
+# escrever um byte. Com a igualdade sozinha no ON o plano vira `HASH_JOIN`, e a
+# condição decide aqui se o item vale ou se as colunas do XML saem nulas.
+#
+# Seguro porque `(chave, numero_item)` é ÚNICO em `xml_itens` — conferido:
+# 1.053.058 linhas para 1.053.058 pares distintos —, então o join não
+# multiplica linha e nular a coluna dá o mesmo resultado que não casar.
+_O_ITEM_COLA = """(abs(x.quantidade - m.quantidade) <= 0.001
+         OR abs(x.valor - m.valor) <= 0.01
+         OR (m._itens_na_efd = 1 AND m._itens_no_xml = 1))"""
+_COLUNAS_DO_XML_SE_COLA = ",\n    ".join(
+    f"CASE WHEN {_O_ITEM_COLA} THEN x.{coluna} END AS {nome}"
+    for coluna, nome in _DO_XML)
 
 # o primeiro dígito do CFOP, do lado de quem emitiu para o de quem recebeu
 _VIRAR_CFOP = """
@@ -272,17 +298,37 @@ def _preparar_xml(con, destino: str, p) -> None:
     # a PRIMEIRA das três passadas não terminou em duas horas: 400% de CPU,
     # memória colada no teto de 4 GB e nenhum byte escrito. Materializar paga
     # a junção uma vez, e as duas leituras seguintes são varredura de tabela.
+    # **As contagens entram como COLUNA do movimento, antes do join.** Elas são
+    # usadas na condição do `LEFT JOIN xml_itens`, e enquanto vinham de dois
+    # outros joins (`ce`, `cx`) o OR referenciava três relações ao mesmo tempo —
+    # o DuckDB não podia usar a igualdade `(chave, numero_item)` como hash join
+    # e caía em laço aninhado.
+    #
+    # Medido na empresa 12: 10.107.934 movimentos contra 1.053.058 itens de XML,
+    # com `(chave, numero_item)` ÚNICO do lado do XML e só 847.013 movimentos
+    # com chave que existe lá. Um hash join nesses números é questão de
+    # segundos; o laço aninhado seria 10¹³ comparações, e de fato não terminou
+    # em 3h19 — 400% de CPU e nenhum byte escrito. Com a contagem já na tabela,
+    # o OR só fala de `m` e de `x`, e o plano volta a ser hash join.
     comeco = time.time()
     con.execute(f"""
-        CREATE TABLE movimentos_com_xml AS
-        SELECT m.*, 'efd' AS fonte_item, {_COLUNAS_DO_XML}
+        CREATE TABLE movimentos_contados AS
+        SELECT m.*, ce.itens AS _itens_na_efd, cx.itens AS _itens_no_xml
         FROM read_parquet('{p(ARQUIVO_MOVIMENTOS_BRUTOS)}') m
         LEFT JOIN efd_contagem ce ON ce.cnpj = m.cnpj AND ce.chave = m.chave
         LEFT JOIN xml_contagem cx ON cx.chave = m.chave
+    """)
+    log.info("movimentos com as contagens ao lado",
+             extra={"segundos": round(time.time() - comeco, 1)})
+
+    comeco = time.time()
+    con.execute(f"""
+        CREATE TABLE movimentos_com_xml AS
+        SELECT m.* EXCLUDE (_itens_na_efd, _itens_no_xml),
+               'efd' AS fonte_item, {_COLUNAS_DO_XML_SE_COLA}
+        FROM movimentos_contados m
         LEFT JOIN xml_itens x
                ON x.chave = m.chave AND x.numero_item = m.numero_item
-              AND (abs(x.quantidade - m.quantidade) <= 0.001 OR abs(x.valor - m.valor) <= 0.01
-                   OR (ce.itens = 1 AND cx.itens = 1))
         UNION ALL BY NAME
         SELECT d.cnpj, d.competencia, d.arquivo, d.chave, d.modelo, d.situacao,
                d.numero_documento, d.serie, d.data, d.operacao, d.emitente, d.participante,
