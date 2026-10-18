@@ -59,6 +59,7 @@ contagens do resumo saem dos parquets já gravados, uma varredura cada.
 from __future__ import annotations
 
 import os
+import time
 from decimal import Decimal
 
 from cat.dominio.icms.cat42.conferencia import Fatia
@@ -260,8 +261,20 @@ def _preparar_xml(con, destino: str, p) -> None:
         SEMI JOIN xml_contagem k ON k.chave = m.chave
         GROUP BY m.cnpj, m.chave
     """)
+    # **Tabela, e não view.** Esta junção é consumida três vezes no
+    # `consolidar`: a contagem de canceladas logo abaixo, as
+    # `chaves_dos_movimentos` e o COPY que grava `movimentos.parquet`. Como
+    # view, ela era recalculada em cada uma delas — e o `LEFT JOIN xml_itens`
+    # tem um OR sobre `ce.itens`/`cx.itens`, colunas de outros dois joins, o
+    # que impede o DuckDB de resolver como hash join limpo.
+    #
+    # Na base da empresa 12 (44,6 milhões de documentos, 79 estabelecimentos),
+    # a PRIMEIRA das três passadas não terminou em duas horas: 400% de CPU,
+    # memória colada no teto de 4 GB e nenhum byte escrito. Materializar paga
+    # a junção uma vez, e as duas leituras seguintes são varredura de tabela.
+    comeco = time.time()
     con.execute(f"""
-        CREATE VIEW movimentos_com_xml AS
+        CREATE TABLE movimentos_com_xml AS
         SELECT m.*, 'efd' AS fonte_item, {_COLUNAS_DO_XML}
         FROM read_parquet('{p(ARQUIVO_MOVIMENTOS_BRUTOS)}') m
         LEFT JOIN efd_contagem ce ON ce.cnpj = m.cnpj AND ce.chave = m.chave
@@ -285,6 +298,10 @@ def _preparar_xml(con, destino: str, p) -> None:
         LEFT JOIN cfop_do_analitico ca ON ca.cnpj = d.cnpj AND ca.chave = d.chave
         -- as colunas das contagens não entram: são só do lado da EFD
     """)
+    linhas = con.execute("SELECT count(*) FROM movimentos_com_xml").fetchone()[0]
+    log.info("movimentos com XML materializados",
+             extra={"linhas": linhas, "segundos": round(time.time() - comeco, 1)})
+
     # a nota cancelada na SEFAZ não tem operação: sai da movimentação e fica
     # contada — aqui, antes que o intermediário da EFD seja apagado
     con.execute("""
