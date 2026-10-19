@@ -8,6 +8,7 @@ do cupom nas observações do fisco e a origem com maiúscula no CF-e.
 
 from datetime import date
 from decimal import Decimal
+import xml.etree.ElementTree as ET
 
 import pytest
 
@@ -217,6 +218,40 @@ class TestOQueNaoEDocumento:
             latin1.decode("utf-8")
         assert ler_documento_xml(latin1).itens[0].descricao.startswith("GRECIN Nº 5")
 
+    def test_namespace_serializado_como_elemento(self):
+        """O download manual do meudanfe põe um `<xmlns:ns0>` dentro do protNFe.
+
+        `xmlns` não é prefixo declarável como elemento: sem o conserto o parser
+        para em "unbound prefix" e a nota inteira some da apuração.
+        """
+        intruso = b"<xmlns:ns0>http://www.w3.org/2000/09/xmldsig#</xmlns:ns0>"
+        quebrado = nfe(ITEM_CST00).replace(b"<protNFe versao=\"4.00\">",
+                                           b"<protNFe versao=\"4.00\">" + intruso)
+        with pytest.raises(ET.ParseError, match="unbound prefix"):
+            ET.fromstring(quebrado)
+        doc = ler_documento_xml(quebrado)
+        assert doc.chave == CHAVE_NFE
+        assert doc.autorizado is True          # o protocolo continua legível
+        assert len(doc.itens) == 1
+
+    def test_namespace_intruso_fechado_em_si(self):
+        quebrado = nfe(ITEM_CST00).replace(b"<protNFe versao=\"4.00\">",
+                                           b"<protNFe versao=\"4.00\"><xmlns:ns0/>")
+        assert ler_documento_xml(quebrado).chave == CHAVE_NFE
+
+    def test_os_dois_defeitos_no_mesmo_arquivo(self):
+        """Latin-1 declarado como UTF-8 E o namespace intruso, juntos."""
+        quebrado = (nfe(ITEM_CST00)
+                    .replace(b"GRECIN 5 CAST. CLARO", "GRECIN Nº 5".encode("latin-1"))
+                    .replace(b"<protNFe versao=\"4.00\">",
+                             b"<protNFe versao=\"4.00\"><xmlns:ns0>x</xmlns:ns0>"))
+        assert ler_documento_xml(quebrado).itens[0].descricao.startswith("GRECIN Nº 5")
+
     def test_xml_quebrado(self):
         with pytest.raises(XmlIlegivel):
             ler_documento_xml(b"<nfeProc><NFe>")
+
+    def test_o_erro_relatado_e_o_do_arquivo_original(self):
+        """Não o do conserto: senão quem lê o log vai atrás do sintoma errado."""
+        with pytest.raises(XmlIlegivel, match="unbound prefix"):
+            ler_documento_xml(b"<nfeProc><xmlns:ns0>x</xmlns:ns0><NFe>")

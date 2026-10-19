@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -255,23 +256,57 @@ def ler_documento_xml(conteudo: bytes) -> DocumentoXml | None:
     return None
 
 
-def _raiz(conteudo: bytes) -> ET.Element:
-    """O XML aberto. Declarado UTF-8 e gravado em Latin-1 é relido como Latin-1.
+# Atributo de namespace serializado como ELEMENTO, dentro do `<protNFe>`:
+#
+#     quebrado  <protNFe><xmlns:ns0>http://www.w3.org/2000/09/xmldsig#</xmlns:ns0><infProt>
+#     bom       <protNFe><infProt>
+#
+# `xmlns` não é prefixo declarável como elemento, então o parser para em
+# "unbound prefix" e a nota inteira se perde. O trecho não carrega dado fiscal:
+# é a URI do xmldsig que vazou para o corpo. Visto no XML baixado **à mão** pelo
+# site do meudanfe.com.br — 3 de 13 arquivos; nos 2.201 baixados pelo caminho
+# automático, nenhum (medido em 19/10/2026).
+_NAMESPACE_COMO_ELEMENTO = re.compile(
+    rb"<(xmlns:[A-Za-z0-9_.-]+)(?:\s*/>|>[^<]*</\1>)")
 
-    Na empresa 04, 13.676 NF-e diziam `encoding="UTF-8"` e traziam o `º` de
-    "nº" num byte só (0xBA), escrito pelo ERP no `infAdProd`. O documento está
-    inteiro; só a declaração mente.
+
+def _consertos(conteudo: bytes) -> Iterator[bytes]:
+    """Cada defeito de origem conhecido, numa tentativa. O original já falhou.
+
+    São defeitos de quem **gerou** o arquivo, não da nota: em todos eles o
+    documento fiscal está inteiro e só a serialização está errada. Consertar é
+    o que separa a nota entrar na apuração de ela sumir sem deixar rastro.
+    """
+    bases = [conteudo]
+    try:
+        conteudo.decode("utf-8")
+    except UnicodeDecodeError:
+        # declarado UTF-8 e gravado em Latin-1. Na empresa 04, 13.676 NF-e
+        # diziam `encoding="UTF-8"` e traziam o `º` de "nº" num byte só
+        # (0xBA), escrito pelo ERP no `infAdProd`. Só a declaração mente.
+        recodificado = conteudo.decode("latin-1").encode("utf-8")
+        bases.append(recodificado)
+        yield recodificado
+    for base in bases:
+        limpo, quantos = _NAMESPACE_COMO_ELEMENTO.subn(b"", base)
+        if quantos:
+            yield limpo
+
+
+def _raiz(conteudo: bytes) -> ET.Element:
+    """O XML aberto, consertando os defeitos de serialização conhecidos.
+
+    Ver `_consertos`. Só o erro do arquivo ORIGINAL é relatado: dizer que o
+    conserto também falhou mandaria quem lê atrás do sintoma, e não da causa.
     """
     try:
         return ET.fromstring(conteudo)
     except ET.ParseError as erro:
-        try:
-            conteudo.decode("utf-8")
-        except UnicodeDecodeError:
+        for tentativa in _consertos(conteudo):
             try:
-                return ET.fromstring(conteudo.decode("latin-1").encode("utf-8"))
+                return ET.fromstring(tentativa)
             except ET.ParseError:
-                pass
+                continue
         raise XmlIlegivel(str(erro)) from erro
 
 
