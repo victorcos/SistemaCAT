@@ -184,3 +184,21 @@ def test_bloco_a_so_da_versao_escolhida_e_so_da_raiz_pedida(tmp_path):
     assert i.db.execute("SELECT COUNT(*) FROM bloco_a").fetchone()[0] == 1
     # a outra raiz fica para depois, e entra quando pedida
     assert i.ler_blocos_a() == 1
+
+
+def test_arquivo_entre_64_e_128_kb_tem_o_fim_lido(tmp_path):
+    # 400 notas de serviço põem o arquivo no meio da faixa que perdia o fim
+    corpo = ["|A001|0|", f"|A010|{CNPJ}|"]
+    for n in range(400):
+        corpo += [f"|A100|1|0|P1|00|1||{n}|NFSE{n}|01012024|01012024|100,00|0|0|100,00|1,65|100,00|7,60|0|0|5,00|",
+                  "|A170|1|S1|SERVICO DE TESTE COM DESCRICAO|100,00|0|||01|100,00|1,65|1,65|01|100,00|7,6|7,60||"]
+    corpo += [f"|A990|{len(corpo) + 1}|", "|C001|1|", "|C990|2|"]
+    b = _sped(corpo)
+    assert inv.TRECHO < len(b) <= 2 * inv.TRECHO
+    raiz = tmp_path / "r"
+    raiz.mkdir()
+    (raiz / "medio.txt").write_bytes(b)
+    banco = str(tmp_path / "i.sqlite")
+    ferramenta.main(["varrer", "--inventario", banco, "--raiz", str(raiz)])
+    assert sqlite3.connect(banco).execute(
+        "SELECT completo, assinado, qtd_a100 FROM arquivo").fetchone() == (1, 1, 400)
