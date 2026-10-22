@@ -97,7 +97,7 @@ def bloco_a(a: argparse.Namespace) -> int:
     t0 = time.perf_counter()
     with contexto(etapa="bloco_a"):
         try:
-            lidos = inv.ler_blocos_a()
+            lidos = inv.ler_blocos_a(a.raiz or None)
         except (Interrompida, KeyboardInterrupt):
             print("interrompida: rode de novo, o que já foi lido não se relê")
             return 3
@@ -129,6 +129,8 @@ def main(argv: list[str] | None = None) -> int:
     b = sub.add_parser("bloco-a", help="ler até o A990 quem declara A100")
     b.add_argument("--inventario", required=True)
     b.add_argument("--limite-segundos", type=float)
+    b.add_argument("--raiz", action="append", default=[],
+                   help="só os arquivos que vieram desta raiz (prefixo; repetível)")
     b.set_defaults(func=bloco_a)
     r = sub.add_parser("relatorio", help="um CNPJ por linha, em ordem de potencial")
     r.add_argument("--inventario", required=True)
