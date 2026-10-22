@@ -169,3 +169,18 @@ def test_relatorio_por_cnpj(tmp_path):
     assert linha["a100_declarados"] == "4" and linha["copias_redundantes"] == "1"
     assert linha["a100_saida_tributada"] == "2" and linha["vl_iss_saida_no_sped"] == "50.00"
     assert linha["saidas_sem_iss_no_sped"] == "1" and linha["periodos_incompletos"] == "2024-04"
+
+
+def test_bloco_a_so_da_versao_escolhida_e_so_da_raiz_pedida(tmp_path):
+    raiz = _rede(tmp_path)
+    outra = tmp_path / "outra"
+    outra.mkdir()
+    (outra / "jan.txt").write_bytes(_sped(BLOCO_A, inicio="01052024", fim="31052024"))
+    banco = str(tmp_path / "inv.sqlite")
+    ferramenta.main(["varrer", "--inventario", banco, "--raiz", str(raiz), "--raiz", str(outra)])
+    i = inv.Inventario(banco)
+    # jan.txt e a cópia dele têm o mesmo conteúdo: só um é lido
+    assert i.ler_blocos_a([str(raiz)]) == 1
+    assert i.db.execute("SELECT COUNT(*) FROM bloco_a").fetchone()[0] == 1
+    # a outra raiz fica para depois, e entra quando pedida
+    assert i.ler_blocos_a() == 1

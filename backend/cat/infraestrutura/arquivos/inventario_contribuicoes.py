@@ -403,12 +403,22 @@ class Inventario:
             [d.get(k) for k in _COLUNAS] + [self.execucao_id, self.execucao_id])
 
     # ---------- bloco A ----------
-    def ler_blocos_a(self) -> int:
-        """Lê até o A990 cada arquivo escolhido que declara A100. Devolve quantos leu."""
+    def ler_blocos_a(self, raizes: list[str] | None = None) -> int:
+        """Lê até o A990 cada arquivo escolhido que declara A100. Devolve quantos leu.
+
+        Só a versão que `versoes` escolheu para o período: ler a cópia e a
+        original substituída custaria um quinto a mais e não mudaria o
+        relatório, que só olha a escolhida. `raizes` restringe a quem veio
+        delas — para priorizar um compartilhamento sem ler o outro.
+        """
+        escolhidos = {v["arquivo"] for v in versoes(self.db)
+                      if not raizes or any(v["raiz"].startswith(r) for r in raizes)}
         lidos = 0
         for caminho, tamanho, mtime in self.db.execute(
                 "SELECT caminho, tamanho, mtime FROM arquivo WHERE tipo = 'efd_contribuicoes' "
                 "AND status = 'ok' AND qtd_a100 > 0 AND caminho NOT LIKE '%!%'").fetchall():
+            if caminho not in escolhidos:
+                continue
             feito = self.db.execute("SELECT tamanho, mtime FROM bloco_a WHERE caminho = ?",
                                     (caminho,)).fetchone()
             if feito and feito[0] == tamanho and abs(feito[1] - mtime) < 1e-3:
