@@ -311,6 +311,14 @@ Em ordem de prioridade. Cada item entra com decisão registrada em DECISOES.md.
 - [ ] Ler a **NFS-e** para o 933: o XML (INF/SERVICO/VALORES) e o leiaute do
       município de São Paulo, de onde sai o ISS que a escrituração não trouxe.
       Sem isso a tese só alcança quem preencheu o A100 — 1 de 33 notas na empresa 05
+- [x] **Triagem da rede para o 933** (`tools/triagem_contribuicoes.py`): diz em
+      que CNPJ e competência há ISS de saída, antes de cadastrar lote. Lê o 9900
+      no fim do arquivo (A100 sem abrir o resto) e só o bloco A até o A990 de quem
+      tem. Conferida contra o 933 na empresa 23: 31 saídas, R$ 6.412,74 de ISS
+- [ ] Varredura completa da rede com a triagem (escopo a definir: Z:, Y: ou lista
+      de clientes) e o ranking de clientes que sai dela
+- [ ] Parar no A990 dentro do próprio 933: hoje ele lê o arquivo inteiro, e o
+      bloco A acaba nos primeiros MB (1,1 GB em 17 s contra 9,5 MB em 0,29 s)
 - [ ] Varrer os outros motores atrás do mesmo descuido do `C010`: documento que
       fica em buffer e é emitido **depois** de o bloco seguinte já ter trocado o
       estabelecimento. Custou 61 linhas no 903 e estava latente no 037; a 047 já

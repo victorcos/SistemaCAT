@@ -5,6 +5,47 @@
 
 ---
 
+## 2026-10-22 — A triagem da rede aponta; quem calcula continua sendo o 933
+
+**A pergunta.** Um prompt mestre pedia um sistema novo — scanner de rede,
+parser, consolidação, motor de oportunidade, cálculo e relatório — para tirar
+o ISS da saída da base do PIS/COFINS. Medido o que já existe, só uma parte
+faltava: o 933 lê, calcula e entrega, mas **só no lote que alguém cadastrou**.
+Ninguém sabia em qual das centenas de pastas da rede valia cadastrar.
+
+**A decisão.** Uma ferramenta de triagem (`tools/triagem_contribuicoes.py` e
+`infraestrutura/arquivos/inventario_contribuicoes.py`), e nada além dela. Não
+há segundo parser, segundo motor nem segundo relatório: a triagem diz *onde*, e
+o 933 diz *quanto*. Ela confere com ele — na empresa 23, 31 saídas tributadas e
+R$ 6.412,74 de ISS, os dois.
+
+**Três leituras, cada uma mais cara.** A varredura lê 64 KB do começo e 64 KB
+do fim de cada arquivo: o 0000 identifica, e o **9900**, logo antes do 9999,
+diz quantos A100 há sem abrir o meio. Quem tem A100 tem o bloco A lido **até o
+A990** — o bloco vem logo depois do 0, então são MB e não GB. O 933 fica para o
+lote.
+
+**O inventário é SQLite local, não Postgres.** É cache de leitura, como o
+índice da quebra (22/09/2026): ninguém decide sobre ele, e apagado se refaz.
+
+**O que a rede real ensinou** (6.053 arquivos, empresas 21, 23 e 24):
+
+* o SPED transmitido traz **assinatura binária depois do 9999** (~8 KB);
+  procurar o 9999 na última linha dava a base inteira como cortada;
+* `os.walk` + `os.stat` **perde caminho acima de 260 caracteres** calado — 65
+  arquivos e 34,6 GB na empresa 23. Daí `DirEntry.stat()` e `\\?\UNC\`;
+* sha256 completo na varredura custaria 85 GB pela rede só nas colisões; a
+  impressão usa os dois trechos já lidos;
+* um quinto dos SPED são cópias, e há **dois conteúdos de retificadora** para
+  o mesmo mês (empresa 23, 01–03/2025). A triagem sugere a mais nova pelo nome
+  e marca revisão — escolher sozinha seria decidir o que é de quem transmitiu.
+
+**Medido:** varredura de 5.099 candidatos em 22 s com o servidor em cache
+(214 s a frio), reexecução sem mudança em 0,7 s, bloco A de um arquivo de 1,1 GB
+em 0,29 s.
+
+---
+
 ## 2026-10-14 — O download voltou a escolher a pasta
 
 Em 02/10 (`08ad378`) o download de planilha passou a ser do **navegador**: um
