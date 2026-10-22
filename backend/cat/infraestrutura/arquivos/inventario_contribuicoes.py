@@ -342,12 +342,15 @@ class Inventario:
         tamanho = base["tamanho"]
         try:
             with open(caminho_longo(base["caminho"]), "rb") as f:
-                comeco = f.read(TRECHO)
                 if tamanho > 2 * TRECHO:
+                    comeco = f.read(TRECHO)
                     f.seek(-TRECHO, os.SEEK_END)
                     fim = f.read(TRECHO)
                 else:
-                    fim = comeco
+                    # até 128 KB lê-se tudo: com um trecho só, o arquivo de 64 a
+                    # 128 KB ficava sem o fim — sem 9999 e sem a contagem do 9900.
+                    # É a faixa da EFD de empresa pequena, e ela sumia da triagem
+                    comeco = fim = f.read()
         except OSError as erro:
             self._erro(base["caminho"], "ler_trechos", erro)
             self._gravar({**base, "status": "ilegivel", "motivo": str(erro)})
