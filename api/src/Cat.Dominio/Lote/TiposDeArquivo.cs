@@ -36,6 +36,8 @@ public static class TiposDeArquivo
         Novo("gerencial_resumo", "Resumo por produto"),
         Novo("cat42_arquivo_digital", "Arquivo digital da CAT 42"),
         Novo("lista_de_canceladas", "Lista de notas canceladas", Icms),
+        Novo("reforma_base_custeada", "Saídas custeadas (reforma)", Cbs, Ibs),
+        Novo("reforma_classificacao", "Classificação de itens (reforma)", Cbs, Ibs),
         Novo("compactado", "Compactado"),
         Novo("nao_baixado", "Não baixado do OneDrive"),
         Novo("desconhecido", "Não reconhecido"),
@@ -47,6 +49,9 @@ public static class TiposDeArquivo
     private const string Icms = Segmentos.Icms;
     private const string PisCofins = Segmentos.PisCofins;
     private const string IrpjCsll = Segmentos.IrpjCsll;
+    // módulos, não segmentos: a reforma mora dentro de PIS/COFINS e de ICMS
+    private const string Cbs = "cbs";
+    private const string Ibs = "ibs";
 
     /// <summary>
     /// Útil é sempre em relação ao trabalho, nunca no absoluto. A EFD Contribuições

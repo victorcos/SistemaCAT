@@ -198,6 +198,17 @@ public static class Etapas
             "É o item que a EFD não traz na saída própria, e o CST que o C170 " +
             "consolidado esconde.",
             Implementada: true, Aba: "Quebra XML"),
+
+        // ---- reforma (CBS e IBS) ----
+        new("simulacao_reforma", "Simular a reforma tributária",
+            "Projeta cada linha de venda de 2025 a 2033 com ICMS, PIS/COFINS, CBS, IBS e " +
+            "Imposto Seletivo lado a lado, com preço e volume constantes: o que a transição " +
+            "faz com a margem. Lê as saídas já custeadas e a classificação dos itens (NCM " +
+            "revisada e cClassTrib) do lote. Sai a DRE de cada ano, a composição do CMV e as " +
+            "visões por grupo de alíquota, UF, mês, capítulo e posição da NCM, categoria do " +
+            "IS, família e SKU. Item sem classificação fica fora da conta, com a receita dita " +
+            "— nunca com alíquota padrão chutada.",
+            Implementada: true, Aba: "Simulação"),
     ];
 
     /// <summary>
@@ -228,6 +239,20 @@ public static class Etapas
     /// <param name="Sigla">o quadrado do card, como no hub: "C42", "OUT".</param>
     public sealed record Trilha(string Chave, string Rotulo, string Sigla, string Descricao,
         IReadOnlyList<string> Etapas);
+
+    private static readonly IReadOnlyList<Trilha> TrilhasDaReforma =
+    [
+        new("importar", "Importar arquivos", "BASE",
+            "Apontar a pasta com as saídas custeadas e a classificação dos itens, e registrar "
+            + "o lote. Pode voltar quantas vezes o cliente mandar arquivo — o ano-calendário "
+            + "inteiro entra como várias competências do mesmo lote.",
+            ["importar"]),
+        new("simulacao_reforma", "Simulação da reforma", "REF",
+            "De 2025 a 2033, com preço e volume constantes: lucro bruto, margem e carga ano a "
+            + "ano, a DRE reconciliada e as visões por grupo, UF, capítulo, categoria do IS e "
+            + "SKU. As alíquotas do IS e a referência de 26,5% são hipóteses.",
+            ["simulacao_reforma"]),
+    ];
 
     /// <summary>
     /// As frentes de trabalho de cada módulo, na ordem em que aparecem.
@@ -321,6 +346,13 @@ public static class Etapas
                     + "mandar arquivo.",
                     ["importar"]),
             ],
+            // A simulação aparece nos dois módulos da reforma, e é a mesma nos dois:
+            // ela não apura um tributo, põe os cinco lado a lado. Quem abre a CBS e
+            // quem abre o IBS procuram a mesma resposta — o que a transição faz com
+            // a margem —, e cada um a encontra onde procura. Antes de 23/10/2026 os
+            // dois módulos não tinham trilha e caíam nas da CAT 42.
+            ["cbs"] = TrilhasDaReforma,
+            ["ibs"] = TrilhasDaReforma,
         };
 
     /// <summary>As frentes do módulo. Módulo desconhecido cai no de ICMS.</summary>

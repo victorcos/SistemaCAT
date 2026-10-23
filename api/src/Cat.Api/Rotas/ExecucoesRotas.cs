@@ -61,6 +61,8 @@ public static class ExecucoesRotas
             "quebrar os XML");
         Etapa(api, Execucoes.Combustivel, "combustivel", detalheExigeEtapa: true,
             "apurar o crédito de combustível");
+        Etapa(api, Execucoes.SimulacaoReforma, "simulacao-reforma", detalheExigeEtapa: true,
+            "simular a reforma tributária");
 
         // o catálogo de colunas do XML não depende de execução: é o que a
         // planilha sabe produzir, e a tela precisa dele antes de existir rodada

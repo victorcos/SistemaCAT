@@ -70,6 +70,8 @@ public static class Segmentos
     {
         PisCofins => "Falta a EFD-Contribuições, a ECD, a EFD ICMS/IPI ou o XML das notas.",
         IrpjCsll => "Falta a ECF ou a ECD.",
+        "cbs" or "ibs" => "Falta a planilha de saídas custeadas ou a classificação de itens " +
+                          "(NCM revisada e cClassTrib).",
         _ => "Falta a EFD ICMS/IPI, o XML das notas ou o relatório gerencial.",
     };
 

@@ -149,6 +149,8 @@ public sealed class Execucoes(
     public const string Exclusoes = "exclusoes";
     public const string QuebraXml = "quebra_xml";
     public const string Combustivel = "combustivel";
+    /// <summary>A simulação da reforma: a mesma nos módulos CBS e IBS.</summary>
+    public const string SimulacaoReforma = "simulacao_reforma";
 
     /// <summary>
     /// A entrega montada e ainda não aprovada. Não é situação gravada: é como o

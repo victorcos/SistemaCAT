@@ -327,6 +327,18 @@ public sealed class RoteiroPorModuloTestes
         Assert.Equal(["importar", "historico"], Etapas.Roteiros["irpj_csll"]);
     }
 
+    [Theory]
+    [InlineData("cbs")]
+    [InlineData("ibs")]
+    public void A_reforma_tem_a_simulacao_e_nao_herda_a_cat42(string modulo)
+    {
+        // antes de 23/10/2026 os dois módulos não tinham trilha e caíam nas do
+        // ICMS: quem abria a CBS via os cards da CAT 42
+        Assert.Equal(["importar", "simulacao_reforma"], Etapas.TrilhasDo(modulo).Select(t => t.Chave));
+        Assert.Equal(["importar", "simulacao_reforma", "historico"], Etapas.Roteiros[modulo]);
+        Assert.Contains("simulacao_reforma", Etapas.DeProcessamento);
+    }
+
     [Fact]
     public void O_piscofins_nao_herda_etapa_de_icms()
     {
