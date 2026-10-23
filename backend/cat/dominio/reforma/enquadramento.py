@@ -20,12 +20,18 @@ regra — inclusive para dizer "este não paga" — e descrição nenhuma decide
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 
 from cat.dominio.reforma.parametros import Cenario, CategoriaDoSeletivo
 
 # o que o cadastro escreve para dizer "este SKU não paga IS", mesmo com NCM sujeita
 SEM_SELETIVO = "nenhuma"
+
+
+def _sem_acento(texto: str | None) -> str:
+    bruto = unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode()
+    return " ".join(bruto.lower().split())
 
 
 def normalizar_ncm(valor: object) -> str:
@@ -87,18 +93,20 @@ class CategoriaAtribuida:
 
 def categoria_do_seletivo(ncm: str, marcada_no_cadastro: str | None,
                           cenario: Cenario) -> CategoriaAtribuida:
-    """O cadastro vence a regra. A marcação precisa ser uma categoria do
-    cenário ou `nenhuma`; qualquer outra coisa é erro de digitação, e recusar
-    é melhor que tratar como "não paga"."""
-    marcada = (marcada_no_cadastro or "").strip().lower()
+    """O cadastro vence a regra. A marcação é a chave ou o nome de uma
+    categoria do cenário ("alcool" ou "Bebidas alcoólicas"), ou `nenhuma`;
+    qualquer outra coisa é erro de digitação, e recusar é melhor que tratar
+    como "não paga"."""
+    marcada = _sem_acento(marcada_no_cadastro)
     if marcada:
-        if marcada == SEM_SELETIVO:
+        if marcada in (SEM_SELETIVO, "nao", "-"):
             return CategoriaAtribuida("", "cadastro")
-        chaves = {c.chave for c in cenario.categorias_do_seletivo}
-        if marcada not in chaves:
-            raise ValueError(
-                f"Categoria do Imposto Seletivo desconhecida no cadastro: {marcada!r}. "
-                f"Vale uma de: {', '.join(sorted(chaves))}, ou {SEM_SELETIVO!r}.")
-        return CategoriaAtribuida(marcada, "cadastro")
+        for c in cenario.categorias_do_seletivo:
+            if marcada in (c.chave, _sem_acento(c.rotulo)):
+                return CategoriaAtribuida(c.chave, "cadastro")
+        raise ValueError(
+            f"Categoria do Imposto Seletivo desconhecida no cadastro: {marcada_no_cadastro!r}. "
+            f"Vale uma de: {', '.join(c.chave for c in cenario.categorias_do_seletivo)}, "
+            f"ou {SEM_SELETIVO!r}.")
     pela_ncm = categoria_pela_ncm(ncm, cenario)
     return CategoriaAtribuida(pela_ncm.chave if pela_ncm else "", "ncm")

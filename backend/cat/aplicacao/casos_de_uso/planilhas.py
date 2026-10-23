@@ -34,6 +34,7 @@ from cat.aplicacao.casos_de_uso import (
     pre_validar_arquivos,
     quebrar_sped,
     quebrar_xml,
+    simular_reforma,
 )
 from cat.infraestrutura.analitico.confronto import (
     ARQUIVO_CONFERIDOS,
@@ -227,6 +228,11 @@ PLANILHAS = {
         "relatorio": (ARQUIVO_RELATORIO, ARQUIVO_RELATORIO, lambda *a, **k: _ja_montado()),
         "pacote": (ARQUIVO_PACOTE, ARQUIVO_PACOTE, lambda *a, **k: _ja_montado()),
     },
+    # também montada na rodada: premissas, DRE e as visões, do mesmo cenário da tela
+    simular_reforma.ETAPA: {
+        "simulacao": (simular_reforma.ARQUIVO_DA_SIMULACAO, simular_reforma.ARQUIVO_DA_SIMULACAO,
+                      lambda *a, **k: _ja_montado()),
+    },
 }
 
 NAO_TERMINOU = {
@@ -244,6 +250,7 @@ NAO_TERMINOU = {
     montar_entrega.ETAPA: "A montagem da entrega ainda não terminou.",
     apurar_exclusoes.ETAPA: "A apuração das exclusões ainda não terminou.",
     quebrar_xml.ETAPA: "A quebra dos XML ainda não terminou.",
+    simular_reforma.ETAPA: "A simulação da reforma ainda não terminou.",
 }
 
 
@@ -424,7 +431,8 @@ def gerar(execucao: ExecucaoDB, etapa_da_rota: str, qual: str,
                      "descartados\" no filtro e rode de novo.")
         if etapa_da_rota in (apurar_suportado.ETAPA, montar_razao.ETAPA, apurar_periodo.ETAPA,
                              gerar_arquivo_digital.ETAPA, pre_validar_arquivos.ETAPA, montar_entrega.ETAPA,
-                             quebrar_sped.ETAPA, apurar_credito_outorgado.ETAPA):
+                             quebrar_sped.ETAPA, apurar_credito_outorgado.ETAPA,
+                             simular_reforma.ETAPA):
             raise PlanilhaRecusada(410, "Os arquivos desta apuração não estão mais em disco. Rode de novo.")
         motivo = ("Esta conferência é de uma versão anterior e não tem esta lista."
                   if os.path.isdir(pasta) else "Os arquivos desta conferência não estão mais em disco.")

@@ -46,6 +46,10 @@ class TestSeletivo:
     def test_o_cadastro_pode_incluir(self):
         assert categoria_do_seletivo("21069010", "Acucaradas", CENARIO_BASE).chave == "acucaradas"
 
+    def test_o_cadastro_pode_escrever_o_nome(self):
+        """A planilha de resultado da primeira simulação escrevia o nome, com acento."""
+        assert categoria_do_seletivo("22030000", "Bebidas Alcoólicas", CENARIO_BASE).chave == "alcool"
+
     def test_categoria_desconhecida_no_cadastro_e_recusada(self):
         """Erro de digitação não pode virar "não paga IS" calado."""
         with pytest.raises(ValueError, match="desconhecida"):

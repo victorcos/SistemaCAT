@@ -54,6 +54,7 @@ from cat.aplicacao.casos_de_uso import (
     quebrar_sped,
     quebrar_xml,
     rodada,
+    simular_reforma,
 )
 from cat.aplicacao.casos_de_uso.analisar_remessa import RemessaAnalisada, analisar
 from cat.aplicacao.casos_de_uso import depara_do_trabalho
@@ -452,6 +453,9 @@ PREPARADORES = {
     apurar_combustivel.ETAPA: (
         apurar_combustivel.preparar, apurar_combustivel.NadaParaApurar,
         "Já existe uma apuração de combustível em andamento neste trabalho."),
+    simular_reforma.ETAPA: (
+        simular_reforma.preparar, simular_reforma.NadaParaSimular,
+        "Já existe uma simulação da reforma em andamento neste trabalho."),
 }
 
 # "cancelando" ainda está em curso: a rodada só para no próximo ponto seguro, e

@@ -55,6 +55,7 @@ from cat.aplicacao.casos_de_uso import (
     pre_validar_arquivos,
     quebrar_sped,
     quebrar_xml,
+    simular_reforma,
 )
 from cat.aplicacao.casos_de_uso.historico_do_projeto import registrar_de_etapa
 from cat.config import obter_config
@@ -84,6 +85,7 @@ EXECUTORES = {
     apurar_credito_outorgado.ETAPA: apurar_credito_outorgado.executar,
     apurar_exclusoes.ETAPA: apurar_exclusoes.executar,
     apurar_combustivel.ETAPA: apurar_combustivel.executar,
+    simular_reforma.ETAPA: simular_reforma.executar,
 }
 
 MOTIVO_INTERRUPCAO = "Interrompida: o motor reiniciou durante a rodada. Rode de novo."
