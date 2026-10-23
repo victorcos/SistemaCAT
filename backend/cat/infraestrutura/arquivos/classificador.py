@@ -38,6 +38,7 @@ from cat.dominio.sped.cabecalho import (
     ler_cabecalho,
 )
 from cat.infraestrutura.arquivos.gerencial import inspecionar
+from cat.infraestrutura.arquivos.planilhas_da_reforma import reconhecer as reconhecer_da_reforma
 from cat.infraestrutura.arquivos.xml_compactado import e_zip, membros_xml
 from cat.log import obter_log
 
@@ -276,6 +277,24 @@ def _da_planilha_de_canceladas(caminho: str, tamanho: int) -> ArquivoDoLote | No
                          detalhe=f"{chaves} chaves nas primeiras linhas")
 
 
+def _da_planilha_da_reforma(caminho: str, tamanho: int) -> ArquivoDoLote | None:
+    """As saídas custeadas ou a classificação de itens da simulação da reforma,
+    pelo cabeçalho. A que quase casa vira desconhecida com as colunas que
+    faltam — é a frase de que o analista precisa para consertar a planilha."""
+    reconhecida = reconhecer_da_reforma(caminho)
+    if reconhecida is None:
+        return None
+    nome = os.path.basename(caminho)
+    if reconhecida.motivo:
+        return ArquivoDoLote(caminho=caminho, nome=nome, tamanho=tamanho,
+                             tipo=TipoDeArquivo.DESCONHECIDO, motivo=reconhecida.motivo)
+    tipo = (TipoDeArquivo.REFORMA_BASE_CUSTEADA if reconhecida.especie == "base"
+            else TipoDeArquivo.REFORMA_CLASSIFICACAO)
+    return ArquivoDoLote(caminho=caminho, nome=nome, tamanho=tamanho, tipo=tipo,
+                         cnpj=reconhecida.cnpj, competencia=reconhecida.competencia,
+                         detalhe=reconhecida.detalhe)
+
+
 def _do_gerencial(caminho: str, tamanho: int) -> ArquivoDoLote:
     try:
         insp = inspecionar(caminho)
@@ -328,6 +347,9 @@ def classificar(caminho: str, tamanho: int | None = None) -> ArquivoDoLote:
         planilha = _da_planilha_de_canceladas(caminho, tamanho)
         if planilha is not None:
             return planilha
+        da_reforma = _da_planilha_da_reforma(caminho, tamanho)
+        if da_reforma is not None:
+            return da_reforma
 
     try:
         texto = _amostra(caminho)

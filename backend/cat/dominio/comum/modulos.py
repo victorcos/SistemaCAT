@@ -12,12 +12,14 @@ contrato: sobe para o canal interno, junto do resto.
 from __future__ import annotations
 
 # ordem de apresentação: o tributo mais pedido primeiro
-MODULOS_EM_ORDEM: tuple[str, ...] = ("piscofins", "icms", "irpj_csll")
+MODULOS_EM_ORDEM: tuple[str, ...] = ("piscofins", "icms", "irpj_csll", "cbs", "ibs")
 
 ROTULO_DO_MODULO: dict[str, str] = {
     "piscofins": "PIS/COFINS",
     "icms": "ICMS",
     "irpj_csll": "IRPJ/CSLL",
+    "cbs": "CBS",
+    "ibs": "IBS",
 }
 
 # o trabalho de ICMS é o de todo projeto anterior à divisão por tributo

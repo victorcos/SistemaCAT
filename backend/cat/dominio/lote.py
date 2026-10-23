@@ -133,6 +133,10 @@ class TipoDeArquivo(str, Enum):
     CAT42_ARQUIVO_DIGITAL = "cat42_arquivo_digital"
     # lista de chaves canceladas na SEFAZ (TXT, CSV ou planilha com "cancel" no nome)
     LISTA_DE_CANCELADAS = "lista_de_canceladas"
+    # as duas planilhas da simulação da reforma: as saídas já custeadas e a
+    # revisão de SKU com NCM, CST e cClassTrib. Reconhecidas pelo cabeçalho
+    REFORMA_BASE_CUSTEADA = "reforma_base_custeada"
+    REFORMA_CLASSIFICACAO = "reforma_classificacao"
     COMPACTADO = "compactado"
     NAO_BAIXADO = "nao_baixado"
     DESCONHECIDO = "desconhecido"
@@ -154,6 +158,8 @@ class TipoDeArquivo(str, Enum):
             TipoDeArquivo.GERENCIAL_RESUMO: "Resumo por produto",
             TipoDeArquivo.CAT42_ARQUIVO_DIGITAL: "Arquivo digital da CAT 42",
             TipoDeArquivo.LISTA_DE_CANCELADAS: "Lista de notas canceladas",
+            TipoDeArquivo.REFORMA_BASE_CUSTEADA: "Saídas custeadas (reforma)",
+            TipoDeArquivo.REFORMA_CLASSIFICACAO: "Classificação de itens (reforma)",
             TipoDeArquivo.COMPACTADO: "Compactado",
             TipoDeArquivo.NAO_BAIXADO: "Não baixado do OneDrive",
             TipoDeArquivo.DESCONHECIDO: "Não reconhecido",
@@ -211,13 +217,20 @@ _MODULOS_POR_TIPO: dict[TipoDeArquivo, tuple[str, ...]] = {
     TipoDeArquivo.GERENCIAL_MOVIMENTO: ("icms",),
     TipoDeArquivo.GERENCIAL_INVENTARIO: ("icms",),
     TipoDeArquivo.LISTA_DE_CANCELADAS: ("icms",),
+    # a simulação mora nos dois módulos da reforma, e é a mesma conta nos dois
+    TipoDeArquivo.REFORMA_BASE_CUSTEADA: ("cbs", "ibs"),
+    TipoDeArquivo.REFORMA_CLASSIFICACAO: ("cbs", "ibs"),
 }
 
 # O que cada trabalho espera receber, para a mensagem de pasta que não serve.
+_FALTA_NA_REFORMA = ("Falta a planilha de saídas custeadas ou a classificação de itens "
+                     "(NCM revisada e cClassTrib).")
 FALTA_POR_MODULO: dict[str, str] = {
     "icms": "Falta a EFD ICMS/IPI, o XML das notas ou o relatório gerencial.",
     "piscofins": "Falta a EFD-Contribuições, a ECD, a EFD ICMS/IPI ou o XML das notas.",
     "irpj_csll": "Falta a ECF ou a ECD.",
+    "cbs": _FALTA_NA_REFORMA,
+    "ibs": _FALTA_NA_REFORMA,
 }
 
 
