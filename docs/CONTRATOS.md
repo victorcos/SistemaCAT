@@ -492,6 +492,56 @@ As chaves são diferentes de propósito: `grupos` por cnpj/competência/CST/unid
 da tese e não entrou"). Uma chave só para as três faria a contagem de recusas
 virar a loja inteira.
 
+### Simulação da reforma tributária — CBS, IBS e IS (23/10/2026)
+
+| Método | Rota | Quem |
+| --- | --- | --- |
+| `POST` | `/api/projetos/{id}/simulacao-reforma` | quem escreve |
+| `GET` | `/api/projetos/{id}/simulacao-reforma` | quem vê o trabalho |
+| `GET` | `/api/simulacao-reforma/{execucaoId}` | quem vê o trabalho |
+| `POST` | `/api/simulacao-reforma/{execucaoId}/cancelar` | quem escreve |
+| `GET` | `/api/simulacao-reforma/{execucaoId}/planilhas/simulacao` | a planilha montada na rodada (só xlsx) |
+
+**A mesma etapa nos módulos `cbs` e `ibs`**, e a mesma rota: ela não apura um
+tributo, põe os cinco lado a lado. Não depende de etapa nenhuma.
+
+**Dois tipos de arquivo novos no lote**, reconhecidos pelo **cabeçalho** e não
+pelo nome: `reforma_base_custeada` (as saídas com custo de compra, uma linha por
+loja × item × CFOP, no leiaute "Margem e Impacto Tributário") e
+`reforma_classificacao` (item, NCM revisada, CST e cClassTrib; aceita também
+`categoria IS` e `categoria mercadológica`). Os dois alimentam `cbs` e `ibs`.
+Planilha que quase casa vira `desconhecido` com as colunas que faltam no
+`motivo`. Lote sem um dos dois faz o `POST` recusar com **422** nomeando o que
+falta.
+
+O resumo traz `cenario` (nome, fator do IS, cronograma, grupos e categorias —
+o retrato das premissas da rodada), `base` (arquivos, linhas lidas e
+consideradas, SKUs, lojas, competências, receita bruta, conflitos de cadastro),
+`exclusoes`, `pendencias`, `por_ano`, `por_grupo`, `por_uf`, `por_seletivo`,
+`por_capitulo` (os 15 maiores), `segundos` e `log`.
+
+Quatro coisas do resumo carregam contrato:
+
+* **os números vêm em float, já somados**, e os percentuais (`margem`, `carga`,
+  `carga_com_seletivo`, `variacao_teorica`) são **calculados sobre a soma** pelo
+  motor. A tela nunca tira média de percentuais; percentual sem base vem `null`,
+  não zero — um grupo vazio não é um grupo sem lucro;
+* **`exclusoes` e `pendencias` são coisas diferentes.** Exclusão é linha sem
+  custo de compra: método, contada pelo motivo que a base dá, com a receita
+  líquida. Pendência é item sem cadastro ou cClassTrib sem grupo no cenário:
+  fora da conta com a receita bruta e até 20 exemplos, e **deveria ser zero**
+  antes de apresentar. Nenhuma das duas entra com alíquota padrão;
+* **`por_ano` cobre todos os anos do cenário**; as visões trazem só 2025, 2027 e
+  2033 (`anos` com `lucro_bruto`, `margem`, `carga`, `variacao_teorica`) — a
+  trajetória completa de cada chave está na planilha;
+* **`variacao_teorica` não é recomendação de reajuste**: é quanto a receita teria
+  de variar para preservar o lucro bruto do ano-base. O termo "ajuste
+  necessário" está vetado desde a revisão de 13/10/2026.
+
+Em disco, na pasta da execução: `simulacao_reforma.xlsx`, montada na rodada —
+premissas primeiro, DRE com composição do CMV e apuração fiscal, as visões com
+os três anos, a linha do tempo por capítulo, e "Fora da conta".
+
 ### Apuração das contribuições — a Gestão (v0.83.0)
 
 | Método | Rota | Quem |

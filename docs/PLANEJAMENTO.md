@@ -61,6 +61,40 @@ leitura do `E111`, que é como se descobre o que o cliente já tomou.
 
 ---
 
+## A reforma entrou no sistema (23/10/2026)
+
+A simulação de IBS/CBS e Imposto Seletivo — feita à mão para a empresa 23 em
+outubro — é agora uma etapa dos módulos **CBS** e **IBS**, a mesma nos dois:
+`simulacao_reforma`. Lê do lote as saídas já custeadas e a classificação dos
+itens, projeta cada linha de 2025 a 2033 com preço e volume constantes, e
+entrega a DRE reconciliada, a trajetória e dez visões (grupo, mês, UF, capítulo,
+posição NCM, categoria do IS, categoria mercadológica, família, SKU e total),
+na tela e em planilha. Validada contra a simulação manual: receita e lucro bruto
+de 2025 ao centavo, margem 9,2% → 4,8% → 15,2%.
+
+Frente própria: `frente/reforma`, worktree `..\SistemaCAT-reforma`. O porquê de
+cada escolha está em DECISOES (2026-10-23).
+
+**O que falta, em ordem:**
+
+- [ ] **Custeio dentro do sistema.** Hoje a base entra custeada; o custo médio
+      de compra por loja × item (ERP, Consinco, RMS) é feito fora. O caminho
+      genérico é pelo C170 de entrada da EFD, que o motor já lê.
+- [ ] **Cenário editável pela tela:** cronograma, grupos de cClassTrib e
+      alíquotas do IS, versionados por nome. O cliente pediu para reprocessar
+      quando as alíquotas forem publicadas.
+- [ ] **Categoria mercadológica** no cadastro de itens: a visão existe e sai
+      vazia até o cliente mandar a classificação dele.
+- [ ] **Regimes do fornecedor** (Simples, produtor rural, monofásico) no crédito
+      de IBS/CBS, e **créditos sobre despesas**. Hoje o crédito é pleno para toda
+      compra, e o relatório diz isso.
+- [ ] **Ano-calendário inteiro** com a curva sazonal do cliente, só nas lojas
+      existentes nos dois anos.
+- [ ] Conversão da base para parquet na importação, se a base anual pesar: a
+      rodada de um mês leva ~3 min, quase tudo leitura do openpyxl.
+
+---
+
 ## O roteiro no sistema
 
 | # | Etapa | O que faz | Desde |
@@ -441,3 +475,8 @@ cliente. Revisão da etapa 7 contra os arquivos aceitos da empresa 17. Lapidaç�
 cadastro editável, pendências por assunto, abertura pelas entradas anteriores,
 uso e consumo fora da ficha, série no 1200, substituição entre arquivos do
 cliente, CSV pelo DuckDB e arquivos digitais em paralelo.
+
+**2026-10-23** — A simulação da reforma (IBS/CBS e IS) entra como etapa dos
+módulos CBS e IBS, na frente `frente/reforma`: domínio puro com regressão
+contra a simulação manual da empresa 23, importação que reconhece as duas
+planilhas pelo cabeçalho, rodada com dez visões, planilha e tela.

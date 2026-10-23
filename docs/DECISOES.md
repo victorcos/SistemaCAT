@@ -5,6 +5,99 @@
 
 ---
 
+## 2026-10-23 — A simulação da reforma entra no sistema
+
+**De onde veio.** A primeira simulação de IBS/CBS e Imposto Seletivo foi feita à
+mão, em planilha, para a empresa 23 (saídas de dez/2025, 474.289 linhas), e o
+README que a documenta foi escrito já como especificação: entrada → regra →
+saída → conferência. Este é o porte dela para o CRM Fiscal, na frente nova
+`frente/reforma` (worktree `..\SistemaCAT-reforma`), ao lado das de ICMS e
+PIS/COFINS.
+
+**Onde mora, e por quê.** O cálculo vive em `dominio/reforma/`, fora de `icms/` e
+de `piscofins/`: a simulação não apura um tributo, põe os cinco — ICMS,
+PIS/COFINS, CBS, IBS e IS — sobre a mesma linha de venda. Na tela ela é **a
+mesma trilha nos módulos CBS e IBS**, coerente com a decisão de 22/09 de que a
+reforma mora ao lado do tributo que sucede: quem abre a CBS e quem abre o IBS
+procuram a mesma resposta. De passagem, os dois módulos não tinham trilha
+nenhuma e `TrilhasDo` caía nas da CAT 42.
+
+**O motor primeiro; o custeio depois.** A base entra **já custeada**, no leiaute
+"Margem e Impacto Tributário" da primeira simulação, e a classificação dos itens
+entra como foi revisada. Achar o custo médio de compra de cada venda (consolidar
+as compras do ERP, Consinco e RMS) continua fora do sistema por enquanto. A
+ordem é esta porque o motor é o que se valida contra os números já apresentados
+ao cliente, e porque o custeio pelo SPED — que é o caminho genérico — é outra
+metodologia, com outros números. Quando entrar, ele produz esta mesma base.
+
+**As planilhas se reconhecem pelo cabeçalho, nunca pelo nome.** O nome é do
+cliente e muda a cada remessa; o cabeçalho da classificação nem está na primeira
+linha. Planilha que quase casa vira `desconhecido` dizendo **quais colunas
+faltam**, que é a frase de que o analista precisa. O CST é obrigatório na
+classificação para que a aba "Base por SKU" da planilha de *resultado* — que tem
+item, NCM e cClassTrib — não entre como cadastro em dobro.
+
+**Cenário, e não constante.** Três números daqui não são lei: a referência de
+26,5% (até o Senado fixar), as alíquotas do IS (lei ordinária que não existe) e
+o fator de sensibilidade do IS. O cliente pediu em 23/10 para reprocessar quando
+forem publicadas. Então eles moram num `Cenario` que se troca inteiro e que o
+relatório nomeia; o `CENARIO_BASE` é o da LC 214/2025 com as hipóteses da
+primeira simulação. Um cClassTrib novo é uma linha no cenário, não código.
+
+**Pendência não é exclusão, e nenhuma das duas vira alíquota padrão.** Linha sem
+custo de compra é **exclusão**: decisão de método, contada pelo motivo que a
+própria base dá (transformado, sem compra, embalagem divergente). Item sem
+cadastro, ou com cClassTrib que o cenário não conhece, é **pendência**: sai da
+conta com a receita dita e a tela avisa que deveria ser zero antes de
+apresentar. Chutar a padrão esconderia justamente o item que ninguém revisou.
+
+**O cadastro vence a regra de NCM no Imposto Seletivo.** A primeira simulação
+tentou tirar as bebidas zero/diet por regra de descrição, e a regra falhou calada
+(expressão regular gravada com o escape quebrado): todas entraram, e quatro itens
+"sem açúcar" saíram por efeito colateral. Aqui a regra por NCM é o padrão e a
+marcação por SKU no cadastro (`categoria IS`, inclusive `nenhuma`) vence —
+descrição não decide nada. Consequência medida: o IS sai **R$ 28,7 mil/mês
+maior** que o da planilha manual, porque os quatro "sem açúcar" voltam, como o
+README pedia. Quem quiser tirá-los marca no cadastro.
+
+**Somar antes de projetar é exato.** Toda fórmula é linear nos valores da linha,
+dados a redução e o ano; o IS entra como **valor** (custo × alíquota da
+categoria), e não como alíquota, para dois SKUs de categorias diferentes caberem
+na mesma soma. Por isso a rodada soma por competência × UF × item e depois por
+(chave da visão, redução), e projeta a soma — meio milhão de linhas vira
+centenas de projeções, e o total do grupo é a soma das linhas ao centavo. A
+exceção é a **variação teórica de preço**, que divide pelo ICMS "por dentro" e
+depende do nível: é calculada por chave e somada em receita requerida, nunca
+agregada de novo.
+
+**A fórmula ganhou o débito de IPI na saída.** A planilha manual não o tinha
+porque o varejista não o tem; entra aqui, zerado no varejo, para a identidade do
+ano-base — receita sem tributos igual à receita líquida de hoje — valer também
+para quem industrializa.
+
+**As três conferências abortam a rodada.** DRE, composição do CMV e apuração
+fiscal fecham em zero por identidade algébrica. Uma que não fecha é fórmula
+errada, não dado ruim, e número errado não sai: a rodada falha em vez de avisar.
+
+**Medido contra a empresa 23.** Os totais por grupo da planilha manual, levados
+ao domínio puro, reproduzem lucro bruto, tributo a recolher, créditos e valor
+bruto das compras de todos os anos da tabela de referência (teste de regressão
+em `test_reforma_projecao.py`). A rodada inteira sobre os três arquivos reais:
+474.289 linhas, 14.197 SKUs, receita e lucro bruto de 2025 ao centavo, margem
+9,2% → 4,8% → 15,2%, BA e SE iguais. Leva ~3 min, quase tudo leitura do
+openpyxl — aceito por ora; se a base anual pesar, o caminho é converter uma vez
+para parquet na importação.
+
+**O que fica para depois, em ordem.** (1) O custeio dentro do sistema, a partir
+das compras do ERP e do SPED. (2) Cenário editável pela tela, com a tabela de
+cClassTrib e as alíquotas do IS. (3) A categoria mercadológica do cliente no
+cadastro — a visão já existe e sai vazia. (4) Fornecedor do Simples, produtor
+rural e monofásico no crédito de IBS/CBS, que hoje é pleno para toda compra.
+(5) Créditos sobre despesas. (6) O ano-calendário inteiro, com a sazonalidade
+que o cliente pediu.
+
+---
+
 ## 2026-10-14 — O download voltou a escolher a pasta
 
 Em 02/10 (`08ad378`) o download de planilha passou a ser do **navegador**: um
