@@ -1,12 +1,12 @@
 # Handoff do front — CRM Fiscal
 
-> Gerado de `frontend/tools/handoff.mjs` em 2026-10-02, sobre a versão **0.124.0**.
+> Gerado de `frontend/tools/handoff.mjs` em 2026-10-23, sobre a versão **0.166.0**.
 > Não editar à mão: rode `npm run handoff` de novo depois de mexer no front.
 
 Tudo aqui sai do código-fonte em `frontend/src`. Se divergir da tela, o
 errado é o código — não este documento.
 
-## 1. Rotas (30)
+## 1. Rotas (32)
 
 O endereço, a tela que o atende e se exige papel específico.
 
@@ -31,6 +31,8 @@ O endereço, a tela que o atende e se exige papel específico.
 | `/projetos/:id/pre-validacao` | PreValidacao | — |
 | `/projetos/:id/quebra-de-sped` | QuebraDeSped | — |
 | `/projetos/:id/credito-outorgado` | CreditoOutorgado | — |
+| `/projetos/:id/combustivel` | Combustivel | — |
+| `/projetos/:id/simulacao-reforma` | SimulacaoReforma | — |
 | `/projetos/:id/frente/:trilha` | Projeto | — |
 | `/projetos/:id/apuracao-piscofins` | ApuracaoPisCofins | — |
 | `/projetos/:id/razao-contabil` | RazaoContabil | — |
@@ -43,7 +45,7 @@ O endereço, a tela que o atende e se exige papel específico.
 | `/usuarios` | Usuarios | sim |
 | `*` | NaoEncontrada | — |
 
-## 2. Telas (31)
+## 2. Telas (37)
 
 O resumo é o que o próprio arquivo diz de si no comentário do topo.
 
@@ -65,6 +67,18 @@ Apuração de PIS/COFINS — o par que se confronta. A tela existe para entregar
 
 Etapa 7 — gerar o arquivo digital. Um arquivo por estabelecimento de SP e por mês. Duas regras mandam na tela:
 
+### Combustivel.teste
+
+`src/pages/Combustivel.teste.tsx` · 136 linhas
+
+O resultado do crédito de combustível: o que a tela não pode deixar de dizer.
+
+### Combustivel
+
+`src/pages/Combustivel.tsx` · 338 linhas
+
+Crédito de ICMS sobre combustível. A tela de uma etapa que **audita** além de apurar: além de dizer quanto o
+
 ### Conferencia
 
 `src/pages/Conferencia.tsx` · 433 linhas
@@ -85,9 +99,15 @@ Crédito outorgado — quais itens vendidos são produto beneficiado.
 
 ### DePara
 
-`src/pages/DePara.tsx` · 393 linhas
+`src/pages/DePara.tsx` · 464 linhas
 
 De-para de códigos do trabalho. O sistema propõe os pares a partir da movimentação — mesmo GTIN, código de
+
+### DeParaSemPar.teste
+
+`src/pages/DeParaSemPar.teste.tsx` · 139 linhas
+
+A seção "Códigos sem par": quantos são, e como alcançar os que não cabem.
 
 ### Entrega
 
@@ -95,9 +115,15 @@ De-para de códigos do trabalho. O sistema propõe os pares a partir da moviment
 
 Etapa 8 — relatórios e entrega. Três regras mandam na tela: **o relatório mostra tudo e o dossiê só o que vai
 
+### Exclusoes.teste
+
+`src/pages/Exclusoes.teste.tsx` · 266 linhas
+
+O número grande das exclusões diz qual dos dois ele é. A tese das contribuições tem **duas frentes**: o consolidado, que arredonda
+
 ### Exclusoes
 
-`src/pages/Exclusoes.tsx` · 879 linhas
+`src/pages/Exclusoes.tsx` · 1094 linhas
 
 Exclusões da base do PIS/COFINS. Quatro teses, cinco leituras, uma rodada.
 
@@ -169,7 +195,7 @@ Pré-validar os arquivos digitais que o cliente já transmitiu.
 
 ### Projeto
 
-`src/pages/Projeto.tsx` · 558 linhas
+`src/pages/Projeto.tsx` · 574 linhas
 
 Para onde cada funcionalidade leva, e com que palavras. A tela não decide o que está disponível — isso vem do domínio, em
 
@@ -193,7 +219,7 @@ Quebra de XML — as notas do lote, item a item. A tela entrega **uma planilha s
 
 ### Razao
 
-`src/pages/Razao.tsx` · 932 linhas
+`src/pages/Razao.tsx` · 936 linhas
 
 Etapa 5 — montar o razão dos itens (Ficha 3). Uma ficha por estabelecimento e mercadoria com ST, pelo custo médio
 
@@ -215,6 +241,18 @@ Razão contábil da ECD — escolher a conta, depois ver os lançamentos.
 
 O hub: por onde se começa depois de entrar. Um card por segmento tributário que a pessoa enxerga — e, para quem
 
+### SimulacaoReforma.teste
+
+`src/pages/SimulacaoReforma.teste.tsx` · 190 linhas
+
+O resultado da simulação da reforma: o que a tela não pode deixar de dizer.
+
+### SimulacaoReforma
+
+`src/pages/SimulacaoReforma.tsx` · 508 linhas
+
+Simulação da reforma tributária do consumo. A mesma tela nos módulos CBS e IBS: a conta põe ICMS, PIS/COFINS, CBS, IBS e
+
 ### Suportado
 
 `src/pages/Suportado.tsx` · 1313 linhas
@@ -233,7 +271,7 @@ Troca obrigatória da senha provisória. Aparece no lugar da aplicação, sem me
 
 O que se diz da pessoa numa linha: uma situação só, na ordem de
 
-## 3. Componentes (32 arquivos)
+## 3. Componentes (33 arquivos)
 
 O que já existe e pode ser reaproveitado. Desenhar um componente que já
 está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
@@ -269,6 +307,7 @@ está aqui custa o dobro: o trabalho de desenhar e o de reconciliar depois.
 | `EditarCadastro.tsx` | EditarCadastro | `projeto, aberto, aoFechar, aoSalvar` | Nome e período do trabalho. Existe porque o período muda de verdade: o trabalho da empresa 19 nasceu como |
 | `ExtrairDoSped.tsx` | ExtrairDoSped | `execucaoId` | Extrair um registro do SPED, consolidado de todos os arquivos. |
 | `FrentesDoTrabalho.tsx` | FrentesDoTrabalho | `projetoId, modulo, trilhas, rota` | As frentes de trabalho de um trabalho: a CAT 42, o crédito outorgado, e as |
+| `LigarCodigo.tsx` | LigarCodigo | `projetoId` | Ligar um código sem par a outro, olhando para os dois. **O que isto substitui.** A tela pedia o código de destino num campo de |
 | `OcorrenciasDoArquivo.tsx` | OcorrenciasDoArquivo | `chave, carregar, cabecalho` | O que a pré-validação achou num arquivo digital. Serve às duas telas que pré-validam — a do arquivo que o sistema gerou e a |
 | `PainelDoTrabalho.tsx` | PainelDoTrabalho, FaixaDeLeiautes | `projetoId, etapas, rota, bloqueio` | O painel do trabalho: o que há para ler, e o que dá para fazer. |
 | `RecorteDoSped.tsx` | RecorteDoSped | `recorte, aoMudar, estabelecimentos` | O recorte da extração: o que entra, e o que nem chega a ser lido. |
@@ -553,7 +592,7 @@ precisa de um token novo, e o token tem de valer nos dois temas.
 | `--borda-sutil` | `rgb(255 255 255 / 8%)` | — |
 | `--brilho-acao` | `0 12px 28px rgb(255 127 0 / 30%)` | — |
 
-## 5. O que a tela pede ao servidor (111 chamadas)
+## 5. O que a tela pede ao servidor (121 chamadas)
 
 Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 `:id`, qualquer que seja o nome no código.
@@ -601,12 +640,27 @@ Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 | GET | `/api/auth/eu` |
 | POST | `/api/auth/token` |
 
+### `combustivel`
+
+| Método | Rota |
+| --- | --- |
+| GET | `/api/combustivel/:id` |
+| POST | `/api/combustivel/:id/cancelar` |
+| POST | `/api/projetos/:id/combustivel` |
+
+### `conferencia.teste`
+
+| Método | Rota |
+| --- | --- |
+| GET | `/api/exclusoes/9/planilhas/pacote` |
+
 ### `conferencia`
 
 | Método | Rota |
 | --- | --- |
 | GET | `/api/conferencias/:id` |
 | GET | `/api/conferencias/:id/planilhas/:id` |
+| GET | `/api/progresso/:id` |
 | POST | `/api/projetos/:id/conferencias` |
 
 ### `correcoes`
@@ -635,6 +689,7 @@ Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 | Método | Rota |
 | --- | --- |
 | POST | `/api/projetos/:id/depara` |
+| GET | `/api/projetos/:id/depara/para-ligar` |
 
 ### `entrega`
 
@@ -758,6 +813,15 @@ Agrupado pelo serviço que faz a chamada. Os parâmetros da URL aparecem como
 | GET | `/api/segmentos/todos` |
 | PUT | `/api/usuarios/:id/segmentos` |
 
+### `simulacaoReforma`
+
+| Método | Rota |
+| --- | --- |
+| POST | `/api/projetos/:id/simulacao-reforma` |
+| GET | `/api/simulacao-reforma/:id` |
+| POST | `/api/simulacao-reforma/:id/cancelar` |
+| GET | `/api/simulacao-reforma/:id/planilhas/simulacao` |
+
 ### `suportado`
 
 | Método | Rota |
@@ -813,10 +877,14 @@ _Nenhuma._
 
 #### Telas em `pages/` sem rota
 
+- `Combustivel.teste`
+- `DeParaSemPar.teste`
+- `Exclusoes.teste`
 - `Inicio.teste`
 - `Lote.teste`
 - `QuebraXml.teste`
 - `RazaoContabil.teste`
+- `SimulacaoReforma.teste`
 
 #### Rotas que nenhum link aponta
 

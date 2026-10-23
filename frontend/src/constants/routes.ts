@@ -35,6 +35,8 @@ export const ROTAS = {
   creditoOutorgado: (id: number | string) => `/projetos/${id}/credito-outorgado`,
   /** o crédito de ICMS do combustível queimado como insumo: a tese do monofásico */
   combustivel: (id: number | string) => `/projetos/${id}/combustivel`,
+  /** a simulação da reforma (IBS, CBS e IS): a mesma nos módulos CBS e IBS */
+  simulacaoReforma: (id: number | string) => `/projetos/${id}/simulacao-reforma`,
   /** a apuração de PIS/COFINS: a 037 e o razão da ECD, o par que se confronta */
   apuracaoPisCofins: (id: number | string) => `/projetos/${id}/apuracao-piscofins`,
   gestao: (id: number | string) => `/projetos/${id}/apuracao-contribuicoes`,

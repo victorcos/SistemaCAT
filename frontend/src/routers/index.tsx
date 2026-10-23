@@ -9,6 +9,7 @@ import Gestao from "@/pages/Gestao";
 import Historico from "@/pages/Historico";
 import Importar from "@/pages/Importar";
 import Inicio from "@/pages/Inicio";
+import SimulacaoReforma from "@/pages/SimulacaoReforma";
 import Entrada from "@/routers/Entrada";
 import Login from "@/pages/Login";
 import Lote from "@/pages/Lote";
@@ -118,6 +119,7 @@ export const roteador = createBrowserRouter([
               { path: "/projetos/:id/quebra-de-sped", element: <QuebraDeSped /> },
               { path: "/projetos/:id/credito-outorgado", element: <CreditoOutorgado /> },
               { path: "/projetos/:id/combustivel", element: <Combustivel /> },
+              { path: "/projetos/:id/simulacao-reforma", element: <SimulacaoReforma /> },
               // a mesma tela do trabalho, um nível dentro: os cards passam a
               // ser as etapas da frente em vez das frentes do trabalho
               { path: "/projetos/:id/frente/:trilha", element: <Projeto /> },

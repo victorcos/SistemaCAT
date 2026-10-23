@@ -108,6 +108,14 @@ const DESTINOS: Record<
       padrao: "Apurar o crédito de combustível",
     },
   },
+  simulacao_reforma: {
+    rota: ROTAS.simulacaoReforma,
+    rotulos: {
+      concluida: "Ver a trajetória da margem e baixar a planilha",
+      em_andamento: "Acompanhar a simulação",
+      padrao: "Simular a reforma",
+    },
+  },
   apuracao_contribuicoes: {
     rota: ROTAS.gestao,
     rotulos: {
