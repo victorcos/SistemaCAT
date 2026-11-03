@@ -5,6 +5,56 @@
 
 ---
 
+## 2026-11-03 — Bonificação na EFD-Contribuições: o C181 casa com o C185 pelo CFOP, não pela posição
+
+**O pedido.** Para um grupo de 11 empresas (empresas 25 a 35 do registro
+local) já havia uma apuração de ICMS nas bonificações (CFOP 5910/6910, EFD
+ICMS/IPI, 701 mil notas). Pediram o mesmo para PIS/COFINS, lido da
+EFD-Contribuições. Virou a ferramenta `tools/bonificacao_contribuicoes.py`,
+genérica (grupo, CFOP e saída por argumento), com dois subcomandos:
+`extrair` (filtro de CFOP, três fontes) e `cruzar` (chave a chave).
+
+**Três escriturações no mesmo grupo.** C100 > C170 item a item (empresas 25 e
+32 sempre; as demais a partir de 2025), C100 > C175 (NFC-e, pouco) e C180 >
+C181/C185 consolidado por produto, sem nota (empresa 27 sempre; as outras até
+2024). Só se descobre lendo o 9900 de cada arquivo — e o leitor cobre as três,
+porque a resposta por empresa muda de fonte no meio da série.
+
+**A decisão: casar C181 × C185 por CFOP e valor dentro do C180, nunca pela
+posição.** `sped/consolidado.py` casa pela posição, com teste que diz que é
+assim que o dado real vem. Na empresa 28 não é: o PIS lista os CFOP numa ordem
+e o COFINS noutra, e um 5102 tributado do PIS caía ao lado do 5910 sem
+incidência do COFINS. O resultado do grupo saía em R$ 1,38 milhão; casando por
+CFOP + VL_ITEM (e, sem par exato, só por CFOP), bate ao centavo com a
+recontagem lado a lado feita direto no arquivo bruto: 175.801 linhas,
+R$ 1.062,93 de PIS e R$ 4.895,85 de COFINS. **Pendência:** o `consolidado.py`
+continua por posição e alimenta a 037/047; precisa do mesmo casamento, com o
+`test_sped_consolidado` revisto para cobrir a ordem trocada.
+
+**Zero no filtro não é ausência de bonificação.** A empresa 32 tem 350 mil
+notas 5910 na EFD ICMS/IPI e nenhuma na EFD-Contribuições — nem por chave,
+nem por série/número, conferido no arquivo bruto. O mesmo nas empresas 30, 28,
+29, 31 e 33 depois que passaram a escriturar item a item: das 441 mil notas em
+meses cruzáveis, só as 771 da empresa 25 existem lá. A nota sem receita é
+omitida pelo gerador da Contribuições; não é tributação como venda. Daí o
+subcomando `cruzar`, e a premissa escrita na planilha.
+
+**Sem pandas.** A pilha do motor é DuckDB + xlsxwriter (ARQUITETURA §7); o
+venv não tem pandas e não vai ter por causa de uma ferramenta. A agregação é
+dicionário, e o Excel sai direto do xlsxwriter, com guarda do limite de
+linhas (CSV ao lado quando passa).
+
+**Outros achados que viraram regra na ferramenta.** Mês com dois arquivos usa o
+de transmissão mais recente, lida do nome do arquivo (o `ReceitanetBX` grava
+`_Original_<data>_` ou `_Retificadora_<data>_`), e não do `mtime`. Caminho
+acima de 260 caracteres (empresa 29) abre com `caminho_longo`. Prescrição de
+PIS/COFINS: dia 25 do mês seguinte + 5 anos, conservador. M200/M600 entram na
+aba mensal para dizer se o mês teve contribuição a recolher.
+
+**Resultado para o grupo:** R$ 5.958,78 de PIS/COFINS destacado em 5910/6910
+em cinco anos, tudo em 2022–2024 da empresa 28 e R$ 33,60 da empresa 30. Não
+há tese de PIS/COFINS sobre bonificação por aí.
+
 ## 2026-10-22 — A triagem da rede aponta; quem calcula continua sendo o 933
 
 **A pergunta.** Um prompt mestre pedia um sistema novo — scanner de rede,
