@@ -21,9 +21,10 @@
     "tsBuildInfoFile": "node_modules/.tmp/tsconfig.tsbuildinfo",
 
     // caminho absoluto '@/' para que mover pasta nao obrigue a reescrever
-    // import relativo em dezenas de arquivos
-    "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] }
+    // import relativo em dezenas de arquivos. Sem baseUrl: ele ficou obsoleto
+    // no TypeScript 6 (o VS Code acusa erro) e sai no 7; o './' torna o
+    // caminho relativo ao próprio tsconfig, que é o que o baseUrl fazia
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src"]
 }
