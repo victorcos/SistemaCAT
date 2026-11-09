@@ -69,6 +69,39 @@ de fora do escritório, as pastas em `Z:` só existem pela VPN.
 
 ## Como rodar
 
+### No dia a dia: dois atalhos
+
+Quem só vai usar o sistema não precisa de terminal. Os atalhos ficam na Área
+de Trabalho e são criados uma vez por máquina:
+
+```
+.\scripts\atalhos.ps1          # cria "Sistema CAT" e "Sistema CAT - Parar"
+```
+
+| atalho | o que faz |
+|---|---|
+| **Sistema CAT** | sobe o que faltar e abre a tela. Se já estiver no ar, só abre a tela |
+| **Sistema CAT - Parar** | derruba motor, fila, API e tela. O Postgres fica de pé |
+
+O `abrir.ps1`, por trás do primeiro atalho, existe porque o `subir.ps1`
+**recusa** subir com porta ocupada — e com razão, já que duas cópias no ar
+fazem a tela falar com o processo errado sem nenhum aviso. Num atalho de um
+clique isso vira beco sem saída, então o `abrir.ps1` separa os três casos:
+já no ar (abre a tela), parado (sobe) e pela metade (manda parar antes).
+Quem decide se está no ar é o `/api/saude`, não a porta: processo travado
+mantém a porta aberta e não responde à tela.
+
+O `parar.ps1` para **por porta**, não por janela, e cuida de dois casos que
+fechar as janelas à mão não resolve:
+
+- a **fila** (`workers.rodar`) não escuta porta nenhuma — parar por porta
+  nunca a alcançaria, e ela ficaria rodando etapa com o resto derrubado;
+- o **neto órfão do uvicorn** sobrevive à morte do pai e continua segurando a
+  8020, com o socket atribuído a um PID já morto (24/09/2026). O que o
+  identifica é o pai não existir mais, não a linha de comando.
+
+### À mão
+
 São três processos. A tela fala só com a API em C#, e a API pede ao motor
 Python, pelo canal interno, tudo o que é de disco: ler lote e remessa, conferir,
 extrair movimentos, gerar planilha (`docs/MIGRACAO_CSHARP.md`). O motor não tem
