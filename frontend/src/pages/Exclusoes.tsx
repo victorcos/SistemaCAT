@@ -17,12 +17,12 @@ import { Botao } from "@/components/ui/Botao";
 import { CabecalhoDePagina, Secao, Voltar } from "@/components/ui/Pagina";
 import { IconeBaixar, IconeParar, IconeTentarDeNovo } from "@/constants/icons";
 import { INTERVALO_POLL_MS } from "@/constants/polling";
-import { ROTAS } from "@/constants/routes";
 import { aceitaProcessamento } from "@/constants/status";
 import { useAcao } from "@/hooks/useAcao";
 import { cn } from "@/lib/cn";
 import { comoErro } from "@/lib/errors";
 import { dinheiro, numero } from "@/lib/format";
+import { rotuloDoVoltar, voltarDaEtapa } from "@/lib/voltar";
 import { EM_CURSO, type Formato } from "@/services/conferencia";
 import {
   baixarPacoteDasExclusoes,
@@ -85,6 +85,9 @@ const data = (iso: string | undefined) =>
 /** "2026-09" -> "09/2026". O mês até onde a Selic acumulou. */
 const mesDe = (aaaamm: string | undefined) =>
   aaaamm?.length === 7 ? `${aaaamm.slice(5)}/${aaaamm.slice(0, 4)}` : "";
+
+/** a chave desta etapa no servidor: decide a frente a que o "voltar" leva */
+const ETAPA = "exclusoes";
 
 export default function Exclusoes() {
   const { id } = useParams<{ id: string }>();
@@ -206,7 +209,9 @@ export default function Exclusoes() {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5">
-      <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
+      <Voltar para={voltarDaEtapa(projetoId, ETAPA, projeto)}>
+        {rotuloDoVoltar(ETAPA, projeto)}
+      </Voltar>
 
       <CabecalhoDePagina
         eyebrow="PIS/COFINS · Exclusões · gerar apuração"

@@ -16,7 +16,6 @@ import {
   IconeTentarDeNovo,
 } from "@/constants/icons";
 import { INTERVALO_POLL_MS } from "@/constants/polling";
-import { ROTAS } from "@/constants/routes";
 import { aceitaProcessamento } from "@/constants/status";
 import { useAcao } from "@/hooks/useAcao";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,6 +23,7 @@ import { useToast } from "@/hooks/useToast";
 import { cn } from "@/lib/cn";
 import { comoErro } from "@/lib/errors";
 import { numero, tamanho } from "@/lib/format";
+import { rotuloDoVoltar, voltarDaEtapa } from "@/lib/voltar";
 import type { Pagina } from "@/services/apuracao";
 import { EM_CURSO } from "@/services/conferencia";
 import {
@@ -66,6 +66,9 @@ const TOM: Record<Gravidade, { borda: string; texto: string; titulo: string }> =
   atencao: { borda: "border-atencao/35 bg-atencao-fundo", texto: "text-atencao", titulo: "Pedem atenção" },
   informacao: { borda: "border-borda bg-superficie-vidro", texto: "text-texto-suave", titulo: "Para informação" },
 };
+
+/** a chave desta etapa no servidor: decide a frente a que o "voltar" leva */
+const ETAPA = "entrega";
 
 export default function Entrega() {
   const { id } = useParams<{ id: string }>();
@@ -191,7 +194,9 @@ export default function Entrega() {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5">
-      <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
+      <Voltar para={voltarDaEtapa(projetoId, ETAPA, projeto)}>
+        {rotuloDoVoltar(ETAPA, projeto)}
+      </Voltar>
 
       <CabecalhoDePagina
         eyebrow="Etapa 8 · Entrega"
@@ -267,6 +272,7 @@ export default function Entrega() {
           resumo={resumo}
           superada={atual !== null && atual.id !== resultado.id}
           anda={anda}
+          voltar={voltarDaEtapa(projetoId, ETAPA, projeto)}
           aoAprovar={(e) => {
             setResultado(e);
             if (atual?.id === e.id) setAtual(e);
@@ -307,6 +313,7 @@ function Concluida({
   superada,
   anda,
   aoAprovar,
+  voltar,
 }: {
   execucao: ExecucaoDaEntrega;
   resumo: ResumoDaEntrega;
@@ -314,6 +321,8 @@ function Concluida({
   superada: boolean;
   anda: boolean;
   aoAprovar: (e: ExecucaoDaEntrega) => void;
+  /** para onde o rodapé leva: a frente desta etapa */
+  voltar: string;
 }) {
   const download = useAcao();
   const [baixando, setBaixando] = useState<"pacote" | "relatorio" | null>(null);
@@ -459,7 +468,7 @@ function Concluida({
             arquivo com o MANIFESTO.txt que vai dentro dele.
           </p>
         </div>
-        <BotaoLink para={ROTAS.projeto(execucao.projeto_id)} variante="secundario">
+        <BotaoLink para={voltar} variante="secundario">
           Ver as etapas
         </BotaoLink>
       </section>

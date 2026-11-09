@@ -22,6 +22,7 @@ import { aceitaProcessamento } from "@/constants/status";
 import { useAcao } from "@/hooks/useAcao";
 import { comoErro } from "@/lib/errors";
 import { dinheiro, numero } from "@/lib/format";
+import { rotuloDoVoltar, voltarDaEtapa } from "@/lib/voltar";
 import {
   baixarPlanilha,
   type Formato,
@@ -38,6 +39,9 @@ import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
 import type { ErroApi } from "@/types/erro";
 
 const INTERVALO_MS = 2000;
+
+/** a chave desta etapa no servidor: decide a frente a que o "voltar" leva */
+const ETAPA = "conferencia";
 
 /**
  * Etapa 2 — conferir documentos.
@@ -135,7 +139,9 @@ export default function Conferencia() {
 
   return (
     <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
-      <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
+      <Voltar para={voltarDaEtapa(projetoId, ETAPA, projeto)}>
+        {rotuloDoVoltar(ETAPA, projeto)}
+      </Voltar>
 
       <CabecalhoDePagina
         eyebrow="Etapa 2"

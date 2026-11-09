@@ -17,11 +17,11 @@ import {
   Voltar,
 } from "@/components/ui/Pagina";
 import { IconeTentarDeNovo } from "@/constants/icons";
-import { ROTAS } from "@/constants/routes";
 import { aceitaProcessamento } from "@/constants/status";
 import { useAcao } from "@/hooks/useAcao";
 import { comoErro } from "@/lib/errors";
 import { dinheiro, numero } from "@/lib/format";
+import { rotuloDoVoltar, voltarDaEtapa } from "@/lib/voltar";
 import { EM_CURSO, type Fatia, type Formato } from "@/services/conferencia";
 import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
 import {
@@ -37,6 +37,9 @@ import type { ErroApi } from "@/types/erro";
 import { Filtro } from "./Conferencia";
 
 const INTERVALO_MS = 2000;
+
+/** a chave desta etapa no servidor: decide a frente a que o "voltar" leva */
+const ETAPA = "movimentos";
 
 /**
  * Etapa 3 — histórico de movimentação.
@@ -132,7 +135,9 @@ export default function Movimentos() {
 
   return (
     <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
-      <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
+      <Voltar para={voltarDaEtapa(projetoId, ETAPA, projeto)}>
+        {rotuloDoVoltar(ETAPA, projeto)}
+      </Voltar>
 
       <CabecalhoDePagina
         eyebrow="Etapa 3"

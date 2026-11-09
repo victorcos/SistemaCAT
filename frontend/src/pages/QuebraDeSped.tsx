@@ -18,12 +18,12 @@ import { Botao } from "@/components/ui/Botao";
 import { CabecalhoDePagina, Voltar } from "@/components/ui/Pagina";
 import { IconeParar, IconeTentarDeNovo } from "@/constants/icons";
 import { INTERVALO_POLL_MS } from "@/constants/polling";
-import { ROTAS } from "@/constants/routes";
 import { aceitaProcessamento } from "@/constants/status";
 import { useAcao } from "@/hooks/useAcao";
 import { cn } from "@/lib/cn";
 import { comoErro } from "@/lib/errors";
 import { numero } from "@/lib/format";
+import { rotuloDoVoltar, voltarDaEtapa } from "@/lib/voltar";
 import { EM_CURSO, type Formato } from "@/services/conferencia";
 import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
 import {
@@ -64,6 +64,9 @@ const cnpjFormatado = (c: string) =>
   c.length === 14
     ? `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}`
     : c;
+
+/** a chave desta etapa no servidor: decide a frente a que o "voltar" leva */
+const ETAPA = "quebra_de_sped";
 
 export default function QuebraDeSped() {
   const { id } = useParams<{ id: string }>();
@@ -185,7 +188,9 @@ export default function QuebraDeSped() {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5">
-      <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
+      <Voltar para={voltarDaEtapa(projetoId, ETAPA, projeto)}>
+        {rotuloDoVoltar(ETAPA, projeto)}
+      </Voltar>
 
       <CabecalhoDePagina
         eyebrow="PIS/COFINS · Etapa 1"
