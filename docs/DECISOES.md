@@ -5,6 +5,54 @@
 
 ---
 
+## 2026-11-09 — O "voltar" da etapa subia dois níveis de uma vez
+
+A navegação tem três níveis desde 28/09: o **trabalho** (cards por frente — CAT
+42, Quebra de XML, Crédito outorgado), a **frente** (cards por etapa —
+Conferência, Movimentos, Suportado, Razão, Apuração, Arquivo digital, Entrega) e
+a **etapa**. A seta do topo de toda etapa, porém, continuava como antes da
+divisão: `ROTAS.projeto(projetoId)`, escrito à mão em 19 telas.
+
+Quem estava na etapa 3 da CAT 42 e clicava em voltar não caía na lista de
+etapas, de onde tinha vindo — caía na lista de frentes, um nível acima. Para
+seguir da etapa 3 para a 4 era preciso entrar na CAT 42 de novo. O rótulo
+"Voltar ao trabalho" descrevia o destino com precisão; o problema é que não era
+ele que se queria.
+
+**O destino passa a ser derivado, não escrito.** `lib/voltar.ts` acha a frente
+da etapa em `trilhas[].etapas`, que já vem do servidor e já é o que monta os
+cards da frente. Repetir esse mapa no front criaria duas verdades sobre quais
+etapas compõem cada frente, e elas divergiriam na primeira frente nova — que é
+exatamente quando ninguém lembra de procurar a cópia.
+
+**Frente de uma etapa só continua voltando ao trabalho**, e essa é a parte que
+não se adivinha: o card dessas frentes vai **direto** para a tela da etapa, sem
+passar pelo painel (`FrentesDoTrabalho.escolhaDe`, 30/09). Mandar essa pessoa
+para o painel a levaria a uma tela que ela nunca viu, com um card só — o clique
+que o atalho existe para poupar. Quem tem painel hoje é a CAT 42, com sete
+etapas; crédito outorgado, combustível, quebra de XML, quebra de SPED, 037,
+exclusões, Gestão e importar têm uma. O rótulo acompanha: "Voltar a CAT 42"
+quando é para a frente, "Voltar ao trabalho" quando é para o trabalho, e
+"Voltar ao trabalho" também enquanto o detalhe não carregou — o link nunca fica
+quebrado nem esperando dado.
+
+**Dois outros cliques prometiam o que não entregavam.** O botão "Ver as etapas"
+do rodapé de Suportado, Razão, Arquivo digital e Entrega apontava para a lista
+de frentes: o rótulo dizia etapas e entregava frentes. E o de-para, que só se
+abre de dentro do razão — o próprio cabeçalho dele diz "Razão dos itens" —
+voltava para o trabalho, dois níveis acima; agora volta para o razão, como a
+Consulta de Saídas e o razão contábil já faziam com a apuração de PIS/COFINS.
+
+**O que fica de fora, de propósito:** `Projeto`, `Histórico` e `Lote`. O
+histórico é do trabalho, não de frente nenhuma; o lote é a etapa `importar`, que
+é frente de uma etapa só e por isso cai na regra acima.
+
+Sete testes em `lib/voltar.teste.ts` guardam a regra, e a exceção da frente de
+uma etapa só é o que mais pediria teste: quebrá-la não dá erro nenhum — dá uma
+tela de um card.
+
+---
+
 ## 2026-10-14 — O download voltou a escolher a pasta
 
 Em 02/10 (`08ad378`) o download de planilha passou a ser do **navegador**: um

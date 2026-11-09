@@ -34,6 +34,7 @@ import { useAcao } from "@/hooks/useAcao";
 import { cn } from "@/lib/cn";
 import { comoErro } from "@/lib/errors";
 import { numero } from "@/lib/format";
+import { rotuloDoVoltar, voltarDaEtapa } from "@/lib/voltar";
 import { EM_CURSO, type Formato } from "@/services/conferencia";
 import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
 import {
@@ -74,6 +75,9 @@ const qtd = (t: string | undefined) =>
 
 const cnpjFormatado = (c: string) =>
   c.length === 14 ? `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}` : c;
+
+/** a chave desta etapa no servidor: decide a frente a que o "voltar" leva */
+const ETAPA = "razao";
 
 export default function Razao() {
   const { id } = useParams<{ id: string }>();
@@ -192,7 +196,9 @@ export default function Razao() {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5">
-      <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
+      <Voltar para={voltarDaEtapa(projetoId, ETAPA, projeto)}>
+        {rotuloDoVoltar(ETAPA, projeto)}
+      </Voltar>
 
       <CabecalhoDePagina
         eyebrow="Etapa 5 · Razão"
@@ -284,7 +290,13 @@ export default function Razao() {
         </Faixa>
       )}
 
-      {resultado && resumo && !anterior && <Concluido execucao={resultado} resumo={resumo} />}
+      {resultado && resumo && !anterior && (
+        <Concluido
+          execucao={resultado}
+          resumo={resumo}
+          voltar={voltarDaEtapa(projetoId, ETAPA, projeto)}
+        />
+      )}
     </div>
   );
 }
@@ -334,7 +346,16 @@ function EmCurso({ e }: { e: ExecucaoDoRazao }) {
 
 /* ------------------------------------------------------------------ */
 
-function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: ResumoDoRazao }) {
+function Concluido({
+  execucao,
+  resumo,
+  voltar,
+}: {
+  execucao: ExecucaoDoRazao;
+  resumo: ResumoDoRazao;
+  /** para onde o rodapé leva: a frente desta etapa */
+  voltar: string;
+}) {
   const download = useAcao();
   const [baixando, setBaixando] = useState<{ qual: PlanilhaDoRazao; formato: Formato } | null>(null);
   const pend = resumo.pendencias;
@@ -475,7 +496,7 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoRazao; resumo: Re
             final contra o inventário.
           </p>
         </div>
-        <BotaoLink para={ROTAS.projeto(execucao.projeto_id)} variante="secundario">
+        <BotaoLink para={voltar} variante="secundario">
           Ver as etapas
         </BotaoLink>
       </section>

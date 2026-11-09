@@ -31,6 +31,7 @@ import { useAcao } from "@/hooks/useAcao";
 import { cn } from "@/lib/cn";
 import { comoErro } from "@/lib/errors";
 import { numero } from "@/lib/format";
+import { rotuloDoVoltar, voltarDaEtapa } from "@/lib/voltar";
 import {
   VERSAO_DO_RESUMO_DA_APURACAO,
   baixarPlanilhaDaApuracao,
@@ -65,6 +66,9 @@ const ESPERA_DA_BUSCA_MS = 350;
 
 const cnpjFormatado = (c: string) =>
   c.length === 14 ? `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}` : c;
+
+/** a chave desta etapa no servidor: decide a frente a que o "voltar" leva */
+const ETAPA = "apuracao";
 
 export default function Apuracao() {
   const { id } = useParams<{ id: string }>();
@@ -183,7 +187,9 @@ export default function Apuracao() {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5">
-      <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
+      <Voltar para={voltarDaEtapa(projetoId, ETAPA, projeto)}>
+        {rotuloDoVoltar(ETAPA, projeto)}
+      </Voltar>
 
       <CabecalhoDePagina
         eyebrow="Etapa 6 · Apuração"

@@ -28,12 +28,12 @@ import {
   IconeTentarDeNovo,
 } from "@/constants/icons";
 import { INTERVALO_POLL_MS } from "@/constants/polling";
-import { ROTAS } from "@/constants/routes";
 import { aceitaProcessamento } from "@/constants/status";
 import { useAcao } from "@/hooks/useAcao";
 import { cn } from "@/lib/cn";
 import { comoErro } from "@/lib/errors";
 import { numero } from "@/lib/format";
+import { rotuloDoVoltar, voltarDaEtapa } from "@/lib/voltar";
 import type { Pagina } from "@/services/apuracao";
 import {
   VERSAO_DO_RESUMO_DO_ARQUIVO_DIGITAL,
@@ -83,6 +83,9 @@ const VENDA: Record<string, string> = {
   enquadramento_1: "enquadramento 1 (ressarcimento e complemento)",
   demais_saidas: "demais saídas (0), só perdas e interestaduais",
 };
+
+/** a chave desta etapa no servidor: decide a frente a que o "voltar" leva */
+const ETAPA = "arquivo_digital";
 
 export default function ArquivoDigital() {
   const { id } = useParams<{ id: string }>();
@@ -201,7 +204,9 @@ export default function ArquivoDigital() {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5">
-      <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
+      <Voltar para={voltarDaEtapa(projetoId, ETAPA, projeto)}>
+        {rotuloDoVoltar(ETAPA, projeto)}
+      </Voltar>
 
       <CabecalhoDePagina
         eyebrow="Etapa 7 · Arquivo digital"
@@ -276,7 +281,13 @@ export default function ArquivoDigital() {
         </Faixa>
       )}
 
-      {resultado && resumo && !anterior && <Concluido execucao={resultado} resumo={resumo} />}
+      {resultado && resumo && !anterior && (
+        <Concluido
+          execucao={resultado}
+          resumo={resumo}
+          voltar={voltarDaEtapa(projetoId, ETAPA, projeto)}
+        />
+      )}
     </div>
   );
 }
@@ -307,7 +318,16 @@ function EmCurso({ e }: { e: ExecucaoDoArquivoDigital }) {
 
 /* ------------------------------------------------------------------ */
 
-function Concluido({ execucao, resumo }: { execucao: ExecucaoDoArquivoDigital; resumo: ResumoDoArquivoDigital }) {
+function Concluido({
+  execucao,
+  resumo,
+  voltar,
+}: {
+  execucao: ExecucaoDoArquivoDigital;
+  resumo: ResumoDoArquivoDigital;
+  /** para onde o rodapé leva: a frente desta etapa */
+  voltar: string;
+}) {
   const download = useAcao();
   const [baixando, setBaixando] = useState<string | null>(null);
 
@@ -492,7 +512,7 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoArquivoDigital; r
             de crítica do validador oficial não são públicas. Copie para a rede conferindo o SHA-256 do índice.
           </p>
         </div>
-        <BotaoLink para={ROTAS.projeto(execucao.projeto_id)} variante="secundario">
+        <BotaoLink para={voltar} variante="secundario">
           Ver as etapas
         </BotaoLink>
       </section>

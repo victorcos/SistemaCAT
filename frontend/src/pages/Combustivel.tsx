@@ -15,10 +15,10 @@ import { Botao } from "@/components/ui/Botao";
 import { CabecalhoDePagina, Metrica, Metricas, Voltar } from "@/components/ui/Pagina";
 import { IconeParar, IconeTentarDeNovo } from "@/constants/icons";
 import { INTERVALO_POLL_MS } from "@/constants/polling";
-import { ROTAS } from "@/constants/routes";
 import { aceitaProcessamento } from "@/constants/status";
 import { comoErro } from "@/lib/errors";
 import { dia, numero } from "@/lib/format";
+import { rotuloDoVoltar, voltarDaEtapa } from "@/lib/voltar";
 import {
   cancelarCombustivel,
   detalharCombustivel,
@@ -51,6 +51,9 @@ import type { ErroApi } from "@/types/erro";
  */
 
 const ESPERA_PARA_CANCELAR_MS = 1500;
+
+/** a chave desta etapa no servidor: decide a frente a que o "voltar" leva */
+const ETAPA = "combustivel";
 
 export default function Combustivel() {
   const { id } = useParams<{ id: string }>();
@@ -173,7 +176,9 @@ export default function Combustivel() {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5">
-      <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
+      <Voltar para={voltarDaEtapa(projetoId, ETAPA, projeto)}>
+        {rotuloDoVoltar(ETAPA, projeto)}
+      </Voltar>
 
       <CabecalhoDePagina
         eyebrow="ICMS · Combustível"

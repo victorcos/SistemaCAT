@@ -144,7 +144,7 @@ export default function DePara() {
   const r = dados?.resumo;
   return (
     <div className="flex flex-col gap-5">
-      <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
+      <Voltar para={ROTAS.razao(projetoId)}>Montar o razão dos itens</Voltar>
       <CabecalhoDePagina
         eyebrow="Razão dos itens"
         titulo="De-para de códigos"

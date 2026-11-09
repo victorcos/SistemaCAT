@@ -11,13 +11,13 @@ import { CabecalhoDePagina, Vazio, Voltar } from "@/components/ui/Pagina";
 import { Celula, Linha, Tabela } from "@/components/ui/Tabela";
 import { IconeApagar, IconeParar, IconeTentarDeNovo } from "@/constants/icons";
 import { INTERVALO_POLL_MS } from "@/constants/polling";
-import { ROTAS } from "@/constants/routes";
 import { aceitaProcessamento } from "@/constants/status";
 import { useAcao } from "@/hooks/useAcao";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/cn";
 import { comoErro } from "@/lib/errors";
 import { numero } from "@/lib/format";
+import { rotuloDoVoltar, voltarDaEtapa } from "@/lib/voltar";
 import { EM_CURSO, type Formato } from "@/services/conferencia";
 import {
   baixarPlanilhaDoOutorgado,
@@ -66,6 +66,9 @@ const reaisDeCentavos = (centavos: number | undefined) =>
 
 const mesmaLista = (a: string[], b: string[]) =>
   a.length === b.length && a.every((x, i) => x === b[i]);
+
+/** a chave desta etapa no servidor: decide a frente a que o "voltar" leva */
+const ETAPA = "credito_outorgado";
 
 export default function CreditoOutorgado() {
   const { id } = useParams<{ id: string }>();
@@ -193,7 +196,9 @@ export default function CreditoOutorgado() {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5">
-      <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
+      <Voltar para={voltarDaEtapa(projetoId, ETAPA, projeto)}>
+        {rotuloDoVoltar(ETAPA, projeto)}
+      </Voltar>
 
       <CabecalhoDePagina
         eyebrow="ICMS · Crédito outorgado"

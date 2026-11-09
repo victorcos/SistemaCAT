@@ -29,12 +29,12 @@ import {
   IconeTentarDeNovo,
 } from "@/constants/icons";
 import { INTERVALO_POLL_MS } from "@/constants/polling";
-import { ROTAS } from "@/constants/routes";
 import { aceitaProcessamento } from "@/constants/status";
 import { useAcao } from "@/hooks/useAcao";
 import { cn } from "@/lib/cn";
 import { comoErro } from "@/lib/errors";
 import { numero } from "@/lib/format";
+import { rotuloDoVoltar, voltarDaEtapa } from "@/lib/voltar";
 import { EM_CURSO, type Formato } from "@/services/conferencia";
 import { detalharProjeto, type ProjetoDetalhe } from "@/services/importacao";
 import { listarMovimentos } from "@/services/movimentos";
@@ -159,6 +159,9 @@ const MODELO: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------ */
+
+/** a chave desta etapa no servidor: decide a frente a que o "voltar" leva */
+const ETAPA = "st_suportado";
 
 export default function Suportado() {
   const { id } = useParams<{ id: string }>();
@@ -294,7 +297,9 @@ export default function Suportado() {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5">
-      <Voltar para={ROTAS.projeto(projetoId)}>Voltar ao trabalho</Voltar>
+      <Voltar para={voltarDaEtapa(projetoId, ETAPA, projeto)}>
+        {rotuloDoVoltar(ETAPA, projeto)}
+      </Voltar>
 
       <CabecalhoDePagina
         eyebrow="Etapa 4 · Apuração"
@@ -387,7 +392,11 @@ export default function Suportado() {
       {rodando && atual && <EmCurso e={atual} />}
 
       {resultado && resumo && !anterior && (
-        <Concluido execucao={resultado} resumo={resumo} />
+        <Concluido
+          execucao={resultado}
+          resumo={resumo}
+          voltar={voltarDaEtapa(projetoId, ETAPA, projeto)}
+        />
       )}
     </div>
   );
@@ -446,7 +455,16 @@ function EmCurso({ e }: { e: ExecucaoDoSuportado }) {
 
 /* ------------------------------------------------------------------ */
 
-function Concluido({ execucao, resumo }: { execucao: ExecucaoDoSuportado; resumo: ResumoDoSuportado }) {
+function Concluido({
+  execucao,
+  resumo,
+  voltar,
+}: {
+  execucao: ExecucaoDoSuportado;
+  resumo: ResumoDoSuportado;
+  /** para onde o rodapé leva: a frente desta etapa */
+  voltar: string;
+}) {
   const [fonte, setFonte] = useState<Fonte | null>(null);
   const download = useAcao();
   const [baixando, setBaixando] = useState<Formato | null>(null);
@@ -582,7 +600,7 @@ function Concluido({ execucao, resumo }: { execucao: ExecucaoDoSuportado; resumo
             ponderado móvel.
           </p>
         </div>
-        <BotaoLink para={ROTAS.projeto(execucao.projeto_id)} variante="secundario">
+        <BotaoLink para={voltar} variante="secundario">
           Ver as etapas
         </BotaoLink>
       </section>
