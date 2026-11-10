@@ -5,6 +5,45 @@
 
 ---
 
+## 2026-11-10 — De-para: cinco travas no "vale sozinho" e o cadastro do código só de estoque
+
+**O problema.** Medido com gabarito (cada par lido dos dois lados), do que o
+de-para aplicava sem ninguém aprovar só **42%** era o mesmo produto na
+empresa 29 (supermercado) e **13%** na execução 227 (material de construção).
+O GTIN era válido, mas estava no produto errado do cadastro ou tinha chegado
+por um pareamento C170 × XML fora de ordem; o sufixo ligava por corrente
+("joelho de PVC → argamassa").
+
+**O que mudou** (`cat/dominio/depara/candidatos.py` e
+`infraestrutura/analitico/depara.py`):
+- o par de GTIN ou sufixo só vale sozinho sem nenhuma **trava**: sufixo entre
+  descrições com até 20% das palavras em comum; GTIN usado em códigos de dois
+  capítulos de NCM; os dois códigos vendendo ou comprando nas mesmas 2+
+  semanas; peso/volume da descrição diferente além de 10%, descontado o fator;
+  custo incoerente (custo × custo 0,5–2,0, ou sobre o preço de venda sem
+  transferência 0,3–1,2). A trava manda para a revisão, com o porquê na
+  explicação;
+- NCM de capítulos diferentes é **aviso**, não trava: barrava 28 pares certos
+  (gaveta com NCM de empilhadeira num cadastro);
+- o GTIN do XML pareado ao C170 só entra quando o XML combina com o cadastro do
+  código (capítulo de NCM ou palavra em comum). A docstring dizia que o pareado
+  não entrava, e o código deixava entrar;
+- **o código que só tem estoque ficava sem descrição**: o cadastro era ligado
+  pelo lado do movimento. Descrição vazia passa como compatível, e era daí que
+  vinham as correntes de sufixo da execução 227 (2.851 pares propostos; com a
+  correção, 622).
+
+**Resultado, com o código implementado:** 91,7% de acerto na empresa 29 e
+100% na amostra da 227, contra 42,1% e 13,3%. Ficaram de fora unidade,
+sabor/versão (barrava mais certo que errado) e CEST (só tirava certos).
+
+**Por que travar e não recusar.** O par certo barrado custa um clique de
+revisão; o errado aceito vai calado para a ficha. Pela mesma razão, o
+resultado da CAT 42 de quem já rodou com o de-para antigo precisa ser refeito
+e comparado.
+
+Especificação e medições: `docs/especificacoes/depara/reforcos-do-depara.md`.
+
 ## 2026-11-03 — Bonificação na EFD-Contribuições: o C181 casa com o C185 pelo CFOP, não pela posição
 
 **O pedido.** Para um grupo de 11 empresas (empresas 25 a 35 do registro
@@ -8988,42 +9027,3 @@ e que alocação ali não muda nada.
 Com isto, a sucessão deixa de ser o único caminho para conceder acesso — ela
 continua concedendo, porque passar o trabalho implica passar o acesso, mas
 agora é atalho e não gambiarra.
-
-## 2026-11-10 — De-para: cinco travas no "vale sozinho" e o cadastro do código só de estoque
-
-**O problema.** Medido com gabarito (cada par lido dos dois lados), do que o
-de-para aplicava sem ninguém aprovar só **42%** era o mesmo produto na
-empresa 29 (supermercado) e **13%** na execução 227 (material de construção).
-O GTIN era válido, mas estava no produto errado do cadastro ou tinha chegado
-por um pareamento C170 × XML fora de ordem; o sufixo ligava por corrente
-("joelho de PVC → argamassa").
-
-**O que mudou** (`cat/dominio/depara/candidatos.py` e
-`infraestrutura/analitico/depara.py`):
-- o par de GTIN ou sufixo só vale sozinho sem nenhuma **trava**: sufixo entre
-  descrições com até 20% das palavras em comum; GTIN usado em códigos de dois
-  capítulos de NCM; os dois códigos vendendo ou comprando nas mesmas 2+
-  semanas; peso/volume da descrição diferente além de 10%, descontado o fator;
-  custo incoerente (custo × custo 0,5–2,0, ou sobre o preço de venda sem
-  transferência 0,3–1,2). A trava manda para a revisão, com o porquê na
-  explicação;
-- NCM de capítulos diferentes é **aviso**, não trava: barrava 28 pares certos
-  (gaveta com NCM de empilhadeira num cadastro);
-- o GTIN do XML pareado ao C170 só entra quando o XML combina com o cadastro do
-  código (capítulo de NCM ou palavra em comum). A docstring dizia que o pareado
-  não entrava, e o código deixava entrar;
-- **o código que só tem estoque ficava sem descrição**: o cadastro era ligado
-  pelo lado do movimento. Descrição vazia passa como compatível, e era daí que
-  vinham as correntes de sufixo da execução 227 (2.851 pares propostos; com a
-  correção, 622).
-
-**Resultado, com o código implementado:** 91,7% de acerto na empresa 29 e
-100% na amostra da 227, contra 42,1% e 13,3%. Ficaram de fora unidade,
-sabor/versão (barrava mais certo que errado) e CEST (só tirava certos).
-
-**Por que travar e não recusar.** O par certo barrado custa um clique de
-revisão; o errado aceito vai calado para a ficha. Pela mesma razão, o
-resultado da CAT 42 de quem já rodou com o de-para antigo precisa ser refeito
-e comparado.
-
-Especificação e medições: `docs/especificacoes/depara/reforcos-do-depara.md`.
