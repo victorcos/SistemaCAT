@@ -166,3 +166,40 @@ class TestNcmDeCapituloDiferenteEhSoAviso:
         par = {p.origem: p for p in propor(itens)}["10108"]
         assert vale_sozinho(par)
         assert par.avisos and "atenção:" in par.explicacao
+
+
+class TestFardoEscritoComCBarra:
+    """"C/12" é o fardo de 12 unidades (pedido de 10/11/2026, caso da Brahma no trabalho 29)."""
+
+    def test_le_o_fardo(self):
+        from cat.dominio.depara.candidatos import fator_do_kit
+        assert fator_do_kit(item("1", "Cerveja Brahma 350ml Lata C/12"))[0] == 12
+        assert fator_do_kit(item("1", "Lava Louca Ype 500ml Coco C/ 6"))[0] == 6
+        assert fator_do_kit(item("1", "PORCA SEXTAVADA 5/16 C/05UN"))[0] == 5
+
+    def test_conteudo_medida_e_modelo_nao_sao_fardo(self):
+        from cat.dominio.depara.candidatos import fator_do_kit
+        for descricao in ("CABO FLEXIVEL ROLO C/100MT 4,0MM PR", "DIPIRONA SODICA 500MG C/ 10 COMP",
+                          "Cha Leao C/25 Sachet Camomila", "REGISTRO ESFERA DECA C/001 UN",
+                          "DECA SIF.LAV.1X1.1/2 1680.C.100.112", "Toalha Umed Baby Bless C/50",
+                          "KIT PINTURA ROMA C/05 PECAS", "Pao Mel Bauducco 30g C/ Cob Chocolate"):
+            assert fator_do_kit(item("1", descricao)) is None, descricao
+
+    def test_fardo_e_lata_com_o_mesmo_gtin_viram_kit_e_nao_valem_sozinhos(self):
+        """Antes: GTIN, fator 1, aprovado pela prova — 12 latas contadas como 1."""
+        gtin = "7891149010509"
+        itens = [item("583022", "Cerveja Brahma 350ml Lata C/12", "22030000", entradas=100, gtins_do_xml={gtin}),
+                 item("306550", "Cerveja Brahma 350ml Lata", "22030000", saidas=900, gtins_do_xml={gtin})]
+        par = propor(itens)[0]
+        assert (par.origem, par.destino, par.fator) == ("583022", "306550", D(12))
+        assert Motivo.KIT in par.motivos and Motivo.GTIN not in par.motivos
+        assert not vale_sozinho(par)
+
+    def test_o_fator_sai_redondo(self):
+        """Pelo caminho inverso (unidade → fardo → unidade) a divisão dava 5,99999…"""
+        itens = [item("1", "Cerveja Heineken 330ml l Neck C/6", "22030000", entradas=10),
+                 item("2", "Cerveja Heineken 330ml l Neck", "22030000", saidas=5),
+                 item("3", "Cerveja Heineken 330ml l Neck C/6", "22030000", saidas=50)]
+        fatores = {p.origem: p.fator for p in propor(itens)}
+        assert all(f == f.to_integral_value() or len(str(f)) <= 12 for f in fatores.values())
+        assert D(6) in fatores.values() or D("0.1666666667") in fatores.values()

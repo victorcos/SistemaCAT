@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-11-10 — De-para: o fardo escrito "C/12" é kit
+
+No trabalho 29, "Cerveja Brahma 350ml Lata C/12" e a lata avulsa tinham o mesmo
+GTIN e eram aplicadas **sozinhas com fator 1**: 12 latas contadas como uma. O
+kit só era reconhecido escrito "KIT 3X" ou `K3` no código.
+
+**A regra** (`candidatos._KIT_C_BARRA`): "C/12", "C/ 12", "C/12UN" na descrição
+**original** (normalizada, "1680.C.100.112" da Deca pareceria "C 100"), com:
+- número de 2 a 24 — acima disso é conteúdo, não fardo ("Lenço C/50",
+  "Espaçador C/100 UNI"; sem o teto a execução 227 perdia 6 pares certos);
+- sem medida ou conteúdo depois do número ("C/100MT", "C/10 COMP",
+  "C/25 Sachet", "C/05 PECAS").
+
+**Efeito.** No trabalho 29, os quatro fardos que valiam sozinhos com fator 1
+(Brahma, Antarctica, Budweiser, Guaraná) viram kit de 12/6 e vão à revisão, e
+surgem 446 propostas de kit (unidade × fardo). Na execução 227, um par certo se
+perde ("Parafuso castelo (PAR)" × "C/02UN"). O acerto do gabarito não muda
+(91,7% e 100%): nenhum fardo estava na amostra.
+
+**De carona:** o fator passa a sair arredondado (10 casas, inteiro quando é
+inteiro). Pelo caminho inverso, 1 ÷ (1/6) dava 5,99999…
+
 ## 2026-11-10 — De-para: cinco travas no "vale sozinho" e o cadastro do código só de estoque
 
 **O problema.** Medido com gabarito (cada par lido dos dois lados), do que o

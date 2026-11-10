@@ -361,6 +361,26 @@ _LOTE_VALIDADE = re.compile(r"\b(LOTE|LT|VAL|VALIDADE|FAB)\b\s*[:.]?\s*\S+", re.
 _KIT_NA_DESCRICAO = re.compile(r"\bKIT\s*(?:C/|COM|DE)?\s*(\d{1,3})\s*(?:X|UN|UNID|UNIDADES)?\b"
                                r"|\b(\d{1,3})\s*X\s*KIT\b|\bKIT\b.*?\b(\d{1,3})\s*X\b", re.IGNORECASE)
 _KIT_NO_CODIGO = re.compile(r"^(.+?)K(\d{1,2})$", re.IGNORECASE)
+# "C/12", "C/ 12", "C/12UN": a embalagem com N unidades ("Cerveja Brahma 350ml Lata C/12"). Lido no texto
+# **original** — normalizada, a barra vira espaço e "1680.C.100.112" (modelo da Deca) pareceria "C 100".
+# Não vale com medida ou conteúdo depois do número: "C/100MT", "C/10 COMP", "C/25 SACHET" são uma unidade
+# vendida inteira, não N unidades vendidas soltas
+_KIT_C_BARRA = re.compile(
+    r"\bC/\s*(\d{1,3})\s*(?:UN|UND|UNID|UNIDADES)?(?![\d,.])"
+    r"(?!\s*(?:ML|MT|MTS|M|MM|CM|G|GR|KG|L|LT|LTS|CAPS|CAP|COMP|CPR|CP|DRG|SACHE|SACHES|SACHET|SACHETS"
+    r"|FL|FLS|FOLHAS|DOSES|METROS|LAMINAS|ROLOS|PECAS|PCS|PC)\b)", re.IGNORECASE)
+# acima disto o número é conteúdo, não fardo: "Lenço C/50", "Fralda C/36", "Espaçador cruzeta C/100 UNI".
+# Fardo de bebida vai até 24. Medido na execução 227: sem o teto, 6 pares certos de GTIN se perdiam
+MAXIMO_DO_KIT_C_BARRA = 24
+
+
+def _kit_c_barra(descricao: str) -> int | None:
+    """Unidades do fardo escrito como "C/12" na descrição, ou None."""
+    for achado in _KIT_C_BARRA.finditer(descricao or ""):
+        n = int(achado.group(1))
+        if 1 < n <= MAXIMO_DO_KIT_C_BARRA:
+            return n
+    return None
 _NAO_ALFANUMERICO = re.compile(r"[^A-Z0-9 ]+")
 
 
@@ -397,6 +417,9 @@ def fator_do_kit(item: ItemParaCasar) -> tuple[int, str] | None:
         return int(no_codigo.group(2)), no_codigo.group(1)
     if n_descricao and n_descricao > 1:
         return n_descricao, codigo
+    c_barra = _kit_c_barra(item.descricao)
+    if c_barra:
+        return c_barra, codigo
     return None
 
 
@@ -413,7 +436,9 @@ def descricoes_compativeis(a: str, b: str, minimo: float = 0.5) -> bool:
 
 
 def _descricao_sem_kit(descricao: str) -> str:
-    texto = normalizar_descricao(descricao)
+    # tira só o "C/12" que é fardo; o "C/001 UN" e o "C/100" ficam, como estavam
+    texto = normalizar_descricao(_KIT_C_BARRA.sub(
+        lambda m: " " if 1 < int(m.group(1)) <= MAXIMO_DO_KIT_C_BARRA else m.group(0), descricao or ""))
     texto = re.sub(r"\bKIT\s*(C|COM|DE)?\s*\d{1,3}\s*(X|UN|UNID|UNIDADES)?\b", " ", texto)
     texto = re.sub(r"\b\d{1,3}\s*X\b", " ", texto)
     texto = re.sub(r"\bKIT\b", " ", texto)
@@ -634,6 +659,14 @@ def propor(itens: list[ItemParaCasar]) -> list[Par]:
     return sorted(pares, key=lambda p: (p.destino, p.origem))
 
 
+def _arredondar_fator(fator: Decimal) -> Decimal:
+    """O fator sem o resíduo da divisão: 1 ÷ (1/6) dava 5,99999…, e o razão multiplicava por isso."""
+    redondo = fator.quantize(Decimal("1e-10"))
+    if abs(redondo - redondo.to_integral_value()) < Decimal("1e-8"):
+        redondo = redondo.to_integral_value()
+    return redondo.normalize()
+
+
 def _pares_do_grupo(grupo: _Grupo, itens: dict[str, ItemParaCasar],
                     contaminados: frozenset[str] = frozenset()) -> list[Par]:
     membros = [itens[c] for c in grupo.codigos if c in itens]
@@ -653,7 +686,7 @@ def _pares_do_grupo(grupo: _Grupo, itens: dict[str, ItemParaCasar],
         if m.codigo == destino.codigo:
             continue
         # q(m) × f(m) = q(raiz) = q(destino) × f(destino)  →  q(destino) = q(m) × f(m) / f(destino)
-        fator = (grupo.fatores[m.codigo] / f_destino).normalize()
+        fator = _arredondar_fator(grupo.fatores[m.codigo] / f_destino)
         motivos = tuple(sorted(grupo.motivos.get(m.codigo, set()) | grupo.motivos.get(destino.codigo, set()),
                                key=lambda x: list(Motivo).index(x)))
         confianca = (Confianca.ALTA if any(x in (Motivo.GTIN, Motivo.SUFIXO, Motivo.KIT) for x in motivos)
