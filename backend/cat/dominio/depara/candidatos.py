@@ -67,6 +67,13 @@ provas identificam o mesmo produto e ligam sempre com fator 1, então aceitá-la
 não muda quantidade nenhuma — só junta duas fichas do mesmo produto, que é o
 que o razão erraria sem elas.
 
+Desde 10/11/2026 o par de prova forte ainda passa por cinco **travas**
+(`travas_do_par`): sufixo entre descrições diferentes, GTIN usado em capítulos
+de NCM diferentes, os dois códigos convivendo, peso/volume diferente na
+descrição e custo incoerente. Qualquer uma manda o par para a revisão. Sem
+elas, do que valia sozinho só 42% e 13% era o mesmo produto, nas duas bases
+medidas; com elas, 89,5% e 90,5%.
+
 O **kit** fica de fora mesmo com confiança alta: é ele que traz fator diferente
 de 1, e fator errado erra a quantidade da ficha, não só o agrupamento. A
 **descrição** fica de fora por ser a prova mais fraca. Essas duas continuam
@@ -129,6 +136,11 @@ class ItemParaCasar:
     estoque_inicial: Decimal = ZERO  # abertura do inventário
     devolucoes_de_venda: Decimal = ZERO   # entrada de devolução (1.411, 2.411...)
     devolucoes_de_compra: Decimal = ZERO  # saída de devolução ao fornecedor (5.411, 6.411...)
+    # para as travas do `vale_sozinho` (ver "O que tira o par do vale sozinho")
+    semanas_com_saida: frozenset = frozenset()    # início de cada semana com venda/saída
+    semanas_com_entrada: frozenset = frozenset()  # início de cada semana com entrada
+    custo_unitario: Decimal | None = None   # Σ(valor − desconto) ÷ Σ quantidade das entradas
+    preco_de_venda: Decimal | None = None   # Σ valor ÷ Σ quantidade das saídas, sem transferência
 
     @property
     def tem_origem(self) -> bool:
@@ -159,6 +171,10 @@ class Par:
     motivos: tuple[Motivo, ...]
     confianca: Confianca
     explicacao: str
+    # o que impede o par de valer sozinho, escrito para quem revisa
+    travas: tuple[str, ...] = ()
+    # o que não impede, mas merece olho (o NCM de capítulo diferente)
+    avisos: tuple[str, ...] = ()
 
 
 # as provas que valem sem ninguém aprovar: identificam o mesmo produto e ligam
@@ -170,16 +186,161 @@ MOTIVOS_QUE_VALEM_SOZINHOS = frozenset({Motivo.GTIN, Motivo.SUFIXO})
 def vale_sozinho(par: Par) -> bool:
     """O par entra na montagem sem ninguém aprovar?
 
-    Quatro exigências, e as três últimas são o cinto depois do suspensório: o
-    grupo pode ter sido ligado por mais de um caminho, e basta um kit no meio
-    para o fator deixar de ser 1. Aceitar fator sem alguém olhar mudaria a
-    quantidade da ficha, que é coisa diferente de juntar duas fichas do mesmo
-    produto.
+    Cinco exigências. As do meio são o cinto depois do suspensório: o grupo
+    pode ter sido ligado por mais de um caminho, e basta um kit no meio para o
+    fator deixar de ser 1. Aceitar fator sem alguém olhar mudaria a quantidade
+    da ficha, que é coisa diferente de juntar duas fichas do mesmo produto.
+
+    A última é nenhuma **trava** (`travas_do_par`): a prova pode ser real e o
+    produto, outro.
     """
     return (par.confianca is Confianca.ALTA
             and bool(MOTIVOS_QUE_VALEM_SOZINHOS & set(par.motivos))
             and Motivo.KIT not in par.motivos
-            and par.fator == UM)
+            and par.fator == UM
+            and not par.travas)
+
+
+# ---------------------------------------------------------------------------
+# O que tira o par do vale sozinho
+# ---------------------------------------------------------------------------
+#
+# Medido em 10/11/2026 com gabarito (cada par lido dos dois lados), em duas
+# bases: a empresa 29 (supermercado, 214 pares rotulados) e a execução 227
+# (material de construção, amostra de 150). Do que valia sozinho, era mesmo
+# produto **42%** na primeira e **13%** na segunda. O GTIN existia e era
+# válido — estava no produto errado do cadastro, ou chegou por um pareamento
+# C170 × XML fora de ordem; o sufixo ligava por corrente ("joelho de PVC →
+# argamassa"). Com as cinco travas abaixo: **89,5% e 90,5%**. A conta está em
+# `docs/especificacoes/depara/reforcos-do-depara.md`.
+#
+# Cada trava **manda para a revisão**, não recusa: o par certo barrado custa
+# um clique; o errado aceito vai calado para a ficha.
+#
+# Ficam como **aviso**, sem barrar: o NCM de capítulo diferente — barrava 28
+# pares certos de gaveta de dinheiro com NCM de empilhadeira num lado, que é
+# cadastro errado e não produto diferente (e é o achado que o reenquadramento
+# de PIS/COFINS quer). Ficaram de fora: unidade, sabor/versão (barrava mais
+# certo que errado) e CEST (só tirava certos).
+
+# sufixo com descrições com até isto de palavras em comum (Jaccard)
+SEMELHANCA_MINIMA_DO_SUFIXO = 0.2
+# semanas em comum, de venda ou de compra, que provam que os dois convivem
+SEMANAS_QUE_PROVAM_CONVIVENCIA = 2
+# peso/volume da descrição: diferença tolerada, já descontado o fator
+TOLERANCIA_DA_MEDIDA = Decimal("0.10")
+# custo da origem ÷ fator, sobre o custo do destino
+FAIXA_DE_CUSTO = (Decimal("0.5"), Decimal("2.0"))
+# custo da origem ÷ fator, sobre o preço de venda do destino (sem entrada nele)
+FAIXA_DE_CUSTO_SOBRE_PRECO = (Decimal("0.3"), Decimal("1.2"))
+# NCM que não diz capítulo nenhum
+NCM_GENERICOS = frozenset({"11111111", "00000000", "99999999"})
+
+_MEDIDA = re.compile(r"(\d+(?:[.,]\d+)?)\s*(KGS?|GRS?|G|MG|LTS?|L|ML)\b")
+_PARA_BASE = {"KG": ("massa", Decimal(1000)), "KGS": ("massa", Decimal(1000)), "G": ("massa", UM),
+              "GR": ("massa", UM), "GRS": ("massa", UM), "MG": ("massa", Decimal("0.001")),
+              "L": ("volume", Decimal(1000)), "LT": ("volume", Decimal(1000)),
+              "LTS": ("volume", Decimal(1000)), "ML": ("volume", UM)}
+_PALAVRA = re.compile(r"[A-Z]{3,}")
+
+
+def capitulo(ncm: str) -> str:
+    """Os dois primeiros dígitos do NCM, ou "" quando ele não diz nada."""
+    n = (ncm or "").strip()
+    return n[:2] if len(n) >= 2 and n.isdigit() and n not in NCM_GENERICOS else ""
+
+
+def semelhanca_de_palavras(a: str, b: str) -> float | None:
+    """Jaccard das palavras de 3+ letras, sem acento. None quando um lado não tem descrição."""
+    pa = set(_PALAVRA.findall(normalizar_descricao(a)))
+    pb = set(_PALAVRA.findall(normalizar_descricao(b)))
+    if not pa or not pb:
+        return None
+    return len(pa & pb) / len(pa | pb)
+
+
+def medidas_da_descricao(descricao: str) -> dict[str, Decimal]:
+    """O primeiro peso e o primeiro volume escritos na descrição, em g e ml."""
+    achadas: dict[str, Decimal] = {}
+    for numero, unidade in _MEDIDA.findall((descricao or "").upper()):
+        tipo, mult = _PARA_BASE[unidade]
+        achadas.setdefault(tipo, Decimal(numero.replace(",", ".")) * mult)
+    return achadas
+
+
+def gtins_contaminados(itens: Iterable[ItemParaCasar]) -> frozenset[str]:
+    """GTINs que o estabelecimento usa em códigos de dois ou mais capítulos de NCM.
+
+    Um GTIN é de um produto. Quando o mesmo aparece em creme de leite e em
+    milho verde, ou o cadastro ou o pareamento erraram, e o GTIN deixa de
+    provar qualquer coisa ali: na empresa 29, `7896232115673` estava em 12
+    pares. Precisão medida: 87%.
+    """
+    capitulos: dict[str, set[str]] = {}
+    for item in itens:
+        cap = capitulo(item.ncm)
+        if not cap:
+            continue
+        for g in item.gtins | item.gtins_do_xml:
+            if gtin_valido(g):
+                capitulos.setdefault(g.lstrip("0"), set()).add(cap)
+    return frozenset(g for g, caps in capitulos.items() if len(caps) >= 2)
+
+
+def travas_do_par(origem: ItemParaCasar, destino: ItemParaCasar, fator: Decimal,
+                  motivos: Iterable[Motivo], contaminados: frozenset[str] = frozenset()) -> tuple[str, ...]:
+    """O que impede o par de valer sozinho; vazio quando nada impede."""
+    motivos = set(motivos)
+    travas: list[str] = []
+
+    # 1. sufixo entre descrições que não se parecem: o par vem de uma corrente
+    # no grupo (na execução 227, 118 erros barrados e nenhum certo)
+    if Motivo.SUFIXO in motivos:
+        s = semelhanca_de_palavras(origem.descricao, destino.descricao)
+        if s is not None and s <= SEMELHANCA_MINIMA_DO_SUFIXO:
+            travas.append(f"sufixo entre descrições diferentes ({s:.0%} das palavras em comum)")
+
+    # 2. GTIN em códigos de capítulos diferentes de NCM
+    comuns = ({g.lstrip("0") for g in origem.gtins | origem.gtins_do_xml if gtin_valido(g)}
+              & {g.lstrip("0") for g in destino.gtins | destino.gtins_do_xml if gtin_valido(g)})
+    sujos = sorted(comuns & contaminados)
+    if sujos:
+        travas.append(f"GTIN {sujos[0]} usado em produtos de capítulos de NCM diferentes")
+
+    # 3. os dois convivem: troca de código não convive (precisão 94% e 100%)
+    juntas = max(len(origem.semanas_com_saida & destino.semanas_com_saida),
+                 len(origem.semanas_com_entrada & destino.semanas_com_entrada))
+    if juntas >= SEMANAS_QUE_PROVAM_CONVIVENCIA:
+        travas.append(f"os dois códigos se movimentam nas mesmas semanas ({juntas}): parecem produtos que convivem")
+
+    # 4. peso ou volume da descrição diferente, descontado o fator (precisão 96%)
+    mo, md = medidas_da_descricao(origem.descricao), medidas_da_descricao(destino.descricao)
+    for tipo in sorted(mo.keys() & md.keys()):
+        if md[tipo] and fator and abs(mo[tipo] / md[tipo] / fator - UM) > TOLERANCIA_DA_MEDIDA:
+            u = "g" if tipo == "massa" else "ml"
+            travas.append(f"{mo[tipo].normalize():f} {u} × {md[tipo].normalize():f} {u} na descrição")
+            break
+
+    # 5. custo incoerente com o fator
+    co = origem.custo_unitario
+    if co and fator:
+        if destino.custo_unitario:
+            razao, faixa, contra = co / fator / destino.custo_unitario, FAIXA_DE_CUSTO, "o custo"
+        elif destino.preco_de_venda:
+            razao, faixa, contra = co / fator / destino.preco_de_venda, FAIXA_DE_CUSTO_SOBRE_PRECO, "o preço de venda"
+        else:
+            razao = None
+        if razao is not None and not faixa[0] <= razao <= faixa[1]:
+            travas.append(f"custo incoerente: {razao:.2f} × {contra} do destino — confira o fator")
+    return tuple(travas)
+
+
+def avisos_do_par(origem: ItemParaCasar, destino: ItemParaCasar) -> tuple[str, ...]:
+    """O que merece olho, sem barrar."""
+    co, cd = capitulo(origem.ncm), capitulo(destino.ncm)
+    if co and cd and co != cd:
+        return (f"NCM de capítulos diferentes ({origem.ncm} × {destino.ncm}): um dos cadastros está errado",)
+    return ()
 
 
 @dataclass
@@ -431,6 +592,7 @@ class _Grupo:
 def propor(itens: list[ItemParaCasar]) -> list[Par]:
     """Os pares `origem → destino` que juntam o mesmo produto, para revisão."""
     por_codigo = {i.codigo: i for i in itens}
+    contaminados = gtins_contaminados(por_codigo.values())
     ligacoes = (_por_gtin(por_codigo) + _por_sufixo(por_codigo)
                 + _por_kit(por_codigo) + _por_descricao(por_codigo))
 
@@ -468,11 +630,12 @@ def propor(itens: list[ItemParaCasar]) -> list[Par]:
                 if vizinho not in grupo.codigos:
                     fila.append(vizinho)
         vistos |= grupo.codigos
-        pares += _pares_do_grupo(grupo, por_codigo)
+        pares += _pares_do_grupo(grupo, por_codigo, contaminados)
     return sorted(pares, key=lambda p: (p.destino, p.origem))
 
 
-def _pares_do_grupo(grupo: _Grupo, itens: dict[str, ItemParaCasar]) -> list[Par]:
+def _pares_do_grupo(grupo: _Grupo, itens: dict[str, ItemParaCasar],
+                    contaminados: frozenset[str] = frozenset()) -> list[Par]:
     membros = [itens[c] for c in grupo.codigos if c in itens]
     if len(membros) < 2:
         return []
@@ -498,7 +661,14 @@ def _pares_do_grupo(grupo: _Grupo, itens: dict[str, ItemParaCasar]) -> list[Par]
         detalhes = "; ".join(dict.fromkeys(grupo.detalhes.get(m.codigo, []) + grupo.detalhes.get(destino.codigo, [])))
         if grupo.conflitos:
             detalhes = f"fatores em conflito no grupo ({'; '.join(grupo.conflitos[:2])}); {detalhes}"
-        pares.append(Par(m.codigo, destino.codigo, fator, motivos, confianca, detalhes))
+        travas = travas_do_par(m, destino, fator, motivos, contaminados)
+        avisos = avisos_do_par(m, destino)
+        # quem revisa lê o porquê na explicação, sem a tela precisar mudar
+        for texto in travas:
+            detalhes = f"{detalhes}; revisar: {texto}"
+        for texto in avisos:
+            detalhes = f"{detalhes}; atenção: {texto}"
+        pares.append(Par(m.codigo, destino.codigo, fator, motivos, confianca, detalhes, travas, avisos))
     return pares
 
 

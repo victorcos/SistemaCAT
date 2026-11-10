@@ -78,6 +78,7 @@ def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
                 "cnpj": cnpj, "origem": p.origem, "destino": p.destino, "fator": format(p.fator, "f"),
                 "motivos": [m.value for m in p.motivos], "confianca": p.confianca.value,
                 "explicacao": p.explicacao, "proposto": True, "automatico": sozinho,
+                "travas": list(p.travas), "avisos": list(p.avisos),
                 **_situacao(d, nomes, automatico=sozinho),
             })
         aprovados_aqui = {o for (c, o), d in decisoes.items()
@@ -109,7 +110,7 @@ def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
             "cnpj": cnpj, "origem": origem, "destino": d.codigo_destino, "fator": format(d.fator.normalize(), "f"),
             "motivos": [d.motivo], "confianca": d.confianca, "explicacao": d.explicacao or "",
             # é decisão gravada: por definição alguém a tomou
-            "proposto": False, "automatico": False, **_situacao(d, nomes),
+            "proposto": False, "automatico": False, "travas": [], "avisos": [], **_situacao(d, nomes),
         })
 
     resumo = {
