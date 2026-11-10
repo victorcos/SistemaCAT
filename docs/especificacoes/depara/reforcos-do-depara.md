@@ -17,7 +17,7 @@ testável sem arquivo); a leitura dos dados, em `infraestrutura/analitico/depara
 
 ---
 
-## MEDIÇÃO NA EMPRESA 29 (09/11/2026) — muda ① e ④, ler antes de tudo
+## MEDIÇÃO NO EMPRESA 29 (09/11/2026) — muda ① e ④, ler antes de tudo
 
 Medido sem gravar nada no projeto 29 (CAT 42 4T2021, movimentos da execução
 215: 73 estabelecimentos, 1,04 milhão de códigos, 1.661 pares propostos). Os
@@ -117,6 +117,64 @@ Scripts: `medir_reforcos_v3.py`, `gabarito266.py`, `combos266.py`.
    com o mesmo GTIN (Óleo Concórdia × Vitaliv). Candidato a regra ⑪: mesma
    marca e tamanho, mas a palavra final diferente → revisão. Medir antes de
    incluir.
+
+---
+
+## TERCEIRA MEDIÇÃO (10/11/2026) — segunda base e calibragem · REGRA FINAL
+
+Segunda base: execução 227, um estabelecimento de material de construção,
+8.294 códigos, **2.842 pares valendo sozinhos**. Amostra aleatória de 150
+pares (semente 42), rotulada como antes: 19 S, 124 D, 7 I. **O atual acerta
+13,3%.** Quase todo o erro vem de **sufixo**: os pares `sufixo` e
+`gtin+sufixo` ligam joelho de PVC a argamassa, tinta spray a pilha. O par é
+proposto contra a raiz do grupo, e o grupo foi formado por uma corrente de
+sufixos. Scripts: `avaliar_bases.py`, `final_bases.py`.
+
+**Achados:**
+- a trava de sufixo da segunda medição (só no motivo `sufixo` puro, sem
+  nenhuma palavra em comum) **não basta**. Ela tem que valer para todo par com
+  sufixo no motivo, inclusive `gtin+sufixo`, e com **semelhança de palavras ≤
+  0,2** (Jaccard das palavras de 3+ letras). Assim ela barrou 118 erros e
+  nenhum certo na 227, e 6 erros e nenhum certo na empresa 29;
+- ⑦ com **2 semanas** é melhor que com 3 nas duas bases;
+- ⑧ com tolerância de **10%** recupera 3 pares certos na empresa 29 ("430 g ×
+  450 g" da cesta), sem soltar erro;
+- ⑪ (sabor/versão) **fica de fora**: na empresa 29 barra 17 certos para pegar
+  10 errados e na 227 barra 2 certos e nenhum errado;
+- ① custo barra 47 erros e nenhum certo na 227. Volta a barrar o `vale_sozinho`;
+- ③ CEST e ④ NCM de capítulo seguem como alerta: somar o ③ só tira certos.
+
+**Percentual de acerto (dos que continuam valendo sozinhos):**
+
+| Metodologia | Empresa 29 | Execução 227 |
+|---|---:|---:|
+| Atual | 42,1% | 13,3% |
+| Cinco reforços (①③④) | 60,0% | 19,3% |
+| ⑥⑦⑧ + sufixo (2ª medição) | 87,5% | 24,4% |
+| ⑥⑦⑧ + sufixo ≤ 0,2 em todo par de sufixo | 87,5% | 79,2% |
+| **Regra final: ① + ⑥ + ⑦(2 sem.) + ⑧(10%) + sufixo ≤ 0,2** | **89,5%** | **90,5%** |
+
+Na regra final ficam barrados, para revisão, 22 dos 90 certos na empresa 29 e
+0 dos 19 na 227. Sem o ①, o acerto é 89,7% e 82,6%, com 12 e 0 certos
+barrados. A escolha pelo ① é porque um erro aceito vai calado para a ficha, e
+um certo barrado só custa um clique de revisão.
+
+**Regra final para implementar** (tira do `vale_sozinho` e manda à revisão com
+o motivo escrito):
+1. sufixo no motivo e semelhança das descrições ≤ 0,2;
+2. ⑥ GTIN contaminado (o mesmo GTIN em códigos de 2+ capítulos de NCM no CNPJ);
+3. ⑦ origem e destino com saída ou entrada em 2+ semanas em comum;
+4. ⑧ peso/volume da descrição diferente além de 10%, descontado o fator;
+5. ① custo incoerente (custo × custo 0,5–2,0; sem entrada no destino, preço de
+   venda sem transferência 0,3–1,2).
+
+Viram selo, sem barrar: ③ CEST diferente, ④ NCM de capítulo diferente (com o
+contrato `divergencias_de_ncm` para PIS/COFINS). Ficam de fora: ⑨ unidade,
+⑩ XML do fornecedor, higiene do GTIN e ⑪ sabor/versão.
+
+Limite das medições: 364 pares rotulados por uma pessoa, em duas empresas. A
+regra de sufixo merece um teste de unidade com a corrente
+("joelho → argamassa") que a 227 mostrou.
 
 ---
 
