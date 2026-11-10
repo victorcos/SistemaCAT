@@ -178,6 +178,34 @@ regra de sufixo merece um teste de unidade com a corrente
 
 ---
 
+## CORREÇÃO NA ORIGEM (10/11/2026) — o GTIN que vem de XML pareado errado
+
+Revisando a lista de pares, o usuário apontou "Cr Leite Tp 200g Italac
+(04022930) × Milho Verde Fugini 170g (20079910)". O NCM dos dois está certo.
+O erro é outro: o código do creme de leite recebeu, numa entrada, o XML do
+**milho** ("MILHO VERDE LA 170G FUGINI", NCM 20058000, GTIN 7897517209391).
+Foi um pareamento C170 × item do XML fora de ordem, e o GTIN do milho entrou no
+código do creme de leite.
+
+**Divergência entre a documentação e o código:** a docstring de
+`infraestrutura/analitico/depara.py` diz que "o XML pareado com o C170 não
+entra". Isso vale para `gtins`, mas `gtins_do_xml = list(ltrim(gtin_xml, '0'))`
+não filtra nada: o GTIN do XML pareado entra.
+
+**Medido na empresa 29:** 167 dos 168 pares de GTIN têm, em pelo menos um lado,
+o GTIN vindo só desse pareamento. Isso inclui os 51 certos, porque o 0200 dela
+quase não tem código de barras. Por isso, **não** dá para descartar o GTIN
+pareado. A regra é aceitá-lo só quando o XML **combina** com o 0200 do código:
+mesmo capítulo de NCM ou alguma palavra em comum na descrição.
+- derruba **52 errados e 0 certos** (precisão de 100%);
+- somada à regra final, não muda o acerto (89,5%): todos esses pares já eram
+  barrados por outra trava. Mesmo assim ela deve entrar, porque corrige a causa,
+  e o par errado deixa de ser proposto em vez de ser proposto e barrado.
+
+Script: `medir_pareamento.py`.
+
+---
+
 ## ① Teste de sanidade de custo (o mais importante)
 
 **Problema:** nada confere se o **fator** faz sentido. Kit de 3 gravado como 12
