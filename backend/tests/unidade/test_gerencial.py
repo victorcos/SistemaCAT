@@ -191,6 +191,29 @@ class TestClassificar:
         assert m.unidade == "005" and m.e_venda_de_pdv and not m.e_entrada
         assert not MovimentoGerencial.de({**dados, "tipo_documento": "Transferência"}, 3).e_venda_de_pdv
 
+    def test_cupom_com_nome_de_coluna_colado(self):
+        """CSV diário de NFC-e de um ERP de varejo: os nomes vêm colados
+        (VLRICMSST, BASCALCICMS). Sem o sinônimo exato, o ICMS-ST não casava e
+        o valor do ICMS caía na BASE (o 'icms' parcial achava BASCALCICMS
+        primeiro); a chave virava número do documento e a loja virava o
+        participante."""
+        cabecalho = ("CNPJ_FILIAL;NUM_EQUIP;CUP;CST;DATA_EMISSAO;NUM_AUTENTIC_NFE;"
+                     "COD_MOD_DOC;NUM_SEQ_ITEM;COD_PRODUTO;DESCRICAO;COD_CFOP;QUANTIDADE;"
+                     "FATOR_CONV_SAIDA;VLR_ITEM;BASCALCICMS;VLRICMS;BASCALCICMSST;VLRICMSST;"
+                     "VLRIPI;BASPISCALC;VLRPISCALC;BASCOFINSCALC;VLRCOFINSCALC").split(";")
+        m = classificar(cabecalho)
+        assert m.especie is Especie.MOVIMENTO
+        assert m.utilizavel
+        assert {k: m.nomes_origem.get(k) for k in (
+            "bc_icms", "valor_icms", "bc_st", "valor_st", "chave", "numero_doc", "unidade",
+        )} == {
+            "bc_icms": "BASCALCICMS", "valor_icms": "VLRICMS",
+            "bc_st": "BASCALCICMSST", "valor_st": "VLRICMSST",
+            "chave": "NUM_AUTENTIC_NFE", "numero_doc": "CUP", "unidade": "CNPJ_FILIAL",
+        }
+        # o consumidor não vem no cupom: a loja não pode passar por participante
+        assert "cnpj_participante" not in m.posicoes
+
     def test_inventario(self):
         m = classificar(INVENTARIO.split("|"))
         assert m.especie is Especie.INVENTARIO
