@@ -90,6 +90,16 @@ _RE_CNPJ_EMITENTE = re.compile(
 # vez de CNPJ (venda a consumidor); aí não há o que capturar, e tudo bem.
 _RE_CNPJ_DESTINATARIO = re.compile(
     r"<dest>.*?<CNPJ>(\d{14})</CNPJ>", re.IGNORECASE | re.DOTALL)
+# Nem 16 KB alcançam toda nota: numa pasta real de compras, 11 XML tinham o
+# <dest> começando entre 16,0 e 16,2 KB. A amostra achava o fornecedor e não a
+# loja, e a nota de compra saía como "de outra empresa". Nesse caso — e só
+# nele — o arquivo é lido inteiro. A busca fica presa ao bloco <dest>: no
+# arquivo inteiro, um <dest> com CPF deixaria o .*? correr até o CNPJ da
+# transportadora ou do <autXML>, que não é o destinatário.
+_RE_BLOCO_DESTINATARIO = re.compile(r"<dest>(.*?)</dest>", re.IGNORECASE | re.DOTALL)
+_RE_CNPJ = re.compile(r"<CNPJ>(\d{14})</CNPJ>", re.IGNORECASE)
+# XML de NF-e passa pouco de 1 MB; acima disto não é nota a ler inteira
+TAMANHO_MAXIMO_PARA_LER_INTEIRO = 5 * 1024 * 1024
 # aaaa-mm-dd na NF-e, aaaammdd no CF-e
 _RE_EMISSAO = re.compile(r"<(?:dhEmi|dEmi)>(\d{4})-?(\d{2})-?(\d{2})")
 # evento de cancelamento de NF-e: tira a nota da movimentação na etapa 3
@@ -162,6 +172,29 @@ def _competencia_da_chave(chave: str) -> date | None:
     return date(2000 + ano, mes, 1) if 1 <= mes <= 12 else None
 
 
+def _destinatario_no_arquivo_inteiro(caminho: str, tamanho: int) -> str | None:
+    """CNPJ do <dest> lido no arquivo inteiro; None se não houver ou não der."""
+    if tamanho > TAMANHO_MAXIMO_PARA_LER_INTEIRO:
+        return None
+    try:
+        with open(caminho, "rb") as f:
+            bruto = f.read()
+    except OSError:
+        return None
+    texto = None
+    for cod in CODIFICACOES:
+        try:
+            texto = bruto.decode(cod)
+            break
+        except UnicodeDecodeError:
+            continue
+    if texto is None:
+        texto = bruto.decode("latin-1", errors="replace")
+    bloco = _RE_BLOCO_DESTINATARIO.search(texto)
+    cnpj = _RE_CNPJ.search(bloco.group(1)) if bloco else None
+    return cnpj.group(1) if cnpj else None
+
+
 def _do_xml(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote:
     chave = _RE_CHAVE_DO_EVENTO.search(texto)
     if _RE_EVENTO_CANCELAMENTO.search(texto) and chave and not _RE_NFE.search(texto):
@@ -175,6 +208,9 @@ def _do_xml(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote:
     e_nfe = _RE_NFE.search(texto) is not None
     emitente = _RE_CNPJ_EMITENTE.search(texto)
     destinatario = _RE_CNPJ_DESTINATARIO.search(texto)
+    cnpj_destinatario = destinatario.group(1) if destinatario else None
+    if e_nfe and emitente and cnpj_destinatario is None and tamanho > BYTES_DE_AMOSTRA:
+        cnpj_destinatario = _destinatario_no_arquivo_inteiro(caminho, tamanho)
     emissao = _RE_EMISSAO.search(texto)
     return ArquivoDoLote(
         caminho=caminho,
@@ -182,7 +218,7 @@ def _do_xml(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote:
         tamanho=tamanho,
         tipo=TipoDeArquivo.XML_NFE if e_nfe else TipoDeArquivo.XML_OUTRO,
         cnpj=emitente.group(1) if emitente else None,
-        cnpj_destinatario=destinatario.group(1) if destinatario else None,
+        cnpj_destinatario=cnpj_destinatario,
         # a competência de uma nota é o mês da emissão
         competencia=(date(int(emissao.group(1)), int(emissao.group(2)), 1)
                      if emissao else None),
