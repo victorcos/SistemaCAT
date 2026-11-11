@@ -91,10 +91,16 @@ class Campo:
 # ---------------------------------------------------------------------------
 CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
     # ---------- identificação do documento ----------
+    # Os sinônimos colados ("vlricmsst", "bascalcicms", "num autentic nfe",
+    # "cnpj filial", "cup") são do CSV diário de NFC-e de um ERP de varejo. Têm
+    # de casar EXATOS: pela busca parcial, "icms" achava BASCALCICMS antes de
+    # VLRICMS, "nf" pegava a chave como número e "cnpj" fazia da loja o
+    # participante.
     Campo("chave", "Chave do documento", "amarra a linha à NF-e e permite cruzar com o SPED",
-          Necessidade.IMPORTANTE, ("chave dfe", "chave nfe", "chave de acesso", "chave")),
+          Necessidade.IMPORTANTE,
+          ("chave dfe", "chave nfe", "chave de acesso", "num autentic nfe", "chave")),
     Campo("numero_doc", "Número do documento", "identifica a nota quando não há chave",
-          Necessidade.IMPORTANTE, ("numero dcto", "numero documento", "num doc", "nf")),
+          Necessidade.IMPORTANTE, ("numero dcto", "numero documento", "num doc", "nf", "cup")),
     Campo("data", "Data de emissão", "define a posição do movimento no razão",
           Necessidade.OBRIGATORIO, ("dt emissao", "data emissao", "dt mvto", "data movimento", "emissao")),
     Campo("cnpj_participante", "CNPJ do participante", "distingue compra de substituto e de substituído",
@@ -102,7 +108,7 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
     Campo("uf_participante", "UF do participante", "operação interestadual muda a regra",
           Necessidade.OPCIONAL, ("uf", "uf mvto", "estado")),
     Campo("unidade", "Unidade (loja)", "diz de qual estabelecimento é a linha — o razão é por loja",
-          Necessidade.OPCIONAL, ("unidade", "loja", "filial", "cod loja")),
+          Necessidade.OPCIONAL, ("unidade", "loja", "filial", "cod loja", "cnpj filial")),
     Campo("tipo_documento", "Tipo do documento",
           "venda de PDV é cupom, e cupom é consumidor final por definição",
           Necessidade.OPCIONAL, ("descricao tipo dcto", "tipo documento", "tipo dcto")),
@@ -131,19 +137,20 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
 
     # ---------- ICMS próprio ----------
     Campo("bc_icms", "Base de cálculo do ICMS", "compõe o ICMS suportado",
-          Necessidade.IMPORTANTE, ("bc icms", "base icms", "base calculo icms", "valor bc icms")),
+          Necessidade.IMPORTANTE,
+          ("bc icms", "base icms", "base calculo icms", "valor bc icms", "bascalcicms")),
     Campo("valor_icms", "Valor do ICMS", "é a parcela da operação própria do substituto",
-          Necessidade.OBRIGATORIO, ("valor icms", "vlr icms", "icms")),
+          Necessidade.OBRIGATORIO, ("valor icms", "vlr icms", "vlricms", "icms")),
 
     # ---------- ICMS-ST: o coração do trabalho ----------
     Campo("bc_st", "Base de cálculo da ST", "confere o cálculo da retenção",
           Necessidade.IMPORTANTE,
           ("valor bc st informada", "bc st", "base st", "base calculo st",
-           "valor bc st", "bc icms st")),
+           "valor bc st", "bc icms st", "bascalcicmsst")),
     Campo("valor_st", "Valor do ICMS-ST", "é a parcela retida, o que se busca ressarcir",
           Necessidade.OBRIGATORIO,
           ("valor st informada", "valor sub trib", "valor st", "vlr st",
-           "valor icms st", "icms st")),
+           "valor icms st", "vlricmsst", "icms st")),
     Campo("valor_fcp_st", "FCP retido por ST", "o manual inclui o FECOEP no imposto suportado",
           Necessidade.IMPORTANTE,
           ("valor fcp st", "fcp st", "valor fcp st ret", "vlr fcp st")),
