@@ -17,7 +17,7 @@ from cat.aplicacao.casos_de_uso.inspecionar_lote import (
     inspecionar_pasta,
 )
 from cat.dominio.lote import Grupo, TipoDeArquivo
-from cat.infraestrutura.arquivos.classificador import classificar
+from cat.infraestrutura.arquivos.classificador import BYTES_DE_AMOSTRA, classificar
 
 # raiz 44000003 — Irmãos Boa
 ICMS_IPI = (
@@ -375,6 +375,47 @@ class TestXmlDeFornecedor:
         r = inspecionar_pasta(str(tmp_path), "44000003")
         assert r.total == 0
         assert len(r.de_outra_empresa) == 1
+
+
+def _com_dest_depois_da_amostra(xml: str) -> str:
+    """Empurra o <dest> para depois da amostra, como na nota com o <emit>
+    longo ou com as tags fora da ordem do leiaute."""
+    enchimento = "<obsCont>" + "x" * (BYTES_DE_AMOSTRA + 512) + "</obsCont>"
+    return xml.replace("</emit>", "</emit>" + enchimento)
+
+
+class TestDestinatarioDepoisDaAmostra:
+    """O classificador lê só os primeiros 16 KB. Numa pasta real de compras, 11
+    notas de fornecedor tinham o <dest> começando entre 16,0 e 16,2 KB: a
+    amostra achava o emitente (o fornecedor) e não o destinatário (a loja), e a
+    nota de compra saía como "de outra empresa" — sem aviso de que era engano.
+    """
+
+    def test_nota_de_compra_com_dest_longe_entra_no_lote(self, tmp_path):
+        escrever(tmp_path, "compra.xml",
+                 _com_dest_depois_da_amostra(NFE_DE_FORNECEDOR), "utf-8")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
+        assert r.total == 1
+        assert not r.de_outra_empresa
+        assert r.arquivos[0].cnpj_destinatario == "44000003000109"
+
+    def test_nota_alheia_com_dest_longe_continua_de_fora(self, tmp_path):
+        escrever(tmp_path, "alheia.xml",
+                 _com_dest_depois_da_amostra(NFE_ALHEIA), "utf-8")
+        r = inspecionar_pasta(str(tmp_path), "44000003")
+        assert r.total == 0
+        assert len(r.de_outra_empresa) == 1
+
+    def test_cnpj_depois_do_dest_nao_vira_destinatario(self, tmp_path):
+        # venda a CPF de outra empresa, com a empresa do projeto só no
+        # <autXML> (o contador autorizado): o <dest> não tem CNPJ, e o
+        # CNPJ que vem depois dele não é do destinatário
+        alheia_a_cpf = _com_dest_depois_da_amostra(NFE_A_CONSUMIDOR).replace(
+            "44000003000109", "99999999000191").replace(
+            "</dest>", "</dest><autXML><CNPJ>44000003000109</CNPJ></autXML>")
+        a = classificar(escrever(tmp_path, "alheia.xml", alheia_a_cpf, "utf-8"))
+        assert a.cnpj == "99999999000191"
+        assert a.cnpj_destinatario is None
 
 
 class TestLeituraCompartilhadaEntreTrabalhos:
