@@ -5,6 +5,66 @@
 
 ---
 
+## 2026-11-16 — Apelido curto só casa exato, e as duas espécies de movimento entram no confronto
+
+Ensinando o motor a ler o **relatório de entrada** do mesmo ERP de varejo
+(empresa 32, 160 colunas), o arquivo passava: espécie certa, nenhum obrigatório
+faltando, 21 campos achados. E **quatro deles apontavam para a coluna errada**,
+sem erro nenhum — a mesma armadilha do dia anterior, agora do outro lado:
+
+| campo | pegava | por quê | devia pegar |
+|---|---|---|---|
+| Descrição do item | `Descrição CFOP` | `descricao` está dentro | `Desc. Produto` |
+| Número do documento | `Vlr Desp Fora NF` | `nf` está dentro | `Nro.Documento` |
+| Indicador de entrada | `Data Ent/Saída` | `ent` está dentro | `Entrada/Saida` |
+| Origem da mercadoria | `Vlr Origem` | `orig` está dentro | nenhuma: não existe |
+| CNPJ do participante | `CNPJ Empresa` (a própria loja) | `cnpj` está dentro | `CPF/CNPJ Pessoa` |
+
+E `Base ICMS/ST` ficava **sem casar**, com o dado ali do lado: não batia com
+`base st` nem com `bc icms st`.
+
+A descrição era a mais grave. **O de-para casa por descrição**: apontada para a
+`Descrição CFOP`, ele passaria a comparar nome de operação — "Venda de
+mercadoria" contra "Venda de mercadoria" — e acharia semelhança em produtos que
+não têm nada a ver. O CNPJ vinha logo atrás: a Ficha 3 é por estabelecimento, e
+confundir a loja com o fornecedor junta a rede inteira num estabelecimento só.
+
+**O que mudou.**
+
+1. `Campo.so_exatos`: apelido curto demais para busca parcial (`nf`, `cup`,
+   `ent`, `entrada`, `e s`, `orig`, `origem`, `cnpj`) **só vale na passada
+   exata**, onde o nome da coluna é aquilo e mais nada. Continua achando a
+   coluna chamada `NF`; deixa de achar `NF` dentro de `Vlr Desp Fora NF`.
+2. Os apelidos exatos entram **no fim** da lista de tentativas, não no começo:
+   prepondo, o `cnpj` do participante levaria a coluna `CNPJ` do próprio
+   estabelecimento antes de `CNNJ_CPF` ser tentado — quebrando o leiaute de
+   saída que tínhamos acabado de ensinar.
+3. Sinônimos do leiaute novo, inclusive `cnpj empresa` para a **unidade**, que
+   é a coluna de filial que o relatório por estabelecimento pede.
+
+**Alternativa descartada:** fazer a busca parcial respeitar limite de palavra.
+Resolveria `orig` dentro de `origem`, mas não `ent` dentro de `Data Ent/Saída`
+nem `nf` dentro de `Vlr Desp Fora NF` — nos dois o apelido É uma palavra
+inteira. E mudaria o casamento de todos os clientes já apurados de uma vez.
+Fica registrada para quando houver motivo próprio.
+
+**O confronto passou a aceitar as duas espécies de movimento.**
+`extracao.py` exigia `Especie.MOVIMENTO` e recusava o movimento sem ST dizendo
+que ele "não tem chave de documento para conferir" — e tem. Agora o portão é
+`serve_para_razao`. **Nenhum trabalho já apurado muda**: a espécie nasceu
+ontem, nenhum arquivo em base está classificado assim.
+
+Em `suportado.py` o portão virou dois, e é de propósito: `serve_para_razao`
+recusa inventário e resumo; `tem_st` recusa o movimento sem ST **com o motivo
+certo escrito no log**. Antes diria "não é de movimento", que seria mentira —
+e o suportado É a parcela retida, então um arquivo sem ela somaria zero e o
+total desceria sem ninguém perceber.
+
+Resultado no arquivo real: de 21 campos com 4 errados para **23 campos, todos
+na coluna certa**, incluindo a base da ST e o FCP retido. 2.088 testes passam.
+
+---
+
 ## 2026-11-16 — Espécie nova: movimento sem ICMS-ST
 
 O relatório de saídas item a item de um ERP de varejo (empresa 32) caía como

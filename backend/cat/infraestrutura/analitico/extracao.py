@@ -313,7 +313,6 @@ def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
     e o fim (o protocolo): nota de uso denegado não é documento, e sai da lista
     mesmo que outra cópia, sem protocolo, tenha entrado antes.
     """
-    from cat.dominio.gerencial.campos import Especie
     from cat.infraestrutura.arquivos.gerencial import Leitura
 
     progresso = ProgressoDaPasta(arquivos_totais=contar_xml(xmls) + len(relatorios))
@@ -366,8 +365,11 @@ def extrair_pasta(xmls: list[str], relatorios: list[str], destino: str,
         try:
             leitura = Leitura(caminho)
             # inventário e resumo não têm documento nem chave; passar por
-            # eles em silêncio daria "0 documentos" sem explicação
-            if leitura.especie is not Especie.MOVIMENTO:
+            # eles em silêncio daria "0 documentos" sem explicação. As duas
+            # espécies de movimento entram: o que o confronto precisa é a
+            # chave do documento, e o movimento sem ICMS-ST também a tem —
+            # falta nele a parcela retida, que aqui não se usa.
+            if not leitura.especie.serve_para_razao:
                 progresso.recusados.append(
                     f"{nome}: é {leitura.especie.rotulo.lower()}, não relatório "
                     "de movimento — não tem chave de documento para conferir")

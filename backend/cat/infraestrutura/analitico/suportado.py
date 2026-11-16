@@ -216,7 +216,6 @@ def extrair_retido(
     da empresa 19 (94 relatórios, 20 GB) — gigabytes de memória numa máquina que
     roda Docker, Excel e o resto ao lado.
     """
-    from cat.dominio.gerencial.campos import Especie
     from cat.infraestrutura.arquivos.gerencial import Leitura
 
     partes = destino + ".partes"
@@ -228,7 +227,7 @@ def extrair_retido(
         for n, caminho in enumerate(relatorios, 1):
             _conferir(deve_parar)
             acumulado = _ler_um_relatorio(caminho, n, len(relatorios), avisar,
-                                          Leitura, Especie)
+                                          Leitura)
             if acumulado is None:
                 recusados += 1
                 continue
@@ -252,7 +251,7 @@ def extrair_retido(
     return extraido
 
 
-def _ler_um_relatorio(caminho, n, total, avisar, Leitura, Especie):
+def _ler_um_relatorio(caminho, n, total, avisar, Leitura):
     """(imposto por item, linhas de entrada, sem chave) de um relatório; None
     quando ele não serve — ilegível ou de outra espécie —, e "so_de_saidas"
     quando as primeiras linhas não mostram entrada nenhuma."""
@@ -261,9 +260,17 @@ def _ler_um_relatorio(caminho, n, total, avisar, Leitura, Especie):
     lidos = sem_chave = vistas = 0
     try:
         leitura = Leitura(caminho)
-        if leitura.especie is not Especie.MOVIMENTO:
+        if not leitura.especie.serve_para_razao:
             log.warning("relatório não é de movimento, ignorado na apuração",
                         extra={"arquivo": nome, "especie": leitura.especie.value})
+            return None
+        if not leitura.especie.tem_st:
+            # O suportado É a parcela retida. Um movimento sem ICMS-ST somaria
+            # zero e o total desceria sem ninguém perceber — o motivo tem de
+            # aparecer, e não como "não é de movimento", que seria mentira.
+            log.warning("relatório não informa ICMS-ST, fora da apuração do "
+                        "suportado", extra={"arquivo": nome,
+                                            "especie": leitura.especie.value})
             return None
         for m in leitura.movimentos():
             vistas += 1
