@@ -305,8 +305,12 @@ class TestRelatorio:
         assert pronta["nome"] == "depara_entrada_saida.csv"
         texto = Path(pronta["caminho"]).read_text(encoding="utf-8-sig")
         cabecalho = texto.splitlines()[0]
-        # o cabeçalho do CSV não tem faixa: os dois blocos viram títulos próprios
-        assert "Qtde entrada" in cabecalho and "Qtde saída" in cabecalho
+        # no CSV não há faixa, então o título repetido ganha o bloco na frente:
+        # sem isso as duas colunas "Código" sairiam iguais e ninguém saberia
+        # qual é a entrada e qual é a saída
+        assert "Entrada - Código" in cabecalho and "Saída - Código" in cabecalho
+        assert cabecalho.index("Entrada - Código") < cabecalho.index("Saída - Código")
+        assert "Qtde que entrou" in cabecalho and "Qtde que saiu" in cabecalho
         assert "X0046E1FBP" in texto
 
     def test_formato_desconhecido_e_recusado(self, cliente, projeto_id):
