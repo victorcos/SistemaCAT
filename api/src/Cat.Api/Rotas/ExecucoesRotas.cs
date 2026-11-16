@@ -417,18 +417,8 @@ public static class ExecucoesRotas
     /// linhas tem gigabytes. E só de dentro da pasta de trabalho — o caminho vem do
     /// motor, e a API não serve arquivo de outro lugar da máquina nem se ele pedir.
     /// </summary>
-    private static IResult Arquivo(PlanilhaPronta pronta, ConfigCat config, ILogger log)
-    {
-        var raiz = Path.GetFullPath(config.PastaDeTrabalho).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        var caminho = Path.GetFullPath(pronta.Caminho);
-        if (!caminho.StartsWith(raiz, StringComparison.OrdinalIgnoreCase) || !File.Exists(caminho))
-        {
-            log.Erro("motor devolveu planilha fora da pasta de trabalho ou inexistente",
-                new { caminho, raiz, existe = File.Exists(caminho) });
-            return CorpoJson.Recusar("A planilha não pôde ser entregue. Veja o log do servidor.", StatusCodes.Status502BadGateway);
-        }
-        return Results.File(caminho, pronta.Tipo, pronta.Nome, enableRangeProcessing: true);
-    }
+    private static IResult Arquivo(PlanilhaPronta pronta, ConfigCat config, ILogger log) =>
+        ArquivoDoMotor.Servir(pronta, config, log);
 
     /// <summary>
     /// O recorte da extração, lido da consulta. Lista vem separada por vírgula.

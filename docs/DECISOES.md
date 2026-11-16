@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-11-16 — O relatório do de-para: a entrada num bloco, a saída no outro
+
+O relatório que se usava era uma linha por par, com origem e destino misturados
+às marcas de suspeita e **sem dizer qual dos dois lados tinha entrado em
+estoque**. Pior: só havia linha onde havia par. Para saber o que faltava decidir
+era preciso cruzar duas listas à mão, e quem abria não se entendia.
+
+**O que mudou.** O arquivo tem duas faixas no cabeçalho, `Entrada` e `Saída`, e
+uma linha por par **e por código solto**:
+
+| Situação | Bloco da entrada | Bloco da saída |
+|---|---|---|
+| `casado` | o código que entrou | o código que saiu |
+| `saída sem entrada` | **vazio** | o código que saiu |
+| `entrada sem saída` | o código que entrou | **vazio** |
+
+A ponta vazia é o ponto: é ela que mostra o que ainda precisa de decisão sem
+obrigar a abrir outra planilha. As colunas que descrevem a ligação (fator,
+prova, confiança, decisão, quem decidiu) ficam juntas no fim, depois dos dois
+lados — no meio da linha eram o que mais confundia.
+
+**O lado não se decide pelo papel no par.** A convenção é a origem do lado da
+entrada, e vale para a proposta do motor e para o par que o cliente informa.
+Mesmo assim o lado se confere pelo que o item tem (`tem_origem`/`tem_saida`):
+base com código que compra e vende ao mesmo tempo existe, e pôr a entrada na
+coluna da saída é exatamente a troca silenciosa que fazia o relatório antigo não
+se entender. Na dúvida, fica a convenção.
+
+**Fora do catálogo de `PLANILHAS`, e sem cache.** O catálogo é por execução e o
+de-para é do trabalho — ele não tem rodada própria, deriva da última
+movimentação concluída. E o conteúdo depende da tabela `depara_item`, que não
+tem data de arquivo: servir o que estava em disco entregaria a planilha de antes
+de alguém aprovar o par, com a tela já mostrando o número novo. Montar de novo
+custa a mesma varredura que abrir a tela já custa.
+
+**A tela e o relatório contam a mesma coisa**, por construção: o levantamento
+por estabelecimento virou `_Levantamento` / `_levantar`, usado pelos dois. Eram
+duas varreduras iguais escritas duas vezes, e no dia em que uma mudasse a
+planilha passaria a divergir do número da tela sem ninguém perceber. Conferido
+em 16/11/2026 nos trabalhos 26 e 29: pares e sem par idênticos aos da tela
+(996/202 e 2.026/2.986), nenhuma ponta vazia inconsistente.
+
+**O recorte por situação não é luxo.** No trabalho 29 a lista inteira deu
+**962.390 linhas**, das quais **957.378** eram `entrada sem saída` — código que
+comprou e não vendeu no período. É o candidato a par, não o problema, e afogava
+as 5.012 linhas que importam. O padrão do botão é `casado,saída sem entrada`; o
+completo fica num segundo botão, para quem está procurando par à mão.
+
+Rota própria, `GET /api/projetos/{id}/depara/planilha?formato=&situacoes=`,
+porque a `/planilhas` é por execução. A guarda que só serve arquivo de dentro da
+pasta de trabalho saiu de `ExecucoesRotas` para `Cat.Api/Infra/ArquivoDoMotor`:
+é regra de segurança, e duplicá-la por rota é como ela deixa de valer numa
+delas.
+
+---
+
 ## 2026-11-10 — De-para: o fardo escrito "C/12" é kit
 
 No trabalho 29, "Cerveja Brahma 350ml Lata C/12" e a lata avulsa tinham o mesmo

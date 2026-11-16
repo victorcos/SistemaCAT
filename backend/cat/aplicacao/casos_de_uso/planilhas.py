@@ -27,6 +27,7 @@ from cat.aplicacao.casos_de_uso import (
     apurar_piscofins,
     apurar_suportado,
     conferir_documentos,
+    depara_do_trabalho,
     extrair_movimentos,
     gerar_arquivo_digital,
     montar_entrega,
@@ -46,6 +47,10 @@ from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_MOVIMENTOS,
 )
 from cat.infraestrutura.analitico.contingencia import ARQUIVO_CONTINGENCIA
+from cat.infraestrutura.analitico.depara import (
+    ARQUIVO_DO_RELATORIO as ARQUIVO_DO_RELATORIO_DO_DEPARA,
+    escrever_relatorio as escrever_relatorio_do_depara,
+)
 from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO
 from cat.infraestrutura.analitico.apuracao import ARQUIVO_APURACAO, ARQUIVO_SALDOS
 from cat.infraestrutura.analitico.arquivo_digital import ARQUIVO_ARQUIVOS, ARQUIVO_OCORRENCIAS
@@ -126,6 +131,7 @@ from cat.infraestrutura.planilhas.exclusao_piscofins_na_base import (
 from cat.infraestrutura.planilhas.exclusoes import gerar_exclusoes
 from cat.infraestrutura.planilhas.pacote_das_exclusoes import zip_das_exclusoes
 from cat.infraestrutura.planilhas.itens_do_xml import gerar_itens_do_xml
+from cat.infraestrutura.planilhas.depara import gerar_depara
 from cat.infraestrutura.planilhas.razao import gerar_conferencia, gerar_ficha3, gerar_fichas
 from cat.infraestrutura.planilhas.suportado import gerar_suportado
 from cat.infraestrutura.repositorios.modelos import ExecucaoDB
@@ -475,6 +481,61 @@ def precisa_gerar(planilha: str, parquet: str) -> bool:
 # ---------------------------------------------------------------------------
 # a extração de registro: fora do catálogo, e por quê
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# o relatório do de-para: fora do catálogo, e por quê
+# ---------------------------------------------------------------------------
+NOME_DO_RELATORIO_DO_DEPARA = "depara_entrada_saida"
+
+
+def planilha_do_depara(projeto_id: int, sessao, formato: str = "xlsx",
+                       situacoes: str | None = None) -> PlanilhaPronta:
+    """O relatório do de-para: a entrada de um lado, a saída do outro.
+
+    Não entra em `PLANILHAS` por dois motivos. O catálogo é por **execução**, e
+    o de-para é do **trabalho**: ele não tem rodada própria, deriva da última
+    movimentação concluída. E o conteúdo depende das decisões gravadas no
+    banco, que o catálogo não alcança.
+
+    **Nada de cache aqui.** As outras planilhas comparam a idade do arquivo com
+    a do parquet de origem, e isso funciona porque o parquet é tudo o que elas
+    leem. Esta lê também a tabela `depara_item`, que não tem data de arquivo
+    nenhuma: servir o que estava em disco entregaria a planilha de antes de
+    alguém aprovar o par, com a tela já mostrando o número novo. Montar de novo
+    custa uma varredura da movimentação, que é o mesmo que a tela faz a cada
+    vez que é aberta.
+
+    `situacoes` recorta por situação do casamento, e não é luxo: numa base de
+    supermercado medida em 16/11/2026 a lista inteira deu **962.390 linhas**,
+    das quais 957.378 eram "entrada sem saída" — código que comprou e não
+    vendeu no período, que é ruído para quem está decidindo par. Pedir só
+    `casado,saída sem entrada` entrega as 5.012 que importam.
+    """
+    if formato not in FORMATOS:
+        raise PlanilhaRecusada(404, f"Formato desconhecido: {formato}. Vale xlsx ou csv.")
+    relatorio = depara_do_trabalho.linhas_do_relatorio(projeto_id, sessao)
+    pasta = relatorio.pasta_de_trabalho
+    if not os.path.isdir(pasta):
+        raise PlanilhaRecusada(
+            410, "Os arquivos da extração de movimentos não estão mais em disco. Rode a extração de novo.")
+
+    escolhidas = conjunto(situacoes)
+    origem = os.path.join(pasta, ARQUIVO_DO_RELATORIO_DO_DEPARA)
+    # o recorte entra no nome: sem isso o arquivo completo já gerado
+    # responderia ao pedido do recortado, e vice-versa
+    destino = os.path.join(pasta, f"{NOME_DO_RELATORIO_DO_DEPARA}"
+                                  f"{sufixo_do_recorte(None, escolhidas)}.{formato}")
+    with contexto(etapa="depara", projeto_id=projeto_id, planilha=NOME_DO_RELATORIO_DO_DEPARA):
+        with espaco_que_acaba(pasta):
+            escrever_relatorio_do_depara(relatorio.linhas, origem)
+            exigir_espaco(origem, pasta, formato)
+            linhas = gerar_depara(origem, destino, None, escolhidas, formato=formato)
+        log.info("planilha do de-para gerada", extra={
+            "linhas": linhas, "formato": formato,
+            "situacoes": sorted(escolhidas) if escolhidas else "todas",
+            "movimentos_execucao_id": relatorio.movimentos_execucao_id})
+    return PlanilhaPronta(caminho=destino, nome=os.path.basename(destino), tipo=TIPOS[formato])
+
+
 def extrair_registro(execucao: ExecucaoDB, alvo: str, formato: str,
                      recorte: extracao_de_registro.Recorte | None = None) -> PlanilhaPronta:
     """Extrai um registro (ou uma hierarquia) da quebra e devolve a planilha.

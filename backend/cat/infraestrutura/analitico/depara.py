@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 from decimal import Decimal
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 
 from cat.dominio.icms.cat42.enquadramento import CFOP_DEVOLUCAO, CFOP_TRANSFERENCIA
@@ -183,3 +184,56 @@ def candidatos(pasta_movimentos: str) -> dict[str, list[Par]]:
             propostos[cnpj] = pares
         log.info("candidatos a de-para", extra={"cnpj": cnpj, "codigos": len(itens), "pares": len(pares)})
     return propostos
+
+
+# ---------------------------------------------------------------------------
+# O relatório de entrada × saída, gravado para a planilha ler
+# ---------------------------------------------------------------------------
+ARQUIVO_DO_RELATORIO = "depara_entrada_saida.parquet"
+
+# as quantidades são as mesmas da ficha: decimal, não float. Um relatório que
+# some 0,1 + 0,2 e mostre 0,30000000000000004 perde a confiança de quem confere
+_QUANTIDADE = pa.decimal128(28, 5)
+_ESQUEMA_DO_RELATORIO = pa.schema([
+    ("cnpj", pa.string()),
+    ("casamento", pa.string()),
+    ("codigo_entrada", pa.string()),
+    ("descricao_entrada", pa.string()),
+    ("ncm_entrada", pa.string()),
+    ("quantidade_entrada", _QUANTIDADE),
+    ("estoque_entrada", _QUANTIDADE),
+    ("codigo_saida", pa.string()),
+    ("descricao_saida", pa.string()),
+    ("ncm_saida", pa.string()),
+    ("quantidade_saida", _QUANTIDADE),
+    ("fator", _QUANTIDADE),
+    ("ficha_do_codigo", pa.string()),
+    ("como_casou", pa.string()),
+    ("confianca", pa.string()),
+    ("situacao_do_par", pa.string()),
+    ("vale_sozinho", pa.string()),
+    ("decidido_por", pa.string()),
+    ("decidido_em", pa.string()),
+    ("explicacao", pa.string()),
+    ("travas", pa.string()),
+    ("avisos", pa.string()),
+])
+
+
+def escrever_relatorio(linhas: list[dict], destino: str) -> int:
+    """Grava as linhas do relatório do de-para. Devolve quantas gravou.
+
+    Vai para parquet, e não direto para xlsx, porque daí a planilha sai pelo
+    mesmo caminho de todas as outras — com CSV, com a quebra de aba no limite
+    do Excel e com a tradução de número no padrão brasileiro, sem nada disso
+    escrito de novo aqui.
+    """
+    colunas = {c: [] for c in _ESQUEMA_DO_RELATORIO.names}
+    for linha in linhas:
+        for nome in colunas:
+            colunas[nome].append(linha.get(nome))
+    tabela = pa.table(colunas, schema=_ESQUEMA_DO_RELATORIO)
+    pq.write_table(tabela, destino, compression="zstd")
+    log.info("relatório do de-para gravado",
+             extra={"destino": destino, "linhas": tabela.num_rows})
+    return tabela.num_rows

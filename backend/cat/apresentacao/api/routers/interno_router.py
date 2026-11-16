@@ -1172,6 +1172,37 @@ def gerar_planilha(
     return PlanilhaDto(caminho=pronta.caminho, nome=pronta.nome, tipo=pronta.tipo)
 
 
+class PedidoDaPlanilhaDoDePara(BaseModel):
+    projeto_id: int
+    formato: str = "xlsx"
+    # recorte por situação do casamento, separado por vírgula. Vazio é tudo
+    situacoes: str | None = None
+
+
+@router.post("/depara/planilha", response_model=PlanilhaDto, dependencies=[Depends(exigir_segredo)])
+def planilha_do_depara(pedido: PedidoDaPlanilhaDoDePara,
+                       sessao: Annotated[Session, Depends(obter_sessao)]) -> PlanilhaDto:
+    """O relatório do de-para: a entrada num bloco, a saída no outro.
+
+    Rota própria, e não a `/planilhas`, porque aquela é por execução e o
+    de-para é do trabalho — ele não tem rodada própria.
+    """
+    with contexto(etapa="depara", projeto_id=pedido.projeto_id):
+        try:
+            pronta = planilhas.planilha_do_depara(pedido.projeto_id, sessao, pedido.formato,
+                                                  pedido.situacoes)
+        except planilhas.PlanilhaRecusada as erro:
+            raise HTTPException(erro.status, str(erro)) from erro
+        except depara_do_trabalho.SemMovimentacao as erro:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(erro)) from erro
+        except LookupError as erro:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, str(erro)) from erro
+        except FileNotFoundError:
+            raise HTTPException(status.HTTP_410_GONE,
+                                "Os arquivos da última movimentação não estão mais em disco. Rode de novo.") from None
+    return PlanilhaDto(caminho=pronta.caminho, nome=pronta.nome, tipo=pronta.tipo)
+
+
 # ---------------------------------------------------------------------------
 # Extrair registro do SPED: o que a quebra indexou, consolidado numa planilha
 #

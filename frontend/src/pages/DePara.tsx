@@ -12,7 +12,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { comoErro } from "@/lib/errors";
 import { numero } from "@/lib/format";
 import {
+  PRECISA_DE_DECISAO,
   ROTULO_DO_MOTIVO,
+  SITUACOES_DO_CASAMENTO,
+  baixarRelatorioDoDePara,
   decidirDePara,
   decisaoDoPar,
   deparaDoTrabalho,
@@ -54,6 +57,7 @@ export default function DePara() {
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const [manual, setManual] = useState<Record<string, { destino: string; fator: string }>>({});
   const [nota, setNota] = useState<string | null>(null);
+  const [baixando, setBaixando] = useState<"xlsx" | "csv" | null>(null);
   // qual linha dos sem par está com o seletor aberto
   const [ligando, setLigando] = useState<string | null>(null);
   // busca da seção "Códigos sem par". Sem ela, a tabela corta em POR_PAGINA e
@@ -117,6 +121,23 @@ export default function DePara() {
       visiveis.filter((p) => marcados.has(chave(p))).map((p) => decisaoDoPar(p, situacao)),
       situacao === "aprovado" ? "par(es) aprovado(s)" : "par(es) recusado(s)",
     );
+
+  async function baixarRelatorio(formato: "xlsx" | "csv", completo = false) {
+    setBaixando(formato);
+    setErro(null);
+    try {
+      await baixarRelatorioDoDePara(
+        projetoId,
+        formato,
+        completo ? SITUACOES_DO_CASAMENTO : PRECISA_DE_DECISAO,
+      );
+    } catch (e) {
+      // cancelar no seletor de pasta não é falha
+      if (comoErro(e).message !== "Download cancelado") setErro(comoErro(e));
+    } finally {
+      setBaixando(null);
+    }
+  }
 
   function baixarPlanilha() {
     if (!dados) return;
@@ -193,6 +214,37 @@ export default function DePara() {
           <span className="text-xs text-texto-fraco">
             sobre a movimentação #{dados?.movimentos_execucao_id}, {numero(r.estabelecimentos)} estabelecimento(s)
           </span>
+          {/* o relatório é da etapa inteira, e não só dos sem par: por isso
+              fica aqui no resumo, e não dentro de uma das seções */}
+          <div className="ml-auto flex gap-2">
+            <Botao
+              tamanho="sm"
+              variante="secundario"
+              disabled={!!baixando}
+              onClick={() => baixarRelatorio("xlsx")}
+            >
+              {baixando === "xlsx" ? "Montando…" : "Baixar relatório"}
+            </Botao>
+            <Botao
+              tamanho="sm"
+              variante="fantasma"
+              disabled={!!baixando}
+              onClick={() => baixarRelatorio("csv")}
+            >
+              {baixando === "csv" ? "Montando…" : "CSV"}
+            </Botao>
+            {/* o completo inclui o código que comprou e não vendeu: útil para
+                procurar o par à mão, grande demais para ser o padrão */}
+            <Botao
+              tamanho="sm"
+              variante="fantasma"
+              disabled={!!baixando}
+              onClick={() => baixarRelatorio("csv", true)}
+              title="Inclui também os códigos que entraram e não saíram"
+            >
+              Completo (CSV)
+            </Botao>
+          </div>
         </div>
       )}
 

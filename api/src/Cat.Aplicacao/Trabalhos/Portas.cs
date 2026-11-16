@@ -204,6 +204,17 @@ public interface IMotor
     Task<System.Text.Json.JsonElement> CandidatosParaLigar(int projetoId, string cnpj, string origem,
         string busca, CancellationToken cancelar);
 
+    /// <summary>
+    /// O relatório do de-para: a entrada de um lado, a saída do outro, e a
+    /// ponta vazia onde falta o par.
+    ///
+    /// Não passa por <c>GerarPlanilha</c> porque aquela é por execução, e o
+    /// de-para é do trabalho: ele deriva da última movimentação concluída e
+    /// das decisões gravadas, sem rodada própria.
+    /// </summary>
+    Task<PlanilhaPronta> PlanilhaDoDePara(int projetoId, string formato, string? situacoes,
+        CancellationToken cancelar);
+
     /// <summary>Os estabelecimentos de uma entrega montada.</summary>
     /// <exception cref="MotorRecusou">não é entrega (404), não terminou (409), material apagado (410), recorte inválido (422)</exception>
     Task<System.Text.Json.JsonElement> EstabelecimentosDaEntrega(int execucaoId, PedidoDeEstabelecimentos pedido, CancellationToken cancelar);

@@ -1,7 +1,8 @@
-using Cat.Api.Infra;
+﻿using Cat.Api.Infra;
 using Cat.Aplicacao.Trabalhos;
 using Cat.Dominio.Acesso;
 using Cat.Dominio.Projeto;
+using Cat.Infraestrutura.Configuracao;
 
 namespace Cat.Api.Rotas;
 
@@ -32,6 +33,19 @@ public static class DeParaRotas
                     await Traduzir(async () =>
                         Results.Json(await caso.ParaLigar(projetoId, cnpj ?? "", origem, busca ?? "",
                             http.UsuarioAtual(), http.RequestAborted))))
+            .ExigirUsuario();
+
+        // o relatório da etapa: a entrada de um lado, a saída do outro, e a
+        // ponta vazia onde falta o par. Baixar é leitura, como ver a tela
+        api.MapGet("/projetos/{projetoId:int}/depara/planilha",
+                async (int projetoId, string? formato, string? situacoes, HttpContext http,
+                       DeParaDoTrabalho caso, ConfigCat config, ILogger<DeParaDoTrabalho> log) =>
+                    await Traduzir(async () =>
+                    {
+                        var pronta = await caso.Planilha(projetoId, formato is { Length: > 0 } f ? f : "xlsx",
+                            situacoes, http.UsuarioAtual(), http.RequestAborted);
+                        return ArquivoDoMotor.Servir(pronta, config, log);
+                    }))
             .ExigirUsuario();
 
         api.MapPost("/projetos/{projetoId:int}/depara", async (int projetoId, HttpContext http, DeParaDoTrabalho caso) =>

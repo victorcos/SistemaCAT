@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Cat.Aplicacao.Log;
 using Cat.Dominio.Acesso;
 using Cat.Dominio.Projeto;
@@ -46,6 +46,24 @@ public sealed class DeParaDoTrabalho(
         if (string.IsNullOrWhiteSpace(origem))
             throw new DadoInvalido("Informe o código de origem para procurar com que ligá-lo.");
         return await motor.CandidatosParaLigar(projetoId, cnpj ?? "", origem, busca ?? "", cancelar);
+    }
+
+    /// <summary>
+    /// O relatório para baixar. É leitura: quem enxerga a empresa baixa, como
+    /// na tela — o arquivo mostra o que a tela mostra, e nada decide.
+    /// </summary>
+    public async Task<PlanilhaPronta> Planilha(int projetoId, string formato, string? situacoes, Usuario por,
+        CancellationToken cancelar)
+    {
+        var projeto = await trabalhos.BuscarProjeto(projetoId, cancelar) ?? throw new ProjetoNaoEncontrado();
+        Escopo.Exigir(por, projeto.EmpresaId, log);
+        var pronta = await motor.PlanilhaDoDePara(projetoId, formato, situacoes, cancelar);
+        log.Aviso("relatório do de-para baixado", new
+        {
+            projeto_id = projetoId, empresa_id = projeto.EmpresaId, por_usuario_id = por.Id, formato,
+            situacoes,
+        });
+        return pronta;
     }
 
     public async Task<int> Decidir(int projetoId, IReadOnlyList<DecisaoDeDePara> decisoes, Usuario por,

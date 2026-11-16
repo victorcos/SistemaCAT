@@ -1,4 +1,5 @@
 import { chamar } from "./api";
+import { baixarArquivo } from "./conferencia";
 
 /**
  * De-para de códigos: o mesmo produto escriturado com outro código na compra,
@@ -195,4 +196,46 @@ function dividir(linha: string): string[] {
   }
   campos.push(atual);
   return campos;
+}
+
+/**
+ * O relatório da etapa: a entrada num bloco, a saída no outro.
+ *
+ * Diferente de `planilhaParaOCliente`, que é montada aqui no navegador a
+ * partir do que a tela já tem em mão: este sai do servidor, porque traz os
+ * dois lados de **todos** os códigos — e a lista de sem par que a tela recebe
+ * é cortada em 5.000. Pedir ao servidor é o que garante que o arquivo tenha o
+ * trabalho inteiro, e não o pedaço que caberia na tela.
+ */
+/** As três situações do relatório, como o motor as escreve. */
+export const SITUACOES_DO_CASAMENTO = ["casado", "saída sem entrada", "entrada sem saída"] as const;
+
+/**
+ * O que precisa de decisão: o par e o código que saiu sem ter entrado.
+ *
+ * É o recorte padrão porque a terceira situação domina o arquivo sem ajudar —
+ * numa base de supermercado foram 957.378 linhas de "entrada sem saída" contra
+ * 5.012 do resto. Código que comprou e não vendeu no período é o candidato a
+ * par, não o problema; quem quiser vê-lo pede o relatório completo.
+ */
+export const PRECISA_DE_DECISAO = ["casado", "saída sem entrada"] as const;
+
+export function baixarRelatorioDoDePara(
+  projetoId: number,
+  formato: "xlsx" | "csv" = "xlsx",
+  situacoes: readonly string[] = PRECISA_DE_DECISAO,
+  sinal?: AbortSignal,
+): Promise<void> {
+  const parametros = new URLSearchParams();
+  if (formato !== "xlsx") parametros.set("formato", formato);
+  // o recorte padrão vai explícito; só o relatório completo omite
+  if (situacoes.length && situacoes.length < SITUACOES_DO_CASAMENTO.length)
+    parametros.set("situacoes", situacoes.join(","));
+  const q = parametros.toString() ? `?${parametros}` : "";
+  const sufixo = situacoes.length === SITUACOES_DO_CASAMENTO.length ? "_completo" : "";
+  return baixarArquivo(
+    `/api/projetos/${projetoId}/depara/planilha${q}`,
+    `depara_entrada_saida${sufixo}.${formato}`,
+    sinal,
+  );
 }

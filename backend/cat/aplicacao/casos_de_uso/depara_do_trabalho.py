@@ -12,6 +12,8 @@ RVZ fez na empresa 04 com os códigos de marketplace.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from dataclasses import dataclass
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -19,6 +21,8 @@ from sqlalchemy.orm import Session
 
 from cat.aplicacao.casos_de_uso.apurar_suportado import movimentacao_concluida
 from cat.dominio.depara.candidatos import (
+    ItemParaCasar,
+    Par,
     normalizar_codigo,
     ordenar_candidatos,
     propor,
@@ -40,7 +44,53 @@ class SemMovimentacao(ValueError):
     """O trabalho ainda não tem movimentação para propor de-para."""
 
 
-def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
+@dataclass(frozen=True)
+class _Levantamento:
+    """O que se sabe de um estabelecimento: os códigos, as propostas e o que
+    já está resolvido.
+
+    Existe para a tela e o relatório **contarem a mesma coisa**. Eram duas
+    varreduras iguais escritas duas vezes, e no dia em que uma mudasse a
+    planilha passaria a divergir do número na tela sem ninguém perceber.
+    """
+
+    cnpj: str
+    itens: list[ItemParaCasar]
+    propostos: list[Par]
+    # códigos que alguma proposta toca, de um lado ou do outro
+    cobertos: frozenset[str]
+    # códigos que uma decisão gravada resolve: aprovados e seus destinos
+    decididos: frozenset[str]
+
+    def resolvido(self, codigo: str) -> bool:
+        return codigo in self.cobertos or codigo in self.decididos
+
+    @property
+    def destinos(self) -> frozenset[str]:
+        """Os códigos que recebem a ficha de outro — por proposta ou decisão."""
+        return frozenset(p.destino for p in self.propostos) | self.decididos
+
+
+def _levantar(itens: dict[str, list[ItemParaCasar]],
+              decisoes: dict[tuple[str, str], DeParaDB]) -> Iterator[_Levantamento]:
+    for cnpj, lista in sorted(itens.items()):
+        propostos = propor(lista)
+        aprovados = {o for (c, o), d in decisoes.items()
+                     if d.situacao == "aprovado" and c in ("", cnpj)}
+        destinos = {d.codigo_destino for (c, _), d in decisoes.items()
+                    if d.situacao == "aprovado" and c in ("", cnpj)}
+        yield _Levantamento(
+            cnpj=cnpj, itens=lista, propostos=propostos,
+            cobertos=frozenset(c for p in propostos for c in (p.origem, p.destino)),
+            decididos=frozenset(aprovados | destinos))
+
+
+def _carregar(projeto_id: int, sessao: Session):
+    """A movimentação concluída, os códigos dela e as decisões da empresa.
+
+    A tela e o relatório entram por aqui: duas leituras diferentes da mesma
+    coisa divergem no dia em que uma mudar.
+    """
     projeto = sessao.get(ProjetoDB, projeto_id)
     if projeto is None:
         raise LookupError("Trabalho não encontrado.")
@@ -53,6 +103,11 @@ def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
         select(DeParaDB).where(DeParaDB.empresa_id == projeto.empresa_id))}
     nomes = {u.id: u.nome_exibicao for u in sessao.scalars(
         select(UsuarioDB).where(UsuarioDB.id.in_({d.decidido_por for d in decisoes.values() if d.decidido_por})))}
+    return projeto, movimentos, itens, decisoes, nomes
+
+
+def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
+    projeto, movimentos, itens, decisoes, nomes = _carregar(projeto_id, sessao)
 
     def decisao(cnpj: str, origem: str) -> DeParaDB | None:
         return decisoes.get((cnpj, origem)) or decisoes.get(("", origem))
@@ -63,13 +118,11 @@ def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
     precisavam_de_par = 0
     automaticos = 0
     vistas: set[tuple[str, str]] = set()
-    for cnpj, lista in sorted(itens.items()):
-        propostos = propor(lista)
-        cobertos: set[str] = set()
-        for p in propostos:
+    for nivel in _levantar(itens, decisoes):
+        cnpj = nivel.cnpj
+        for p in nivel.propostos:
             d = decisao(cnpj, p.origem)
             vistas.add((d.cnpj, d.codigo_origem) if d else (cnpj, p.origem))
-            cobertos |= {p.origem, p.destino}
             # GTIN e sufixo valem por padrão: só há decisão gravada quando
             # alguém discorda, e discordar vence
             sozinho = d is None and vale_sozinho(p)
@@ -81,13 +134,8 @@ def candidatos_do_projeto(projeto_id: int, sessao: Session) -> dict:
                 "travas": list(p.travas), "avisos": list(p.avisos),
                 **_situacao(d, nomes, automatico=sozinho),
             })
-        aprovados_aqui = {o for (c, o), d in decisoes.items()
-                          if d.situacao == "aprovado" and c in ("", cnpj)}
-        destinos_aqui = {d.codigo_destino for (c, _), d in decisoes.items()
-                         if d.situacao == "aprovado" and c in ("", cnpj)}
-        for item in lista:
-            resolvido = (item.codigo in cobertos or item.codigo in aprovados_aqui
-                         or item.codigo in destinos_aqui)
+        for item in nivel.itens:
+            resolvido = nivel.resolvido(item.codigo)
             if item.tem_saida and not item.tem_origem:
                 # **o denominador da cobertura.** Código com saída e sem entrada
                 # é o que viraria ficha negativa e sairia do total; é esse o
@@ -166,6 +214,199 @@ def _situacao(d: DeParaDB | None, nomes: dict[int, str], automatico: bool = Fals
     return {"situacao": d.situacao, "decidido_por": nomes.get(d.decidido_por),
             "decidido_em": d.decidido_em.isoformat() if d.decidido_em else None,
             "destino_decidido": d.codigo_destino, "fator_decidido": format(d.fator.normalize(), "f")}
+
+
+# ---------------------------------------------------------------------------
+# O relatório: a entrada de um lado, a saída do outro
+# ---------------------------------------------------------------------------
+# O relatório antigo punha origem e destino na mesma linha, misturados com as
+# marcas de suspeita, e não dizia qual dos dois lados era a entrada. Quem abria
+# não distinguia o par do código solto, porque **código solto não aparecia**:
+# só havia linha quando havia par.
+#
+# Aqui a linha tem dois blocos. À esquerda o código por onde o estoque entrou;
+# à direita o código por onde ele saiu. Quando falta o par de um dos lados, o
+# bloco daquele lado vem **vazio** — e é essa ponta vazia que mostra o que
+# ainda precisa de decisão, sem precisar cruzar duas listas.
+CASADO = "casado"
+SAIDA_SEM_ENTRADA = "saída sem entrada"
+ENTRADA_SEM_SAIDA = "entrada sem saída"
+
+ROTULO_DO_MOTIVO = {
+    "gtin": "mesmo GTIN",
+    "sufixo": "código + sufixo",
+    "kit": "kit",
+    "descricao": "descrição e NCM",
+    "cliente": "informado pelo cliente",
+    "analista": "informado pelo analista",
+}
+
+
+def _rotulos(motivos) -> str:
+    return ", ".join(ROTULO_DO_MOTIVO.get(str(m), str(m)) for m in motivos)
+
+
+def _quantidade(valor: Decimal | None) -> Decimal | None:
+    """Zero não vira célula: a ponta sem par tem de ficar visivelmente vazia."""
+    return valor if valor else None
+
+
+def _lado_da_entrada(item: ItemParaCasar | None, codigo: str) -> dict:
+    if item is None:
+        return {"codigo_entrada": codigo, "descricao_entrada": "", "ncm_entrada": "",
+                "quantidade_entrada": None, "estoque_entrada": None}
+    return {"codigo_entrada": item.codigo, "descricao_entrada": item.descricao,
+            "ncm_entrada": item.ncm, "quantidade_entrada": _quantidade(item.entradas),
+            "estoque_entrada": _quantidade(item.estoque_inicial)}
+
+
+def _lado_da_saida(item: ItemParaCasar | None, codigo: str) -> dict:
+    if item is None:
+        return {"codigo_saida": codigo, "descricao_saida": "", "ncm_saida": "",
+                "quantidade_saida": None}
+    return {"codigo_saida": item.codigo, "descricao_saida": item.descricao,
+            "ncm_saida": item.ncm, "quantidade_saida": _quantidade(item.saidas)}
+
+
+VAZIO_NA_ENTRADA = {"codigo_entrada": "", "descricao_entrada": "", "ncm_entrada": "",
+                    "quantidade_entrada": None, "estoque_entrada": None}
+VAZIO_NA_SAIDA = {"codigo_saida": "", "descricao_saida": "", "ncm_saida": "",
+                  "quantidade_saida": None}
+
+
+def _lados(origem: str, destino: str,
+           indice: dict[str, ItemParaCasar]) -> tuple[str, ItemParaCasar | None, str, ItemParaCasar | None]:
+    """Qual dos dois códigos vai no bloco da entrada. `(cód, item, cód, item)`.
+
+    A convenção do par é a **origem do lado da entrada**: ela é o código por
+    onde o estoque entrou, e o destino é a ficha que recebe — a que tem a saída
+    e ficaria negativa sem o par. Vale igual para a proposta do motor e para o
+    par que o cliente informa.
+
+    Mesmo assim o lado se confere pelo que o item **tem**, e não só pelo papel:
+    base com código que compra e vende ao mesmo tempo existe, e pôr a entrada
+    na coluna da saída é exatamente o tipo de troca silenciosa que fazia a
+    planilha antiga não se entender. Na dúvida fica a convenção.
+    """
+    da_origem, do_destino = indice.get(origem), indice.get(destino)
+    pela_convencao = (origem, da_origem, destino, do_destino)
+    if da_origem is None or do_destino is None:
+        return pela_convencao
+    if da_origem.tem_origem and do_destino.tem_saida:
+        return pela_convencao
+    if do_destino.tem_origem and da_origem.tem_saida:
+        return (destino, do_destino, origem, da_origem)
+    return pela_convencao
+
+
+@dataclass(frozen=True)
+class RelatorioDoDePara:
+    """As linhas e onde elas podem ser gravadas.
+
+    A pasta vem junto porque é a da movimentação de onde o relatório saiu:
+    quem escreve a planilha não deve ter de descobrir isso de novo, sob risco
+    de gravar na pasta de outra rodada.
+    """
+
+    linhas: list[dict]
+    pasta_de_trabalho: str
+    movimentos_execucao_id: int
+
+
+def linhas_do_relatorio(projeto_id: int, sessao: Session) -> RelatorioDoDePara:
+    """Uma linha por par e por código solto, com a ponta que falta vazia."""
+    projeto, movimentos, itens, decisoes, nomes = _carregar(projeto_id, sessao)
+
+    def decisao(cnpj: str, origem: str) -> DeParaDB | None:
+        return decisoes.get((cnpj, origem)) or decisoes.get(("", origem))
+
+    linhas: list[dict] = []
+    vistas: set[tuple[str, str]] = set()
+    por_codigo: dict[tuple[str, str], ItemParaCasar] = {}
+    for nivel in _levantar(itens, decisoes):
+        cnpj = nivel.cnpj
+        indice = {i.codigo: i for i in nivel.itens}
+        por_codigo.update({(cnpj, c): i for c, i in indice.items()})
+        destinos = nivel.destinos
+        for p in nivel.propostos:
+            d = decisao(cnpj, p.origem)
+            vistas.add((d.cnpj, d.codigo_origem) if d else (cnpj, p.origem))
+            aprovada = d is not None and d.situacao == "aprovado" and bool(d.codigo_destino)
+            # o lado da entrada é o destino que o razão vai usar, e não o que
+            # foi proposto: quem aprovou com outro destino manda
+            destino = d.codigo_destino if aprovada else p.destino
+            fator = d.fator if aprovada else p.fator
+            avisos = list(p.avisos)
+            if destino != p.destino:
+                avisos.append(f"proposta era o código {p.destino}")
+            sozinho = d is None and vale_sozinho(p)
+            cod_entrada, item_entrada, cod_saida, item_saida = _lados(p.origem, destino, indice)
+            linhas.append({
+                "cnpj": cnpj, "casamento": CASADO,
+                **_lado_da_entrada(item_entrada, cod_entrada),
+                **_lado_da_saida(item_saida, cod_saida),
+                "fator": fator, "ficha_do_codigo": destino,
+                "como_casou": _rotulos(m.value for m in p.motivos),
+                "confianca": p.confianca.value, "explicacao": p.explicacao,
+                "vale_sozinho": "sim" if sozinho else "",
+                "travas": "; ".join(p.travas), "avisos": "; ".join(avisos),
+                **_decisao_no_relatorio(d, nomes, automatico=sozinho),
+            })
+        for item in nivel.itens:
+            if nivel.resolvido(item.codigo):
+                continue
+            if item.tem_saida and not item.tem_origem:
+                # saiu e não entrou: é a ficha que fica negativa, e o que o
+                # de-para existe para resolver
+                linhas.append({"cnpj": cnpj, "casamento": SAIDA_SEM_ENTRADA, **VAZIO_NA_ENTRADA,
+                               **_lado_da_saida(item, item.codigo), **_SEM_PAR})
+            elif item.tem_origem and not item.tem_saida and item.codigo not in destinos:
+                # entrou e não saiu: é o candidato natural a par de alguma
+                # linha de cima, e é por isso que ele vem na mesma planilha
+                linhas.append({"cnpj": cnpj, "casamento": ENTRADA_SEM_SAIDA,
+                               **_lado_da_entrada(item, item.codigo), **VAZIO_NA_SAIDA, **_SEM_PAR})
+
+    # a decisão que não veio de proposta: do cliente, do analista, ou de base antiga
+    for (cnpj, origem), d in sorted(decisoes.items()):
+        if (cnpj, origem) in vistas:
+            continue
+        # a decisão pode ser do CNPJ vazio, que vale para todos: aí o item não
+        # está indexado sob ele, e os dois lados saem só com o código
+        indice = {c: i for (e, c), i in por_codigo.items() if e == cnpj}
+        cod_entrada, item_entrada, cod_saida, item_saida = _lados(origem, d.codigo_destino, indice)
+        linhas.append({
+            "cnpj": cnpj, "casamento": CASADO,
+            **_lado_da_entrada(item_entrada, cod_entrada),
+            **_lado_da_saida(item_saida, cod_saida),
+            "fator": d.fator, "ficha_do_codigo": d.codigo_destino,
+            "como_casou": _rotulos([d.motivo]),
+            "confianca": d.confianca or "", "explicacao": d.explicacao or "",
+            "vale_sozinho": "", "travas": "", "avisos": "",
+            **_decisao_no_relatorio(d, nomes),
+        })
+    log.info("relatório do de-para", extra={
+        "projeto_id": projeto_id, "movimentos_execucao_id": movimentos.id,
+        "empresa_id": projeto.empresa_id, "linhas": len(linhas),
+        "casados": sum(l["casamento"] == CASADO for l in linhas),
+        "saida_sem_entrada": sum(l["casamento"] == SAIDA_SEM_ENTRADA for l in linhas),
+        "entrada_sem_saida": sum(l["casamento"] == ENTRADA_SEM_SAIDA for l in linhas)})
+    return RelatorioDoDePara(linhas=linhas, pasta_de_trabalho=movimentos.pasta_de_trabalho or "",
+                             movimentos_execucao_id=movimentos.id)
+
+
+_SEM_PAR = {"fator": None, "ficha_do_codigo": "", "como_casou": "", "confianca": "", "situacao_do_par": "",
+            "vale_sozinho": "", "decidido_por": "", "decidido_em": "",
+            "explicacao": "", "travas": "", "avisos": ""}
+
+
+def _decisao_no_relatorio(d: DeParaDB | None, nomes: dict[int, str],
+                          automatico: bool = False) -> dict:
+    if d is None:
+        return {"situacao_do_par": "aprovado" if automatico else "pendente",
+                "decidido_por": "", "decidido_em": ""}
+    return {"situacao_do_par": d.situacao,
+            "decidido_por": nomes.get(d.decidido_por, "") or "",
+            "decidido_em": d.decidido_em.strftime("%d/%m/%Y") if d.decidido_em else ""}
 
 
 class CodigoNaoEstaNaMovimentacao(LookupError):

@@ -288,6 +288,19 @@ public sealed class MotorHttp(HttpClient cliente, ConfigCat config, ILogger<Moto
             ["pagina"] = pedido.Pagina, ["por_pagina"] = pedido.PorPagina,
         }), PrazoLinhas, cancelar);
 
+    public async Task<PlanilhaPronta> PlanilhaDoDePara(int projetoId, string formato, string? situacoes,
+        CancellationToken cancelar)
+    {
+        // o prazo é o da planilha: montar o relatório varre a movimentação
+        // inteira, como a tela do de-para já faz, e depois escreve o xlsx
+        var json = await Chamar("interno/depara/planilha", JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["projeto_id"] = projetoId, ["formato"] = formato, ["situacoes"] = situacoes,
+        }), PrazoPlanilha, cancelar);
+        return new PlanilhaPronta(json.GetProperty("caminho").GetString()!, json.GetProperty("nome").GetString()!,
+            json.GetProperty("tipo").GetString()!);
+    }
+
     public async Task<JsonElement> CandidatosDeDePara(int projetoId, CancellationToken cancelar) =>
         await Chamar("interno/depara/candidatos", JsonContent.Create(new Dictionary<string, object?>
         {
