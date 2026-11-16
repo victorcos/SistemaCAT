@@ -532,3 +532,75 @@ class TestMovimentoSemSt:
         assert m.aliquota_icms == Decimal("18")
         # sem ST informado, o registro não inventa parcela retida
         assert m.origem_do_st is OrigemDoSt.SEM_ST and m.st_que_vale == Decimal(0)
+
+
+# Entrada do mesmo ERP de varejo: 160 colunas no arquivo real, aqui só as que o
+# trabalho usa **e as que roubavam campo**. A ordem é a do arquivo, e é ela que
+# importa: toda coluna isca vem ANTES da coluna certa, que foi o que fez o
+# casamento parcial errar.
+ENTRADA_DO_VAREJO = (
+    "CNPJ Empresa;Data Ent/Saída;Espécie;Nro.Documento;Cód. Modelo;"
+    "Entrada/Saida;Data Emissão;Série;Chave Acesso;Razão Social;"
+    "CPF/CNPJ Pessoa;UF;CFOP;Descrição CFOP;NCM Cadastro;NCM Docto;"
+    "Cód. Produto;Desc. Produto;Qtde.;Emb.;Valor Item;CST ICMS;Base ICMS;"
+    "Aliq. ICMS;Valor ICMS;MVA ICMS/ST;Base ICMS/ST;Valor ICMS/ST;Cod. EAN;"
+    "Vlr Origem;Valor FCP ICMS ST;Vlr Desp Fora NF"
+)
+
+
+class TestEntradaDoVarejo:
+    def _mapa(self):
+        return classificar(ENTRADA_DO_VAREJO.split(";"))
+
+    def test_traz_st_entao_e_movimento_comum(self):
+        m = self._mapa()
+        assert m.especie is Especie.MOVIMENTO
+        assert m.utilizavel
+
+    def test_a_coluna_isca_nao_leva_mais_o_campo(self):
+        """Cada um destes apontava para uma coluna errada, e sem erro nenhum.
+        O pior era a descrição: o de-para casa por descrição, e passaria a
+        comparar nome de operação ("Venda de mercadoria") em vez de produto."""
+        de = self._mapa().nomes_origem
+        assert de["descricao_item"] == "Desc. Produto"        # era Descrição CFOP
+        assert de["numero_doc"] == "Nro.Documento"            # era Vlr Desp Fora NF
+        assert de["indicador_entrada"] == "Entrada/Saida"     # era Data Ent/Saída
+        assert "origem_mercadoria" not in de                  # era Vlr Origem
+
+    def test_a_filial_nao_e_o_fornecedor(self):
+        """A Ficha 3 é por estabelecimento: confundir os dois CNPJ junta a rede
+        inteira num estabelecimento só e perde o participante."""
+        de = self._mapa().nomes_origem
+        assert de["unidade"] == "CNPJ Empresa"
+        assert de["cnpj_participante"] == "CPF/CNPJ Pessoa"
+
+    def test_acha_a_base_da_st_que_antes_passava_batido(self):
+        """"Base ICMS/ST" não casava com "base st" nem com "bc icms st", e o
+        campo ficava vazio com o dado ali do lado."""
+        de = self._mapa().nomes_origem
+        assert de["bc_st"] == "Base ICMS/ST"
+        assert de["valor_st"] == "Valor ICMS/ST"
+        assert de["valor_fcp_st"] == "Valor FCP ICMS ST"
+        assert de["bc_icms"] == "Base ICMS"          # e não a base da ST
+
+
+class TestApelidoCurto:
+    """`so_exatos`: apelido curto demais para sair procurando dentro de outro
+    nome de coluna."""
+
+    def test_nao_casa_dentro_de_outro_nome(self):
+        m = mapear(["Data", "Código", "CFOP", "Qtde", "Valor ICMS",
+                    "Valor ICMS ST", "Vlr Desp Fora NF"], Especie.MOVIMENTO)
+        assert "numero_doc" not in m.nomes_origem
+
+    def test_mas_casa_quando_a_coluna_e_aquilo(self):
+        m = mapear(["Data", "Código", "CFOP", "Qtde", "Valor ICMS",
+                    "Valor ICMS ST", "NF"], Especie.MOVIMENTO)
+        assert m.nomes_origem["numero_doc"] == "NF"
+
+    def test_o_explicito_ganha_do_apelido_curto(self):
+        """O apelido curto é tentado por último: com as duas colunas no
+        arquivo, quem leva é a que diz o nome inteiro."""
+        m = mapear(["Data", "Código", "CFOP", "Qtde", "Valor ICMS",
+                    "Valor ICMS ST", "CNPJ", "CNNJ_CPF"], Especie.MOVIMENTO)
+        assert m.nomes_origem["cnpj_participante"] == "CNNJ_CPF"

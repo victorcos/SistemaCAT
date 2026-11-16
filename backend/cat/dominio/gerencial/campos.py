@@ -101,6 +101,12 @@ class Campo:
     para_que: str
     necessidade: Necessidade
     sinonimos: tuple[str, ...] = ()
+    # Apelido curto demais para sair procurando dentro de outro nome. ``nf``
+    # casava com ``Vlr Desp Fora NF``, ``ent`` com ``Data Ent/Saída`` e com
+    # ``cliente``, ``orig`` com ``Vlr Origem``: o campo saía apontado para uma
+    # coluna de dinheiro, e **sem erro nenhum**. Aqui ele só vale na passada
+    # exata, onde o nome da coluna é aquilo e mais nada.
+    so_exatos: tuple[str, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +125,9 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
           ("chave dfe", "chave nfe", "chave de acesso", "num autentic nfe", "chave")),
     Campo("numero_doc", "Número do documento", "identifica a nota quando não há chave",
           Necessidade.IMPORTANTE,
-          ("numero dcto", "numero documento", "num doc", "numerocfe", "nf", "cup")),
+          ("numero dcto", "numero documento", "num doc", "numerocfe",
+           "nro documento", "nro dcto", "nro nf"),
+          so_exatos=("nf", "cup")),
     Campo("modelo_documento", "Modelo do documento",
           "55 é nota, 65 e 59 são cupom — e cupom é consumidor final por definição",
           Necessidade.OPCIONAL, ("codmodelo", "cod modelo", "cod mod", "modelo")),
@@ -129,13 +137,20 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
           Necessidade.IMPORTANTE,
           # "cnnj cpf" é erro de digitação na origem, e é o nome real da coluna
           # no relatório de saída de um ERP de varejo. Sem ele, o parcial
-          # "cnpj" pegava a coluna do próprio estabelecimento
-          ("cnpj cpf", "cnnj cpf", "cnpj", "cpf cnpj", "cnpj fornecedor")),
+          # "cnpj" pegava a coluna do próprio estabelecimento — e era o que
+          # acontecia no relatório de entrada, onde "CNPJ Empresa" vem antes
+          # de "CPF/CNPJ Pessoa": o fornecedor virava a própria loja.
+          ("cnpj cpf", "cnnj cpf", "cpf cnpj pessoa", "cpf cnpj",
+           "cnpj fornecedor", "cnpj participante"),
+          so_exatos=("cnpj",)),
     Campo("uf_participante", "UF do participante", "operação interestadual muda a regra",
           Necessidade.OPCIONAL, ("uf", "uf mvto", "estado")),
     Campo("unidade", "Unidade (loja)", "diz de qual estabelecimento é a linha — o razão é por loja",
           Necessidade.OPCIONAL,
-          ("unidade", "loja", "filial", "cod loja", "cnpj filial", "nroempresa")),
+          # a Ficha 3 é por estabelecimento: sem esta coluna o relatório de
+          # uma rede inteira vira um monte só
+          ("cnpj empresa", "cnpj do estabelecimento", "unidade", "loja",
+           "filial", "cod loja", "cnpj filial", "nroempresa")),
     Campo("unidade_medida", "Unidade de medida",
           "a quantidade só se converte sabendo se a linha é UN, KG ou caixa",
           Necessidade.OPCIONAL,
@@ -150,7 +165,12 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
           ("codigo", "cod item", "codigo produto", "cod produto", "seqproduto")),
     Campo("descricao_item", "Descrição do item", "identifica a mercadoria para conferência e de-para",
           Necessidade.IMPORTANTE,
-          ("descricao", "desccompleta", "descricao cliente", "descricao produto", "produto")),
+          # "desc produto" antes de "descricao": num relatório que traz as duas,
+          # "Descrição CFOP" vem antes de "Desc. Produto" e levava o campo — o
+          # de-para passaria a casar nome de operação em vez de mercadoria.
+          ("desc produto", "desc do produto", "descricao do produto",
+           "descricao produto", "desccompleta", "descricao cliente",
+           "descricao", "produto")),
     Campo("codigo_barras", "Código de barras", "chave exata do de-para entre empresas",
           Necessidade.OPCIONAL, ("codigo barras", "ean", "gtin", "cod barras")),
     Campo("ncm", "NCM", "classificação fiscal, usada no enquadramento",
@@ -172,9 +192,13 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
           ("cst icms", "dois ultimos digitos cst", "cst", "situacao tributaria")),
     Campo("origem_mercadoria", "Origem da mercadoria",
           "o primeiro dígito do CST, quando o ERP o entrega em coluna própria",
-          Necessidade.OPCIONAL, ("primeiro digito cst", "origem mercadoria", "orig")),
+          Necessidade.OPCIONAL,
+          ("primeiro digito cst", "origem mercadoria", "origem da mercadoria"),
+          so_exatos=("orig", "origem")),
     Campo("indicador_entrada", "Indicador de entrada", "distingue entrada de saída quando o CFOP não basta",
-          Necessidade.OPCIONAL, ("ent", "entrada", "ind mov", "e s")),
+          Necessidade.OPCIONAL,
+          ("entrada saida", "entrada ou saida", "ind mov", "ind oper"),
+          so_exatos=("ent", "entrada", "e s")),
 
     # ---------- ICMS próprio ----------
     Campo("bc_icms", "Base de cálculo do ICMS", "compõe o ICMS suportado",
@@ -191,15 +215,16 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
     # ---------- ICMS-ST: o coração do trabalho ----------
     Campo("bc_st", "Base de cálculo da ST", "confere o cálculo da retenção",
           Necessidade.IMPORTANTE,
-          ("valor bc st informada", "bc st", "base st", "base calculo st",
-           "valor bc st", "bc icms st", "bascalcicmsst")),
+          ("valor bc st informada", "base icms st", "bc st", "base st",
+           "base calculo st", "valor bc st", "bc icms st", "bascalcicmsst")),
     Campo("valor_st", "Valor do ICMS-ST", "é a parcela retida, o que se busca ressarcir",
           Necessidade.OBRIGATORIO,
           ("valor st informada", "valor sub trib", "valor st", "vlr st",
            "valor icms st", "vlricmsst", "icms st")),
     Campo("valor_fcp_st", "FCP retido por ST", "o manual inclui o FECOEP no imposto suportado",
           Necessidade.IMPORTANTE,
-          ("valor fcp st", "fcp st", "valor fcp st ret", "vlr fcp st")),
+          ("valor fcp icms st", "valor fcp st", "fcp st", "valor fcp st ret",
+           "vlr fcp st")),
 
     # ---------- valores vindos do XML pelo próprio ERP ----------
     Campo("bc_st_xml", "Base da ST no XML", "o valor do documento, que prevalece sobre o do ERP",
@@ -441,6 +466,11 @@ def mapear(cabecalho: list[str] | tuple[str, ...],
         restantes: list[Campo] = []
         for campo in faltando:
             alvo = [normalizar(s) for s in (campo.sinonimos or (campo.chave,))]
+            if exato:
+                # no fim: o apelido explícito tenta primeiro. Prepondo, o
+                # "cnpj" do participante levaria a coluna "CNPJ" do próprio
+                # estabelecimento antes de "CNNJ_CPF" ser tentado.
+                alvo = alvo + [normalizar(s) for s in campo.so_exatos]
             achado = _casar(normalizados, alvo, usadas, exato=exato)
             if achado is None:
                 restantes.append(campo)
