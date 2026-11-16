@@ -66,6 +66,7 @@ _POR_TIPO_SPED = {
 
 _POR_ESPECIE = {
     Especie.MOVIMENTO: TipoDeArquivo.GERENCIAL_MOVIMENTO,
+    Especie.MOVIMENTO_SEM_ST: TipoDeArquivo.GERENCIAL_SEM_ST,
     Especie.INVENTARIO: TipoDeArquivo.GERENCIAL_INVENTARIO,
     Especie.RESUMO: TipoDeArquivo.GERENCIAL_RESUMO,
 }

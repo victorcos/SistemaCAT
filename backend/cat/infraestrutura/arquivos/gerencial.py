@@ -177,17 +177,22 @@ class Leitura:
         self._encerrar()
 
     def movimentos(self) -> Iterator[MovimentoGerencial]:
-        yield from self._tipados(MovimentoGerencial.de, Especie.MOVIMENTO)
+        """As duas espécies de movimento entram: o registro é o mesmo, e quem
+        precisa da parcela retida decide pela espécie (`Especie.tem_st`), e não
+        por esta porta."""
+        yield from self._tipados(MovimentoGerencial.de,
+                                 Especie.MOVIMENTO, Especie.MOVIMENTO_SEM_ST)
 
     def inventario(self) -> Iterator[ItemInventariado]:
         yield from self._tipados(ItemInventariado.de, Especie.INVENTARIO)
 
     # ------------------------------------------------------------------
-    def _tipados(self, construtor, esperada: Especie) -> Iterator:
-        if self.especie is not esperada:
+    def _tipados(self, construtor, *esperadas: Especie) -> Iterator:
+        if self.especie not in esperadas:
+            quais = " nem ".join(e.rotulo.lower() for e in esperadas)
             raise RelatorioIlegivel(
                 f"{os.path.basename(self.inspecao.caminho)} é "
-                f"{self.especie.rotulo.lower()}, não {esperada.rotulo.lower()}"
+                f"{self.especie.rotulo.lower()}, não {quais}"
             )
         for numero, dados in self.brutos():
             try:

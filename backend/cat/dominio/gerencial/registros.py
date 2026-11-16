@@ -29,6 +29,9 @@ ZERO = Decimal("0")
 
 # primeiro dígito do CFOP: 1, 2 e 3 entram; 5, 6 e 7 saem
 _ENTRADA = frozenset("123")
+# CF-e SAT e NFC-e: os dois modelos que só existem para documentar venda a
+# consumidor final. 02 e 2D são o cupom antigo do ECF, pela mesma razão
+_MODELOS_DE_CUPOM = frozenset({"59", "65", "02", "2D"})
 
 
 class OrigemDoSt(str, Enum):
@@ -68,10 +71,15 @@ class MovimentoGerencial:
     cpf_participante: str | None = None
     uf_participante: str = ""
     cst_icms: str = ""
+    origem_mercadoria: str = ""
     unidade: str = ""
+    unidade_medida: str = ""
+    # 55 é nota, 65 e 59 são cupom. Vem vazio no relatório que não traz a coluna
+    modelo_documento: str = ""
     tipo_documento: str = ""
 
     bc_icms: Decimal = ZERO
+    aliquota_icms: Decimal = ZERO
     valor_icms: Decimal = ZERO
     bc_st: Decimal = ZERO
     valor_st: Decimal = ZERO
@@ -90,7 +98,14 @@ class MovimentoGerencial:
     def e_venda_de_pdv(self) -> bool:
         """Venda de ponto de venda é cupom — NFC-e ou CF-e SAT —, e cupom existe
         para documentar venda a consumidor final. Não é suposição sobre quem
-        comprou: é o que o documento é, a mesma regra do modelo 65 e 59."""
+        comprou: é o que o documento é, a mesma regra do modelo 65 e 59.
+
+        Quando o relatório traz o modelo, é ele que decide: o texto do tipo de
+        documento é nome que cada ERP escreve como quer, e há relatório de
+        varejo que não tem esse texto nenhum — só o modelo.
+        """
+        if self.modelo_documento.strip() in _MODELOS_DE_CUPOM:
+            return True
         return "pdv" in self.tipo_documento.lower()
 
     @property
@@ -171,6 +186,10 @@ class MovimentoGerencial:
             cnpj_participante=cnpj,
             cpf_participante=cpf,
             uf_participante=v.texto(dados.get("uf_participante")).upper(),
+            origem_mercadoria=v.texto(dados.get("origem_mercadoria")),
+            unidade_medida=v.texto(dados.get("unidade_medida")),
+            modelo_documento=v.texto(dados.get("modelo_documento")),
+            aliquota_icms=v.decimal(dados.get("aliquota_icms"), campo="aliquota_icms"),
             cst_icms=v.texto(dados.get("cst_icms")),
             unidade=v.texto(dados.get("unidade")),
             tipo_documento=v.texto(dados.get("tipo_documento")),

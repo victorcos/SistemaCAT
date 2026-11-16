@@ -1,14 +1,23 @@
-using Cat.Dominio.Lote;
+﻿using Cat.Dominio.Lote;
 
 namespace Cat.Dominio.Testes;
 
 public sealed class TiposDeArquivoTestes
 {
     [Fact]
-    public void So_sete_tipos_alimentam_a_cat() =>
+    public void So_oito_tipos_alimentam_a_cat() =>
         Assert.Equal(["sped_icms_ipi", "xml_nfe", "xml_cancelamento", "xml_compactado", "gerencial_movimento",
-                "gerencial_inventario", "lista_de_canceladas"],
+                "gerencial_sem_st", "gerencial_inventario", "lista_de_canceladas"],
             TiposDeArquivo.Todos.Where(t => t.AlimentaACat).Select(t => t.Valor));
+
+    [Fact]
+    public void Movimento_sem_st_e_do_icms_e_do_grupo_gerencial()
+    {
+        var t = TiposDeArquivo.Buscar("gerencial_sem_st");
+        Assert.Equal("gerencial", t.Grupo);
+        Assert.Equal("Relatório de movimento sem ICMS-ST", t.Rotulo);
+        Assert.True(t.AlimentaACat);
+    }
 
     [Theory]
     [InlineData("sped_contribuicoes", "sped", "EFD Contribuições")]
