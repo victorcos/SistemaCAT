@@ -5,6 +5,66 @@
 
 ---
 
+## 2026-11-16 — Espécie nova: movimento sem ICMS-ST
+
+O relatório de saídas item a item de um ERP de varejo (empresa 32) caía como
+**não reconhecido**: "faltam Código do item, Valor do ICMS-ST". O ST não falta
+por descuido — **venda a consumidor de mercadoria com ST sai em CST 60, sem ST
+destacado**. O catálogo de movimento exige ST porque foi desenhado para o
+relatório de entrada, onde ST ausente significa arquivo inútil.
+
+**E o pior não era a recusa.** Medindo o que aconteceria se os dois obrigatórios
+fossem resolvidos com apelidos, o casamento parcial levava **cinco campos para
+a coluna errada, em silêncio**:
+
+| campo | pegava | devia pegar |
+|---|---|---|
+| Descrição do item | `SEQPRODUTO` (o código) | `DESCCOMPLETA` |
+| Número do documento | `SITUACAONFPIS` (CST do PIS) | `NUMEROCFE` |
+| Unidade (loja) | `UNIDADEPADRAO` (UN/KG) | `NROEMPRESA` |
+| CNPJ do participante | o CNPJ do próprio estabelecimento | `CNNJ_CPF` |
+| CST do ICMS | só o dígito de origem | `DOIS_ULTIMOS_DIGITOS_CST` |
+
+É a mesma armadilha que os comentários de `CAMPOS_MOVIMENTO` já registravam
+("'nf' pegava a chave como número e 'cnpj' fazia da loja o participante"),
+batendo de novo com um leiaute novo.
+
+**O que mudou.**
+
+1. `Especie.MOVIMENTO_SEM_ST`, com catálogo **derivado** de `CAMPOS_MOVIMENTO`
+   (`CAMPOS_SEM_ST`) em que só os campos de ST deixam de ser cobrados. Derivado
+   e não reescrito: duas listas iguais menos um campo divergem no primeiro dia
+   em que alguém acrescentar coluna só numa delas.
+2. `Especie.tem_st` diz se a espécie promete a parcela retida. **Era a
+   alternativa descartada:** afrouxar o ST no próprio movimento faria a apuração
+   do ICMS suportado somar zero sem dizer nada — pior que recusar o arquivo.
+   Com espécie própria, quem apura o suportado sabe que não pode ler daqui.
+3. A espécie nova é **menos exigente** (um obrigatório a menos), então a ordem de
+   classificação tenta movimento primeiro: arquivo que traz ST cai em movimento,
+   como antes. Há teste fixando isso.
+4. `TipoDeArquivo.GERENCIAL_SEM_ST` nos dois lados (motor e API em C#).
+   `tipo` é `String(30)` no banco — **não houve migração**.
+5. Apelidos **exatos** para o leiaute novo. Todo exato é resolvido antes de
+   qualquer parcial, e é isso que desfaz as cinco trocas. Entre eles
+   `cnnj cpf` — erro de digitação na origem, e o nome real da coluna.
+6. Quatro campos que o sistema jogava fora passaram a entrar:
+   `modelo_documento`, `unidade_medida`, `aliquota_icms` e `origem_mercadoria`.
+   O modelo não é enfeite: `e_venda_de_pdv` dependia do texto do tipo de
+   documento, que este relatório **não tem**; agora o modelo 59/65/02/2D decide,
+   que é a regra citada no próprio comentário da propriedade. A unidade de
+   medida é o que permite aplicar o fator de conversão.
+
+Resultado no arquivo real: de 12 campos achados (5 errados) para **19 campos,
+todos certos**, zero obrigatório e zero importante faltando. O relatório de
+entrada do mesmo cliente continua classificado como movimento.
+
+**O que isto ainda não faz.** A extração de movimentos e a apuração do suportado
+filtram por `Especie.MOVIMENTO` e portanto **ignoram** a espécie nova — de
+propósito, para nada mudar de valor sem decisão. Abrir o lado da saída da Ficha 3
+para ela é o passo seguinte, e é onde o ganho aparece.
+
+---
+
 ## 2026-11-16 — O relatório do de-para: a entrada num bloco, a saída no outro
 
 O relatório que se usava era uma linha por par, com origem e destino misturados

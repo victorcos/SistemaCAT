@@ -172,14 +172,17 @@ class TestClassificar:
         assert m.especie is Especie.MOVIMENTO
         assert m.utilizavel
         assert m.tem_valores_do_xml
-        # unidade e tipo do documento só vêm no relatório de saídas das lojas
-        assert {c.chave for c in m.nao_encontrados} == {"unidade", "tipo_documento"}
+        # unidade e tipo do documento só vêm no relatório de saídas das lojas.
+        # O que se afirma é a ausência **destes**, e não o conjunto inteiro:
+        # campo opcional novo no catálogo não é regressão deste leiaute
+        assert {"unidade", "tipo_documento"} <= {c.chave for c in m.nao_encontrados}
+        assert not m.faltam_obrigatorios and not m.faltam_importantes
 
     def test_saida_de_loja_traz_unidade_e_tipo_do_documento(self):
         """É o que diz de qual loja é o cupom e que ele é venda a consumidor."""
         cabecalho = MOVIMENTO.split("|") + ["Unidade", "Descrição Tipo Dcto"]
         m = classificar(cabecalho)
-        assert not m.nao_encontrados
+        assert not m.faltam_obrigatorios and not m.faltam_importantes
         assert m.nomes_origem["unidade"] == "Unidade"
         assert m.nomes_origem["tipo_documento"] == "Descrição Tipo Dcto"
 
@@ -441,3 +444,91 @@ class TestLeitura:
         insp = inspecionar(c)
         assert insp.especie is Especie.RESUMO
         assert not insp.especie.serve_para_razao
+
+
+# ---------------------------------------------------------------------------
+# Movimento sem ICMS-ST: o relatório de saída do varejo
+#
+# O cabeçalho abaixo é o real de um relatório de saídas item a item de um ERP de
+# varejo (empresa 32), com os nomes como vêm — inclusive `CNNJ_CPF`, que é erro
+# de digitação na origem, e o CST partido em duas colunas.
+#
+# Este arquivo caía como "não reconhecido" por faltar ICMS-ST, que ele não tem
+# por natureza: venda a consumidor de mercadoria com ST sai em CST 60. E o pior
+# não era a recusa — era que, aceitando-o, cinco campos casavam com a coluna
+# errada pela busca parcial.
+# ---------------------------------------------------------------------------
+SAIDA_DO_VAREJO = (
+    "CNPJ;NROEMPRESA;UF;DTAEMISSAO;NUMEROCFE;CFECHAVEACESSO;CODMODELO;SEQPESSOA;"
+    "NOMERAZAO;CNNJ_CPF;CIDADE;UF;CFOP;SEQPRODUTO;DESCCOMPLETA;NCM;"
+    "PRIMEIRO_DIGITO_CST;DOIS_ULTIMOS_DIGITOS_CST;SITUACAONFPIS;SITUACAONFCOFINS;"
+    "UNIDADEPADRAO;QUANTIDADE;VLRUNITARIO;VLRDESCONTO;VLRTOTAL;VLRBASEICMS;"
+    "PERALIQUOTAICMS;VLRICMS;BASEPISCALC;ALIQPISCALC;VLRPISCALC;BASECOFINSCALC;"
+    "ALIQCOFINSCALC;VLRCOFINSCALC"
+)
+
+
+class TestMovimentoSemSt:
+    def _mapa(self):
+        return classificar(SAIDA_DO_VAREJO.split(";"))
+
+    def test_e_movimento_sem_st_e_serve(self):
+        m = self._mapa()
+        assert m.especie is Especie.MOVIMENTO_SEM_ST
+        assert m.utilizavel
+        assert not m.faltam_obrigatorios and not m.faltam_importantes
+
+    def test_a_especie_avisa_que_nao_tem_a_parcela_retida(self):
+        """É o que impede o ICMS suportado de somar zero calado."""
+        assert not Especie.MOVIMENTO_SEM_ST.tem_st
+        assert Especie.MOVIMENTO.tem_st
+        # mas serve ao razão: tem data e CFOP por linha
+        assert Especie.MOVIMENTO_SEM_ST.serve_para_razao
+
+    def test_cada_coluna_no_campo_certo(self):
+        """O ponto da mudança. Antes, pela busca parcial: SEQPRODUTO caía na
+        descrição, SITUACAONFPIS no número do documento, UNIDADEPADRAO na loja,
+        o CNPJ do próprio estabelecimento no participante e só o dígito de
+        origem no CST."""
+        de = self._mapa().nomes_origem
+        assert de["codigo_item"] == "SEQPRODUTO"
+        assert de["descricao_item"] == "DESCCOMPLETA"
+        assert de["numero_doc"] == "NUMEROCFE"
+        assert de["unidade"] == "NROEMPRESA"
+        assert de["unidade_medida"] == "UNIDADEPADRAO"
+        assert de["cnpj_participante"] == "CNNJ_CPF"
+        assert de["cst_icms"] == "DOIS_ULTIMOS_DIGITOS_CST"
+        assert de["origem_mercadoria"] == "PRIMEIRO_DIGITO_CST"
+        assert de["modelo_documento"] == "CODMODELO"
+        assert de["valor_item"] == "VLRTOTAL"
+        assert de["bc_icms"] == "VLRBASEICMS"
+        assert de["aliquota_icms"] == "PERALIQUOTAICMS"
+        assert de["valor_icms"] == "VLRICMS"
+        assert de["chave"] == "CFECHAVEACESSO"
+
+    def test_quem_tem_st_continua_movimento(self):
+        """A regressão que importa: a espécie nova é menos exigente, e não pode
+        roubar o arquivo que traz a parcela retida."""
+        m = classificar(MOVIMENTO.split("|"))
+        assert m.especie is Especie.MOVIMENTO
+
+    def test_cupom_pelo_modelo_sem_texto_de_tipo(self):
+        """Este relatório não tem a coluna de tipo de documento — só o modelo.
+        Sem ler o modelo, a venda a consumidor não se reconhecia."""
+        dados = {"codigo_item": "363204", "data": "02/01/2026", "cfop": "5102",
+                 "quantidade": "1", "modelo_documento": "65"}
+        m = MovimentoGerencial.de(dados, 2)
+        assert m.e_venda_de_pdv and not m.e_entrada
+        assert MovimentoGerencial.de({**dados, "modelo_documento": "59"}, 3).e_venda_de_pdv
+        assert not MovimentoGerencial.de({**dados, "modelo_documento": "55"}, 4).e_venda_de_pdv
+
+    def test_o_cst_vem_dos_dois_digitos_e_a_origem_a_parte(self):
+        dados = {"codigo_item": "363204", "data": "02/01/2026", "cfop": "5102",
+                 "quantidade": "1", "cst_icms": "60", "origem_mercadoria": "0",
+                 "unidade_medida": "UN", "aliquota_icms": "18"}
+        m = MovimentoGerencial.de(dados, 2)
+        assert (m.cst_icms, m.origem_mercadoria) == ("60", "0")
+        assert m.unidade_medida == "UN"
+        assert m.aliquota_icms == Decimal("18")
+        # sem ST informado, o registro não inventa parcela retida
+        assert m.origem_do_st is OrigemDoSt.SEM_ST and m.st_que_vale == Decimal(0)

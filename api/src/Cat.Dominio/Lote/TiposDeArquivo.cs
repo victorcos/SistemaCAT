@@ -32,6 +32,10 @@ public static class TiposDeArquivo
         Novo("xml_cancelamento", "Evento de cancelamento de NF-e", Icms),
         Novo("xml_compactado", "Zip de XML", Icms, PisCofins),
         Novo("gerencial_movimento", "Relatório de movimento", Icms),
+        // o mesmo movimento, sem a parcela retida por ST: é como vem o relatório
+        // de saída do varejo, porque venda a consumidor de mercadoria com ST sai
+        // em CST 60. Alimenta a CAT pelo lado da saída, não pelo suportado
+        Novo("gerencial_sem_st", "Relatório de movimento sem ICMS-ST", Icms),
         Novo("gerencial_inventario", "Relatório de inventário", Icms),
         Novo("gerencial_resumo", "Resumo por produto"),
         Novo("cat42_arquivo_digital", "Arquivo digital da CAT 42"),

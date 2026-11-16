@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 
 
@@ -31,6 +31,12 @@ class Especie(str, Enum):
     """Que espécie de arquivo é, pelo que ele descreve."""
 
     MOVIMENTO = "movimento"
+    # o mesmo movimento por documento, mas sem a parcela retida por ST. O
+    # relatório de saída do varejo é assim por natureza: venda a consumidor de
+    # mercadoria com ST sai em CST 60, sem ST destacado. Exigir ST dele
+    # recusava o arquivo; aceitá-lo como movimento comum faria o ICMS
+    # suportado somar zero calado. Espécie própria resolve os dois.
+    MOVIMENTO_SEM_ST = "movimento_sem_st"
     INVENTARIO = "inventario"
     RESUMO = "resumo"
 
@@ -38,6 +44,7 @@ class Especie(str, Enum):
     def rotulo(self) -> str:
         return {
             Especie.MOVIMENTO: "Movimento por documento",
+            Especie.MOVIMENTO_SEM_ST: "Movimento sem ICMS-ST",
             Especie.INVENTARIO: "Inventário",
             Especie.RESUMO: "Resumo por produto",
         }[self]
@@ -47,6 +54,10 @@ class Especie(str, Enum):
         return {
             Especie.MOVIMENTO:
                 "Uma linha por item de nota. É a fonte do razão da Ficha 3.",
+            Especie.MOVIMENTO_SEM_ST:
+                "Uma linha por item de nota, sem ICMS-ST informado. Serve ao "
+                "lado da saída da Ficha 3; não serve ao ICMS suportado, que é "
+                "justamente a parcela retida que falta aqui.",
             Especie.INVENTARIO:
                 "Uma linha por item, com saldo e imposto médio por unidade. "
                 "Serve de estoque de abertura.",
@@ -58,7 +69,14 @@ class Especie(str, Enum):
 
     @property
     def serve_para_razao(self) -> bool:
-        """Só o movimento tem data e CFOP por linha, que é o que o razão pede."""
+        """Data e CFOP por linha é o que o razão pede — as duas espécies de
+        movimento têm; inventário e resumo, não."""
+        return self in (Especie.MOVIMENTO, Especie.MOVIMENTO_SEM_ST)
+
+    @property
+    def tem_st(self) -> bool:
+        """Se a espécie promete a parcela retida. Quem apura o ICMS suportado
+        só pode ler quem promete."""
         return self is Especie.MOVIMENTO
 
 
@@ -100,24 +118,39 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
           Necessidade.IMPORTANTE,
           ("chave dfe", "chave nfe", "chave de acesso", "num autentic nfe", "chave")),
     Campo("numero_doc", "Número do documento", "identifica a nota quando não há chave",
-          Necessidade.IMPORTANTE, ("numero dcto", "numero documento", "num doc", "nf", "cup")),
+          Necessidade.IMPORTANTE,
+          ("numero dcto", "numero documento", "num doc", "numerocfe", "nf", "cup")),
+    Campo("modelo_documento", "Modelo do documento",
+          "55 é nota, 65 e 59 são cupom — e cupom é consumidor final por definição",
+          Necessidade.OPCIONAL, ("codmodelo", "cod modelo", "cod mod", "modelo")),
     Campo("data", "Data de emissão", "define a posição do movimento no razão",
           Necessidade.OBRIGATORIO, ("dt emissao", "data emissao", "dt mvto", "data movimento", "emissao")),
     Campo("cnpj_participante", "CNPJ do participante", "distingue compra de substituto e de substituído",
-          Necessidade.IMPORTANTE, ("cnpj cpf", "cnpj", "cpf cnpj", "cnpj fornecedor")),
+          Necessidade.IMPORTANTE,
+          # "cnnj cpf" é erro de digitação na origem, e é o nome real da coluna
+          # no relatório de saída de um ERP de varejo. Sem ele, o parcial
+          # "cnpj" pegava a coluna do próprio estabelecimento
+          ("cnpj cpf", "cnnj cpf", "cnpj", "cpf cnpj", "cnpj fornecedor")),
     Campo("uf_participante", "UF do participante", "operação interestadual muda a regra",
           Necessidade.OPCIONAL, ("uf", "uf mvto", "estado")),
     Campo("unidade", "Unidade (loja)", "diz de qual estabelecimento é a linha — o razão é por loja",
-          Necessidade.OPCIONAL, ("unidade", "loja", "filial", "cod loja", "cnpj filial")),
+          Necessidade.OPCIONAL,
+          ("unidade", "loja", "filial", "cod loja", "cnpj filial", "nroempresa")),
+    Campo("unidade_medida", "Unidade de medida",
+          "a quantidade só se converte sabendo se a linha é UN, KG ou caixa",
+          Necessidade.OPCIONAL,
+          ("unidadepadrao", "unidade padrao", "unidade medida", "emb", "embalagem", "un med")),
     Campo("tipo_documento", "Tipo do documento",
           "venda de PDV é cupom, e cupom é consumidor final por definição",
           Necessidade.OPCIONAL, ("descricao tipo dcto", "tipo documento", "tipo dcto")),
 
     # ---------- item ----------
     Campo("codigo_item", "Código do item", "é a chave da ficha: uma por mercadoria",
-          Necessidade.OBRIGATORIO, ("codigo", "cod item", "codigo produto", "cod produto")),
+          Necessidade.OBRIGATORIO,
+          ("codigo", "cod item", "codigo produto", "cod produto", "seqproduto")),
     Campo("descricao_item", "Descrição do item", "identifica a mercadoria para conferência e de-para",
-          Necessidade.IMPORTANTE, ("descricao", "descricao cliente", "descricao produto", "produto")),
+          Necessidade.IMPORTANTE,
+          ("descricao", "desccompleta", "descricao cliente", "descricao produto", "produto")),
     Campo("codigo_barras", "Código de barras", "chave exata do de-para entre empresas",
           Necessidade.OPCIONAL, ("codigo barras", "ean", "gtin", "cod barras")),
     Campo("ncm", "NCM", "classificação fiscal, usada no enquadramento",
@@ -127,18 +160,31 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
     Campo("quantidade", "Quantidade", "entra no custo médio ponderado móvel",
           Necessidade.OBRIGATORIO, ("qtde unitaria", "quantidade", "qtd", "qtde")),
     Campo("valor_item", "Valor do item", "confere o total e apura divergência",
-          Necessidade.IMPORTANTE, ("valor", "valor total", "vlr item", "valor item")),
+          Necessidade.IMPORTANTE,
+          ("valor", "valor total", "vlrtotal", "vlr item", "valor item")),
     Campo("cfop", "CFOP", "diz o que a operação é: entrada, saída, devolução, baixa",
           Necessidade.OBRIGATORIO, ("cfop mvto", "cfop", "cod fiscal")),
     Campo("cst_icms", "CST do ICMS", "situação tributária, separa o que é ST do que não é",
-          Necessidade.IMPORTANTE, ("cst icms", "cst", "situacao tributaria")),
+          Necessidade.IMPORTANTE,
+          # há ERP que parte o CST em duas colunas: a origem num campo e os dois
+          # dígitos da tributação noutro. O CST é o segundo — o primeiro é a
+          # origem da mercadoria, e lê-lo como CST dava "0" em toda linha
+          ("cst icms", "dois ultimos digitos cst", "cst", "situacao tributaria")),
+    Campo("origem_mercadoria", "Origem da mercadoria",
+          "o primeiro dígito do CST, quando o ERP o entrega em coluna própria",
+          Necessidade.OPCIONAL, ("primeiro digito cst", "origem mercadoria", "orig")),
     Campo("indicador_entrada", "Indicador de entrada", "distingue entrada de saída quando o CFOP não basta",
           Necessidade.OPCIONAL, ("ent", "entrada", "ind mov", "e s")),
 
     # ---------- ICMS próprio ----------
     Campo("bc_icms", "Base de cálculo do ICMS", "compõe o ICMS suportado",
           Necessidade.IMPORTANTE,
-          ("bc icms", "base icms", "base calculo icms", "valor bc icms", "bascalcicms")),
+          ("bc icms", "base icms", "base calculo icms", "valor bc icms",
+           "bascalcicms", "vlrbaseicms")),
+    Campo("aliquota_icms", "Alíquota do ICMS",
+          "reconstrói o imposto quando o valor vem zerado e a base não",
+          Necessidade.OPCIONAL,
+          ("peraliquotaicms", "aliq icms", "aliquota icms", "perc icms")),
     Campo("valor_icms", "Valor do ICMS", "é a parcela da operação própria do substituto",
           Necessidade.OBRIGATORIO, ("valor icms", "vlr icms", "vlricms", "icms")),
 
@@ -279,8 +325,37 @@ CAMPOS_RESUMO: tuple[Campo, ...] = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Movimento sem ICMS-ST: o mesmo contrato, menos a parcela retida.
+#
+# **Derivado, e não escrito de novo.** Duas listas iguais menos um campo
+# divergem no primeiro dia em que alguém acrescentar coluna só numa delas. Aqui
+# o que muda é explícito: os campos de ST deixam de ser cobrados, e nada mais.
+#
+# Por que não bastava afrouxar o ST no movimento: o ICMS suportado é a soma da
+# parcela própria com a retida. Aceitar no movimento um arquivo sem ST faria a
+# apuração somar zero sem dizer, que é pior do que recusar o arquivo. Com
+# espécie própria, `Especie.tem_st` é falso e quem apura o suportado sabe que
+# não pode ler daqui.
+#
+# Esta espécie é menos exigente que o movimento (um obrigatório a menos), então
+# a ordem de classificação tenta o movimento primeiro: arquivo que tem ST cai
+# em movimento, como antes.
+# ---------------------------------------------------------------------------
+CAMPOS_DA_ST = frozenset({
+    "bc_st", "valor_st", "valor_fcp_st", "bc_st_xml", "valor_st_xml",
+    "st_retido_anterior",
+})
+
+CAMPOS_SEM_ST: tuple[Campo, ...] = tuple(
+    replace(c, necessidade=Necessidade.OPCIONAL) if c.chave in CAMPOS_DA_ST else c
+    for c in CAMPOS_MOVIMENTO
+)
+
+
 CATALOGOS: dict[Especie, tuple[Campo, ...]] = {
     Especie.MOVIMENTO: CAMPOS_MOVIMENTO,
+    Especie.MOVIMENTO_SEM_ST: CAMPOS_SEM_ST,
     Especie.INVENTARIO: CAMPOS_INVENTARIO,
     Especie.RESUMO: CAMPOS_RESUMO,
 }

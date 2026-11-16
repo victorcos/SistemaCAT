@@ -126,6 +126,10 @@ class TipoDeArquivo(str, Enum):
     # zip com XML de NF-e ou CF-e: as etapas leem os membros sem extrair
     XML_COMPACTADO = "xml_compactado"
     GERENCIAL_MOVIMENTO = "gerencial_movimento"
+    # o mesmo movimento, sem a parcela retida por ST: é como vem o relatório de
+    # saída do varejo, porque venda a consumidor de mercadoria com ST sai em
+    # CST 60. Tipo próprio para quem apura o ICMS suportado não ler daqui
+    GERENCIAL_SEM_ST = "gerencial_sem_st"
     GERENCIAL_INVENTARIO = "gerencial_inventario"
     GERENCIAL_RESUMO = "gerencial_resumo"
     # o TXT que o cliente transmitiu à SEFAZ, gerado por outra ferramenta: não
@@ -150,6 +154,7 @@ class TipoDeArquivo(str, Enum):
             TipoDeArquivo.XML_CANCELAMENTO: "Evento de cancelamento de NF-e",
             TipoDeArquivo.XML_COMPACTADO: "Zip de XML",
             TipoDeArquivo.GERENCIAL_MOVIMENTO: "Relatório de movimento",
+            TipoDeArquivo.GERENCIAL_SEM_ST: "Relatório de movimento sem ICMS-ST",
             TipoDeArquivo.GERENCIAL_INVENTARIO: "Relatório de inventário",
             TipoDeArquivo.GERENCIAL_RESUMO: "Resumo por produto",
             TipoDeArquivo.CAT42_ARQUIVO_DIGITAL: "Arquivo digital da CAT 42",
@@ -209,6 +214,7 @@ _MODULOS_POR_TIPO: dict[TipoDeArquivo, tuple[str, ...]] = {
     TipoDeArquivo.XML_CANCELAMENTO: ("icms",),
     TipoDeArquivo.XML_COMPACTADO: ("icms", "piscofins"),
     TipoDeArquivo.GERENCIAL_MOVIMENTO: ("icms",),
+    TipoDeArquivo.GERENCIAL_SEM_ST: ("icms",),
     TipoDeArquivo.GERENCIAL_INVENTARIO: ("icms",),
     TipoDeArquivo.LISTA_DE_CANCELADAS: ("icms",),
 }
