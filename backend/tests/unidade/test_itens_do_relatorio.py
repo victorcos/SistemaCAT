@@ -185,6 +185,28 @@ class TestExtracao:
                           "SELECT quantidade FROM r WHERE codigo = '999777'")
         assert qtd == Decimal("0.53200")
 
+    def test_linha_sem_cfop_e_com_numero_torto_ficam_de_fora_e_contadas(self, tmp_path):
+        """A leitura é pelo texto cru, para não pagar vinte conversões por
+        linha. O que o registro montado recusava continua recusado — e agora
+        cada motivo tem o seu número, em vez de um 'incompleto' só."""
+        arquivo = escrever(tmp_path, "tortas.txt", [
+            CABECALHO_DO_RELATORIO,
+            # sem CFOP: não se sabe se entrou ou saiu
+            linha_de_saida(CHAVE_SAIDA, "363204", "ARROZ", "10063021",
+                           "", "1", "10,00"),
+            # quantidade que não é número
+            linha_de_saida(CHAVE_SAIDA, "363204", "ARROZ", "10063021",
+                           "5405", "mil", "10,00"),
+            linha_de_saida(CHAVE_SAIDA, "363204", "ARROZ", "10063021",
+                           "5405", "1", "10,00"),
+        ])
+        p = extrair_itens_do_relatorio([arquivo], str(tmp_path / "ex"))
+        assert (p.sem_cfop, p.invalidos, p.itens) == (1, 1, 1)
+        # o item que entrou é o número 1: a numeração não conta o que foi fora
+        (n,), = _linhas(f"{tmp_path}/ex/{ARQUIVO_ITENS_DO_RELATORIO}",
+                        "SELECT numero_item FROM r")
+        assert n == 1
+
     def test_o_que_nao_e_movimento_nao_entra_e_e_contado(self, tmp_path):
         inventario = escrever(tmp_path, "inv.txt", [
             "CNPJ|CODIGO|DESCRICAO|UNIDADE|QUANTIDADE|VALOR_UNITARIO|ICMS_ST_UNITARIO|DATA",

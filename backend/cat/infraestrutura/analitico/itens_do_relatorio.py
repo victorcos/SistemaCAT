@@ -77,6 +77,9 @@ ESQUEMA_ITENS_DO_RELATORIO = pa.schema([
 ])
 
 TAMANHO_DA_CHAVE = 44
+# quantas linhas inválidas vão ao log com o motivo: o bastante para reconhecer
+# o defeito, longe de encher o log com milhões de linhas iguais
+AMOSTRA_DE_INVALIDOS = 20
 
 
 @dataclass
@@ -88,6 +91,11 @@ class ProgressoDoRelatorio(Progresso):
     # interna, ou chave que passou pelo Excel e voltou em notação científica.
     # Não é defeito do leitor, e também não entra — fica contada
     sem_chave: int = 0
+    # linha de item sem CFOP: não se sabe se entrou ou saiu, e o movimento não
+    # classifica. Mesma exigência que o registro montado fazia
+    sem_cfop: int = 0
+    # número ou CFOP que não converte
+    invalidos: int = 0
     # arquivo que não é de movimento (inventário, resumo) ou que não abriu
     nao_sao_movimento: int = 0
     ilegiveis: int = 0
@@ -154,46 +162,87 @@ def extrair_itens_do_relatorio(
                     "itens": progresso.itens,
                     "documentos": progresso.documentos,
                     "sem_chave": progresso.sem_chave,
+                    "sem_cfop": progresso.sem_cfop,
+                    "invalidos": progresso.invalidos,
                     "nao_sao_movimento": progresso.nao_sao_movimento,
                     "ilegiveis": progresso.ilegiveis})
     return progresso
 
 
+# (coluna do parquet, chave do campo, escala) — os seis números que a ficha e o
+# de-para leem. O relatório tem dezenas de outros (PIS, COFINS, IPI, reforma);
+# converter o que não se usa é o que fazia esta leitura custar seis vezes mais
+_NUMEROS = (
+    ("quantidade", "quantidade", QUANTIDADE),
+    ("valor", "valor_item", CENTAVOS),
+    ("bc_icms", "bc_icms", CENTAVOS),
+    ("aliq_icms", "aliquota_icms", ALIQUOTA),
+    ("valor_icms", "valor_icms", CENTAVOS),
+    ("bc_st", "bc_st", CENTAVOS),
+    ("valor_st", "valor_st", CENTAVOS),
+)
+_TEXTOS = (
+    ("codigo", "codigo_item"), ("gtin", "codigo_barras"),
+    ("descricao", "descricao_item"), ("ncm", "ncm"),
+    ("unidade", "unidade_medida"), ("cst_icms", "cst_icms"),
+)
+
+
 def _ler_um(leitura, nome: str, escritor: _Escritor, p: ProgressoDoRelatorio) -> None:
     """As linhas de um relatório, numerando o item dentro de cada documento.
 
-    O contador é por arquivo, e isso basta: o relatório vem por estabelecimento
-    e mês, e as linhas de um documento saem juntas. Um documento que apareça em
-    dois arquivos é resolvido depois, escolhendo um arquivo por chave — não
-    aqui, somando itens de dois lugares no mesmo documento.
+    **Lê o texto cru (`brutos`), e não o registro montado (`movimentos`).** É o
+    mesmo caminho do confronto, e pelo mesmo motivo: montar
+    `MovimentoGerencial` converte vinte campos por linha — data, CFOP, CNPJ,
+    PIS, COFINS, ST do XML, retido anterior —, e deste módulo só sete números
+    e seis textos são usados. Medido na empresa 17, loja 02: 1,31 milhão de
+    linhas em 110 s pelo registro montado (3,3 MB/s), contra os 19,6 MB/s que o
+    confronto faz nos mesmos arquivos. Na base inteira a diferença é de quase
+    quatro horas.
+
+    O contador do item é por arquivo, e isso basta: o relatório vem por
+    estabelecimento e mês, e as linhas de um documento saem juntas. Um
+    documento que apareça em dois arquivos é resolvido depois, escolhendo um
+    arquivo por chave — não aqui, somando itens de dois lugares no mesmo
+    documento.
     """
+    from cat.dominio.gerencial import valores as v
+
     numero: dict[str, int] = {}
     antes = p.itens
-    for m in leitura.movimentos():
-        chave = m.chave.strip()
+    for _linha, dados in leitura.brutos():
+        chave = (dados.get("chave") or "").strip()
         if len(chave) != TAMANHO_DA_CHAVE or not chave.isdigit():
-            p.sem_chave += 1
+            # linha de total e de rodapé não tem código: não é item, e o
+            # leitor do gerencial já a conta como descarte. O que se conta
+            # aqui é o item de verdade cuja chave não serve
+            if (dados.get("codigo_item") or "").strip():
+                p.sem_chave += 1
             continue
-        n = numero[chave] = numero.get(chave, 0) + 1
-        escritor.acrescentar({
-            "chave": chave,
-            "arquivo": nome,
-            "numero_item": n,
-            "codigo": m.codigo_item,
-            "gtin": m.codigo_barras or None,
-            "descricao": m.descricao_item or None,
-            "ncm": m.ncm or None,
-            "cfop": m.cfop,
-            "unidade": m.unidade_medida or None,
-            "quantidade": _q(m.quantidade, QUANTIDADE),
-            "valor": _q(m.valor_item, CENTAVOS),
-            "cst_icms": m.cst_icms,
-            "bc_icms": _q(m.bc_icms, CENTAVOS),
-            "aliq_icms": _q(m.aliquota_icms, ALIQUOTA),
-            "valor_icms": _q(m.valor_icms, CENTAVOS),
-            "bc_st": _q(m.bc_st, CENTAVOS),
-            "valor_st": _q(m.valor_st, CENTAVOS),
-        })
+        try:
+            # sem CFOP não se sabe se entrou ou saiu, e o movimento não
+            # classifica: é a mesma exigência que o registro montado fazia,
+            # e a linha fica contada em vez de virar movimento sem lado
+            cfop = v.cfop(dados.get("cfop"))
+            if cfop is None:
+                p.sem_cfop += 1
+                continue
+            linha = {"chave": chave, "arquivo": nome, "cfop": cfop}
+            for coluna, campo in _TEXTOS:
+                linha[coluna] = v.texto(dados.get(campo)) or None
+            for coluna, campo, escala in _NUMEROS:
+                linha[coluna] = _q(v.decimal(dados.get(campo), campo=campo), escala)
+        except v.ValorInvalido as erro:
+            # número ou CFOP que não converte. Um punhado é dado ruim; muitos
+            # seriam mapeamento errado — e aí o confronto, que lê os mesmos
+            # arquivos, recusa o relatório antes desta etapa
+            p.invalidos += 1
+            if p.invalidos <= AMOSTRA_DE_INVALIDOS:
+                log.warning("linha de item inválida no relatório",
+                            extra={"arquivo": nome, "linha": _linha, "motivo": str(erro)})
+            continue
+        linha["numero_item"] = numero[chave] = numero.get(chave, 0) + 1
+        escritor.acrescentar(linha)
         p.itens += 1
     p.documentos += len(numero)
     p.bytes_lidos += _tamanho(leitura.inspecao.caminho)
