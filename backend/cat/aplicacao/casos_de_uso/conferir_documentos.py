@@ -33,7 +33,7 @@ from cat.aplicacao.casos_de_uso.historico_do_projeto import (
 from cat.config import obter_config
 from cat.dominio.icms.cat42.conferencia import ResumoDaConferencia
 from cat.dominio.projeto.historico import TipoDeEvento
-from cat.dominio.lote import TipoDeArquivo
+from cat.dominio.lote import GERENCIAIS_DE_MOVIMENTO, TipoDeArquivo
 from cat.infraestrutura.analitico.confronto import (
     ARQUIVO_SEM_DOCUMENTO,
     confrontar,
@@ -177,7 +177,7 @@ def preparar(projeto_id: int, usuario_id: int, sessao: Session) -> ExecucaoDB:
         )
     documentos = caminhos_do_projeto(
         projeto_id,
-        (TipoDeArquivo.XML_NFE, TipoDeArquivo.XML_COMPACTADO, TipoDeArquivo.GERENCIAL_MOVIMENTO),
+        (TipoDeArquivo.XML_NFE, TipoDeArquivo.XML_COMPACTADO, *GERENCIAIS_DE_MOVIMENTO),
         sessao,
     )
     if not documentos:
@@ -286,7 +286,7 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     efd, substituidas = caminhos_de_efd_vigentes(projeto_id, sessao)
     xmls = caminhos_do_projeto(projeto_id, (TipoDeArquivo.XML_NFE, TipoDeArquivo.XML_COMPACTADO), sessao)
     relatorios = caminhos_do_projeto(
-        projeto_id, (TipoDeArquivo.GERENCIAL_MOVIMENTO,), sessao)
+        projeto_id, GERENCIAIS_DE_MOVIMENTO, sessao)
 
     # Antes de qualquer leitura: o que o lote promete ainda está no disco?
     # Aqui, e não no fim, porque a resposta não melhora depois de 20 minutos de

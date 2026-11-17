@@ -71,6 +71,10 @@ from cat.infraestrutura.analitico.contingencia import (
     montar_contingencia,
     resumir_contingencia,
 )
+from cat.infraestrutura.analitico.itens_do_relatorio import (
+    ARQUIVO_ITENS_DO_RELATORIO,
+    ESQUEMA_ITENS_DO_RELATORIO,
+)
 from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML, ESQUEMA_ITENS_DO_XML
 from cat.infraestrutura.analitico.movimentos import (  # noqa: F401
     ARQUIVO_ANALITICO,
@@ -114,6 +118,21 @@ _DO_XML = (
     ("consumidor_final", "consumidor_final_xml"),
 )
 _COLUNAS_DO_XML = ",\n    ".join(f"x.{coluna} AS {nome}" for coluna, nome in _DO_XML)
+
+# O que o relatório do cliente acrescenta ao movimento que ele completou.
+#
+# **Colunas próprias, e não as do XML.** A tentação era reaproveitar
+# `descricao_xml` e `ncm_xml` — o `consolidar` já as usa quando o 0200 não tem
+# o código. Mas elas querem dizer "o que o XML declarou", e o de-para decide
+# por isso: `gtin_xml` vale como prova porque é o fornecedor dizendo, na nota
+# autorizada, qual é o código de barras. O que o ERP do cliente diz é outra
+# coisa, de outra força. Misturar as duas seria dar ao campo digitado no
+# cadastro do cliente o peso de um documento fiscal.
+_DO_RELATORIO = (
+    ("descricao", "descricao_relatorio"), ("ncm", "ncm_relatorio"),
+    ("gtin", "gtin_relatorio"), ("arquivo", "arquivo_relatorio"),
+)
+_COLUNAS_DO_RELATORIO = ",\n    ".join(f"r.{coluna} AS {nome}" for coluna, nome in _DO_RELATORIO)
 
 # O que decide se o item do XML cola no C170: o número do item casa, e a
 # quantidade ou o valor confirmam — ou, sem nenhum dos dois, a nota tem um item
@@ -203,14 +222,27 @@ def consolidar(destino: str, conferidos: str | None) -> ResumoDaMovimentacao:
             classificacao = "'nao_conferido'"
             juncao = ""
             usada = False
-        # sem 0200, a descrição, o código de barras, o NCM e o CEST vêm do XML;
-        # `cadastro_da_efd` continua dizendo quem não está no cadastro
+        # sem 0200, a descrição, o código de barras, o NCM e o CEST vêm do XML
+        # e, se o XML não tiver, do relatório do cliente — nessa ordem, que é a
+        # da força da prova: documento autorizado antes do que o ERP diz.
+        # `cadastro_da_efd` continua dizendo quem não está no cadastro.
+        #
+        # Na empresa 17 isto não é detalhe: o 0200 só lista o item que o
+        # arquivo referencia, e a saída dela vai à EFD sem item — o código que
+        # só vende não aparece em cadastro nenhum, e sem esta queda a ficha
+        # dele sairia sem nome e sem NCM.
         con.execute(f"""
             COPY (
                 SELECT m.*,
-                       CASE WHEN i.codigo IS NULL THEN m.descricao_xml ELSE i.descricao END AS descricao,
-                       CASE WHEN i.codigo IS NULL THEN m.gtin_xml ELSE i.codigo_barras END AS codigo_barras,
-                       CASE WHEN i.codigo IS NULL THEN m.ncm_xml ELSE i.ncm END AS ncm,
+                       CASE WHEN i.codigo IS NULL
+                            THEN coalesce(m.descricao_xml, m.descricao_relatorio)
+                            ELSE i.descricao END AS descricao,
+                       CASE WHEN i.codigo IS NULL
+                            THEN coalesce(m.gtin_xml, m.gtin_relatorio)
+                            ELSE i.codigo_barras END AS codigo_barras,
+                       CASE WHEN i.codigo IS NULL
+                            THEN coalesce(m.ncm_xml, m.ncm_relatorio)
+                            ELSE i.ncm END AS ncm,
                        CASE WHEN i.codigo IS NULL THEN m.cest_xml ELSE i.cest END AS cest,
                        i.unidade AS unidade_cadastro,
                        i.codigo IS NOT NULL AS cadastro_da_efd,
@@ -234,6 +266,7 @@ def consolidar(destino: str, conferidos: str | None) -> ResumoDaMovimentacao:
 
         resumo = _resumir(con, p, usada)
         _resumir_xml(con, p, resumo)
+        _resumir_relatorio(con, p, resumo)
         _resumir_contingencia(con, p, resumo)
     finally:
         con.close()
@@ -243,6 +276,8 @@ def consolidar(destino: str, conferidos: str | None) -> ResumoDaMovimentacao:
              extra={"documentos": resumo.documentos,
                     "com_item": resumo.documentos_com_item,
                     "saidas_sem_item": resumo.saidas_sem_item,
+                    "completadas_pelo_relatorio": resumo.saidas_completadas_pelo_relatorio,
+                    "movimentos_do_relatorio": resumo.movimentos_do_relatorio,
                     "movimentos": resumo.movimentos,
                     "itens": resumo.itens_cadastrados,
                     "sem_cadastro": resumo.itens_sem_cadastro,
@@ -280,6 +315,7 @@ def _preparar_xml(con, destino: str, p) -> None:
         SEMI JOIN docs_do_xml d ON d.cnpj = a.cnpj AND d.chave = a.chave AND d.emitente = 'terceiros'
         GROUP BY a.cnpj, a.chave HAVING count(DISTINCT replace(a.cfop, '.', '')) = 1
     """)
+    _preparar_relatorio(con, destino, p)
     con.execute("CREATE TABLE xml_contagem AS SELECT chave, count(*) AS itens FROM xml_itens GROUP BY chave")
     con.execute(f"""
         CREATE TABLE efd_contagem AS
@@ -343,6 +379,23 @@ def _preparar_xml(con, destino: str, p) -> None:
         JOIN xml_itens x ON x.chave = d.chave
         LEFT JOIN cfop_do_analitico ca ON ca.cnpj = d.cnpj AND ca.chave = d.chave
         -- as colunas das contagens não entram: são só do lado da EFD
+        UNION ALL BY NAME
+        -- o item que o relatório do cliente completou. Mesma porta do XML, e
+        -- depois dele na fila: `docs_do_relatorio` já exclui o que o XML cobre.
+        --
+        -- **O CFOP entra como está, sem virar o primeiro dígito.** O do XML é
+        -- de quem emitiu — numa compra, o 5.401 do fornecedor, que do lado de
+        -- quem recebe é 1.401. O do relatório é do ERP do próprio cliente: já
+        -- é o CFOP dele. Virar seria trocar entrada por saída.
+        SELECT d.cnpj, d.competencia, d.arquivo, d.chave, d.modelo, d.situacao,
+               d.numero_documento, d.serie, d.data, d.operacao, d.emitente, d.participante,
+               'RELATORIO' AS registro, r.numero_item, r.codigo,
+               r.descricao AS descricao_complementar, r.quantidade, r.unidade, r.valor,
+               '0' AS ind_mov, r.cst_icms, r.cfop,
+               r.bc_icms, r.aliq_icms, r.valor_icms, r.bc_st, r.valor_st,
+               'relatorio' AS fonte_item, {_COLUNAS_DO_RELATORIO}
+        FROM docs_do_relatorio d
+        JOIN rel_itens r ON r.chave = d.chave
     """)
     linhas = con.execute("SELECT count(*) FROM movimentos_com_xml").fetchone()[0]
     log.info("movimentos com XML materializados",
@@ -359,6 +412,69 @@ def _preparar_xml(con, destino: str, p) -> None:
         CREATE VIEW movimentos_juntos AS
         SELECT m.* FROM movimentos_com_xml m ANTI JOIN canceladas c ON c.chave = m.chave
     """)
+
+
+def _preparar_relatorio(con, destino: str, p) -> None:
+    """`rel_itens` e `docs_do_relatorio`: o item do relatório do cliente, e o
+    documento que ele completa.
+
+    Duas decisões ficam aqui:
+
+    **Uma cópia por chave, escolhida em SQL.** O cliente reexporta, e o mesmo
+    documento vem em dois arquivos — na empresa 17, 3,3 milhões de chaves
+    repetidas entre os 217 relatórios e a remessa de 13/11. Somar os dois
+    dobraria a quantidade vendida de cada item. Fica o arquivo de nome menor,
+    que é critério estável: a escolha não muda entre duas rodadas da mesma
+    base. Em memória isto seria um `set` de 13,8 milhões de chaves, mais de
+    1,5 GB; aqui o DuckDB derrama em disco.
+
+    **Só documento escriturado sem item, e só o que o XML não cobre.** O
+    relatório não cria documento: quem diz o que foi escriturado é a EFD.
+    E quando os dois têm o mesmo documento vale o XML, que é o que a SEFAZ
+    autorizou — o relatório é o que o ERP diz.
+    """
+    caminho = os.path.join(destino, ARQUIVO_ITENS_DO_RELATORIO)
+    if os.path.isfile(caminho):
+        con.execute(f"""
+            CREATE TABLE rel_fonte AS
+            SELECT chave, min(arquivo) AS arquivo
+            FROM read_parquet('{_escapar(caminho)}') GROUP BY chave
+        """)
+        con.execute(f"""
+            CREATE TABLE rel_itens AS
+            SELECT r.* FROM read_parquet('{_escapar(caminho)}') r
+            SEMI JOIN rel_fonte f ON f.chave = r.chave AND f.arquivo = r.arquivo
+        """)
+    else:
+        con.register("rel_vazio", ESQUEMA_ITENS_DO_RELATORIO.empty_table())
+        con.execute("CREATE TABLE rel_itens AS SELECT * FROM rel_vazio")
+        con.unregister("rel_vazio")
+    situacoes = ", ".join(f"'{s}'" for s in SITUACOES_COM_DOCUMENTO)
+    con.execute("CREATE TABLE rel_chaves AS SELECT DISTINCT chave FROM rel_itens")
+    con.execute(f"""
+        CREATE TABLE docs_do_relatorio AS
+        SELECT d.* FROM read_parquet('{p(ARQUIVO_DOCUMENTOS)}') d
+        SEMI JOIN rel_chaves k ON k.chave = d.chave
+        ANTI JOIN xml_chaves x ON x.chave = d.chave
+        WHERE d.itens = 0 AND d.situacao IN ({situacoes})
+    """)
+    log.info("itens do relatório preparados", extra={
+        "itens": con.execute("SELECT count(*) FROM rel_itens").fetchone()[0],
+        "chaves": con.execute("SELECT count(*) FROM rel_chaves").fetchone()[0],
+        "documentos_completados": con.execute(
+            "SELECT count(*) FROM docs_do_relatorio").fetchone()[0]})
+
+
+def _resumir_relatorio(con, p, r: ResumoDaMovimentacao) -> None:
+    """O que o relatório do cliente completou — separado do que o XML completou."""
+    (r.relatorio_itens, r.relatorio_chaves) = con.execute(
+        "SELECT count(*), count(DISTINCT chave) FROM rel_itens").fetchone()
+    (r.saidas_completadas_pelo_relatorio, r.entradas_completadas_pelo_relatorio) = con.execute("""
+        SELECT count(*) FILTER (WHERE operacao = 'saida'),
+               count(*) FILTER (WHERE operacao = 'entrada')
+        FROM docs_do_relatorio""").fetchone()
+    r.movimentos_do_relatorio = con.execute(
+        "SELECT count(*) FROM movimentos_juntos WHERE fonte_item = 'relatorio'").fetchone()[0]
 
 
 def _resumir_xml(con, p, r: ResumoDaMovimentacao) -> None:

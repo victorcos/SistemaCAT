@@ -40,10 +40,14 @@ from cat.aplicacao.casos_de_uso.historico_do_projeto import (
 )
 from cat.aplicacao.casos_de_uso.rodada import raiz_do_trabalho
 from cat.dominio.icms.cat42.movimentacao import ResumoDaMovimentacao
-from cat.dominio.lote import TipoDeArquivo
+from cat.dominio.lote import GERENCIAIS_DE_MOVIMENTO, TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.canceladas import ler_chaves_canceladas
 from cat.infraestrutura.analitico.confronto import ARQUIVO_CONFERIDOS
+from cat.infraestrutura.analitico.itens_do_relatorio import (
+    ProgressoDoRelatorio,
+    extrair_itens_do_relatorio,
+)
 from cat.infraestrutura.analitico.itens_do_xml import ProgressoDoXml, extrair_itens_do_xml
 from cat.infraestrutura.analitico.movimentacao import consolidar
 from cat.infraestrutura.arquivos.xml_compactado import contar_xml
@@ -155,11 +159,17 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
         execucao.projeto_id, (TipoDeArquivo.XML_NFE, TipoDeArquivo.XML_COMPACTADO), sessao)
     # o zip conta um por XML de dentro, que é o que a barra percorre
     total_de_xml = contar_xml(xmls)
-    execucao.arquivos_totais = len(efd) + total_de_xml
+    # os relatórios do cliente são a segunda porta do item de saída, e contam
+    # na mesma barra: na empresa 17 são 217 arquivos e 46 GB, mais tempo que a
+    # EFD inteira. Listados aqui, antes da barra, para o total não crescer no
+    # meio da rodada — que é como o progresso volta para trás na tela
+    relatorios = caminhos_do_projeto(execucao.projeto_id, GERENCIAIS_DE_MOVIMENTO, sessao)
+    total = len(efd) + total_de_xml + len(relatorios)
+    execucao.arquivos_totais = total
     sessao.commit()
 
     inicio = time.time()
-    relogio = _Relogio(execucao, sessao, len(efd) + total_de_xml)
+    relogio = _Relogio(execucao, sessao, total)
     progresso = extrair_movimentos(efd, destino, avisar=relogio.marcar)
 
     # os XML contam arquivos na mesma barra; os documentos e bytes da EFD ficam
@@ -169,6 +179,18 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     sessao.commit()
     do_xml = extrair_itens_do_xml(xmls, destino, avisar=relogio.marcar,
                                   cnpj_raiz=raiz_do_trabalho(execucao.projeto_id, sessao))
+
+    # o item de saída que não veio em XML: o relatório do cliente. A segunda
+    # porta para o mesmo item — ver `cat.infraestrutura.analitico.itens_do_relatorio`
+    do_relatorio = ProgressoDoRelatorio(arquivos_totais=len(relatorios))
+    if relatorios:
+        relogio.deslocar(total_de_xml)
+        relogio.congelar_totais(documentos=progresso.documentos,
+                                bytes_lidos=progresso.bytes_lidos + do_xml.bytes_lidos)
+        execucao.passo = "Lendo os itens dos relatórios do cliente"
+        sessao.commit()
+        do_relatorio = extrair_itens_do_relatorio(
+            relatorios, destino, avisar=relogio.marcar, progresso=do_relatorio)
 
     # sempre grava, mesmo vazio: a pasta não herda lista de uma rodada anterior
     execucao.passo = "Lendo as notas canceladas"
@@ -180,13 +202,17 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
     execucao.passo = "Consolidando"
     execucao.arquivos_lidos = execucao.arquivos_totais
     execucao.documentos = progresso.documentos
-    execucao.bytes_lidos = progresso.bytes_lidos + do_xml.bytes_lidos
+    execucao.bytes_lidos = (progresso.bytes_lidos + do_xml.bytes_lidos
+                            + do_relatorio.bytes_lidos)
     execucao.fracao = 0.97
     sessao.commit()
 
     resumo = consolidar(destino, _conferidos(execucao.projeto_id, sessao))
     resumo.arquivos_fora_de_ordem = len(progresso.arquivos_com_orfaos)
     _somar_xml(resumo, do_xml)
+    resumo.relatorio_arquivos = do_relatorio.arquivos_lidos
+    resumo.relatorio_ilegiveis = do_relatorio.ilegiveis
+    resumo.relatorio_linhas_sem_chave = do_relatorio.sem_chave
 
     execucao.situacao = "concluida"
     execucao.passo = "Concluída"
@@ -203,6 +229,8 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
                "documentos": resumo.documentos,
                "movimentos": resumo.movimentos,
                "saidas_sem_item": resumo.saidas_sem_item,
+               "completadas_pelo_xml": resumo.saidas_completadas_pelo_xml,
+               "completadas_pelo_relatorio": resumo.saidas_completadas_pelo_relatorio,
                "segundos": round(time.time() - inicio, 1)},
         autor_id=execucao.criada_por,
     )
@@ -210,7 +238,9 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session) -> None:
              extra={"segundos": round(time.time() - inicio, 1),
                     "documentos": progresso.documentos,
                     "movimentos": resumo.movimentos,
-                    "saidas_sem_item": resumo.saidas_sem_item})
+                    "saidas_sem_item": resumo.saidas_sem_item,
+                    "completadas_pelo_relatorio": resumo.saidas_completadas_pelo_relatorio,
+                    "movimentos_do_relatorio": resumo.movimentos_do_relatorio})
 
 
 def _conferidos(projeto_id: int, sessao: Session) -> str | None:
