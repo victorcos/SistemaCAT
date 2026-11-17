@@ -10,8 +10,18 @@ não é o razão ainda — é o inventário honesto do que existe para montá-lo
 * e, tão importante quanto, **as saídas que a EFD não detalha**. NF-e de
   emissão própria e cupom SAT vão para a EFD só com o analítico (C190/C850):
   total por CST e CFOP, sem item. Medido em duas empresas reais: 27.448 C170,
-  nenhum de saída; 171.652 cupons, nenhum C810. O item de saída virá do XML,
-  e a tela tem de dizer isso com número, não deixar para o razão descobrir.
+  nenhum de saída; 171.652 cupons, nenhum C810. O item de saída virá do XML
+  ou do relatório do cliente, e a tela tem de dizer isso com número, não
+  deixar para o razão descobrir.
+
+**Duas portas para o item de saída, e não uma.** O XML era a única até
+17/11/2026, e não serve a quem não o guardou: na empresa 17 há 7,4 mil
+arquivos de XML para 13,8 milhões de documentos escriturados, e a EFD dela
+traz 100.269 saídas num mês com zero C170. O relatório do ERP faz o mesmo
+trabalho e é o que essas empresas têm. As duas são contadas em separado,
+porque são provas de força diferente: o XML é o documento que a SEFAZ
+autorizou; o relatório é o que o sistema do cliente diz. Quando os dois cobrem
+o mesmo documento, vale o XML.
 
 Cada movimento carrega a classificação da conferência anterior — conferido,
 pendente, sem chave — porque o histórico "do que foi encontrado" é isto: o
@@ -71,6 +81,26 @@ class ResumoDaMovimentacao:
     saidas_completadas_pelo_xml: int = 0
     entradas_completadas_pelo_xml: int = 0
     movimentos_do_xml: int = 0
+
+    # ---- o relatório do cliente: a mesma porta do XML, para quem não tem XML ----
+    # Contado em separado de propósito. São provas de força diferente — o XML é
+    # o documento que a SEFAZ autorizou, o relatório é o que o ERP diz —, e
+    # quem lê o resumo tem de poder saber de onde veio o item de cada saída.
+    # Na empresa 17 o XML cobre 7,4 mil dos 13,8 milhões de documentos: sem o
+    # relatório não haveria item de saída nenhum, e um número só não mostraria
+    # isso.
+    relatorio_arquivos: int = 0
+    relatorio_itens: int = 0
+    relatorio_chaves: int = 0
+    relatorio_ilegiveis: int = 0
+    # linha de item do relatório sem chave de 44 dígitos: total, rodapé,
+    # movimentação interna, ou chave que passou pelo Excel e voltou em notação
+    # científica. Não liga a documento nenhum e fica de fora — contada, porque
+    # é por este número que se percebe um arquivo estragado na origem
+    relatorio_linhas_sem_chave: int = 0
+    saidas_completadas_pelo_relatorio: int = 0
+    entradas_completadas_pelo_relatorio: int = 0
+    movimentos_do_relatorio: int = 0
     # C170 com o item do XML ao lado (mesmo número do item e mesmo valor)
     itens_pareados_com_xml: int = 0
     # C170 de documento que tem XML, mas sem item que case: ficou com a EFD

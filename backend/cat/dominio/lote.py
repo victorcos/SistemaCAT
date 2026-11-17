@@ -219,6 +219,26 @@ _MODULOS_POR_TIPO: dict[TipoDeArquivo, tuple[str, ...]] = {
     TipoDeArquivo.LISTA_DE_CANCELADAS: ("icms",),
 }
 
+# Os relatórios que trazem **movimento** — linha de item de documento. São dois
+# tipos porque a parcela retida só existe num deles, e quem apura o ICMS
+# suportado tem de poder pedir só o que a tem.
+#
+# **Uma constante, e não a lista escrita em cada caso de uso.** Até 17/11/2026
+# a conferência, o razão e o suportado escreviam `(GERENCIAL_MOVIMENTO,)` cada
+# um no seu arquivo, e o `GERENCIAL_SEM_ST` — que é como vem o relatório de
+# saída de todo varejo — **nunca era pedido ao banco**. O tipo existia, era
+# reconhecido na importação, contava no cartão do lote e não chegava a etapa
+# nenhuma. Na empresa 17 isso silenciava os 217 arquivos que contêm o único
+# item de saída que existe: a EFD dela traz 100.269 saídas no mês e zero C170.
+#
+# Quem precisa da parcela retida continua filtrando pela espécie **dentro** da
+# leitura (`Especie.tem_st`), onde o motivo aparece no log — e não aqui, onde
+# o arquivo desapareceria sem explicação.
+GERENCIAIS_DE_MOVIMENTO: tuple[TipoDeArquivo, ...] = (
+    TipoDeArquivo.GERENCIAL_MOVIMENTO,
+    TipoDeArquivo.GERENCIAL_SEM_ST,
+)
+
 # O que cada trabalho espera receber, para a mensagem de pasta que não serve.
 FALTA_POR_MODULO: dict[str, str] = {
     "icms": "Falta a EFD ICMS/IPI, o XML das notas ou o relatório gerencial.",

@@ -48,7 +48,7 @@ from cat.aplicacao.casos_de_uso.rodada import (
     reais,
 )
 from cat.dominio.icms.cat42.enquadramento import VendaAConsumidor
-from cat.dominio.lote import TipoDeArquivo
+from cat.dominio.lote import GERENCIAIS_DE_MOVIMENTO, TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.razao import (
     ARQUIVO_SAIDAS_DO_RELATORIO,
@@ -123,7 +123,7 @@ def preparar(projeto_id: int, usuario_id: int, sessao: Session) -> ExecucaoDB:
     if projeto is not None:
         exigir_que_ande(projeto, "montar o razão")
     movimentos, apuracao = _exigir_fontes(projeto_id, sessao)
-    relatorios = caminhos_do_projeto(projeto_id, (TipoDeArquivo.GERENCIAL_MOVIMENTO,), sessao)
+    relatorios = caminhos_do_projeto(projeto_id, GERENCIAIS_DE_MOVIMENTO, sessao)
 
     execucao = ExecucaoDB(projeto_id=projeto_id, etapa=ETAPA, situacao="na_fila",
                           passo="Na fila", arquivos_totais=len(relatorios),
@@ -191,7 +191,7 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     movimentos, apuracao = _exigir_fontes(execucao.projeto_id, sessao)
     diario.base["movimentos_execucao_id"] = movimentos.id
     diario.base["apuracao_execucao_id"] = apuracao.id
-    relatorios = caminhos_do_projeto(execucao.projeto_id, (TipoDeArquivo.GERENCIAL_MOVIMENTO,), sessao)
+    relatorios = caminhos_do_projeto(execucao.projeto_id, GERENCIAIS_DE_MOVIMENTO, sessao)
     execucao.arquivos_totais = len(relatorios)
     diario.anotar("info", f"Rodada iniciada sobre a movimentação #{movimentos.id}, a apuração "
                           f"#{apuracao.id} e {len(relatorios)} relatórios do cliente.")

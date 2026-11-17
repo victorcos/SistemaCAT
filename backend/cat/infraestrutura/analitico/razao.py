@@ -315,7 +315,6 @@ def extrair_saidas(
     que não mostra saída nenhuma nas primeiras linhas é de entradas e é
     deixado de lado sem ser lido inteiro.
     """
-    from cat.dominio.gerencial.campos import Especie as EspecieDoRelatorio
     from cat.infraestrutura.arquivos.gerencial import Leitura
 
     partes = destino + ".partes"
@@ -328,7 +327,18 @@ def extrair_saidas(
             nome = os.path.basename(caminho)
             try:
                 leitura = Leitura(caminho)
-                if leitura.especie is not EspecieDoRelatorio.MOVIMENTO:
+                # **As duas espécies de movimento entram.** Até 17/11/2026 só
+                # `MOVIMENTO` passava, e o relatório de saída do varejo — que é
+                # `MOVIMENTO_SEM_ST`, porque venda de mercadoria com ST sai em
+                # CST 60 e não tem parcela retida — era recusado em silêncio.
+                # Na empresa 17 isso descartava os 217 arquivos que contêm a
+                # única saída item a item que existe: as saídas do razão
+                # sairiam vazias e a ficha fecharia só com entradas.
+                #
+                # O que o razão precisa daqui é a saída, e o relatório sem ST a
+                # tem. O que falta nele é a parcela retida, que é da entrada e
+                # se apura na etapa 4.
+                if not leitura.especie.serve_para_razao:
                     r.recusados += 1
                     continue
                 gravadas = _gravar_saidas_de(leitura, os.path.join(partes, f"{n:05d}.parquet"))

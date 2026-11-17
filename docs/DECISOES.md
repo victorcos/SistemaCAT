@@ -5,6 +5,98 @@
 
 ---
 
+## 2026-11-17 — O item de saída tem duas portas: o XML e o relatório do cliente
+
+A EFD não pede o item do documento de emissão própria. NF-e, NFC-e e CF-e vão à
+escrituração só com o analítico (C190/C850): total por CST e CFOP, sem item.
+Medido na EFD da **empresa 17**, matriz, janeiro de 2026:
+
+| operação | emitente | modelo | C100 | C170 | C190 |
+|---|---|---|---|---|---|
+| saída | própria | 65 (NFC-e) | 99.868 | **0** | 277.104 |
+| saída | própria | 55 (NF-e) | 401 | **0** | 503 |
+| entrada | terceiros | 55 | 1.718 | 14.260 | 2.293 |
+| entrada | própria | 55 | 315 | 0 | 354 |
+
+**100.269 saídas num mês, nenhum item.** Até aqui o sistema tinha uma resposta
+para isso, e uma só: o XML. Ela não serve a quem não guardou XML — a empresa 17
+tem 7,4 mil arquivos para 13,8 milhões de documentos escriturados em 2026. O que
+ela tem é o relatório do ERP: 217 arquivos, 111 milhões de linhas de item, com
+chave de acesso em cada uma.
+
+**Quatro portões fechavam o caminho desse relatório**, e os quatro em silêncio:
+
+1. **O tipo não era pedido ao banco.** `GERENCIAL_SEM_ST` — que é como todo
+   relatório de saída de varejo é classificado, porque venda a consumidor de
+   mercadoria com ST sai em CST 60 e não tem parcela retida — era reconhecido na
+   importação, contava no cartão do lote e **não chegava a etapa nenhuma**: a
+   conferência, o razão e a movimentação escreviam `(GERENCIAL_MOVIMENTO,)` cada
+   um no seu arquivo. Agora há uma constante, `GERENCIAIS_DE_MOVIMENTO`, e um
+   teste que falha se alguém voltar a escrever a lista à mão.
+2. **O confronto exigia a espécie com ST** (`extracao.py`, corrigido em 16/11).
+3. **O razão também** (`razao.extrair_saidas`): recusava o arquivo e as saídas
+   saíam vazias — a ficha fechava só com entradas.
+4. **O `movimentos.parquet` não aceitava item de relatório.** Este era o de
+   verdade: ele é montado do C170 e do XML, e o de-para nativo
+   (`itens_para_casar`) lê só esse arquivo. Sem mudança, **todo código da
+   empresa 17 sairia como "só entrada, sem saída no período"** e nenhum par
+   seria proposto.
+
+**O que mudou.** Um módulo novo, `itens_do_relatorio.py`, grava
+`itens_do_relatorio.parquet` com uma linha por item que tem chave de 44
+dígitos; e `movimentacao.py` ganhou uma terceira perna no
+`movimentos_com_xml`, ao lado da EFD e do XML.
+
+Quatro decisões dentro disso:
+
+- **O relatório entra como item, nunca como documento.** Quem diz o que foi
+  escriturado é a EFD: o estabelecimento, a data, o modelo e a situação
+  continuam vindo dela, e a ligação é a chave — o mesmo encaixe do XML. Linha
+  sem chave de 44 dígitos fica fora e **contada**
+  (`relatorio_linhas_sem_chave`): é por esse número que se percebe o arquivo que
+  passou pelo Excel e voltou com a chave em notação científica, como aconteceu
+  numa loja da empresa 17.
+- **O XML ganha do relatório.** Quando os dois cobrem o mesmo documento vale o
+  XML, que é o que a SEFAZ autorizou; o relatório é o que o ERP diz. As duas
+  fontes são contadas em separado no resumo, e cada movimento carrega
+  `fonte_item` (`efd`, `xml` ou `relatorio`) — quem lê o número tem de poder
+  saber de onde ele veio.
+- **O CFOP do relatório entra como está.** O do XML é de quem emitiu, e numa
+  compra tem de virar (5.401 do fornecedor é 1.401 de quem recebe). O do
+  relatório é do ERP do próprio cliente: já é o CFOP dele. Virar trocaria
+  entrada por saída.
+- **Uma cópia por chave, escolhida em SQL.** O cliente reexporta: na empresa 17,
+  3,3 milhões das 5,5 milhões de chaves da remessa de 13/11 já estavam nos 217
+  relatórios. Somar as duas cópias dobraria a quantidade vendida de cada item.
+  A escolha é por `(chave, menor nome de arquivo)`, que é critério estável entre
+  rodadas. Em memória seria um `set` de 13,8 milhões de chaves, mais de 1,5 GB;
+  o DuckDB resolve derramando em disco.
+
+**Colunas próprias, e não as do XML.** A tentação era reaproveitar
+`descricao_xml` e `ncm_xml`, que o `consolidar` já usa quando o 0200 não tem o
+código. Elas querem dizer "o que o XML declarou", e o de-para decide por isso:
+`gtin_xml` vale como prova porque é o fornecedor dizendo, na nota autorizada,
+qual é o código de barras. Misturar daria ao campo digitado no cadastro do
+cliente o peso de um documento fiscal. O relatório tem
+`descricao_relatorio`, `ncm_relatorio` e `gtin_relatorio`, e o cadastro cai
+nessa ordem: 0200, depois XML, depois relatório.
+
+Isso não é detalhe na empresa 17: o 0200 só lista o item que o arquivo
+referencia, e a saída dela vai sem item — **o código que só vende não aparece em
+cadastro nenhum**, e sem essa queda a ficha dele sairia sem nome e sem NCM.
+
+**Nenhum trabalho já apurado muda.** A perna nova não exige arquivo: sem
+`itens_do_relatorio.parquet` o `consolidar` faz exatamente o que fazia, e há
+teste para isso.
+
+**O que ficou para depois.** O relatório passa a ser lido duas vezes — uma na
+movimentação (item) e outra no razão (saídas). Na empresa 17 são 46 GB por
+passada. O certo é o razão ler as saídas do `movimentos.parquet`, onde elas
+agora estão; não foi feito agora porque mexer no razão é mexer no coração da
+Ficha 3, e o pedido em cima da mesa era o relatório de de-para.
+
+---
+
 ## 2026-11-16 — Apelido curto só casa exato, e as duas espécies de movimento entram no confronto
 
 Ensinando o motor a ler o **relatório de entrada** do mesmo ERP de varejo
