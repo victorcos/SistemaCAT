@@ -49,8 +49,15 @@ def itens_para_casar(pasta_movimentos: str) -> dict[str, list[ItemParaCasar]]:
     tem_xml = "fonte_item" in colunas
     proprio = "coalesce(cadastro_da_efd, true)" if "cadastro_da_efd" in colunas else "true"
     # o código de barras do 0200; sem cadastro, o que o consolidar trouxe do XML — só vale na linha do próprio XML
-    gtins = (f"list(codigo_barras) FILTER (WHERE {proprio} OR fonte_item = 'xml')" if tem_xml
-             else "list(codigo_barras)")
+    #
+    # O `DISTINCT` vai **dentro** do `list`, não só no `list_distinct` de
+    # fora: a lista não derrama em disco, então sem ele o agrupamento
+    # guarda um valor por linha de movimento para depois jogar quase tudo
+    # fora.
+    # Na empresa 17 eram 112 milhões de valores para 30.744 distintos, e a
+    # etapa morria de falta de memória com qualquer teto razoável.
+    gtins = (f"list(DISTINCT codigo_barras) FILTER (WHERE {proprio} OR fonte_item = 'xml')" if tem_xml
+             else "list(DISTINCT codigo_barras)")
     # **o GTIN que o documento declarou, separado do que o cadastro diz.** São
     # provas de força diferente: o do cadastro é um campo que alguém digitou
     # uma vez — na empresa 04 ele apontava o GTIN de outro produto, e um GTIN
@@ -69,9 +76,9 @@ def itens_para_casar(pasta_movimentos: str) -> dict[str, list[ItemParaCasar]]:
     if "gtin_xml" not in colunas:
         gtins_do_xml = "[]::VARCHAR[]"
     elif tem_xml and {"descricao_xml", "ncm_xml", "descricao", "ncm"} <= set(colunas):
-        gtins_do_xml = f"list(ltrim(gtin_xml, '0')) FILTER (WHERE fonte_item = 'xml' OR {_XML_COMBINA_COM_O_CADASTRO})"
+        gtins_do_xml = f"list(DISTINCT ltrim(gtin_xml, '0')) FILTER (WHERE fonte_item = 'xml' OR {_XML_COMBINA_COM_O_CADASTRO})"
     else:
-        gtins_do_xml = "list(ltrim(gtin_xml, '0'))"
+        gtins_do_xml = "list(DISTINCT ltrim(gtin_xml, '0'))"
     tem_data = "data" in colunas
     tem_valor = "valor" in colunas
     devolucoes = ", ".join(f"'{c}'" for c in sorted(CFOP_DEVOLUCAO))
