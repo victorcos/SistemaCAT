@@ -1155,3 +1155,102 @@ class TestCorrecoesAMao:
             {"campo": "aliquota", "codigo": "X", "valor": "25"}], nome="serializado")
         assert serializar(r)["correcoes"] == {"aliquota": 4}
 
+
+
+# ---------------------------------------------------------------------------
+# Transferência recebida sem o retido: o valor vem das entradas mais recentes do
+# remetente (§ 5º da CAT 42/2018), em ordem de data, inclusive em cadeia.
+#
+#   CD   05/01 compra 10 un, R$ 20 suportado
+#   CD   06/01 transfere 4 para a loja B ......... B recebe sem retido -> 4/10 x 20 = 8
+#   CD   08/01 compra 10 un, R$ 40 suportado
+#   CD   09/01 transfere 12 para B ............... as 10 de 08/01 (40) + 2 de 05/01 (4) = 44
+#   B    10/01 transfere 3 para a loja C ......... a entrada mais recente de B é a de 09/01,
+#                                                  já valorada: 3/12 x 44 = 11
+# ---------------------------------------------------------------------------
+CD, LOJA_B, LOJA_C = "33333333000101", "33333333000282", "33333333000363"
+
+
+def chave_de(emitente: str, n: int) -> str:
+    return f"352101{emitente}550010000000{n:012d}"
+
+
+@pytest.fixture
+def rede(tmp_path):
+    mov = tmp_path / "movimentacao"
+    apu = tmp_path / "apuracao"
+    mov.mkdir()
+    apu.mkdir()
+    base_mov = {"competencia": date(2021, 1, 1), "codigo": "X", "cst_icms": "060", "modelo": "55",
+                "unidade": "UN", "numero_item": 1, "valor": d(10), "valor_icms": d(0), "valor_st": d(0)}
+    movimentos = [
+        {**base_mov, "cnpj": CD, "operacao": "entrada", "data": date(2021, 1, 5), "cfop": "1403",
+         "quantidade": d(10), "chave": "7" * 44, "numero_documento": "1"},
+        {**base_mov, "cnpj": CD, "operacao": "entrada", "data": date(2021, 1, 8), "cfop": "1403",
+         "quantidade": d(10), "chave": "8" * 44, "numero_documento": "2"},
+        {**base_mov, "cnpj": CD, "operacao": "saida", "data": date(2021, 1, 6), "cfop": "5152",
+         "quantidade": d(4), "chave": chave_de(CD, 1), "numero_documento": "11"},
+        {**base_mov, "cnpj": CD, "operacao": "saida", "data": date(2021, 1, 9), "cfop": "5152",
+         "quantidade": d(12), "chave": chave_de(CD, 2), "numero_documento": "12"},
+        {**base_mov, "cnpj": LOJA_B, "operacao": "entrada", "data": date(2021, 1, 6), "cfop": "1152",
+         "quantidade": d(4), "chave": chave_de(CD, 1), "numero_documento": "11"},
+        {**base_mov, "cnpj": LOJA_B, "operacao": "entrada", "data": date(2021, 1, 9), "cfop": "1152",
+         "quantidade": d(12), "chave": chave_de(CD, 2), "numero_documento": "12"},
+        {**base_mov, "cnpj": LOJA_B, "operacao": "saida", "data": date(2021, 1, 10), "cfop": "5152",
+         "quantidade": d(3), "chave": chave_de(LOJA_B, 3), "numero_documento": "13"},
+        {**base_mov, "cnpj": LOJA_C, "operacao": "entrada", "data": date(2021, 1, 10), "cfop": "1152",
+         "quantidade": d(3), "chave": chave_de(LOJA_B, 3), "numero_documento": "13"},
+    ]
+    gravar(mov / ARQUIVO_MOVIMENTOS, [
+        ("cnpj", pa.string()), ("competencia", pa.date32()), ("operacao", pa.string()),
+        ("codigo", pa.string()), ("data", pa.date32()), ("cfop", pa.string()),
+        ("unidade", pa.string()), ("numero_item", pa.int32()),
+        ("cst_icms", pa.string()), ("modelo", pa.string()), ("quantidade", pa.decimal128(20, 5)),
+        ("valor", pa.decimal128(18, 2)), ("valor_icms", pa.decimal128(18, 2)),
+        ("valor_st", pa.decimal128(18, 2)), ("chave", pa.string()), ("numero_documento", pa.string()),
+        ("participante", pa.string()),
+    ], movimentos)
+    gravar(mov / ARQUIVO_ITENS, [
+        ("cnpj", pa.string()), ("codigo", pa.string()), ("descricao", pa.string()),
+        ("unidade", pa.string()), ("aliq_icms", pa.decimal128(9, 4)),
+    ], [{"cnpj": c, "codigo": "X", "descricao": "Detergente 500ml", "unidade": "UN", "aliq_icms": d(18)}
+        for c in (CD, LOJA_B, LOJA_C)])
+    # a apuração da etapa 4: as compras do CD com o retido, as três transferências sem
+    gravar(apu / ARQUIVO_SUPORTADO, [
+        ("cnpj", pa.string()), ("codigo", pa.string()), ("data", pa.date32()), ("cfop", pa.string()),
+        ("cst_icms", pa.string()), ("modelo", pa.string()), ("quantidade", pa.decimal128(18, 5)),
+        ("suportado", pa.decimal128(18, 6)), ("chave", pa.string()), ("numero_documento", pa.string()),
+        ("numero_item", pa.int32()), ("participante", pa.string()),
+    ], [
+        {"cnpj": m["cnpj"], "codigo": "X", "data": m["data"], "cfop": m["cfop"], "cst_icms": "060",
+         "modelo": "55", "quantidade": m["quantidade"], "chave": m["chave"],
+         "numero_documento": m["numero_documento"], "numero_item": 1,
+         "suportado": {"1": d(20), "2": d(40)}.get(m["numero_documento"], d(0))}
+        for m in movimentos if m["operacao"] == "entrada"
+    ])
+    destino = tmp_path / "razao"
+    destino.mkdir()
+    resumo = montar(Fontes(movimentacao=str(mov), apuracao=str(apu)), str(destino),
+                    uf_por_cnpj={CD: "SP", LOJA_B: "SP", LOJA_C: "SP"})
+    return destino, resumo
+
+
+class TestTransferenciaSemRetido:
+    def test_vale_as_entradas_mais_recentes_do_remetente_em_cadeia(self, rede):
+        destino, _ = rede
+        entradas = {(l["cnpj"], l["data"]): l["icms_suportado"] for l in ficha(destino)
+                    if l["especie"] == "entrada"}
+        assert entradas[(LOJA_B, date(2021, 1, 6))] == d(8)
+        assert entradas[(LOJA_B, date(2021, 1, 9))] == d(44)
+        assert entradas[(LOJA_C, date(2021, 1, 10))] == d(11)
+        # a compra do CD continua com o retido que a nota trouxe
+        assert entradas[(CD, date(2021, 1, 5))] == d(20)
+
+    def test_a_prova_fica_gravada_e_contada(self, rede):
+        from cat.infraestrutura.analitico.razao import ARQUIVO_TRANSFERENCIAS_VALORADAS  # noqa: PLC0415
+        destino, resumo = rede
+        prova = pq.read_table(str(destino / ARQUIVO_TRANSFERENCIAS_VALORADAS)).to_pylist()
+        assert [(p["cnpj"], p["remetente"], p["entradas_usadas"]) for p in prova] == [
+            (LOJA_B, CD, 1), (LOJA_B, CD, 2), (LOJA_C, LOJA_B, 1)]
+        assert (resumo.transferencias_valoradas, resumo.transferencias_parciais,
+                resumo.transferencias_sem_entrada, resumo.icms_das_transferencias) == (3, 0, 0, d(63))

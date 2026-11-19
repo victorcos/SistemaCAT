@@ -319,6 +319,28 @@ def valor_da_abertura(quantidade: Decimal, entradas) -> ValorDaAbertura:
     return ValorDaAbertura(valor, coberta, quantidade)
 
 
+def valor_pelas_entradas_do_remetente(quantidade: Decimal, entradas_do_remetente) -> ValorDaAbertura:
+    """O ICMS suportado da entrada que veio sem ele, pelas entradas do remetente.
+
+    A Portaria CAT 42/2018 manda quem dá a saída informar o retido na nota
+    (`vICMSSTRet`, ID N27) e diz, no § 5º, como achá-lo quando não se identifica
+    a entrada: **as entradas mais recentes, suficientes para comportar a
+    quantidade envolvida** (redação da CAT-111/18, efeitos desde 01/01/2019).
+
+    É o caso da transferência entre filiais do mesmo titular: medido numa rede de
+    varejo em 2026, 94% das entradas por transferência vinham sem o retido, porque
+    o CD não o informava. O valor que a nota deveria trazer é o que o remetente
+    teria calculado, então ele vem das entradas do remetente, até a data da
+    transferência. Não é o custo médio da ficha dele: o parágrafo fala em
+    entradas, e o custo médio misturaria saldo antigo com compra recente.
+
+    A conta é a mesma da abertura (item 3.3.8): mesmas entradas mais recentes,
+    mesma média quando uma nota não basta, mesmo `coberta` dizendo quanto delas
+    alcançou a quantidade.
+    """
+    return valor_da_abertura(quantidade, entradas_do_remetente)
+
+
 @dataclass
 class ResumoDoRazao:
     """Totais de uma ficha, para conferir contra o que o cliente entregou."""

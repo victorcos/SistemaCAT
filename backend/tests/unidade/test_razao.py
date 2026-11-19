@@ -346,3 +346,26 @@ class TestValorDaAbertura:
         v = valor_da_abertura(D(5), [EntradaAnterior(dia, D(5), D(10), ordem=0),
                                      EntradaAnterior(dia, D(5), D(20), ordem=1)])
         assert v.valor == D(20)
+
+
+class TestEntradasDoRemetente:
+    """§ 5º da CAT 42/2018: a entrada sem retido vale o das entradas mais recentes do remetente."""
+
+    def test_e_a_mesma_conta_das_entradas_mais_recentes(self):
+        from cat.dominio.icms.cat42.razao import (  # noqa: PLC0415
+            EntradaAnterior,
+            valor_pelas_entradas_do_remetente,
+        )
+        # o CD comprou 10 a R$ 20 e depois 10 a R$ 40; transfere 12: as 10 últimas e 2 das primeiras
+        v = valor_pelas_entradas_do_remetente(D(12), [EntradaAnterior(date(2021, 1, 5), D(10), D(20)),
+                                                      EntradaAnterior(date(2021, 1, 8), D(10), D(40))])
+        assert (v.valor, v.coberta, v.parcial) == (D(44), D(12), False)
+
+    def test_cfop_recebido_espelha_o_enviado(self):
+        from cat.dominio.icms.cat42.enquadramento import (  # noqa: PLC0415
+            CFOP_TRANSFERENCIA,
+            CFOP_TRANSFERENCIA_RECEBIDA,
+        )
+        assert {"1152", "1409", "2152", "2409"} <= CFOP_TRANSFERENCIA_RECEBIDA
+        assert len(CFOP_TRANSFERENCIA_RECEBIDA) == len(CFOP_TRANSFERENCIA)
+        assert not any(c[0] in "56" for c in CFOP_TRANSFERENCIA_RECEBIDA)
