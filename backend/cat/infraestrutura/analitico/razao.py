@@ -99,6 +99,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from bisect import bisect_right
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -112,6 +113,7 @@ from cat.dominio.icms.cat42.correcao import Campo
 from cat.dominio.icms.cat42.enquadramento import (
     CFOP_DEVOLUCAO,
     CFOP_OUTRAS_X949,
+    CFOP_TRANSFERENCIA_RECEBIDA,
     CFOP_USO_E_CONSUMO,
     VendaAConsumidor,
     classificar,
@@ -121,6 +123,7 @@ from cat.dominio.icms.cat42.razao import (
     EnquadramentoLegal,
     ValorDaAbertura,
     valor_da_abertura,
+    valor_pelas_entradas_do_remetente,
     Especie,
     Movimento,
     MovimentoInvalido,
@@ -153,6 +156,21 @@ ARQUIVO_SAIDAS_DO_RELATORIO = "saidas_do_relatorio.parquet"
 ARQUIVO_FICHA3 = "ficha3.parquet"
 ARQUIVO_FICHAS = "fichas.parquet"
 ARQUIVO_CONFERENCIA_INVENTARIO = "conferencia_inventario.parquet"
+# cada transferência recebida sem o retido e o valor que as entradas do
+# remetente deram a ela: a prova do número que entrou na ficha
+ARQUIVO_TRANSFERENCIAS_VALORADAS = "transferencias_valoradas.parquet"
+ESQUEMA_TRANSFERENCIAS_VALORADAS = pa.schema([
+    ("cnpj", pa.string()),
+    ("codigo", pa.string()),
+    ("data", pa.date32()),
+    ("chave", pa.string()),
+    ("numero_item", pa.int32()),
+    ("remetente", pa.string()),
+    ("quantidade", pa.decimal128(38, 9)),
+    ("suportado", pa.decimal128(30, 15)),
+    ("coberta", pa.decimal128(38, 9)),
+    ("entradas_usadas", pa.int32()),
+])
 
 LINHAS_POR_LOTE = 200_000
 POR_PAGINA_PADRAO = 50
@@ -479,6 +497,13 @@ class ResumoDaMontagem:
     fichas_abertura_valorada: int = 0
     fichas_abertura_parcial: int = 0
     icms_da_abertura: Decimal = Decimal(0)
+    # transferências recebidas sem o retido, valoradas pelas entradas mais
+    # recentes do remetente (§ 5º da CAT 42/2018): inteiras, só em parte, e as
+    # que o remetente não tinha entrada para cobrir
+    transferencias_valoradas: int = 0
+    transferencias_parciais: int = 0
+    transferencias_sem_entrada: int = 0
+    icms_das_transferencias: Decimal = Decimal(0)
     # fora da ficha por decisão: uso e consumo não é estoque de comercialização
     lancamentos_de_uso_e_consumo: int = 0
     # fora da ficha por decisão: X.949, outras entradas e saídas (remessa e retorno)
@@ -555,6 +580,7 @@ def montar(
         resumo.linhas_com_depara, resumo.codigos_trocados_pelo_depara = con.execute(
             "SELECT count(*), count(DISTINCT (cnpj, codigo_original)) FROM lancamentos "
             "WHERE codigo_original <> codigo").fetchone()
+        _valorar_transferencias(con, destino, resumo)
         aberturas = {(c, k): q for c, k, q in con.execute(
             "SELECT cnpj, codigo, quantidade FROM abertura").fetchall()}
         valores = _valorar_aberturas(con, aberturas)
@@ -633,6 +659,115 @@ def _valorar_aberturas(con, aberturas: dict) -> dict[tuple[str, str], ValorDaAbe
         if chave not in valores:
             valores[chave] = valor_da_abertura(Decimal(quantidade), [])
     return valores
+
+
+def _valorar_transferencias(con, destino: str, resumo: ResumoDaMontagem) -> None:
+    """Dá às transferências recebidas sem retido o valor das entradas do remetente.
+
+    A regra está em `valor_pelas_entradas_do_remetente` (§ 5º da CAT 42/2018).
+    Aqui é achar o remetente — o CNPJ do emitente, na chave de acesso, que tem
+    de ser um estabelecimento da própria base — e percorrer **em ordem de data
+    na rede inteira**: a entrada do remetente pode ser ela mesma uma
+    transferência (fornecedor → filial que recebe leite → CD → loja; e há
+    transferência de loja para loja), e ela precisa ter o seu valor antes de
+    servir de base para a seguinte.
+
+    As quantidades vão na unidade da ficha (`quantidade * fator`) dos dois
+    lados, e o código é o de depois do de-para. Só a linha sem valor nenhum é
+    valorada: o retido que a nota trouxe vale mais que qualquer reconstrução.
+    """
+    lista = lambda conj: ", ".join(f"'{c}'" for c in sorted(conj))  # noqa: E731
+    recebidas = lista(CFOP_TRANSFERENCIA_RECEBIDA)
+    con.execute(f"""
+        CREATE OR REPLACE TABLE sem_retido AS
+        SELECT cnpj, codigo, data, chave, numero_item, substr(chave, 7, 14) AS remetente,
+               quantidade * fator AS quantidade
+        FROM lancamentos
+        WHERE especie = 'entrada' AND NOT devolucao AND cfop IN ({recebidas})
+          AND coalesce(suportado, 0) = 0 AND quantidade > 0 AND length(coalesce(chave, '')) = 44
+          AND substr(chave, 7, 14) <> cnpj
+          AND substr(chave, 7, 14) IN (SELECT cnpj FROM estabs)
+    """)
+    total = con.execute("SELECT count(*) FROM sem_retido").fetchone()[0]
+    if total == 0:
+        return
+    # as entradas de cada (remetente, código) que alguma transferência vai pedir:
+    # as do período e as de antes do inventário que a abertura já separou
+    con.execute("CREATE OR REPLACE TABLE pedidos AS SELECT DISTINCT remetente AS cnpj, codigo FROM sem_retido")
+    cursor = con.execute(f"""
+        SELECT l.cnpj, l.codigo, l.data, coalesce(l.chave, ''), coalesce(l.numero_item, 0),
+               l.quantidade * l.fator, coalesce(l.suportado, 0)
+        FROM lancamentos l SEMI JOIN pedidos p ON p.cnpj = l.cnpj AND p.codigo = l.codigo
+        WHERE l.especie = 'entrada' AND NOT l.devolucao AND l.quantidade > 0
+        UNION ALL
+        SELECT a.cnpj, a.codigo, a.data, a.chave, a.numero_item, a.quantidade, a.suportado
+        FROM anteriores a SEMI JOIN pedidos p ON p.cnpj = a.cnpj AND p.codigo = a.codigo
+        WHERE a.quantidade > 0
+        ORDER BY 1, 2, 3, 4, 5
+    """)
+    # por (estabelecimento, código), da mais antiga para a mais recente; o valor
+    # fica num dicionário à parte porque a transferência valorada aqui muda o
+    # valor da entrada de quem a recebeu, que pode ser remetente mais adiante
+    entradas: dict[tuple[str, str], list[tuple]] = {}
+    datas: dict[tuple[str, str], list[date]] = {}
+    valor_de: dict[tuple, Decimal] = {}
+    while lote := cursor.fetchmany(LINHAS_POR_LOTE):
+        for cnpj, codigo, data_, chave, item, quantidade, suportado in lote:
+            id_ = (cnpj, codigo, chave, item)
+            entradas.setdefault((cnpj, codigo), []).append((data_, id_, Decimal(quantidade)))
+            datas.setdefault((cnpj, codigo), []).append(data_)
+            valor_de[id_] = Decimal(suportado)
+
+    saida = {n: [] for n in ESQUEMA_TRANSFERENCIAS_VALORADAS.names}
+    cursor = con.execute("""SELECT cnpj, codigo, data, chave, numero_item, remetente, quantidade
+                            FROM sem_retido ORDER BY data, chave, numero_item""")
+    while lote := cursor.fetchmany(LINHAS_POR_LOTE):
+        for cnpj, codigo, data_, chave, item, remetente, quantidade in lote:
+            quantidade = Decimal(quantidade)
+            usadas: list[EntradaAnterior] = []
+            coberto = Decimal(0)
+            # da mais recente para trás, até cobrir a quantidade; a do mesmo dia
+            # vale (o remetente recebeu e transferiu no dia). O ponto de partida
+            # sai por busca binária na data: no CD um código tem centenas de
+            # entradas e milhares de transferências, e varrer a lista inteira a
+            # cada uma seria quadrático
+            do_remetente = entradas.get((remetente, codigo), [])
+            i = bisect_right(datas.get((remetente, codigo), []), data_)
+            while i > 0 and coberto < quantidade:
+                i -= 1
+                dia, id_, q = do_remetente[i]
+                usadas.append(EntradaAnterior(dia, q, valor_de[id_], ordem=i))
+                coberto += q
+            v = valor_pelas_entradas_do_remetente(quantidade, usadas)
+            valor_de[(cnpj, codigo, chave, item)] = v.valor
+            for nome, x in (("cnpj", cnpj), ("codigo", codigo), ("data", data_), ("chave", chave),
+                            ("numero_item", item), ("remetente", remetente), ("quantidade", quantidade),
+                            ("suportado", v.valor.quantize(Decimal("0.000000000000001"))),
+                            ("coberta", v.coberta), ("entradas_usadas", len(usadas))):
+                saida[nome].append(x)
+            if v.sem_valor:
+                resumo.transferencias_sem_entrada += 1
+            else:
+                resumo.transferencias_valoradas += 1
+                resumo.transferencias_parciais += int(v.parcial)
+                resumo.icms_das_transferencias += v.valor
+
+    caminho = os.path.join(destino, ARQUIVO_TRANSFERENCIAS_VALORADAS)
+    pq.write_table(pa.Table.from_pydict(saida, schema=ESQUEMA_TRANSFERENCIAS_VALORADAS), caminho)
+    # o valor volta ao lançamento; a quantidade da ficha é `quantidade * fator`,
+    # e o suportado é o da linha inteira, então nada a converter
+    con.execute(f"""
+        UPDATE lancamentos l SET suportado = CAST(v.suportado AS DECIMAL(18, 6))
+        FROM read_parquet('{_escapar(caminho)}') v
+        WHERE v.cnpj = l.cnpj AND v.codigo = l.codigo AND v.chave = l.chave AND v.numero_item = l.numero_item
+          AND l.especie = 'entrada' AND NOT l.devolucao AND l.cfop IN ({recebidas})
+          AND coalesce(l.suportado, 0) = 0
+    """)
+    log.info("transferências recebidas sem retido, valoradas pelo remetente",
+             extra={"linhas": total, "valoradas": resumo.transferencias_valoradas,
+                    "parciais": resumo.transferencias_parciais,
+                    "sem_entrada": resumo.transferencias_sem_entrada,
+                    "icms": str(resumo.icms_das_transferencias)})
 
 
 def _completar_ficha3(con, ficha3: str, itens: str, xml_itens: str = "") -> None:

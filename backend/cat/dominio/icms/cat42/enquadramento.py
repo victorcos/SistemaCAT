@@ -96,6 +96,10 @@ CFOP_TRANSFERENCIA = frozenset({
     "6408", "6409",
 })
 
+# A mesma transferência vista de quem recebe: 5.152 vira 1.152, 6.409 vira 2.409.
+# Derivada da de saída para as duas listas não divergirem no dia em que uma mudar.
+CFOP_TRANSFERENCIA_RECEBIDA = frozenset({"5": "1", "6": "2"}[c[0]] + c[1:] for c in CFOP_TRANSFERENCIA)
+
 # Devolução. Não define enquadramento — inverte o sinal da operação original.
 # O 5.410 fica aqui e não em transferência: é devolução de compra para
 # industrialização em operação com ST. Ter o mesmo CFOP nos dois conjuntos
