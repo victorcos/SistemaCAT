@@ -176,3 +176,64 @@ class TestNoSuportado:
         assert linhas[(CHAVE_ENTRADA, 3)]["fonte"] == Fonte.INFORMADO_PELO_FORNECEDOR.name.lower()
         assert linhas[(CHAVE_ENTRADA, 3)]["suportado"] == D("0.80")
         assert (resumo.itens_com_valor_do_xml, resumo.itens_com_retido_do_xml) == (3, 1)
+
+
+# A filial que recebe numera os itens do jeito dela, e o fornecedor informa o GTIN da caixa:
+# o número do item não serve, e o casamento tem de vir do código, do GTIN ou do valor.
+CNPJ_IRMA = "44000002000318"          # outra filial da mesma empresa (mesma raiz)
+CHAVE_TRANSFERENCIA = "41210544000002000318550010000000011000000005"
+CHAVE_CAIXA = "41210599888777000166550010000000021000000006"
+C100_TRANSFERENCIA = (f"|C100|0|1|F003|55|00|001|1|{CHAVE_TRANSFERENCIA}"
+                      "|02052021|02052021|60,00|2|0|0|60,00|9|0|0|0|0|0|0|0|0|0|0|0|0|")
+# a EFD de quem recebe: o 1 é a abóbora e o 2 o iogurte; no XML de quem enviou é o contrário,
+# e os dois valem R$ 30,00 — o valor não desempata, o número engana, só o código acerta
+C170_TRANSF_1 = ("|C170|1|537861|Abobora|3|KG|30,00|0|0|060|1409|300|0|0|0"
+                 "|0|0|0||49||0|0|0||0|0|0|0|0||0|0|0|0|0|1.1.20.01.01|0|")
+C170_TRANSF_2 = ("|C170|2|1000144|Iogurte|2|CX|30,00|0|0|060|1409|300|0|0|0"
+                 "|0|0|0||49||0|0|0||0|0|0|0|0||0|0|0|0|0|1.1.20.01.01|0|")
+C100_CAIXA = (f"|C100|0|1|F004|55|00|001|2|{CHAVE_CAIXA}"
+              "|03052021|03052021|80,00|2|0|0|80,00|9|0|0|0|0|0|0|0|0|0|0|0|0|")
+# a entrada escriturada em unidades (24) e com o valor sem o desconto que o XML trouxe
+C170_CAIXA = ("|C170|1|1000144|Iogurte|24|CX|80,00|0|0|060|1403|300|0|0|0"
+              "|0|0|0||49||0|0|0||0|0|0|0|0||0|0|0|0|0|1.1.20.01.01|0|")
+ICMS60_RETIDO_2 = ("<ICMS60><orig>0</orig><CST>60</CST><vBCSTRet>30.00</vBCSTRet><vICMSSubstituto>2.00</vICMSSubstituto>"
+                   "<vICMSSTRet>3.00</vICMSSTRet></ICMS60>")
+
+
+@pytest.fixture
+def pasta_renumerada(tmp_path):
+    efd = escrever(tmp_path, "efd_2021_05.txt", [
+        CABECALHO, ITEM_A_V2, ITEM_B,
+        C100_TRANSFERENCIA, C170_TRANSF_1, C170_TRANSF_2,
+        C100_CAIXA, C170_CAIXA,
+    ])
+    xmls = tmp_path / "xml"
+    xmls.mkdir()
+    arquivos = {
+        "transferencia.xml": nfe(CHAVE_TRANSFERENCIA, det(1, "1000144", "5409", "2", "30.00", ICMS60_RETIDO)
+                                 + det(2, "537861", "5409", "3", "30.00", ICMS60_RETIDO_2), emit=CNPJ_IRMA),
+        # o fornecedor manda 2 caixas com o GTIN da caixa (DUN-14 do mesmo EAN) como item 2
+        "caixa.xml": nfe(CHAVE_CAIXA, det(1, "FORN-BRINDE", "5910", "1", "0.01", ICMS60)
+                         + det(2, "FORN-CX", "5405", "2", "79.90", ICMS60_RETIDO_2, gtin="17898194090408")),
+    }
+    caminhos = []
+    for nome, conteudo in sorted(arquivos.items()):
+        (xmls / nome).write_bytes(conteudo)
+        caminhos.append(str(xmls / nome))
+    destino = str(tmp_path / "saida")
+    extrair_movimentos([efd], destino)
+    extrair_itens_do_xml(caminhos, destino)
+    consolidar(destino, None)
+    return {(l["chave"], l["numero_item"]): l for l in pq.read_table(f"{destino}/{ARQUIVO_MOVIMENTOS}").to_pylist()}
+
+
+class TestItemRenumerado:
+    def test_transferencia_casa_pelo_codigo_e_nao_pelo_numero(self, pasta_renumerada):
+        abobora = pasta_renumerada[(CHAVE_TRANSFERENCIA, 1)]
+        iogurte = pasta_renumerada[(CHAVE_TRANSFERENCIA, 2)]
+        assert (abobora["codigo"], abobora["codigo_xml"], abobora["retido_xml"]) == ("537861", "537861", D("5.00"))
+        assert (iogurte["codigo"], iogurte["codigo_xml"], iogurte["retido_xml"]) == ("1000144", "1000144", D("0.80"))
+
+    def test_gtin_da_caixa_casa_com_o_ean_do_cadastro(self, pasta_renumerada):
+        caixa = pasta_renumerada[(CHAVE_CAIXA, 1)]
+        assert (caixa["codigo_xml"], caixa["gtin_xml"], caixa["retido_xml"]) == ("FORN-CX", "17898194090408", D("5.00"))

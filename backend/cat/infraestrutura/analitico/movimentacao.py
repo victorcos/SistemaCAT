@@ -151,9 +151,35 @@ _COLUNAS_DO_RELATORIO = ",\n    ".join(f"r.{coluna} AS {nome}" for coluna, nome 
 _O_ITEM_COLA = """(abs(x.quantidade - m.quantidade) <= 0.001
          OR abs(x.valor - m.valor) <= 0.01
          OR (m._itens_na_efd = 1 AND m._itens_no_xml = 1))"""
-_COLUNAS_DO_XML_SE_COLA = ",\n    ".join(
-    f"CASE WHEN {_O_ITEM_COLA} THEN x.{coluna} END AS {nome}"
-    for coluna, nome in _DO_XML)
+
+# O número do item não basta. Quem recebe escritura a nota com a numeração DELA:
+# na transferência entre filiais de uma empresa de varejo (2026), a EFD da loja
+# trazia o item 1 como o lava-roupa e o XML do CD como o alvejante, e o XML ainda
+# tinha itens que a EFD não escriturou. Casando só pelo número, 442 mil entradas
+# de transferência ficavam sem o XML — e com elas o retido que o XML informa.
+# Também o fornecedor que informa o GTIN da caixa (DUN-14) e escritura em unidades
+# não casava: nem número, nem quantidade, nem valor.
+#
+# Por isso a cascata, cada critério só para o que o anterior deixou livre, e só
+# quando o par é ÚNICO dos dois lados dentro da chave (um movimento, um item):
+#
+# 1. código — só na nota da própria empresa (mesma raiz do CNPJ na chave): ali o
+#    código do XML é o do cadastro. Em nota de fornecedor o código é o dele, e uma
+#    coincidência com o nosso não prova nada;
+# 2. número do item, confirmado por quantidade ou valor (a regra de sempre);
+# 3. GTIN, pelos 12 dígitos do meio: o EAN-13 e o DUN-14 da caixa dele coincidem aí;
+# 4. valor do item.
+#
+# Cada critério é uma igualdade, para o DuckDB resolver por hash join (ver acima o
+# preço de um OR na cláusula ON).
+_CRITERIOS_DO_PAR = (
+    ("codigo", "x.codigo = e.codigo", "e.mesma_empresa"),
+    ("numero", "x.numero_item = e.numero_item", None),
+    ("gtin", "x.gtin12 = e.gtin12", "e.gtin12 IS NOT NULL"),
+    ("valor", "x.centavos = e.centavos", None),
+)
+_GTIN12 = """CASE WHEN regexp_full_match(ltrim(trim({0}), '0'), '[0-9]{{7,14}}')
+    THEN substr(lpad(ltrim(trim({0}), '0'), 14, '0'), 2, 12) END"""
 
 # o primeiro dígito do CFOP, do lado de quem emitiu para o de quem recebeu
 _VIRAR_CFOP = """
@@ -349,7 +375,8 @@ def _preparar_xml(con, destino: str, p) -> None:
     comeco = time.time()
     con.execute(f"""
         CREATE TABLE movimentos_contados AS
-        SELECT m.*, ce.itens AS _itens_na_efd, cx.itens AS _itens_no_xml
+        SELECT m.*, ce.itens AS _itens_na_efd, cx.itens AS _itens_no_xml,
+               row_number() OVER () AS _id
         FROM read_parquet('{p(ARQUIVO_MOVIMENTOS_BRUTOS)}') m
         LEFT JOIN efd_contagem ce ON ce.cnpj = m.cnpj AND ce.chave = m.chave
         LEFT JOIN xml_contagem cx ON cx.chave = m.chave
@@ -358,13 +385,20 @@ def _preparar_xml(con, destino: str, p) -> None:
              extra={"segundos": round(time.time() - comeco, 1)})
 
     comeco = time.time()
+    _parear_com_o_xml(con, p)
+    log.info("itens da EFD pareados com o XML",
+             extra={"por_criterio": dict(con.execute(
+                 "SELECT por, count(*) FROM pares_xml GROUP BY 1").fetchall()),
+                    "segundos": round(time.time() - comeco, 1)})
+
+    comeco = time.time()
     con.execute(f"""
         CREATE TABLE movimentos_com_xml AS
-        SELECT m.* EXCLUDE (_itens_na_efd, _itens_no_xml),
-               'efd' AS fonte_item, {_COLUNAS_DO_XML_SE_COLA}
+        SELECT m.* EXCLUDE (_itens_na_efd, _itens_no_xml, _id),
+               'efd' AS fonte_item, {_COLUNAS_DO_XML}
         FROM movimentos_contados m
-        LEFT JOIN xml_itens x
-               ON x.chave = m.chave AND x.numero_item = m.numero_item
+        LEFT JOIN pares_xml px ON px._id = m._id
+        LEFT JOIN xml_itens x ON x.chave = m.chave AND x.numero_item = px.numero_item_xml
         UNION ALL BY NAME
         SELECT d.cnpj, d.competencia, d.arquivo, d.chave, d.modelo, d.situacao,
                d.numero_documento, d.serie, d.data, d.operacao, d.emitente, d.participante,
@@ -475,6 +509,69 @@ def _resumir_relatorio(con, p, r: ResumoDaMovimentacao) -> None:
         FROM docs_do_relatorio""").fetchone()
     r.movimentos_do_relatorio = con.execute(
         "SELECT count(*) FROM movimentos_juntos WHERE fonte_item = 'relatorio'").fetchone()[0]
+
+
+def _parear_com_o_xml(con, p) -> None:
+    """Grava `pares_xml(_id, numero_item_xml, por)`: qual item do XML vai ao lado
+    de cada C170/C810, pela cascata de `_CRITERIOS_DO_PAR`.
+
+    O par é por estabelecimento: na transferência a mesma chave está na EFD de quem
+    enviou e na de quem recebeu, e o mesmo item do XML vale para as duas.
+    """
+    con.execute(f"""
+        CREATE TABLE gtin_do_cadastro AS
+        SELECT cnpj, codigo, {_GTIN12.format('arg_max(codigo_barras, competencia)')} AS gtin12
+        FROM read_parquet('{p(ARQUIVO_ITENS_DA_EFD)}')
+        WHERE coalesce(codigo_barras, '') <> ''
+        GROUP BY cnpj, codigo
+    """)
+    con.execute("""
+        CREATE TABLE efd_com_xml AS
+        SELECT m._id, m.cnpj, m.chave, m.codigo, m.numero_item, m.quantidade, m.valor,
+               m._itens_na_efd, m._itens_no_xml, round(m.valor * 100)::BIGINT AS centavos,
+               g.gtin12, substr(m.chave, 7, 8) = substr(m.cnpj, 1, 8) AS mesma_empresa
+        FROM movimentos_contados m
+        LEFT JOIN gtin_do_cadastro g ON g.cnpj = m.cnpj AND g.codigo = m.codigo
+        WHERE m._itens_no_xml IS NOT NULL
+    """)
+    con.execute(f"""
+        CREATE TABLE xml_para_parear AS
+        SELECT chave, numero_item, codigo, quantidade, valor,
+               round(valor * 100)::BIGINT AS centavos, {_GTIN12.format('gtin')} AS gtin12
+        FROM xml_itens
+    """)
+    con.execute("CREATE TABLE pares_xml (_id BIGINT, numero_item_xml INTEGER, por VARCHAR)")
+    con.execute("CREATE TABLE xml_usados (cnpj VARCHAR, chave VARCHAR, numero_item INTEGER)")
+    for por, igual, filtro in _CRITERIOS_DO_PAR:
+        if por == "numero":
+            filtro = _O_ITEM_COLA.replace("m.", "e.")
+        # livres dos dois lados: o movimento ainda sem par, o item do XML ainda não
+        # usado por este estabelecimento
+        con.execute(f"""
+            CREATE OR REPLACE TABLE candidatos AS
+            SELECT e._id, e.cnpj, e.chave, x.numero_item
+            FROM efd_com_xml e
+            JOIN xml_para_parear x ON x.chave = e.chave AND {igual}
+            WHERE e._id NOT IN (SELECT _id FROM pares_xml)
+              AND (e.cnpj, e.chave, x.numero_item) NOT IN (SELECT (cnpj, chave, numero_item) FROM xml_usados)
+              {f"AND {filtro}" if filtro else ""}
+        """)
+        con.execute(f"""
+            INSERT INTO pares_xml
+            SELECT c._id, any_value(c.numero_item), '{por}'
+            FROM candidatos c
+            WHERE c._id IN (SELECT _id FROM candidatos GROUP BY _id HAVING count(*) = 1)
+              AND (c.cnpj, c.chave, c.numero_item) IN (
+                  SELECT (cnpj, chave, numero_item) FROM candidatos
+                  GROUP BY cnpj, chave, numero_item HAVING count(*) = 1)
+            GROUP BY c._id
+        """)
+        con.execute(f"""
+            INSERT INTO xml_usados
+            SELECT e.cnpj, e.chave, px.numero_item_xml FROM pares_xml px
+            JOIN efd_com_xml e ON e._id = px._id WHERE px.por = '{por}'
+        """)
+    con.execute("DROP TABLE candidatos")
 
 
 def _resumir_xml(con, p, r: ResumoDaMovimentacao) -> None:
