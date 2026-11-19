@@ -9362,3 +9362,63 @@ e que alocação ali não muda nada.
 Com isto, a sucessão deixa de ser o único caminho para conceder acesso — ela
 continua concedendo, porque passar o trabalho implica passar o acesso, mas
 agora é atalho e não gambiarra.
+
+---
+
+## 2026-11-19 — Item do XML casado em cascata, e não só pelo número
+
+**O problema.** A etapa 3 punha o item do XML ao lado do C170 pelo par
+`(chave, número do item)`, confirmado por quantidade ou valor. Numa rede de
+varejo isso deixou sem XML a maior parte das entradas que mais importam:
+
+* **Transferência entre filiais.** A loja escritura a nota do CD com a
+  numeração dela — o item 1 da EFD era o lava-roupa, o item 1 do XML era o
+  alvejante —, e o XML ainda trazia itens que a EFD não escriturou. 442 mil
+  entradas de transferência ficaram sem o XML, e com elas o retido que o XML
+  informava item a item.
+* **Fornecedor que informa o GTIN da caixa (DUN-14)** e é escriturado em
+  unidades: nem número, nem quantidade, nem valor batiam.
+
+**A decisão.** Uma cascata, cada critério só para o que o anterior deixou
+livre, e só quando o par é único dos dois lados dentro da chave:
+
+1. **código**, só em nota da própria empresa (mesma raiz de CNPJ na chave) —
+   ali o código do XML é o do cadastro; em nota de fornecedor, uma coincidência
+   não prova nada;
+2. **número do item** confirmado por quantidade ou valor (a regra de antes);
+3. **GTIN** pelos 12 dígitos do meio, onde o EAN-13 e o DUN-14 da caixa coincidem;
+4. **valor** do item.
+
+Cada critério é uma igualdade, para continuar em hash join (o OR na cláusula
+ON já custou um processamento que não terminou em 3h19).
+
+## 2026-11-19 — Transferência sem retido vale as entradas mais recentes do remetente
+
+**O problema.** Medido na mesma rede: 94% das entradas por transferência
+(CFOP 1.409) vinham sem o retido, porque quem transferia não preenchia o
+`vICMSSTRet`. Sem valor, a entrada ia à Ficha 3 com ICMS suportado zero.
+
+**A decisão.** A Portaria CAT 42/2018, § 5º (redação da CAT-111/18, efeitos
+desde 01/01/2019), diz como achar o valor quando não se identifica a entrada:
+**as entradas mais recentes, suficientes para comportar a quantidade**. É a
+mesma metodologia do item 3.3.8 que já valora a abertura, e o domínio a
+expõe como `valor_pelas_entradas_do_remetente`. **Não é o custo médio da
+ficha do remetente** — essa foi a primeira proposta, recusada pelo Victor com o
+texto da portaria: o parágrafo fala em entradas, e o custo médio misturaria
+saldo antigo com compra recente.
+
+Como o razão aplica:
+
+* só a transferência recebida (`CFOP_TRANSFERENCIA_RECEBIDA`, espelho da de
+  saída) sem valor nenhum — o retido que a nota trouxe vence;
+* o remetente é o emitente da chave e tem de ser um estabelecimento da base;
+* em **ordem de data na rede inteira**, porque a entrada do remetente pode ser
+  ela mesma uma transferência (fornecedor → filial → CD → loja, e loja → loja);
+* quantidades na unidade da ficha e código depois do de-para, dos dois lados;
+* cada linha valorada fica em `transferencias_valoradas.parquet` (remetente,
+  quantidade, valor, quanto foi coberto, quantas entradas usou), e o resumo
+  da montagem conta as inteiras, as parciais e as sem entrada.
+
+O cliente fica avisado: o § 4º obriga quem dá a saída a informar o retido na
+nota. Valorar pelo remetente resolve o passado; o certo daqui em diante é a
+nota de transferência já sair com ele.
