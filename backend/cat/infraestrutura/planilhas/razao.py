@@ -286,7 +286,18 @@ def _derivado(parquet: str, destino: str) -> str:
                             f"ficha3_leiaute.{uuid4().hex}.parquet")
     con = duckdb.connect()
     try:
-        con.execute("SET threads TO 4")
+        # **uma thread, e a ordem é o motivo.** A Ficha 3 é um histórico: a
+        # linha só faz sentido depois da anterior. Com 4 threads este COPY
+        # escreve os grupos do parquet fora da ordem em que leu — e não é
+        # teórico: na empresa 17, 487 mil linhas saíram com 3 mercadorias
+        # trocadas de lugar, uma delas com agosto na primeira linha do arquivo
+        # e janeiro na 483 milésima. Nada avisa; a planilha só fica errada.
+        #
+        # `preserve_insertion_order` **não** resolve: medido em 23/11/2026, com
+        # ele ligado explicitamente o resultado é o mesmo. O que resolve é não
+        # paralelizar a escrita, e o custo é 0,7 s num COPY de 1,1 s — perto
+        # dos 40 minutos que a planilha grande leva para ser montada, nada.
+        con.execute("SET threads TO 1")
         con.execute(f"SET temp_directory = {_literal(os.path.dirname(rascunho))}")
         con.execute(f"COPY (SELECT {', '.join(partes)} FROM read_parquet({_literal(parquet)})) "
                     f"TO {_literal(rascunho)} (FORMAT parquet)")

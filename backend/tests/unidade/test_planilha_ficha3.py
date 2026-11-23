@@ -7,6 +7,7 @@ Arial 10 branco vale para **todas** as planilhas do projeto (pedido do Victor,
 """
 
 import csv
+import os
 from datetime import date
 from decimal import Decimal
 
@@ -495,3 +496,68 @@ class TestConversaoDeUnidadeNaLinha:
                                       unidade_sem_fator=True)
         assert ler("Quantidade no Documento (NF-e)") is None
         assert ler("Unidade sem Fator de Conversão") == "Sim"
+
+
+class TestAOrdemSobreviveAGeracao:
+    """A ficha é um histórico: a linha só faz sentido depois da anterior.
+
+    A derivação do leiaute copia o parquet inteiro, e com várias threads o
+    DuckDB escreve os grupos fora da ordem em que leu. Na empresa 17 isso
+    trocou 3 mercadorias de lugar em 487 mil linhas — uma delas com agosto na
+    primeira linha do arquivo e janeiro na 483 milésima, e nada avisa: a
+    planilha só fica errada.
+
+    `preserve_insertion_order` **não** resolve, medido em 23/11/2026 com ele
+    ligado explicitamente. O que resolve é não paralelizar a escrita.
+
+    O teste precisa de volume: com 200 mil linhas o DuckDB nem paraleliza e o
+    defeito não aparece. Com 500 mil em grupos de 122.880 ele aparece todas as
+    vezes — foi assim que a correção foi verificada.
+    """
+
+    LINHAS = 500_000
+    POR_GRUPO = 122_880
+
+    @pytest.fixture
+    def ficha_grande(self, tmp_path):
+        n = self.LINHAS
+        campos = {c: [None] * n for c in ESQUEMA_FICHA3.names}
+        campos["cnpj"] = ["1" * 14] * n
+        # o código muda a cada 100 linhas: é por ele que a ordem se vê
+        campos["codigo"] = [f"{i // 100:08d}" for i in range(n)]
+        campos["numero"] = [i % 100 + 1 for i in range(n)]
+        campos["descricao"] = ["MERCADORIA DE TESTE " + "x" * 40] * n
+        campos["especie"] = ["saida" if i % 3 else "entrada" for i in range(n)]
+        campos["devolucao"] = [i % 97 == 0 for i in range(n)]
+        campos["cfop"] = [["5405", "1403", "1409", "5409", "5411"][i % 5] for i in range(n)]
+        campos["data"] = [date(2026, (i % 8) + 1, 15) for i in range(n)]
+        campos["quantidade"] = [d(i % 50 + 1) for i in range(n)]
+        campos["fator_conversao"] = [d(1)] * n
+        campos["saldo_quantidade"] = [d(i % 500) for i in range(n)]
+        caminho = tmp_path / "grande.parquet"
+        pq.write_table(pa.Table.from_pydict(campos, schema=ESQUEMA_FICHA3), str(caminho),
+                       row_group_size=self.POR_GRUPO)
+        return caminho
+
+    def test_a_derivacao_do_leiaute_nao_embaralha_as_mercadorias(
+            self, ficha_grande, tmp_path):
+        from cat.infraestrutura.planilhas.razao import _derivado
+
+        derivado = _derivado(str(ficha_grande), str(tmp_path / "saida.xlsx"))
+        try:
+            anterior, vistos, fora = None, set(), 0
+            arquivo = pq.ParquetFile(derivado)
+            try:
+                for lote in arquivo.iter_batches(50_000, columns=["codigo"]):
+                    for codigo in lote.column("codigo").to_pylist():
+                        if codigo != anterior:
+                            if codigo in vistos:
+                                fora += 1
+                            vistos.add(codigo)
+                            anterior = codigo
+            finally:
+                arquivo.close()
+        finally:
+            os.remove(derivado)
+        assert fora == 0, f"{fora} mercadorias saíram fora de ordem"
+        assert len(vistos) == self.LINHAS // 100
