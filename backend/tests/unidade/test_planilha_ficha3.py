@@ -447,3 +447,51 @@ class TestSaidaComCfopDeEntrada:
         """A marca é sobre a contradição, não sobre o CFOP: entrada com CFOP de
         entrada é o caso normal."""
         assert self._marca(tmp_path, especie="entrada", cfop="1403") == "Não"
+
+
+class TestConversaoDeUnidadeNaLinha:
+    """O pão entra em pacote e sai em fatia (exemplo do Victor, 23/11/2026).
+
+    A quantidade da ficha está na unidade do inventário, mas o documento quase
+    nunca usa essa unidade: na empresa 17, 83,3% dos itens entram numa e saem
+    em outra. Sem o fator e a quantidade de origem na linha, a conta não se
+    refaz sem abrir outro arquivo.
+    """
+
+    def _linha_da_planilha(self, tmp_path, **campos):
+        caminho = tmp_path / "conv.parquet"
+        linhas = [_linha(**campos)]
+        pq.write_table(pa.Table.from_pydict(
+            {c: [l[c] for l in linhas] for c in ESQUEMA_FICHA3.names},
+            schema=ESQUEMA_FICHA3), str(caminho))
+        destino = tmp_path / "conv.xlsx"
+        gerar_ficha3(str(caminho), str(destino))
+        aba = openpyxl.load_workbook(str(destino)).active
+        return lambda titulo: aba.cell(row=4, column=_coluna(aba, titulo)).value
+
+    def test_a_caixa_de_doze_mostra_o_pacote_o_fator_e_as_unidades(self, tmp_path):
+        """Uma caixa de 12 no documento são 12 unidades na ficha."""
+        ler = self._linha_da_planilha(tmp_path, especie="entrada", unidade_estoque="UN1",
+                                      unidade_origem="CX12", fator_conversao=d(12),
+                                      quantidade=d(12))
+        assert ler("Unidade de Medida") == "UN1"
+        assert ler("Unidade de Medida (NF-e)") == "CX12"
+        assert ler("Fator de Conversão") == 12
+        assert ler("Quantidade no Documento (NF-e)") == 1
+        assert ler("Quantidade (Entrada)") == 12
+
+    def test_a_saida_na_unidade_de_venda_mantem_a_quantidade(self, tmp_path):
+        ler = self._linha_da_planilha(tmp_path, especie="saida", unidade_estoque="UN1",
+                                      unidade_origem="UN", fator_conversao=d(1),
+                                      quantidade=d(-3))
+        assert ler("Fator de Conversão") == 1
+        assert ler("Quantidade no Documento (NF-e)") == 3
+        assert ler("Quantidade (Saída)") == 3
+
+    def test_sem_fator_a_coluna_fica_vazia_em_vez_de_inventar(self, tmp_path):
+        """Fator zero ou ausente não vira 1: a planilha diz que não sabe."""
+        ler = self._linha_da_planilha(tmp_path, especie="saida", unidade_origem="CX",
+                                      fator_conversao=None, quantidade=d(-5),
+                                      unidade_sem_fator=True)
+        assert ler("Quantidade no Documento (NF-e)") is None
+        assert ler("Unidade sem Fator de Conversão") == "Sim"

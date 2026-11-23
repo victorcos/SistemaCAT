@@ -126,6 +126,16 @@ COLUNAS_FICHA3 = (
     Coluna("ncm", "NCM", "texto", 11, GERAIS),
     Coluna("unidade_estoque", "Unidade de Medida", "texto", 10, GERAIS),
     Coluna("unidade_origem", "Unidade de Medida (NF-e)", "texto", 11, GERAIS),
+    # **sem estas duas a ficha esconde a conta.** A quantidade da ficha está na
+    # unidade do inventário, mas o documento quase nunca usa essa unidade: na
+    # empresa 17, 83,3% dos itens entram numa e saem em outra, e `CX12 -> UN`
+    # sozinho são 4,4 milhões de linhas. O pão entra em pacote e sai em fatia
+    # (exemplo do Victor, 23/11/2026), e quem confere precisa ver o pacote, o
+    # fator e as fatias — senão a linha não se refaz sem abrir outro arquivo,
+    # que é justamente o que este leiaute se propõe a evitar
+    Coluna("fator_conversao", "Fator de Conversão", "quantidade", 12, GERAIS),
+    Coluna("quantidade_no_documento", "Quantidade no Documento (NF-e)",
+           "quantidade", 14, GERAIS),
     Coluna("aliquota_documento", "Alíquota do ICMS", "quantidade", 10, GERAIS),
     Coluna("numero", "Número da Ordem", "numero_inteiro", 9, GERAIS, "1"),
     Coluna("data", "Data", "data", 11, GERAIS, "2"),
@@ -219,6 +229,12 @@ DERIVACAO = {
     "codigo_original": "coalesce(codigo_original, codigo)",
     "serie_ecf": "NULL::VARCHAR",
     "tipo": "CASE WHEN especie = 'entrada' THEN '0' ELSE '1' END",
+    # a quantidade como o documento a trouxe, desfazendo a conversão. Em DOUBLE
+    # porque a divisão de dois decimais de escala alta estoura a precisão do
+    # resultado; aqui é coluna de leitura, não entra em nenhuma apuração
+    "quantidade_no_documento":
+        "CASE WHEN coalesce(fator_conversao, 0) > 0 "
+        "THEN abs(quantidade)::DOUBLE / fator_conversao::DOUBLE END",
     "qtd_entrada": "CASE WHEN especie = 'entrada' THEN abs(quantidade) END",
     "suportado_entrada": "CASE WHEN especie = 'entrada' THEN icms_suportado END",
     "cod_legal": "enquadramento",
