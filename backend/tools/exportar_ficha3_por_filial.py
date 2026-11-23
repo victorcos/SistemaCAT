@@ -114,11 +114,22 @@ def main() -> None:
     rascunhos = os.path.join(args.destino, "_rascunho")
     os.makedirs(rascunhos, exist_ok=True)
 
-    con = duckdb.connect()
+    # **banco em arquivo, não em memória.** O recorte de uma filial grande
+    # ordena milhões de linhas e precisa derramar em disco; num banco
+    # in-memory o DuckDB quebrou com `INTERNAL Error: Cannot perform IO in
+    # in-memory database - CreateBlock` mesmo com `temp_directory` definido.
+    # Um arquivo por processo, apagado no fim.
+    banco = os.path.join(rascunhos, f"recorte_{os.getpid()}.duckdb")
+    con = duckdb.connect(banco)
     con.execute(f"SET temp_directory = {_como_sql(rascunhos)}")
     con.execute(f"SET memory_limit = {_literal(args.memoria)}")
     con.execute("SET threads TO 2")
-    con.execute("SET preserve_insertion_order = false")
+    # **a ordem é o produto.** A Ficha 3 é um histórico: a linha só faz sentido
+    # depois da anterior, porque o saldo e o custo médio vêm de lá. Com
+    # `preserve_insertion_order = false` o COPY pode gravar os blocos fora da
+    # ordem que o ORDER BY produziu, e a planilha sairia embaralhada sem erro
+    # nenhum. Aqui o padrão do DuckDB (preservar) é que está certo.
+    con.execute("SET preserve_insertion_order = true")
     if not args.todas:
         con.execute(f"""CREATE TABLE par AS
             SELECT cnpj, codigo FROM read_parquet({_como_sql(fichas)})
@@ -175,6 +186,11 @@ def main() -> None:
 
     log.info("pronto: %d arquivos, %s linhas, %.1f min, em %s",
              len(lista), f"{gravadas:,}", (time.time() - inicio) / 60, args.destino)
+    con.close()
+    for sufixo in ("", ".wal"):
+        caminho = banco + sufixo
+        if os.path.isfile(caminho):
+            os.remove(caminho)
     try:
         os.rmdir(rascunhos)
     except OSError:
