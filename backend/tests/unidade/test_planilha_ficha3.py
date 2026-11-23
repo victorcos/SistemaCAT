@@ -369,3 +369,81 @@ class TestDuasGeracoesNaMesmaPasta:
         pasta.mkdir()
         gerar_ficha3(str(ficha3), str(pasta / "ficha3.xlsx"))
         assert [a.name for a in pasta.iterdir()] == ["ficha3.xlsx"]
+
+
+class TestNaturezaDoLancamento:
+    """A ficha se lê por blocos, e o nome do bloco vai na linha.
+
+    Decisão do Victor, 23/11/2026. As listas de CFOP são as do domínio: o que
+    se testa aqui é a tradução para a coluna, não a lista.
+    """
+
+    def _planilha_de(self, tmp_path, *linhas):
+        caminho = tmp_path / "natureza.parquet"
+        pq.write_table(pa.Table.from_pydict(
+            {c: [l[c] for l in linhas] for c in ESQUEMA_FICHA3.names},
+            schema=ESQUEMA_FICHA3), str(caminho))
+        destino = tmp_path / "natureza.xlsx"
+        gerar_ficha3(str(caminho), str(destino))
+        return openpyxl.load_workbook(str(destino)).active
+
+    @pytest.mark.parametrize("especie,devolucao,cfop,esperado", [
+        ("entrada", False, "1403", "Entrada"),
+        ("saida", False, "5405", "Saída"),
+        ("saida", False, "5152", "Transferência enviada"),
+        ("entrada", False, "1152", "Transferência recebida"),
+        ("saida", False, "6409", "Transferência enviada"),
+        ("entrada", True, "5411", "Devolução de compra"),
+        ("entrada", False, "1202", "Devolução de venda"),
+        # CFOP com ponto, como algumas fontes o trazem
+        ("saida", False, "5.152", "Transferência enviada"),
+        # marcado como devolução pelo motor, com CFOP fora das listas
+        ("saida", True, "5949", "Devolução"),
+    ])
+    def test_cada_lancamento_recebe_o_seu_nome(self, tmp_path, especie, devolucao,
+                                               cfop, esperado):
+        aba = self._planilha_de(tmp_path, _linha(especie=especie, devolucao=devolucao,
+                                                 cfop=cfop))
+        assert aba.cell(row=4, column=_coluna(aba, "Natureza do Lançamento")).value == esperado
+
+    def test_a_devolucao_nao_e_confundida_com_transferencia(self, tmp_path):
+        """O 5.410 está nas devoluções e não nas transferências, e é o caso em
+        que ter o CFOP nos dois conjuntos faria a ordem das regras decidir."""
+        aba = self._planilha_de(tmp_path, _linha(especie="entrada", devolucao=True,
+                                                 cfop="5410"))
+        assert aba.cell(row=4, column=_coluna(aba, "Natureza do Lançamento")).value \
+            == "Devolução de compra"
+
+
+class TestSaidaComCfopDeEntrada:
+    """A linha baixa estoque e baixa ICMS suportado, mas o CFOP diz que a
+    mercadoria entrou.
+
+    Na empresa 17 são 220.295 linhas levando R$ 12,8 mi de suportado embora
+    sem gerar ressarcimento nem complemento, e 81,3% das chaves estão também
+    lançadas como entrada pela EFD: a mesma transferência recebida contada duas
+    vezes, com sinais opostos. A planilha marca; quem decide tirar da apuração
+    é o responsável pelo trabalho.
+    """
+
+    def _marca(self, tmp_path, **campos):
+        caminho = tmp_path / "cfop.parquet"
+        linhas = [_linha(**campos)]
+        pq.write_table(pa.Table.from_pydict(
+            {c: [l[c] for l in linhas] for c in ESQUEMA_FICHA3.names},
+            schema=ESQUEMA_FICHA3), str(caminho))
+        destino = tmp_path / "cfop.xlsx"
+        gerar_ficha3(str(caminho), str(destino))
+        aba = openpyxl.load_workbook(str(destino)).active
+        return aba.cell(row=4, column=_coluna(aba, "Saída com CFOP de Entrada")).value
+
+    def test_saida_com_cfop_de_entrada_fica_marcada(self, tmp_path):
+        assert self._marca(tmp_path, especie="saida", cfop="1409") == "Sim"
+
+    def test_saida_com_cfop_de_saida_nao_e_marcada(self, tmp_path):
+        assert self._marca(tmp_path, especie="saida", cfop="5405") == "Não"
+
+    def test_entrada_com_cfop_de_entrada_nao_e_marcada(self, tmp_path):
+        """A marca é sobre a contradição, não sobre o CFOP: entrada com CFOP de
+        entrada é o caso normal."""
+        assert self._marca(tmp_path, especie="entrada", cfop="1403") == "Não"

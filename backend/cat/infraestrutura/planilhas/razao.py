@@ -45,12 +45,65 @@ from uuid import uuid4
 import duckdb
 import pyarrow.parquet as pq
 
+from cat.dominio.icms.cat42.enquadramento import (
+    CFOP_DEVOLUCAO,
+    CFOP_TRANSFERENCIA,
+    CFOP_TRANSFERENCIA_RECEBIDA,
+)
 from cat.infraestrutura.planilhas.conferencia import (
     Coluna,
     _literal,
     _pasta_de_rascunho,
     gerar,
 )
+
+# ---------------------------------------------------------------------------
+# a natureza do lançamento, e a composição da ficha em blocos
+# ---------------------------------------------------------------------------
+# Decisão do Victor, 23/11/2026: a ficha de cada mercadoria se lê por blocos —
+# as entradas, e abaixo delas as saídas, as transferências e as devoluções —,
+# não em ordem cronológica corrida. Quem confere quer ver o que entrou e o que
+# saiu daquele item; a cronologia resolve o cálculo, não a leitura.
+#
+# As listas de CFOP são as do domínio: repeti-las aqui seria garantir que um
+# dia divergissem. `CFOP_TRANSFERENCIA_RECEBIDA` já é derivada da de saída pelo
+# mesmo motivo.
+
+
+def _em(cfops) -> str:
+    return ", ".join(_literal(c) for c in sorted(cfops))
+
+
+# o CFOP vem com e sem ponto conforme a fonte; `replace` deixa a comparação
+# com a lista do domínio, que é sem ponto
+_CFOP = "replace(coalesce(cfop, ''), '.', '')"
+
+NATUREZA = f"""CASE
+    WHEN {_CFOP} IN ({_em(c for c in CFOP_DEVOLUCAO if c[0] in '12')}
+         ) THEN 'Devolução de venda'
+    WHEN {_CFOP} IN ({_em(c for c in CFOP_DEVOLUCAO if c[0] in '56')}
+         ) THEN 'Devolução de compra'
+    WHEN devolucao THEN 'Devolução'
+    WHEN {_CFOP} IN ({_em(CFOP_TRANSFERENCIA_RECEBIDA)}) THEN 'Transferência recebida'
+    WHEN {_CFOP} IN ({_em(CFOP_TRANSFERENCIA)}) THEN 'Transferência enviada'
+    WHEN especie = 'entrada' THEN 'Entrada'
+    ELSE 'Saída'
+END"""
+
+# a ordem dos blocos dentro da mercadoria, na sequência que o Victor pediu:
+# entradas, saídas, transferências, devoluções. Recebida e enviada ficam em
+# sub-blocos próprios: ordenadas só por data elas se intercalam, e a primeira
+# amostra da empresa 17 saiu com recebida e enviada alternando linha a linha,
+# que é o oposto de compor por bloco.
+ORDEM_DO_BLOCO = f"""CASE
+    WHEN {_CFOP} IN ({_em(c for c in CFOP_DEVOLUCAO if c[0] in '12')}) THEN 5
+    WHEN {_CFOP} IN ({_em(c for c in CFOP_DEVOLUCAO if c[0] in '56')}) THEN 6
+    WHEN devolucao THEN 7
+    WHEN {_CFOP} IN ({_em(CFOP_TRANSFERENCIA_RECEBIDA)}) THEN 3
+    WHEN {_CFOP} IN ({_em(CFOP_TRANSFERENCIA)}) THEN 4
+    WHEN especie = 'entrada' THEN 1
+    ELSE 2
+END"""
 
 # ---------------------------------------------------------------------------
 # a Ficha 3 no leiaute do papel de trabalho
@@ -89,6 +142,10 @@ COLUNAS_FICHA3 = (
     Coluna("valor_item", "VL_ITEM (base de cálculo do ICMS)", "numero", 16, GERAIS),
     Coluna("cst_icms", "CST", "texto", 7, GERAIS),
     Coluna("origem", "Origem do Dado", "texto", 11, GERAIS),
+    # o bloco a que a linha pertence quando a ficha sai composta por blocos.
+    # Vale também na ficha cronológica: dizer que a linha é transferência ou
+    # devolução pelo nome poupa consultar a tabela de CFOP a cada dúvida
+    Coluna("natureza", "Natureza do Lançamento", "texto", 18, GERAIS),
 
     Coluna("qtd_entrada", "Quantidade (Entrada)", "quantidade", 12, ENTRADAS, "11"),
     Coluna("suportado_entrada",
@@ -135,6 +192,15 @@ COLUNAS_FICHA3 = (
     Coluna("saldo_negativo", "Saldo Parcial Negativo", "texto", 12, INCONSISTENCIAS),
     Coluna("enquadramento_indefinido", "Enquadramento Indefinido", "texto", 12, INCONSISTENCIAS),
     Coluna("unidade_sem_fator", "Unidade sem Fator de Conversão", "texto", 12, INCONSISTENCIAS),
+    # saída com CFOP de entrada: a linha baixa estoque e baixa ICMS suportado,
+    # mas o CFOP diz que a mercadoria **entrou**. Na empresa 17 são 220.295
+    # linhas que levam R$ 12,8 mi de suportado embora, sem gerar ressarcimento
+    # nem complemento, e 81,3% das chaves estão também lançadas como entrada
+    # pela EFD — a mesma transferência recebida contada duas vezes, com sinais
+    # opostos. Marcar por linha, porque a decisão de tirar da apuração é do
+    # responsável pelo trabalho, não do gerador da planilha
+    Coluna("saida_com_cfop_de_entrada", "Saída com CFOP de Entrada", "texto", 12,
+           INCONSISTENCIAS),
     Coluna("ficha_retirada", "Ficha Retirada do Total", "texto", 12, INCONSISTENCIAS),
     Coluna("corrigida", "Corrigida à Mão", "texto", 12, INCONSISTENCIAS),
 
@@ -148,6 +214,7 @@ COLUNAS_FICHA3 = (
 # arquivo — rodada antiga, coluna que ainda não havia — vira nulo, e a planilha
 # sai assim mesmo: melhor a coluna vazia do que a etapa recusando o download.
 DERIVACAO = {
+    "natureza": NATUREZA,
     "periodo": "date_trunc('month', data)::DATE",
     "codigo_original": "coalesce(codigo_original, codigo)",
     "serie_ecf": "NULL::VARCHAR",
@@ -174,6 +241,8 @@ DERIVACAO = {
     "devolucao_sem_suportado": "devolucao AND coalesce(icms_suportado, 0) = 0",
     "ressarcimento_sem_confronto": "ressarcimento > 0 AND icms_efetivo IS NULL",
     "saldo_negativo": "saldo_quantidade < 0",
+    "saida_com_cfop_de_entrada":
+        f"especie = 'saida' AND substr({_CFOP}, 1, 1) IN ('1', '2')",
     # vazias na geração: é o que a pessoa escreve para devolver a planilha
     # corrigida, e o que volta é conferido em `planilhas/correcoes_da_planilha.py`
     "tirar_da_ficha": "NULL::VARCHAR",

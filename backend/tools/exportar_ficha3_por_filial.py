@@ -40,7 +40,7 @@ import time
 import duckdb
 
 from cat.infraestrutura.analitico.razao import ARQUIVO_FICHA3, ARQUIVO_FICHAS
-from cat.infraestrutura.planilhas.razao import gerar_ficha3
+from cat.infraestrutura.planilhas.razao import ORDEM_DO_BLOCO, gerar_ficha3
 from cat.log import configurar, obter_log
 
 log = obter_log(__name__)
@@ -67,18 +67,25 @@ def estabelecimentos(ficha3: str, con: duckdb.DuckDBPyConnection) -> list[tuple[
 
 
 def recortar(con: duckdb.DuckDBPyConnection, ficha3: str, cnpj: str,
-             rascunho: str, so_com_par: bool) -> int:
-    """Grava o parquet de uma filial, em ordem de histórico. Devolve as linhas."""
+             rascunho: str, so_com_par: bool, cronologico: bool) -> int:
+    """Grava o parquet de uma filial, na ordem de leitura da ficha.
+
+    Por bloco: dentro de cada mercadoria, primeiro as entradas, depois as
+    saídas, as transferências e as devoluções, cada bloco em ordem de data.
+    `cronologico` devolve a ordem antiga, de lançamento corrido, que é a que
+    deixa conferir o saldo e o custo médio linha a linha.
+    """
     filtro = ""
     if so_com_par:
         # semi-join com as fichas que têm os dois lados: é o recorte que o
         # Victor pediu, "os itens com entradas e saídas confirmadas"
         filtro = " AND EXISTS (SELECT 1 FROM par p WHERE p.cnpj = f.cnpj AND p.codigo = f.codigo)"
+    ordem = "f.codigo, f.numero" if cronologico else f"f.codigo, {ORDEM_DO_BLOCO}, f.numero"
     con.execute(f"""
         COPY (
             SELECT f.* FROM read_parquet({_como_sql(ficha3)}) f
             WHERE f.cnpj = {_literal(cnpj)}{filtro}
-            ORDER BY f.codigo, f.numero
+            ORDER BY {ordem}
         ) TO {_como_sql(rascunho)} (FORMAT parquet)
     """)
     return con.execute(f"SELECT count(*) FROM read_parquet({_como_sql(rascunho)})").fetchone()[0]
@@ -100,6 +107,8 @@ def main() -> None:
     # levou um segmentation fault no meio da empresa 17. O recorte derrama em
     # disco sem reclamar; o que não se recupera é o processo morto na metade
     p.add_argument("--memoria", default="2GB")
+    p.add_argument("--cronologico", action="store_true",
+                   help="ordem de lançamento corrido, em vez da composição por blocos")
     args = p.parse_args()
     # sem isto o log do projeto não tem handler e a exportação roda muda — e
     # esta roda horas em segundo plano, onde o log é a única forma de acompanhar
@@ -148,9 +157,11 @@ def main() -> None:
         # a lista já vem do maior para o menor, então intercalar distribui as
         # filiais grandes entre as fatias em vez de amontoá-las numa só
         lista = lista[n - 1::m]
-    log.info("estabelecimentos a exportar: %d, formato %s, recorte %s",
+    log.info("estabelecimentos a exportar: %d, formato %s, recorte %s, ordem %s",
              len(lista), args.formato, "todas as mercadorias" if args.todas
-             else "só com entrada e saída")
+             else "só com entrada e saída",
+             "lançamento corrido" if args.cronologico
+             else "blocos (entradas, saídas, transferências, devoluções)")
 
     inicio = time.time()
     gravadas = 0
@@ -169,7 +180,7 @@ def main() -> None:
                      i, len(lista), cnpj, os.path.getsize(destino) / 1e6)
             continue
         rascunho = os.path.join(rascunhos, f"ficha3_{cnpj}.parquet")
-        linhas = recortar(con, ficha3, cnpj, rascunho, not args.todas)
+        linhas = recortar(con, ficha3, cnpj, rascunho, not args.todas, args.cronologico)
         if not linhas:
             log.warning("filial %s sem linha no recorte: %s lançamentos ao todo, "
                         "nenhum de mercadoria com os dois lados", cnpj, f"{total_bruto:,}")
