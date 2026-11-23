@@ -33,7 +33,8 @@ import duckdb
 from cat.dominio.icms.cat42.enquadramento import CFOP_DEVOLUCAO
 
 from relatorio_cat42_filial_comum import (ESTOQUE, FAIXA_BOA, MESMO, PARADO, RAZAO_SUSPEITA, SEM_PAR, SITUACOES_REGULARES,
-                             SO_ENTRADA, UNIFICADO, ean, fator_da_descricao, fator_da_unidade, n, sem_acento)
+                             SO_DEVOLUCAO, SO_ENTRADA, UNIFICADO, ean, fator_da_descricao,
+                             fator_da_unidade, n, sem_acento)
 from relatorio_cat42_filial_planilha import escrever
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -62,6 +63,11 @@ SITUAÇÃO DO ITEM (na filial):
   sem par: saída sem entrada — vende sem compra, sem estoque e sem EAN/descrição igual: fica EM BRANCO para a análise manual.
      Se 'compra em OUTRAS filiais' > 0, o mesmo código é comprado em outra filial: provável transferência fora da base.
   só entrada na base (sem saída no período) — comprou e não vendeu no período.
+  só devolução no período (compra anterior à base) — o único movimento do código foi DEVOLVER ao fornecedor (CFOP 5202/5411)
+     mercadoria comprada antes de 01/2026. A compra está fora da janela, então os dois lados ficam zerados e só a coluna
+     'Quantidade - Devolução' tem valor. Medido nesta base: 1.248 códigos, dos quais 96% estavam no inventário de
+     31/12/2025 e 96% devolveram já em janeiro. Com a retroação de 3 meses das entradas, a maior parte deixa de aparecer
+     assim — é o mesmo buraco de período que põe item em 'sem par'.
 
 SEM PAR (aba): os itens 'sem par' para a análise manual, com colunas amarelas para preencher (código certo, fator, observação).
 ENTRADA SEM SAÍDA (aba): os códigos que compram e não vendem na filial — onde procurar o par na análise manual.
@@ -427,6 +433,10 @@ def classificar(item: dict) -> str:
         return SEM_PAR
     if tem_e and not tem_s:
         return SO_ENTRADA
+    # devolução não é entrada nem saída, mas é movimento: sem este caso o item
+    # cairia em "sem movimento no período" com a coluna de devolução preenchida
+    if n(item.get("e_devolucao")) or n(item.get("s_devolucao")):
+        return SO_DEVOLUCAO
     return PARADO
 
 
@@ -478,7 +488,8 @@ def main(pasta: str, saida: str, titulo: str) -> None:
     log.info("participantes (com linha de ST): %d de %d", len(itens), antes)
 
     itens.sort(key=lambda i: (i["cnpj"],
-                              {UNIFICADO: 0, SEM_PAR: 1, MESMO: 2, ESTOQUE: 3, SO_ENTRADA: 4, PARADO: 5}
+                              {UNIFICADO: 0, SEM_PAR: 1, MESMO: 2, ESTOQUE: 3, SO_ENTRADA: 4,
+                               SO_DEVOLUCAO: 5, PARADO: 6}
                               .get(i["situacao"], 9),
                               -(n(i.get("e_valor")) or 0.0)))
     conferir.sort(key=lambda c: -c["quantidade"])

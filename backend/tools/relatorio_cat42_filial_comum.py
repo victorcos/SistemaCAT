@@ -12,6 +12,9 @@ MESMO = "não precisa: compra e venda no mesmo código"
 ESTOQUE = "não precisa: saída coberta pelo estoque inicial"
 SEM_PAR = "sem par: saída sem entrada"
 SO_ENTRADA = "só entrada na base (sem saída no período)"
+# o único movimento do código foi devolver ao fornecedor mercadoria comprada
+# antes do início da base: a compra fica fora da janela e os dois lados zeram
+SO_DEVOLUCAO = "só devolução no período (compra anterior à base)"
 PARADO = "sem movimento no período"
 
 # "parece que a compra ainda está em caixa": custo médio acima de 1,3x o preço de

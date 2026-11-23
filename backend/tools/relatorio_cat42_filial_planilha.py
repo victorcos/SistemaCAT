@@ -7,7 +7,8 @@ from collections import defaultdict
 
 import xlsxwriter
 
-from relatorio_cat42_filial_comum import (ESTOQUE, LIMITE_EXCEL, MESMO, PARADO, SEM_PAR, SO_ENTRADA, UNIFICADO,
+from relatorio_cat42_filial_comum import (ESTOQUE, LIMITE_EXCEL, MESMO, PARADO, SEM_PAR, SO_DEVOLUCAO,
+                                          SO_ENTRADA, UNIFICADO,
                              descricao_bate, descricao_com_outras, ean, lista, media, n)
 
 log = logging.getLogger("relatorio_cat42_filial")
@@ -63,7 +64,7 @@ CAB_UNIFICADOS = ["CNPJ da filial", "CÓDIGO QUE FICOU (venda)", "Descrição (c
                   "EAN do antigo", "Por que unificou", "Resultado", "Unidade do antigo × do que ficou",
                   "Conferir unidade / quantidade"]
 CAB_RESUMO = ["CNPJ da filial", "Itens no relatório", "unificados (código antigo → código de venda)",
-              SEM_PAR, MESMO, ESTOQUE, SO_ENTRADA, PARADO,
+              SEM_PAR, MESMO, ESTOQUE, SO_ENTRADA, SO_DEVOLUCAO, PARADO,
               "Sem par com entrada do código em outra filial"]
 
 
@@ -250,20 +251,22 @@ def escrever(itens, unificados, conferir, saida, titulo, filiais, periodo, leia_
             c["outra_filial"] += 1
     totais: dict[str, int] = defaultdict(int)
     log.info("resumo por filial")
-    log.info("  %-18s %8s %8s %8s %8s %8s %8s", "CNPJ", "itens", "unific.", "sem par", "mesmo", "estoque", "outra")
+    log.info("  %-18s %8s %8s %8s %8s %8s %8s %8s", "CNPJ", "itens", "unific.", "sem par", "mesmo",
+             "estoque", "só dev", "outra")
     for r, cnpj in enumerate(sorted(por_filial), start=1):
         c = por_filial[cnpj]
         ws.write_row(r, 0, [cnpj, c["itens"], c["unificados"], c[SEM_PAR], c[MESMO], c[ESTOQUE],
-                            c[SO_ENTRADA], c[PARADO], c["outra_filial"]])
+                            c[SO_ENTRADA], c[SO_DEVOLUCAO], c[PARADO], c["outra_filial"]])
         for k, v in c.items():
             totais[k] += v
-        log.info("  %-18s %8d %8d %8d %8d %8d %8d", cnpj, c["itens"], c["unificados"], c[SEM_PAR],
-                 c[MESMO], c[ESTOQUE], c["outra_filial"])
+        log.info("  %-18s %8d %8d %8d %8d %8d %8d %8d", cnpj, c["itens"], c["unificados"], c[SEM_PAR],
+                 c[MESMO], c[ESTOQUE], c[SO_DEVOLUCAO], c["outra_filial"])
     r = len(por_filial) + 1
     ws.write_row(r, 0, ["TODAS", totais["itens"], totais["unificados"], totais[SEM_PAR], totais[MESMO],
-                        totais[ESTOQUE], totais[SO_ENTRADA], totais[PARADO], totais["outra_filial"]])
-    log.info("  %-18s %8d %8d %8d %8d %8d %8d", "TODAS", totais["itens"], totais["unificados"],
-             totais[SEM_PAR], totais[MESMO], totais[ESTOQUE], totais["outra_filial"])
+                        totais[ESTOQUE], totais[SO_ENTRADA], totais[SO_DEVOLUCAO], totais[PARADO],
+                        totais["outra_filial"]])
+    log.info("  %-18s %8d %8d %8d %8d %8d %8d %8d", "TODAS", totais["itens"], totais["unificados"],
+             totais[SEM_PAR], totais[MESMO], totais[ESTOQUE], totais[SO_DEVOLUCAO], totais["outra_filial"])
 
     # -------------------------------------------------------------- Leia-me
     ws = wb.add_worksheet("Leia-me")
