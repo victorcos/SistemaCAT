@@ -70,17 +70,23 @@ def recortar(con: duckdb.DuckDBPyConnection, ficha3: str, cnpj: str,
              rascunho: str, so_com_par: bool, cronologico: bool) -> int:
     """Grava o parquet de uma filial, na ordem de leitura da ficha.
 
-    Por bloco: dentro de cada mercadoria, primeiro as entradas, depois as
-    saídas, as transferências e as devoluções, cada bloco em ordem de data.
-    `cronologico` devolve a ordem antiga, de lançamento corrido, que é a que
-    deixa conferir o saldo e o custo médio linha a linha.
+    Mercadoria, **período**, bloco, data. O período é nível de hierarquia e não
+    detalhe: a Ficha 3 é escriturada por período de apuração, e sem ele a
+    composição por bloco junta no topo entradas de janeiro, fevereiro, julho e
+    agosto e só depois mostra as saídas — que foi o que a primeira versão fez
+    na empresa 17, e não se confere assim. Dentro do mês, o bloco: as entradas,
+    depois as saídas, as transferências e as devoluções.
+
+    `cronologico` devolve a ordem de lançamento corrido, que é a que deixa
+    conferir o saldo e o custo médio linha a linha.
     """
     filtro = ""
     if so_com_par:
         # semi-join com as fichas que têm os dois lados: é o recorte que o
         # Victor pediu, "os itens com entradas e saídas confirmadas"
         filtro = " AND EXISTS (SELECT 1 FROM par p WHERE p.cnpj = f.cnpj AND p.codigo = f.codigo)"
-    ordem = "f.codigo, f.numero" if cronologico else f"f.codigo, {ORDEM_DO_BLOCO}, f.numero"
+    ordem = ("f.codigo, f.numero" if cronologico else
+             f"f.codigo, date_trunc('month', f.data), {ORDEM_DO_BLOCO}, f.numero")
     con.execute(f"""
         COPY (
             SELECT f.* FROM read_parquet({_como_sql(ficha3)}) f
