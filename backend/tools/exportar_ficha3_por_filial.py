@@ -96,6 +96,10 @@ def main() -> None:
     # sobrando: `--fatia 1/3` em três processos divide as filiais em três
     # listas intercaladas pelo tamanho, o que as deixa com volume parecido
     p.add_argument("--fatia", default="", metavar="N/M")
+    # com três processos a 4 GB cada, esta máquina (23,7 GB, ~9 GB livres)
+    # levou um segmentation fault no meio da empresa 17. O recorte derrama em
+    # disco sem reclamar; o que não se recupera é o processo morto na metade
+    p.add_argument("--memoria", default="2GB")
     args = p.parse_args()
     # sem isto o log do projeto não tem handler e a exportação roda muda — e
     # esta roda horas em segundo plano, onde o log é a única forma de acompanhar
@@ -112,8 +116,8 @@ def main() -> None:
 
     con = duckdb.connect()
     con.execute(f"SET temp_directory = {_como_sql(rascunhos)}")
-    con.execute("SET memory_limit = '4GB'")
-    con.execute("SET threads TO 4")
+    con.execute(f"SET memory_limit = {_literal(args.memoria)}")
+    con.execute("SET threads TO 2")
     con.execute("SET preserve_insertion_order = false")
     if not args.todas:
         con.execute(f"""CREATE TABLE par AS
@@ -141,6 +145,18 @@ def main() -> None:
     gravadas = 0
     for i, (cnpj, total_bruto) in enumerate(lista, start=1):
         t0 = time.time()
+        # o sufixo do CNPJ é o número da filial no ERP: é por ele que o cliente
+        # pede "a ficha da loja 19", e é o que deixa a pasta legível
+        nome = f"FICHA3_{cnpj[8:12]}_{cnpj}.{args.formato}"
+        destino = os.path.join(args.destino, nome)
+        # **retomada.** Uma filial grande leva 40 minutos, e a base inteira
+        # horas: processo morto no meio não pode custar o que já estava pronto.
+        # O nome final só aparece quando o arquivo fechou inteiro
+        # (`materializando`), então existir é garantia de estar completo.
+        if os.path.isfile(destino):
+            log.info("[%d/%d] %s já está pronto (%.1f MB): pulando",
+                     i, len(lista), cnpj, os.path.getsize(destino) / 1e6)
+            continue
         rascunho = os.path.join(rascunhos, f"ficha3_{cnpj}.parquet")
         linhas = recortar(con, ficha3, cnpj, rascunho, not args.todas)
         if not linhas:
@@ -148,10 +164,6 @@ def main() -> None:
                         "nenhum de mercadoria com os dois lados", cnpj, f"{total_bruto:,}")
             os.remove(rascunho)
             continue
-        # o sufixo do CNPJ é o número da filial no ERP: é por ele que o cliente
-        # pede "a ficha da loja 19", e é o que deixa a pasta legível
-        nome = f"FICHA3_{cnpj[8:12]}_{cnpj}.{args.formato}"
-        destino = os.path.join(args.destino, nome)
         try:
             escritas = gerar_ficha3(rascunho, destino, formato=args.formato)
         finally:
