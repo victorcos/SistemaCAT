@@ -44,6 +44,7 @@ from cat.dominio.icms.cat42.suportado import Pendencia, ResumoDaApuracao
 from cat.dominio.lote import TipoDeArquivo
 from cat.dominio.projeto.historico import TipoDeEvento
 from cat.infraestrutura.analitico.movimentacao import ARQUIVO_MOVIMENTOS
+from cat.infraestrutura.arquivos.gerencial import relatorios_do_lote
 from cat.infraestrutura.analitico.suportado import (
     ARQUIVO_RETIDO,
     Andamento,
@@ -205,8 +206,9 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     pasta_movimentos = movimentos.pasta_de_trabalho
     diario.base["movimentos_execucao_id"] = movimentos.id
 
-    relatorios = caminhos_do_projeto(
-        execucao.projeto_id, (TipoDeArquivo.GERENCIAL_MOVIMENTO,), sessao)
+    # os CSV de dentro dos zips do lote também: o mês de cupons vem zipado
+    relatorios = relatorios_do_lote(caminhos_do_projeto(
+        execucao.projeto_id, (TipoDeArquivo.GERENCIAL_MOVIMENTO, TipoDeArquivo.COMPACTADO), sessao))
     execucao.arquivos_totais = len(relatorios)
     diario.anotar("info", f"Rodada iniciada sobre a movimentação #{movimentos.id} "
                           f"e {len(relatorios)} relatórios do cliente.")

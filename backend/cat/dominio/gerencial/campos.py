@@ -149,12 +149,19 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
           Necessidade.OPCIONAL,
           # a Ficha 3 é por estabelecimento: sem esta coluna o relatório de
           # uma rede inteira vira um monte só
-          ("cnpj empresa", "cnpj do estabelecimento", "unidade", "loja",
+          # "cnpj loja" antes de "loja": o relatório do varejo do projeto 1 traz
+          # LOJA (o número interno, "2") e CNPJ_LOJA lado a lado, e o número
+          # levava o campo — a loja tem de ser o CNPJ, que é o que a ficha usa
+          ("cnpj empresa", "cnpj do estabelecimento", "cnpj loja", "unidade", "loja",
            "filial", "cod loja", "cnpj filial", "nroempresa")),
     Campo("unidade_medida", "Unidade de medida",
           "a quantidade só se converte sabendo se a linha é UN, KG ou caixa",
           Necessidade.OPCIONAL,
-          ("unidadepadrao", "unidade padrao", "unidade medida", "emb", "embalagem", "un med")),
+          # "und medida" é exato e vem antes do parcial "emb", que casava com
+          # QTDEMBALAGEM (a quantidade da embalagem, um número) no lugar da
+          # unidade UND_MEDIDA
+          ("unidadepadrao", "unidade padrao", "unidade medida", "und medida",
+           "emb", "embalagem", "un med")),
     Campo("tipo_documento", "Tipo do documento",
           "venda de PDV é cupom, e cupom é consumidor final por definição",
           Necessidade.OPCIONAL, ("descricao tipo dcto", "tipo documento", "tipo dcto")),
@@ -181,7 +188,7 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
           Necessidade.OBRIGATORIO, ("qtde unitaria", "quantidade", "qtd", "qtde")),
     Campo("valor_item", "Valor do item", "confere o total e apura divergência",
           Necessidade.IMPORTANTE,
-          ("valor", "valor total", "vlrtotal", "vlr item", "valor item")),
+          ("valor", "valor total", "vlrtotal", "vlr item", "vlritem", "valor item")),
     Campo("cfop", "CFOP", "diz o que a operação é: entrada, saída, devolução, baixa",
           Necessidade.OBRIGATORIO, ("cfop mvto", "cfop", "cod fiscal")),
     Campo("cst_icms", "CST do ICMS", "situação tributária, separa o que é ST do que não é",
@@ -216,7 +223,8 @@ CAMPOS_MOVIMENTO: tuple[Campo, ...] = (
     Campo("bc_st", "Base de cálculo da ST", "confere o cálculo da retenção",
           Necessidade.IMPORTANTE,
           ("valor bc st informada", "base icms st", "bc st", "base st",
-           "base calculo st", "valor bc st", "bc icms st", "bascalcicmsst")),
+           "base calculo st", "valor bc st", "bc icms st", "bascalcicmsst",
+           "base calculo icms st")),
     Campo("valor_st", "Valor do ICMS-ST", "é a parcela retida, o que se busca ressarcir",
           Necessidade.OBRIGATORIO,
           ("valor st informada", "valor sub trib", "valor st", "vlr st",

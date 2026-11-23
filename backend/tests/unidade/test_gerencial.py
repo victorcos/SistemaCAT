@@ -32,6 +32,7 @@ from cat.infraestrutura.arquivos.gerencial import (
     Leitura,
     RelatorioIlegivel,
     inspecionar,
+    relatorios_do_lote,
 )
 
 # ---------------------------------------------------------------------------
@@ -604,3 +605,101 @@ class TestApelidoCurto:
         m = mapear(["Data", "Código", "CFOP", "Qtde", "Valor ICMS",
                     "Valor ICMS ST", "CNPJ", "CNNJ_CPF"], Especie.MOVIMENTO)
         assert m.nomes_origem["cnpj_participante"] == "CNNJ_CPF"
+
+
+# ---------------------------------------------------------------------------
+# O relatório de saídas de um ERP de varejo: todo campo entre aspas, a loja
+# por número e por CNPJ lado a lado, e o mês de cupons dentro de zip. O
+# cabeçalho é o real; a linha é inventada.
+# ---------------------------------------------------------------------------
+SAIDAS_DO_VAREJO = (
+    '"LOJA";"CNPJ_LOJA";"COD_FORNEC";"CNPJ_FORNECEDOR";"RAZAO_SOCIAL";"NUM_DOC";'
+    '"SERIE_DOCFIS";"DATA_EMISSAO";"COD_CFOP";"DT_ENTRADA";"COD_PRODUTO";"DESCRICAO_ITEM";'
+    '"QTDEMBALAGEM";"UND_MEDIDA";"QUANTIDADE";"VLRITEM";"CST";"VLR_BASE_ICMS";"VLR_ICMS";'
+    '"BASE_CALCULO_ICMS_ST";"VLR_IMPOSTO_ICMS_ST"'
+)
+LOJA = "11111111000272"
+LINHA_DO_VAREJO = (
+    f'"7";"{LOJA}";"7";"{LOJA}";"LOJA SETE";"123";"3";"28/01/2026";"5927";'
+    '"28/01/2026";"555";"CARNE BOVINA kg";"1,000000";"KG";"11,616";"97,79";"020";'
+    '"0";"0";"0";"0"'
+)
+
+
+class TestRelatorioEntreAspas:
+    def test_a_loja_e_o_cnpj_e_a_unidade_nao_e_a_embalagem(self):
+        """LOJA ("7") levava a unidade e QTDEMBALAGEM (um número) levava a
+        unidade de medida; VLRITEM e a base da ST nem casavam."""
+        m = classificar(SAIDAS_DO_VAREJO.split(";"))
+        de = {k: v.strip('"') for k, v in m.nomes_origem.items()}
+        assert m.utilizavel
+        assert de["unidade"] == "CNPJ_LOJA"
+        assert de["unidade_medida"] == "UND_MEDIDA"
+        assert de["valor_item"] == "VLRITEM"
+        assert de["bc_st"] == "BASE_CALCULO_ICMS_ST"
+        assert de["valor_st"] == "VLR_IMPOSTO_ICMS_ST"
+
+    def test_le_o_campo_sem_as_aspas(self, tmp_path):
+        """Antes, `"28/01/2026"` não era data, as 500 primeiras linhas falhavam
+        e o relatório inteiro era recusado."""
+        c = escrever(tmp_path, "Saidas_JAN2026.csv", [SAIDAS_DO_VAREJO] + [LINHA_DO_VAREJO] * 3)
+        leitura = Leitura(c)
+        movs = list(leitura.movimentos())
+        assert len(movs) == 3 and leitura.total_invalidos == 0
+        m = movs[0]
+        assert (m.data, m.cfop, m.unidade, m.unidade_medida) == (
+            date(2026, 1, 28), "5927", LOJA, "KG")
+        assert (m.quantidade, m.valor_item, m.numero_doc) == (
+            Decimal("11.616"), Decimal("97.79"), 123)
+
+    def test_aspas_dobradas_dentro_do_campo_viram_uma(self, tmp_path):
+        linha = LINHA_DO_VAREJO.replace('"CARNE BOVINA kg"', '"PICANHA ""PREMIUM"""')
+        c = escrever(tmp_path, "s.csv", [SAIDAS_DO_VAREJO, linha])
+        assert next(Leitura(c).movimentos()).descricao_item == 'PICANHA "PREMIUM"'
+
+
+class TestRelatorioDentroDoZip:
+    @staticmethod
+    def _zip(caminho, membros: dict[str, str]) -> str:
+        import zipfile
+        with zipfile.ZipFile(caminho, "w") as z:
+            for nome, texto in membros.items():
+                z.writestr(nome, texto.encode("latin-1"))
+        return str(caminho)
+
+    TEXTO = "\r\n".join([SAIDAS_DO_VAREJO, LINHA_DO_VAREJO, LINHA_DO_VAREJO])
+
+    def test_le_o_membro_direto_do_zip(self, tmp_path):
+        z = self._zip(tmp_path / "CUPONS_FEV2026.zip", {"CUPONS_02FEV2026.CSV": self.TEXTO})
+        [membro] = relatorios_do_lote([z])
+        assert membro == f"{z}::CUPONS_02FEV2026.CSV"
+        assert len(list(Leitura(membro).movimentos())) == 2
+
+    def test_o_mesmo_relatorio_entra_uma_vez_e_o_solto_vence(self, tmp_path):
+        """O cliente mandou os CSV de janeiro abertos, o zip de janeiro e a
+        pasta inteira zipada de novo: janeiro entraria três vezes."""
+        solto = tmp_path / "CUPONS_02JAN2026.CSV"
+        solto.write_bytes(self.TEXTO.encode("latin-1"))
+        outro = self.TEXTO + "\r\n"                     # outro relatório: tamanho diferente
+        mes = self._zip(tmp_path / "CUPONS_JAN2026.zip", {
+            "CUPONS_02JAN2026.CSV": self.TEXTO,          # o mesmo que está solto
+            "CUPONS_03JAN2026.CSV": outro,
+            "leia-me.pdf": "não é relatório",
+        })
+        pasta = self._zip(tmp_path / "ERP_2026.zip", {
+            "ERP_2026/CUPONS_JAN2026.zip": "zip dentro de zip não se abre",
+            "ERP_2026/CUPONS_03JAN2026.CSV": outro,      # repete o do primeiro zip
+            "ERP_2026/Saidas_JAN2026.csv": self.TEXTO,
+        })
+        assert relatorios_do_lote([str(solto), mes, pasta]) == [
+            str(solto),
+            f"{mes}::CUPONS_03JAN2026.CSV",
+            f"{pasta}::ERP_2026/Saidas_JAN2026.csv",
+        ]
+
+    def test_zip_ilegivel_fica_de_fora_sem_derrubar_o_resto(self, tmp_path):
+        ruim = tmp_path / "CUPONS_MAR2026.zip"
+        ruim.write_bytes(b"isto nao e zip")
+        solto = tmp_path / "s.csv"
+        solto.write_text("x")
+        assert relatorios_do_lote([str(ruim), str(solto)]) == [str(solto)]

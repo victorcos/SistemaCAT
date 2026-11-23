@@ -60,6 +60,7 @@ from cat.infraestrutura.analitico.razao import (
     serializar,
 )
 from cat.infraestrutura.analitico.suportado import ARQUIVO_SUPORTADO, ApuracaoCancelada
+from cat.infraestrutura.arquivos.gerencial import relatorios_do_lote
 from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import (
     ArquivoDoLoteDB,
@@ -191,7 +192,9 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     movimentos, apuracao = _exigir_fontes(execucao.projeto_id, sessao)
     diario.base["movimentos_execucao_id"] = movimentos.id
     diario.base["apuracao_execucao_id"] = apuracao.id
-    relatorios = caminhos_do_projeto(execucao.projeto_id, GERENCIAIS_DE_MOVIMENTO, sessao)
+    # os CSV de dentro dos zips do lote também: o mês de cupons vem zipado
+    relatorios = relatorios_do_lote(caminhos_do_projeto(
+        execucao.projeto_id, GERENCIAIS_DE_MOVIMENTO + (TipoDeArquivo.COMPACTADO,), sessao))
     execucao.arquivos_totais = len(relatorios)
     diario.anotar("info", f"Rodada iniciada sobre a movimentação #{movimentos.id}, a apuração "
                           f"#{apuracao.id} e {len(relatorios)} relatórios do cliente.")

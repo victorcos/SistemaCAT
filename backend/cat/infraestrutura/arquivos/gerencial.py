@@ -23,9 +23,13 @@ duas coisas são contadas em separado.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import os
+import zipfile
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import IO
 
 from cat.dominio.gerencial.campos import Especie, Mapeamento, classificar, mapear
 from cat.dominio.gerencial.leiaute import Descarte, Leiaute, farejar
@@ -90,6 +94,115 @@ class Inspecao:
         }
 
 
+# ---------------------------------------------------------------------------
+# Relatório dentro de zip
+#
+# O cliente manda o mês de cupons num zip — 40 CSV de loja, 330 MB compactados
+# e 2,3 GB abertos. O lote registra o zip como "compactado" e, até 23/11/2026,
+# ninguém o abria: na empresa de varejo do projeto 1, só janeiro tinha sido
+# descompactado à mão, e a Ficha 3 de fevereiro a setembro saía sem venda de
+# PDV nenhuma — o saldo das lojas só subia.
+#
+# O membro é lido direto do zip, sem passar pelo disco (o mês aberto não cabe
+# no disco da máquina que roda a apuração). O endereço é "zip::membro": "::"
+# não aparece em caminho de Windows, onde ":" só existe depois da letra do
+# drive.
+# ---------------------------------------------------------------------------
+SEPARADOR_DO_ZIP = "::"
+EXTENSOES_DE_RELATORIO = (".csv", ".txt")
+
+
+def _partes(caminho: str) -> tuple[str, str | None]:
+    if SEPARADOR_DO_ZIP in caminho:
+        zip_, membro = caminho.split(SEPARADOR_DO_ZIP, 1)
+        return zip_, membro
+    return caminho, None
+
+
+@contextlib.contextmanager
+def _abrir_binario(caminho: str) -> Iterator[IO[bytes]]:
+    arquivo, membro = _partes(caminho)
+    if membro is None:
+        with open(arquivo, "rb") as f:
+            yield f
+        return
+    with zipfile.ZipFile(arquivo) as z, z.open(membro) as f:
+        yield f
+
+
+@contextlib.contextmanager
+def _abrir_texto(caminho: str, codificacao: str) -> Iterator[IO[str]]:
+    with _abrir_binario(caminho) as f:
+        yield io.TextIOWrapper(f, encoding=codificacao, errors="replace", newline="")
+
+
+def _sem_aspas(texto: str) -> str:
+    """``"02/01/2026"`` vira ``02/01/2026``.
+
+    Há ERP que põe todo campo entre aspas — o "Saídas" e o "Entradas" do
+    varejo do projeto 1. Sem tirá-las, nenhuma data convertia, a leitura
+    abortava por "registro inválido demais", e 27 relatórios por apuração
+    eram recusados inteiros. Aspas dobradas dentro do campo voltam a ser uma.
+
+    Separador **dentro** das aspas não é tratado de propósito: a linha fica com
+    campos a mais e cai no descarte por tamanho, que é a defesa de sempre deste
+    módulo — melhor descartada e contada do que alinhada na força.
+    """
+    t = texto.strip()
+    if len(t) >= 2 and t[0] == '"' and t[-1] == '"':
+        return t[1:-1].replace('""', '"')
+    return texto
+
+
+def relatorios_do_lote(caminhos: list[str]) -> list[str]:
+    """Os relatórios a ler: os soltos e os CSV/TXT de dentro dos zips, sem repetir.
+
+    **O mesmo relatório entra uma vez.** O cliente do projeto 1 mandou a pasta
+    solta *e* a mesma pasta zipada de novo (um zip de 4,7 GB), e o zip do
+    mês de janeiro *e* os CSV de janeiro já abertos. Lidos todos, a venda de
+    janeiro entraria duas vezes. "O mesmo" é mesmo nome e mesmo tamanho; o
+    solto vence o de dentro do zip, e o primeiro zip vence os seguintes.
+
+    Zip dentro de zip não é aberto: no caso real ele é cópia de um zip que o
+    lote já tem solto. Zip ilegível é registrado e deixado de lado — ele já
+    tinha sido classificado como "compactado", e ninguém contava com ele.
+    """
+    soltos = [c for c in caminhos if not _e_zip(c)]
+    vistos: set[tuple[str, int]] = set()
+    for c in soltos:
+        try:
+            vistos.add((os.path.basename(c).lower(), os.path.getsize(c)))
+        except OSError:
+            continue
+    saida = list(soltos)
+    for c in caminhos:
+        if not _e_zip(c):
+            continue
+        try:
+            with zipfile.ZipFile(c) as z:
+                membros = [i for i in z.infolist()
+                           if not i.is_dir() and i.filename.lower().endswith(EXTENSOES_DE_RELATORIO)]
+        except (OSError, zipfile.BadZipFile) as erro:
+            log.warning("zip de relatórios ilegível", extra={"arquivo": os.path.basename(c), "motivo": str(erro)})
+            continue
+        repetidos = 0
+        for info in membros:
+            chave = (os.path.basename(info.filename).lower(), info.file_size)
+            if chave in vistos:
+                repetidos += 1
+                continue
+            vistos.add(chave)
+            saida.append(f"{c}{SEPARADOR_DO_ZIP}{info.filename}")
+        log.info("relatórios dentro do zip", extra={"arquivo": os.path.basename(c),
+                                                    "relatorios": len(membros) - repetidos,
+                                                    "repetidos": repetidos})
+    return saida
+
+
+def _e_zip(caminho: str) -> bool:
+    return SEPARADOR_DO_ZIP not in caminho and caminho.lower().endswith(".zip")
+
+
 def _decodificar(bruto: bytes) -> tuple[str, str]:
     for cod in CODIFICACOES:
         try:
@@ -106,7 +219,7 @@ def inspecionar(caminho: str, especie: Especie | None = None) -> Inspecao:
     classificação automática erra — o caso de um relatório de movimento cujo
     ERP não exporta CFOP, por exemplo.
     """
-    with open(caminho, "rb") as f:
+    with _abrir_binario(caminho) as f:
         bruto = f.read(BYTES_PARA_FAREJAR)
     if not bruto.strip():
         raise RelatorioIlegivel(f"arquivo vazio: {os.path.basename(caminho)}")
@@ -159,8 +272,7 @@ class Leitura:
             )
 
         posicoes = m.posicoes
-        with open(insp.caminho, encoding=insp.codificacao,
-                  errors="replace", newline="") as f:
+        with _abrir_texto(insp.caminho, insp.codificacao) as f:
             for numero, linha in enumerate(f, start=1):
                 if numero <= leiaute.primeira_linha_de_dado:
                     continue
@@ -172,7 +284,7 @@ class Leitura:
                     self.descarte.registrar(numero, linha, len(campos))
                     continue
                 self.lidas += 1
-                yield numero, {ch: campos[i] for ch, i in posicoes.items()}
+                yield numero, {ch: _sem_aspas(campos[i]) for ch, i in posicoes.items()}
 
         self._encerrar()
 
