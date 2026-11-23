@@ -252,6 +252,81 @@ class TestAsFontes:
         assert r.saidas_por_origem == {"efd": 1}
 
 
+class TestRelatorioSemChave:
+    """O relatório de saídas do varejo do projeto 1: NF-e sem chave, loja pelo CNPJ.
+
+    Três linhas da loja A, todas sem chave:
+
+    * a transferência 11 de 06/01, que a EFD já tem com item (o relatório
+      escreve o número com zeros) — sai, a EFD vence;
+    * uma NF-e de 5.929 (a nota de um cupom) — sai, a venda está no cupom;
+    * uma baixa (5.927) que a EFD só tem sem item — entra, e de A, porque a
+      coluna da loja traz o CNPJ, ainda que não haja venda de PDV que o ensine.
+    """
+
+    @pytest.fixture
+    def montado(self, fontes, tmp_path):
+        base = {"cnpj_participante": "", "chave": "", "codigo": "X", "cst_icms": "060",
+                "valor": d(0), "suportado": d(0), "pdv": False, "unidade": A}
+        acrescentar_linhas(fontes.saidas_do_relatorio, [
+            {**base, "numero_documento": "000011", "data": date(2021, 1, 6), "cfop": "5152",
+             "quantidade": d(2)},
+            {**base, "numero_documento": "40841", "data": date(2021, 1, 6), "cfop": "5929",
+             "quantidade": d(3)},
+            {**base, "numero_documento": "40899", "data": date(2021, 1, 6), "cfop": "5927",
+             "quantidade": d(1)},
+        ])
+        destino = tmp_path / "sem_chave"
+        destino.mkdir()
+        return destino, montar(fontes, str(destino), uf_por_cnpj={A: "SP", B: "SP"})
+
+    def test_a_nota_com_item_na_efd_nao_entra_de_novo(self, montado):
+        destino, r = montado
+        # a da fixture, pela chave, e esta, por loja, número e data
+        assert r.relatorio_trocado_pela_efd == 2
+        assert len([l for l in ficha(destino) if l["cfop"] == "5152"]) == 1
+
+    def test_a_nota_do_cupom_nao_tira_do_estoque(self, montado):
+        destino, r = montado
+        assert r.relatorio_registrado_em_cupom == 1
+        assert not [l for l in ficha(destino) if l["cfop"] == "5929"]
+        assert serializar(r)["pendencias"]["relatorio_registrado_em_cupom"] == 1
+
+    def test_a_baixa_sem_item_na_efd_entra_pela_loja_do_relatorio(self, montado):
+        destino, _ = montado
+        baixas = [l for l in ficha(destino) if l["cfop"] == "5927"]
+        assert len(baixas) == 1
+        assert baixas[0]["origem"] == "relatorio" and baixas[0]["cnpj"] == A
+
+
+class TestAMesmaLinhaEmDoisRelatorios:
+    """As "quebras" de um ERP de varejo são as baixas que as "Saídas" já
+    trazem. A linha repetida em outro relatório conta uma vez; a repetida
+    dentro do mesmo relatório é dado dele e fica (o mesmo item pesado duas
+    vezes na mesma nota)."""
+
+    CABECALHO = '"CNPJ_LOJA";"NUM_DOC";"DATA_EMISSAO";"COD_CFOP";"COD_PRODUTO";"QUANTIDADE";"VLRITEM";"CST";"VLR_ICMS";"VLR_IMPOSTO_ICMS_ST"'
+
+    @staticmethod
+    def linha(qtd: str) -> str:
+        return f'"{A}";"123";"28/01/2026";"5927";"X";"{qtd}";"10,00";"060";"0";"0"'
+
+    def test_conta_uma_vez(self, tmp_path):
+        from cat.infraestrutura.analitico.razao import extrair_saidas
+        saidas = tmp_path / "Saidas_JAN2026.csv"
+        quebras = tmp_path / "quebras_JAN2026.csv"
+        saidas.write_text("\n".join([self.CABECALHO, self.linha("1,5"), self.linha("1,5"),
+                                     self.linha("2")]), encoding="latin-1")
+        quebras.write_text("\n".join([self.CABECALHO, self.linha("1,5"), self.linha("3")]),
+                           encoding="latin-1")
+        destino = tmp_path / "saidas.parquet"
+        r = extrair_saidas([str(saidas), str(quebras)], str(destino))
+        quantidades = sorted(x["quantidade"] for x in pq.read_table(str(destino)).to_pylist())
+        # as duas de 1,5 da mesma nota ficam; a terceira, das quebras, sai
+        assert quantidades == [d("1.5"), d("1.5"), d(2), d(3)]
+        assert r.repetidas_entre_relatorios == 1 and r.linhas == 4
+
+
 class TestVendaAConsumidor:
     """A escolha do trabalho: o cupom no enquadramento 1 (o manual) ou no 0 (a empresa 17)."""
 

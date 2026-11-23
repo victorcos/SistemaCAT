@@ -113,6 +113,7 @@ from cat.dominio.icms.cat42.correcao import Campo
 from cat.dominio.icms.cat42.enquadramento import (
     CFOP_DEVOLUCAO,
     CFOP_OUTRAS_X949,
+    CFOP_REGISTRADO_EM_CUPOM,
     CFOP_TRANSFERENCIA_RECEBIDA,
     CFOP_USO_E_CONSUMO,
     VendaAConsumidor,
@@ -318,6 +319,8 @@ class SaidasExtraidas:
     so_de_entradas: int = 0
     recusados: int = 0
     linhas: int = 0
+    # a mesma linha já vinda de outro relatório (as "quebras" dentro das "Saídas")
+    repetidas_entre_relatorios: int = 0
 
 
 def extrair_saidas(
@@ -376,10 +379,27 @@ def extrair_saidas(
         if arquivos:
             con = _leitura(partes)
             try:
+                # **A mesma linha em dois relatórios conta uma vez.** O varejo
+                # do projeto 1 manda "quebras" e "Saídas", e as quebras são as
+                # baixas (5.927) que as Saídas já trazem: 77.539 das 78.017
+                # linhas de janeiro eram idênticas. A linha fica com o primeiro
+                # relatório que a tem; repetição DENTRO de um relatório é dado
+                # dele (o pão francês pesado duas vezes no mesmo cupom) e fica.
+                chave = ("unidade, chave, numero_documento, codigo, data, cfop, "
+                         "quantidade, valor")
                 con.execute(f"""
-                    COPY (SELECT * FROM read_parquet('{_escapar(os.path.join(partes, "*.parquet"))}'))
+                    CREATE TABLE linhas AS
+                    SELECT *, filename = min(filename) OVER (PARTITION BY {chave}) AS fica
+                    FROM read_parquet('{_escapar(os.path.join(partes, "*.parquet"))}',
+                                      filename = true)
+                """)
+                r.repetidas_entre_relatorios = con.execute(
+                    "SELECT count(*) FROM linhas WHERE NOT fica").fetchone()[0]
+                con.execute(f"""
+                    COPY (SELECT * EXCLUDE (filename, fica) FROM linhas WHERE fica)
                     TO '{_escapar(destino)}' (FORMAT PARQUET, COMPRESSION ZSTD)
                 """)
+                r.linhas -= r.repetidas_entre_relatorios
             finally:
                 con.close()
         else:
@@ -511,6 +531,8 @@ class ResumoDaMontagem:
     fichas_fora_de_sp: int = 0
     relatorio_sem_estabelecimento: int = 0
     relatorio_trocado_pela_efd: int = 0
+    # linhas de 5.929/6.929 do relatório: a venda já está no cupom
+    relatorio_registrado_em_cupom: int = 0
     quantidade_negativa: int = 0
     fichas_retiradas: int = 0
     linhas_retiradas: int = 0
@@ -570,6 +592,7 @@ def montar(
         resumo.codigos_com_st = info["codigos"]
         resumo.relatorio_sem_estabelecimento = info["sem_estabelecimento"]
         resumo.relatorio_trocado_pela_efd = info["trocado_pela_efd"]
+        resumo.relatorio_registrado_em_cupom = info["registrado_em_cupom"]
         resumo.abertura_sem_fator = info["abertura_sem_fator"]
         resumo.saidas_com_aliquota_do_mes = con.execute(
             "SELECT count(*) FROM lancamentos WHERE especie = 'saida' AND NOT devolucao "
@@ -1017,7 +1040,7 @@ def _preparar(con, fontes: Fontes) -> dict:
         FROM {mov} s WHERE s.operacao = 'saida'
     """)
 
-    sem_estab = trocado = 0
+    sem_estab = trocado = do_cupom = 0
     if tem_rel:
         con.execute(f"""
             CREATE OR REPLACE TABLE rel AS
@@ -1026,6 +1049,11 @@ def _preparar(con, fontes: Fontes) -> dict:
                             THEN substr(r.chave, 7, 14)
                         WHEN r.pdv AND r.cnpj_participante IN (SELECT cnpj FROM estabs)
                             THEN r.cnpj_participante
+                        -- o relatório que traz a loja como CNPJ diz direto de
+                        -- quem é a linha. Sem isto, a loja que não tem venda de
+                        -- PDV (o CD) não aprendia o próprio CNPJ de ninguém e
+                        -- as baixas dela iam para "sem estabelecimento"
+                        WHEN r.unidade IN (SELECT cnpj FROM estabs) THEN r.unidade
                    END AS cnpj_direto
             FROM read_parquet('{_escapar(rel)}') r
             WHERE r.data BETWEEN DATE '{inicio}' AND DATE '{fim}'
@@ -1041,11 +1069,32 @@ def _preparar(con, fontes: Fontes) -> dict:
             FROM rel r LEFT JOIN unidade_cnpj u ON u.unidade = r.unidade
         """)
         sem_estab = con.execute("SELECT count(*) FROM rel_com_cnpj WHERE cnpj IS NULL").fetchone()[0]
-        # documento da EFD vence o relatório: a nota que tem item lá não entra duas vezes
-        trocado = con.execute("""
-            SELECT count(*) FROM rel_com_cnpj
-            WHERE length(chave) = 44 AND chave IN (SELECT chave FROM saidas_efd WHERE length(chave) = 44)
-        """).fetchone()[0]
+        # documento da EFD vence o relatório: a nota que tem item lá não entra
+        # duas vezes. Pela chave, e — para o relatório que não traz chave — por
+        # estabelecimento, número e data. Sem a segunda regra, as transferências
+        # das "Saídas" do varejo do projeto 1 (98 mil linhas em janeiro, todas
+        # com XML na base) entrariam em dobro. A série não entra na conta: o
+        # relatório a escreve diferente da EFD ("3" contra "003") e só 80 de
+        # 163 mil batiam. Número e data na mesma loja já separam a nota.
+        con.execute(f"""
+            CREATE OR REPLACE TABLE notas_com_item AS
+            SELECT DISTINCT cnpj, ltrim(numero_documento, '0') AS numero, data
+            FROM saidas_efd WHERE coalesce(numero_documento, '') <> ''
+        """)
+        con.execute(f"""
+            CREATE OR REPLACE TABLE rel_com_cnpj AS
+            SELECT r.*,
+                   CASE WHEN length(r.chave) = 44
+                            THEN r.chave IN (SELECT chave FROM saidas_efd WHERE length(chave) = 44)
+                        ELSE (r.cnpj, ltrim(r.numero_documento, '0'), r.data) IN
+                             (SELECT (cnpj, numero, data) FROM notas_com_item)
+                   END AS ja_na_efd,
+                   replace(r.cfop, '.', '') IN ({lista(CFOP_REGISTRADO_EM_CUPOM)}) AS do_cupom
+            FROM rel_com_cnpj r
+        """)
+        trocado = con.execute("SELECT count(*) FROM rel_com_cnpj WHERE ja_na_efd").fetchone()[0]
+        do_cupom = con.execute(
+            "SELECT count(*) FROM rel_com_cnpj WHERE do_cupom AND NOT ja_na_efd").fetchone()[0]
         con.execute("""
             CREATE OR REPLACE TABLE saidas_rel AS
             SELECT cnpj, codigo, data, cfop, cst_icms,
@@ -1062,9 +1111,8 @@ def _preparar(con, fontes: Fontes) -> dict:
                    NULL::INTEGER AS numero_item, '' AS participante, numero_documento,
                    NULL::VARCHAR AS serie, CASE WHEN pdv THEN true END AS consumidor_final
             FROM rel_com_cnpj
-            WHERE cnpj IS NOT NULL
-              AND NOT (length(chave) = 44
-                       AND chave IN (SELECT chave FROM saidas_efd WHERE length(chave) = 44))
+            -- a NF-e de 5.929 é papel de uma venda que o cupom já contou
+            WHERE cnpj IS NOT NULL AND NOT ja_na_efd AND NOT do_cupom
         """)
         saidas = "(SELECT * FROM saidas_efd UNION ALL BY NAME SELECT * FROM saidas_rel)"
     else:
@@ -1238,6 +1286,7 @@ def _preparar(con, fontes: Fontes) -> dict:
     return {"inicio": inicio, "fim": fim, "abertura_em": abertura_em, "codigos": codigos,
             "correcoes": correcoes,
             "sem_estabelecimento": sem_estab, "trocado_pela_efd": trocado,
+            "registrado_em_cupom": do_cupom,
             "abertura_sem_fator": abertura_sem_fator, "uso_e_consumo": uso_e_consumo, "x949": x949,
             "base_inicio": base_inicio, "base_fim": base_fim}
 
@@ -2054,6 +2103,7 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
             "fichas_fora_de_sp": resumo.fichas_fora_de_sp,
             "relatorio_sem_estabelecimento": resumo.relatorio_sem_estabelecimento,
             "relatorio_trocado_pela_efd": resumo.relatorio_trocado_pela_efd,
+            "relatorio_registrado_em_cupom": resumo.relatorio_registrado_em_cupom,
             "linhas_com_depara": resumo.linhas_com_depara,
             "codigos_trocados_pelo_depara": resumo.codigos_trocados_pelo_depara,
             "quantidade_negativa": resumo.quantidade_negativa,

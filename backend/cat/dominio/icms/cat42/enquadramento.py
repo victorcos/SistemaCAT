@@ -111,6 +111,13 @@ CFOP_DEVOLUCAO = frozenset({
     "6201", "6202", "6410", "6411",
 })
 
+# Lançamento de documento relativo a operação também registrada em cupom
+# (ECF/NFC-e). A mercadoria saiu uma vez só — no cupom; a NF-e é o papel que o
+# cliente pediu depois. No relatório de saídas do varejo do projeto 1 eram 25
+# mil linhas em janeiro de 2026, e cada uma já estava no relatório de cupons:
+# contar as duas tiraria do estoque o dobro do que foi vendido.
+CFOP_REGISTRADO_EM_CUPOM = frozenset({"5929", "6929"})
+
 # Uso e consumo. Não entra no estoque de comercialização que a Ficha 3 controla:
 # a compra para consumo (1.407, 1.556), a transferência de material de consumo
 # (1.557) e as devoluções e saídas correspondentes. Na empresa 19 eram 366 linhas
