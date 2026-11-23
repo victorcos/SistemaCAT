@@ -9422,3 +9422,50 @@ Como o razão aplica:
 O cliente fica avisado: o § 4º obriga quem dá a saída a informar o retido na
 nota. Valorar pelo remetente resolve o passado; o certo daqui em diante é a
 nota de transferência já sair com ele.
+
+## 2026-11-23 — Relatório do ERP entre aspas, dentro de zip, e sem chave
+
+**O problema.** Numa rede de varejo, a Ficha 3 de fevereiro a setembro saía
+sem venda de PDV nenhuma, e o saldo das lojas só subia. Eram três defeitos na
+leitura dos relatórios do cliente, um escondendo o outro:
+
+* **o mês de cupons vinha zipado.** O lote registra o zip como "compactado" e
+  ninguém o abria. Só janeiro tinha sido descompactado à mão;
+* **o "Saídas", o "Entradas" e o "quebras" do ERP põem todo campo entre
+  aspas.** Nenhuma data convertia, a leitura abortava por "registro inválido
+  demais" e os 27 relatórios do período eram recusados inteiros;
+* **três colunas casavam errado.** LOJA (o número interno) levava o
+  estabelecimento no lugar de CNPJ_LOJA, o parcial "emb" levava QTDEMBALAGEM
+  no lugar de UND_MEDIDA, e VLRITEM e BASE_CALCULO_ICMS_ST não casavam.
+
+**A decisão.** O leitor abre o CSV de dentro do zip direto, sem descompactar
+no disco, onde o mês aberto (2,3 GB) não cabe. O endereço do membro é
+`zip::membro`. O leitor também tira as aspas do campo. As colunas ganham
+sinônimos **exatos**, que vencem os parciais sem mexer no que já casava.
+
+Ler mais relatórios pedia três regras para não contar a mesma saída duas vezes:
+
+1. **O mesmo relatório entra uma vez**, sendo "o mesmo" o mesmo nome e o mesmo
+   tamanho. O solto vence o de dentro do zip. O cliente mandou os CSV de
+   janeiro abertos, o zip de janeiro e a pasta inteira zipada de novo. Zip
+   dentro de zip não se abre, porque era cópia do que o lote já tinha solto.
+2. **A mesma linha em dois relatórios conta uma vez.** As "quebras" são as
+   baixas (5.927) que as "Saídas" já trazem: 77.539 das 78.017 linhas de
+   janeiro eram idênticas. A repetição dentro de um mesmo relatório fica,
+   porque é dado dele.
+3. **A nota que já tem item na EFD ou no XML não entra pelo relatório**, como
+   já era pela chave. Para o relatório sem chave, a comparação é por
+   estabelecimento, número e data. Em janeiro, as transferências do relatório
+   (5.152 e 5.409, 163 mil linhas) estavam todas na base com XML. A série fica
+   de fora porque o ERP a escreve diferente da EFD. **O que a EFD tem sem item
+   o relatório completa**: baixas, devoluções de compra e 5.949, sem os quais
+   o estoque da ficha não baixa.
+
+E o CFOP **5.929/6.929** (documento de operação já registrada em cupom) não
+tira do estoque (`CFOP_REGISTRADO_EM_CUPOM`): a mercadoria saiu no cupom, e a
+NF-e é o papel que o consumidor pediu depois. Foram 25 mil linhas em janeiro.
+O resumo da montagem conta essas linhas em `relatorio_registrado_em_cupom`.
+
+Por fim, o relatório que traz a loja como CNPJ da empresa diz direto de quem é
+a linha. Antes só a venda de PDV ensinava o CNPJ de cada loja, e o CD, que não
+tem PDV, mandava as baixas dele para "sem estabelecimento".
