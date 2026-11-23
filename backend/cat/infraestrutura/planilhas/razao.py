@@ -40,6 +40,7 @@ a Ficha 3 de milhões de linhas continua saindo com memória constante.
 from __future__ import annotations
 
 import os
+from uuid import uuid4
 
 import duckdb
 import pyarrow.parquet as pq
@@ -189,7 +190,15 @@ def _derivado(parquet: str, destino: str) -> str:
         if coluna.campo not in DERIVACAO and coluna.campo not in tem:
             expressao = "NULL"
         partes.append(f'{expressao} AS "{coluna.campo}"')
-    rascunho = os.path.join(_pasta_de_rascunho(destino), "ficha3_leiaute.parquet")
+    # **nome exclusivo, não `ficha3_leiaute.parquet`.** O rascunho fica na pasta
+    # do destino, e duas Fichas 3 geradas ao mesmo tempo para a mesma pasta
+    # disputavam este arquivo: a melhor saída era o `IOException: Could not move
+    # file` que derrubou a exportação por filial da empresa 17 em 23/11/2026, e
+    # a pior era uma ler o derivado que a outra acabara de escrever — planilha
+    # com o nome de uma filial e os lançamentos de outra, sem erro nenhum.
+    # É a mesma lição de `materializando`, que já resolveu isso na escrita.
+    rascunho = os.path.join(_pasta_de_rascunho(destino),
+                            f"ficha3_leiaute.{uuid4().hex}.parquet")
     con = duckdb.connect()
     try:
         con.execute("SET threads TO 4")

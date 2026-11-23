@@ -327,3 +327,45 @@ class TestOAndamentoDaGeracao:
         tudo funciona igual."""
         linhas = gerar_ficha3(str(ficha3), str(tmp_path / "ficha3.xlsx"))
         assert linhas == 3
+
+
+class TestDuasGeracoesNaMesmaPasta:
+    """O rascunho do leiaute mora na pasta do destino, e duas Fichas 3 pedidas
+    ao mesmo tempo para a mesma pasta disputavam o mesmo nome de arquivo.
+
+    A melhor saída disso era o `IOException: Could not move file` que derrubou a
+    exportação por filial da empresa 17 em 23/11/2026. A pior era uma leitura
+    pegar o derivado que a outra acabara de escrever: planilha com o nome de uma
+    filial e os lançamentos de outra, sem erro nenhum para denunciar.
+    """
+
+    def _ficha_de(self, tmp_path, nome: str, codigo: str):
+        caminho = tmp_path / f"{nome}.parquet"
+        linhas = [_linha(codigo=codigo)]
+        pq.write_table(pa.Table.from_pydict(
+            {c: [l[c] for l in linhas] for c in ESQUEMA_FICHA3.names},
+            schema=ESQUEMA_FICHA3), str(caminho))
+        return caminho
+
+    def test_cada_planilha_sai_com_o_seu_proprio_conteudo(self, tmp_path):
+        from concurrent.futures import ThreadPoolExecutor
+
+        pasta = tmp_path / "entrega"
+        pasta.mkdir()
+        pedidos = [(self._ficha_de(tmp_path, f"origem{i}", f"COD{i}"),
+                    pasta / f"ficha3_{i}.xlsx") for i in range(4)]
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            escritas = list(executor.map(
+                lambda p: gerar_ficha3(str(p[0]), str(p[1])), pedidos))
+
+        assert escritas == [1, 1, 1, 1]
+        for i, (_, destino) in enumerate(pedidos):
+            aba = openpyxl.load_workbook(str(destino), read_only=True).active
+            codigo = aba.cell(row=4, column=_coluna(aba, "Código da Mercadoria")).value
+            assert codigo == f"COD{i}", f"{destino.name} saiu com os dados de outra ficha"
+
+    def test_o_rascunho_nao_fica_para_tras(self, ficha3, tmp_path):
+        pasta = tmp_path / "entrega"
+        pasta.mkdir()
+        gerar_ficha3(str(ficha3), str(pasta / "ficha3.xlsx"))
+        assert [a.name for a in pasta.iterdir()] == ["ficha3.xlsx"]
