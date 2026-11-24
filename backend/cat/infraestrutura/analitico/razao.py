@@ -385,21 +385,39 @@ def extrair_saidas(
                 # linhas de janeiro eram idênticas. A linha fica com o primeiro
                 # relatório que a tem; repetição DENTRO de um relatório é dado
                 # dele (o pão francês pesado duas vezes no mesmo cupom) e fica.
-                chave = ("unidade, chave, numero_documento, codigo, data, cfop, "
-                         "quantidade, valor")
+                #
+                # **Sem montar a rede inteira numa tabela.** A primeira versão
+                # (23/11/2026) fazia uma janela sobre todas as linhas e estourou
+                # 11,5 GB de temporário nos cupons de nove meses da rede toda.
+                # Agora cada linha vira uma impressão de 128 bits (md5 dos oito
+                # campos) e o número do relatório; o agrupamento guarda só as
+                # impressões que aparecem em MAIS de um relatório, com o menor
+                # número — pouca coisa — e a cópia final é um passe só, em
+                # fluxo, que solta a linha cuja impressão é repetida e não é do
+                # relatório que fica.
+                campos = ("unidade", "chave", "numero_documento", "codigo", "data", "cfop",
+                          "quantidade", "valor")
+                impressao = "md5_number(concat_ws(chr(31), {}))".format(", ".join(
+                    f"coalesce(CAST({c} AS VARCHAR), chr(30))" for c in campos))
+                numero = r"CAST(regexp_extract(filename, '(\d+)\.parquet$', 1) AS INTEGER)"
+                origem = (f"read_parquet('{_escapar(os.path.join(partes, '*.parquet'))}', "
+                          "filename = true)")
                 con.execute(f"""
-                    CREATE TABLE linhas AS
-                    SELECT *, filename = min(filename) OVER (PARTITION BY {chave}) AS fica
-                    FROM read_parquet('{_escapar(os.path.join(partes, "*.parquet"))}',
-                                      filename = true)
+                    CREATE TABLE repetidas AS
+                    SELECT h, min(n) AS fica FROM (
+                        SELECT {impressao} AS h, {numero} AS n FROM {origem})
+                    GROUP BY h HAVING min(n) <> max(n)
                 """)
-                r.repetidas_entre_relatorios = con.execute(
-                    "SELECT count(*) FROM linhas WHERE NOT fica").fetchone()[0]
-                con.execute(f"""
-                    COPY (SELECT * EXCLUDE (filename, fica) FROM linhas WHERE fica)
-                    TO '{_escapar(destino)}' (FORMAT PARQUET, COMPRESSION ZSTD)
-                """)
-                r.linhas -= r.repetidas_entre_relatorios
+                gravadas = con.execute(f"""
+                    COPY (
+                        SELECT l.* EXCLUDE (filename, h, n) FROM (
+                            SELECT *, {impressao} AS h, {numero} AS n FROM {origem}) l
+                        LEFT JOIN repetidas r ON l.h = r.h
+                        WHERE r.h IS NULL OR l.n = r.fica
+                    ) TO '{_escapar(destino)}' (FORMAT PARQUET, COMPRESSION ZSTD)
+                """).fetchone()[0]
+                r.repetidas_entre_relatorios = r.linhas - gravadas
+                r.linhas = gravadas
             finally:
                 con.close()
         else:
