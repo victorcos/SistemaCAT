@@ -1275,6 +1275,11 @@ def rede(tmp_path):
          "quantidade": d(3), "chave": chave_de(LOJA_B, 3), "numero_documento": "13"},
         {**base_mov, "cnpj": LOJA_C, "operacao": "entrada", "data": date(2021, 1, 10), "cfop": "1152",
          "quantidade": d(3), "chave": chave_de(LOJA_B, 3), "numero_documento": "13"},
+        # um produto que ninguém comprou com destaque: a transferência fica para estimar
+        {**base_mov, "codigo": "Y", "cnpj": LOJA_B, "operacao": "entrada", "data": date(2021, 1, 7),
+         "cfop": "1152", "quantidade": d(2), "chave": chave_de(CD, 4), "numero_documento": "14"},
+        {**base_mov, "codigo": "Y", "cnpj": LOJA_B, "operacao": "saida", "data": date(2021, 1, 11),
+         "cfop": "5405", "quantidade": d(1), "chave": chave_de(LOJA_B, 5), "numero_documento": "15"},
     ]
     gravar(mov / ARQUIVO_MOVIMENTOS, [
         ("cnpj", pa.string()), ("competencia", pa.date32()), ("operacao", pa.string()),
@@ -1288,8 +1293,8 @@ def rede(tmp_path):
     gravar(mov / ARQUIVO_ITENS, [
         ("cnpj", pa.string()), ("codigo", pa.string()), ("descricao", pa.string()),
         ("unidade", pa.string()), ("aliq_icms", pa.decimal128(9, 4)),
-    ], [{"cnpj": c, "codigo": "X", "descricao": "Detergente 500ml", "unidade": "UN", "aliq_icms": d(18)}
-        for c in (CD, LOJA_B, LOJA_C)])
+    ], [{"cnpj": c, "codigo": k, "descricao": "Detergente 500ml", "unidade": "UN", "aliq_icms": d(18)}
+        for c in (CD, LOJA_B, LOJA_C) for k in ("X", "Y")])
     # a apuração da etapa 4: as compras do CD com o retido, as três transferências sem
     gravar(apu / ARQUIVO_SUPORTADO, [
         ("cnpj", pa.string()), ("codigo", pa.string()), ("data", pa.date32()), ("cfop", pa.string()),
@@ -1297,7 +1302,7 @@ def rede(tmp_path):
         ("suportado", pa.decimal128(18, 6)), ("chave", pa.string()), ("numero_documento", pa.string()),
         ("numero_item", pa.int32()), ("participante", pa.string()),
     ], [
-        {"cnpj": m["cnpj"], "codigo": "X", "data": m["data"], "cfop": m["cfop"], "cst_icms": "060",
+        {"cnpj": m["cnpj"], "codigo": m["codigo"], "data": m["data"], "cfop": m["cfop"], "cst_icms": "060",
          "modelo": "55", "quantidade": m["quantidade"], "chave": m["chave"],
          "numero_documento": m["numero_documento"], "numero_item": 1,
          "suportado": {"1": d(20), "2": d(40)}.get(m["numero_documento"], d(0))}
@@ -1311,21 +1316,51 @@ def rede(tmp_path):
 
 
 class TestTransferenciaSemRetido:
-    def test_vale_as_entradas_mais_recentes_do_remetente_em_cadeia(self, rede):
+    """Decisão de 25/11/2026: o destaque da própria filial primeiro, depois o
+    do remetente e o de outra filial da mesma UF; sem nenhum, a linha fica
+    marcada para estimar. Uma transferência valorada não serve de destaque."""
+
+    def test_sem_destaque_na_filial_vale_o_remetente_e_depois_outra_filial(self, rede):
         destino, _ = rede
-        entradas = {(l["cnpj"], l["data"]): l["icms_suportado"] for l in ficha(destino)
+        entradas = {(l["cnpj"], l["codigo"], l["data"]): l["icms_suportado"] for l in ficha(destino)
                     if l["especie"] == "entrada"}
-        assert entradas[(LOJA_B, date(2021, 1, 6))] == d(8)
-        assert entradas[(LOJA_B, date(2021, 1, 9))] == d(44)
-        assert entradas[(LOJA_C, date(2021, 1, 10))] == d(11)
+        # a loja B não comprou com destaque: vale o CD, que a abasteceu
+        assert entradas[(LOJA_B, "X", date(2021, 1, 6))] == d(8)
+        assert entradas[(LOJA_B, "X", date(2021, 1, 9))] == d(44)
+        # a loja C recebeu da loja B, que só tem transferências — que não são
+        # destaque: vale a nota mais próxima de outra filial de SP, a do CD de
+        # 08/01 (R$ 40 por 10 un; 3 un = R$ 12). Até 25/11/2026 a cadeia dava 11
+        assert entradas[(LOJA_C, "X", date(2021, 1, 10))] == d(12)
         # a compra do CD continua com o retido que a nota trouxe
-        assert entradas[(CD, date(2021, 1, 5))] == d(20)
+        assert entradas[(CD, "X", date(2021, 1, 5))] == d(20)
+        # sem destaque em filial nenhuma, nada é estimado
+        assert entradas[(LOJA_B, "Y", date(2021, 1, 7))] == d(0)
 
     def test_a_prova_fica_gravada_e_contada(self, rede):
         from cat.infraestrutura.analitico.razao import ARQUIVO_TRANSFERENCIAS_VALORADAS  # noqa: PLC0415
         destino, resumo = rede
         prova = pq.read_table(str(destino / ARQUIVO_TRANSFERENCIAS_VALORADAS)).to_pylist()
-        assert [(p["cnpj"], p["remetente"], p["entradas_usadas"]) for p in prova] == [
-            (LOJA_B, CD, 1), (LOJA_B, CD, 2), (LOJA_C, LOJA_B, 1)]
+        assert sorted((p["cnpj"], p["codigo"], p["remetente"], p["entradas_usadas"], p["criterio"],
+                       p["filial_do_destaque"]) for p in prova) == sorted([
+            (LOJA_B, "X", CD, 1, "remetente_anterior", CD),
+            (LOJA_B, "X", CD, 2, "remetente_anterior", CD),
+            (LOJA_C, "X", LOJA_B, 1, "outra_filial_anterior", CD),
+            (LOJA_B, "Y", CD, 0, "precisa_estimar", None),
+        ])
         assert (resumo.transferencias_valoradas, resumo.transferencias_parciais,
-                resumo.transferencias_sem_entrada, resumo.icms_das_transferencias) == (3, 0, 0, d(63))
+                resumo.transferencias_sem_entrada, resumo.icms_das_transferencias) == (3, 0, 1, d(64))
+        assert resumo.transferencias_por_criterio == {
+            "remetente_anterior": 2, "outra_filial_anterior": 1, "precisa_estimar": 1}
+
+    def test_a_ficha_3_mostra_o_criterio_a_filial_e_a_marca_de_estimar(self, rede):
+        destino, _ = rede
+        linhas = {(l["cnpj"], l["codigo"], l["data"]): l for l in ficha(destino) if l["especie"] == "entrada"}
+        c = linhas[(LOJA_C, "X", date(2021, 1, 10))]
+        assert (c["criterio_do_suportado"], c["filial_do_destaque"], c["suportado_a_estimar"]) == (
+            "outra_filial_anterior", CD, False)
+        y = linhas[(LOJA_B, "Y", date(2021, 1, 7))]
+        assert (y["criterio_do_suportado"], y["filial_do_destaque"], y["suportado_a_estimar"]) == (
+            "precisa_estimar", None, True)
+        # a compra com destaque não leva critério nenhum
+        cd = linhas[(CD, "X", date(2021, 1, 5))]
+        assert (cd["criterio_do_suportado"], cd["suportado_a_estimar"]) == (None, False)

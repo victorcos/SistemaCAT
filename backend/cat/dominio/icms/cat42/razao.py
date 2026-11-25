@@ -20,6 +20,8 @@ que entra no estoque e sai na baixa.
 
 from __future__ import annotations
 
+from bisect import bisect_right
+
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
@@ -301,11 +303,17 @@ def valor_da_abertura(quantidade: Decimal, entradas) -> ValorDaAbertura:
     valorado pela média das que alcançaram, e `coberta` diz quanto foi de fato
     coberto. Sem entrada nenhuma, o valor é zero e a ficha fica sinalizada.
     """
+    return _compor(quantidade, sorted(entradas, key=lambda e: (e.data, e.ordem), reverse=True))
+
+
+def _compor(quantidade: Decimal, entradas_em_ordem) -> ValorDaAbertura:
+    """Usa as entradas NA ORDEM DADA até cobrir a quantidade, com média
+    ponderada quando uma não basta (item 3.3.8)."""
     if quantidade <= ZERO:
         return ValorDaAbertura(ZERO, ZERO, quantidade)
     restante = quantidade
     valor = ZERO
-    for e in sorted(entradas, key=lambda e: (e.data, e.ordem), reverse=True):
+    for e in entradas_em_ordem:
         if restante <= ZERO:
             break
         if e.quantidade <= ZERO:
@@ -339,6 +347,177 @@ def valor_pelas_entradas_do_remetente(quantidade: Decimal, entradas_do_remetente
     alcançou a quantidade.
     """
     return valor_da_abertura(quantidade, entradas_do_remetente)
+
+
+# ---------------------------------------------------------------------------
+# transferência recebida sem o retido: de onde vem o destaque
+# ---------------------------------------------------------------------------
+# Decisão do Victor, 25/11/2026. Até aqui a transferência sem retido era sempre
+# valorada pelas entradas mais recentes do REMETENTE (§ 5º). Na conferência da
+# Ficha 3 do projeto 1 (um item de uma loja) o valor não batia com a entrada
+# destacada mais próxima da própria loja, porque a do CD vencia por estar mais
+# perto no tempo. A ordem passa a ser:
+#   1º o destaque do mesmo produto NA MESMA FILIAL, até 6 meses para trás
+#      (prioridade) ou, se não houver, até 6 meses para frente;
+#   2º sem destaque na filial, o de outra filial DA MESMA UF — primeiro o
+#      remetente, depois a filial com o destaque mais próximo —, na mesma
+#      janela, e a linha diz de que filial ele veio;
+#   3º sem destaque nenhum, nada é estimado: a linha fica marcada para estimar.
+# A composição não muda: as entradas da janela, a partir da mais próxima, até
+# cobrir a quantidade, com média ponderada quando uma nota não basta.
+# "Destaque" é o retido que a nota trouxe: uma transferência valorada por esta
+# regra não serve de destaque para outra.
+JANELA_DO_DESTAQUE_EM_MESES = 6
+
+
+class CriterioDoSuportado(str, Enum):
+    MESMA_FILIAL_ANTERIOR = "mesma_filial_anterior"
+    MESMA_FILIAL_POSTERIOR = "mesma_filial_posterior"
+    REMETENTE_ANTERIOR = "remetente_anterior"
+    REMETENTE_POSTERIOR = "remetente_posterior"
+    OUTRA_FILIAL_ANTERIOR = "outra_filial_anterior"
+    OUTRA_FILIAL_POSTERIOR = "outra_filial_posterior"
+    PRECISA_ESTIMAR = "precisa_estimar"
+
+    @property
+    def rotulo(self) -> str:
+        return _ROTULO_DO_CRITERIO[self.value]
+
+
+_ROTULO_DO_CRITERIO = {
+    "mesma_filial_anterior": "Mesma filial, até 6 meses antes",
+    "mesma_filial_posterior": "Mesma filial, até 6 meses depois",
+    "remetente_anterior": "Filial remetente, até 6 meses antes",
+    "remetente_posterior": "Filial remetente, até 6 meses depois",
+    "outra_filial_anterior": "Outra filial da mesma UF, até 6 meses antes",
+    "outra_filial_posterior": "Outra filial da mesma UF, até 6 meses depois",
+    "precisa_estimar": "Sem destaque: precisa estimar",
+}
+
+
+def somar_meses(dia: date, meses: int) -> date:
+    """`dia` deslocado de `meses` (negativo volta), no último dia do mês quando
+    o dia não existe nele (31/08 - 6 meses = 28/02)."""
+    total = dia.year * 12 + dia.month - 1 + meses
+    ano, mes = divmod(total, 12)
+    mes += 1
+    seguinte = date(ano + (mes == 12), mes % 12 + 1, 1)
+    ultimo = (seguinte - date.resolution).day
+    return date(ano, mes, min(dia.day, ultimo))
+
+
+@dataclass(frozen=True)
+class DestaquesDaFilial:
+    """As entradas COM destaque de um produto numa filial, em ordem de data."""
+
+    entradas: list
+    datas: list = field(default_factory=list)
+
+    def __post_init__(self):
+        if not self.datas:
+            object.__setattr__(self, "datas", [e.data for e in self.entradas])
+
+    def anteriores(self, dia: date) -> list:
+        """Da mais recente até `dia` (inclusive) para trás, dentro da janela."""
+        inicio = somar_meses(dia, -JANELA_DO_DESTAQUE_EM_MESES)
+        achadas = []
+        i = bisect_right(self.datas, dia)
+        while i > 0 and self.datas[i - 1] >= inicio:
+            i -= 1
+            achadas.append(self.entradas[i])
+        return achadas
+
+    def posteriores(self, dia: date) -> list:
+        """Da mais próxima depois de `dia` para frente, dentro da janela."""
+        fim = somar_meses(dia, JANELA_DO_DESTAQUE_EM_MESES)
+        achadas = []
+        j = bisect_right(self.datas, dia)
+        while j < len(self.datas) and self.datas[j] <= fim:
+            achadas.append(self.entradas[j])
+            j += 1
+        return achadas
+
+
+@dataclass(frozen=True)
+class DestaqueEscolhido:
+    criterio: CriterioDoSuportado
+    filial: str | None              # de que filial veio o destaque
+    valor: ValorDaAbertura
+    entradas_usadas: int
+
+    @property
+    def precisa_estimar(self) -> bool:
+        return self.criterio is CriterioDoSuportado.PRECISA_ESTIMAR
+
+
+def _ate_cobrir(entradas: list, quantidade: Decimal) -> list:
+    usadas, coberto = [], ZERO
+    for e in entradas:
+        if coberto >= quantidade:
+            break
+        usadas.append(e)
+        coberto += e.quantidade
+    return usadas
+
+
+def escolher_destaque(
+    quantidade: Decimal,
+    dia: date,
+    filial: str,
+    remetente: str | None,
+    destaques: dict,
+    mesma_uf: set | None = None,
+) -> DestaqueEscolhido:
+    """O ICMS suportado da transferência recebida sem retido, pela ordem da
+    decisão de 25/11/2026 (ver o bloco acima).
+
+    `destaques` traz, por filial, as entradas com destaque DO PRODUTO desta
+    ficha (`DestaquesDaFilial`); `mesma_uf` são as filiais da UF de `filial`
+    — None quando não há cadastro de UF, e então todas valem.
+    """
+    C = CriterioDoSuportado
+
+    def compor(criterio, origem, entradas):
+        usadas = _ate_cobrir(entradas, quantidade)
+        return DestaqueEscolhido(criterio, origem, _compor(quantidade, usadas), len(usadas))
+
+    def da(origem, anterior, posterior):
+        d = destaques.get(origem)
+        if d is None:
+            return None
+        if antes := d.anteriores(dia):
+            return compor(anterior, origem, antes)
+        if depois := d.posteriores(dia):
+            return compor(posterior, origem, depois)
+        return None
+
+    if (r := da(filial, C.MESMA_FILIAL_ANTERIOR, C.MESMA_FILIAL_POSTERIOR)) is not None:
+        return r
+
+    def vale(f):
+        return f != filial and (mesma_uf is None or f in mesma_uf)
+
+    if remetente and vale(remetente):
+        if (r := da(remetente, C.REMETENTE_ANTERIOR, C.REMETENTE_POSTERIOR)) is not None:
+            return r
+    outras = sorted(f for f in destaques if vale(f) and f != remetente)
+    # a filial cujo destaque está mais perto da data: antes, a mais recente; só
+    # sem nenhuma antes, a mais próxima depois. Empate: o menor CNPJ (a lista
+    # está em ordem e max/min ficam com o primeiro que achar)
+    melhor = None
+    for f in outras:
+        if antes := destaques[f].anteriores(dia):
+            if melhor is None or antes[0].data > melhor[0]:
+                melhor = (antes[0].data, f, antes)
+    if melhor is not None:
+        return compor(C.OUTRA_FILIAL_ANTERIOR, melhor[1], melhor[2])
+    for f in outras:
+        if depois := destaques[f].posteriores(dia):
+            if melhor is None or depois[0].data < melhor[0]:
+                melhor = (depois[0].data, f, depois)
+    if melhor is not None:
+        return compor(C.OUTRA_FILIAL_POSTERIOR, melhor[1], melhor[2])
+    return DestaqueEscolhido(C.PRECISA_ESTIMAR, None, ValorDaAbertura(ZERO, ZERO, quantidade), 0)
 
 
 @dataclass

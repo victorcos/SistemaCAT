@@ -120,8 +120,10 @@ from cat.dominio.icms.cat42.enquadramento import (
     classificar,
 )
 from cat.dominio.icms.cat42.razao import (
+    DestaquesDaFilial,
     EntradaAnterior,
     EnquadramentoLegal,
+    escolher_destaque,
     ValorDaAbertura,
     valor_da_abertura,
     valor_pelas_entradas_do_remetente,
@@ -171,6 +173,9 @@ ESQUEMA_TRANSFERENCIAS_VALORADAS = pa.schema([
     ("suportado", pa.decimal128(30, 15)),
     ("coberta", pa.decimal128(38, 9)),
     ("entradas_usadas", pa.int32()),
+    # de onde veio o destaque (`CriterioDoSuportado`) e de que filial
+    ("criterio", pa.string()),
+    ("filial_do_destaque", pa.string()),
 ])
 
 LINHAS_POR_LOTE = 200_000
@@ -266,6 +271,12 @@ ESQUEMA_FICHA3 = pa.schema([
     # o código como veio da fonte, quando o de-para o trocou pelo da mercadoria
     ("codigo_original", pa.string()),
     ("credito_operacao_propria", pa.decimal128(30, 15)),
+    # transferência recebida sem retido: por que critério o suportado foi
+    # achado, de que filial veio o destaque e, sem destaque nenhum, a marca de
+    # que o valor precisa ser estimado (decisão de 25/11/2026)
+    ("criterio_do_suportado", pa.string()),
+    ("filial_do_destaque", pa.string()),
+    ("suportado_a_estimar", pa.bool_()),
 ])
 
 ESQUEMA_FICHAS = pa.schema([
@@ -540,8 +551,9 @@ class ResumoDaMontagem:
     # que o remetente não tinha entrada para cobrir
     transferencias_valoradas: int = 0
     transferencias_parciais: int = 0
-    transferencias_sem_entrada: int = 0
+    transferencias_sem_entrada: int = 0      # sem destaque nenhum: precisam ser estimadas
     icms_das_transferencias: Decimal = Decimal(0)
+    transferencias_por_criterio: dict = field(default_factory=dict)
     # fora da ficha por decisão: uso e consumo não é estoque de comercialização
     lancamentos_de_uso_e_consumo: int = 0
     # fora da ficha por decisão: X.949, outras entradas e saídas (remessa e retorno)
@@ -621,7 +633,7 @@ def montar(
         resumo.linhas_com_depara, resumo.codigos_trocados_pelo_depara = con.execute(
             "SELECT count(*), count(DISTINCT (cnpj, codigo_original)) FROM lancamentos "
             "WHERE codigo_original <> codigo").fetchone()
-        _valorar_transferencias(con, destino, resumo)
+        _valorar_transferencias(con, destino, resumo, uf_por_cnpj)
         aberturas = {(c, k): q for c, k, q in con.execute(
             "SELECT cnpj, codigo, quantidade FROM abertura").fetchall()}
         valores = _valorar_aberturas(con, aberturas)
@@ -702,113 +714,139 @@ def _valorar_aberturas(con, aberturas: dict) -> dict[tuple[str, str], ValorDaAbe
     return valores
 
 
-def _valorar_transferencias(con, destino: str, resumo: ResumoDaMontagem) -> None:
-    """Dá às transferências recebidas sem retido o valor das entradas do remetente.
+def _valorar_transferencias(con, destino: str, resumo: ResumoDaMontagem,
+                            uf_por_cnpj: dict | None = None) -> None:
+    """Dá às transferências recebidas sem retido o ICMS suportado de um destaque.
 
-    A regra está em `valor_pelas_entradas_do_remetente` (§ 5º da CAT 42/2018).
-    Aqui é achar o remetente — o CNPJ do emitente, na chave de acesso, que tem
-    de ser um estabelecimento da própria base — e percorrer **em ordem de data
-    na rede inteira**: a entrada do remetente pode ser ela mesma uma
-    transferência (fornecedor → filial que recebe leite → CD → loja; e há
-    transferência de loja para loja), e ela precisa ter o seu valor antes de
-    servir de base para a seguinte.
+    A ordem é a de `escolher_destaque` (decisão de 25/11/2026): o destaque do
+    mesmo produto na mesma filial, até 6 meses antes ou, sem ele, até 6 meses
+    depois; depois o do remetente e o de outra filial da mesma UF, na mesma
+    janela; sem nenhum, a linha fica marcada para estimar e o suportado não é
+    inventado. Até 25/11/2026 valia sempre o remetente, em cadeia.
 
-    As quantidades vão na unidade da ficha (`quantidade * fator`) dos dois
-    lados, e o código é o de depois do de-para. Só a linha sem valor nenhum é
-    valorada: o retido que a nota trouxe vale mais que qualquer reconstrução.
+    "Destaque" é o retido que a nota trouxe: uma transferência valorada aqui não
+    serve de destaque para outra, e por isso a ordem de data na rede deixou de
+    importar. Vai um código por vez — as entradas de um produto em todas as
+    filiais cabem em memória; as da rede inteira, não.
+
+    As quantidades vão na unidade da ficha (`quantidade * fator`) e o código é o
+    de depois do de-para. Só a linha sem valor nenhum é valorada: o retido que a
+    nota trouxe vale mais que qualquer reconstrução.
     """
     lista = lambda conj: ", ".join(f"'{c}'" for c in sorted(conj))  # noqa: E731
     recebidas = lista(CFOP_TRANSFERENCIA_RECEBIDA)
+    con.execute("ALTER TABLE lancamentos ADD COLUMN IF NOT EXISTS criterio_do_suportado VARCHAR")
+    con.execute("ALTER TABLE lancamentos ADD COLUMN IF NOT EXISTS filial_do_destaque VARCHAR")
     con.execute(f"""
         CREATE OR REPLACE TABLE sem_retido AS
-        SELECT cnpj, codigo, data, chave, numero_item, substr(chave, 7, 14) AS remetente,
+        SELECT cnpj, codigo, data, coalesce(chave, '') AS chave, numero_item,
+               CASE WHEN length(coalesce(chave, '')) = 44 THEN substr(chave, 7, 14) END AS remetente,
                quantidade * fator AS quantidade
         FROM lancamentos
         WHERE especie = 'entrada' AND NOT devolucao AND cfop IN ({recebidas})
-          AND coalesce(suportado, 0) = 0 AND quantidade > 0 AND length(coalesce(chave, '')) = 44
-          AND substr(chave, 7, 14) <> cnpj
-          AND substr(chave, 7, 14) IN (SELECT cnpj FROM estabs)
+          AND coalesce(suportado, 0) = 0 AND quantidade > 0
+          AND (length(coalesce(chave, '')) <> 44 OR substr(chave, 7, 14) <> cnpj)
     """)
     total = con.execute("SELECT count(*) FROM sem_retido").fetchone()[0]
     if total == 0:
         return
-    # as entradas de cada (remetente, código) que alguma transferência vai pedir:
-    # as do período e as de antes do inventário que a abertura já separou
-    con.execute("CREATE OR REPLACE TABLE pedidos AS SELECT DISTINCT remetente AS cnpj, codigo FROM sem_retido")
-    cursor = con.execute(f"""
-        SELECT l.cnpj, l.codigo, l.data, coalesce(l.chave, ''), coalesce(l.numero_item, 0),
-               l.quantidade * l.fator, coalesce(l.suportado, 0)
-        FROM lancamentos l SEMI JOIN pedidos p ON p.cnpj = l.cnpj AND p.codigo = l.codigo
-        WHERE l.especie = 'entrada' AND NOT l.devolucao AND l.quantidade > 0
-        UNION ALL
-        SELECT a.cnpj, a.codigo, a.data, a.chave, a.numero_item, a.quantidade, a.suportado
-        FROM anteriores a SEMI JOIN pedidos p ON p.cnpj = a.cnpj AND p.codigo = a.codigo
-        WHERE a.quantidade > 0
-        ORDER BY 1, 2, 3, 4, 5
+    con.execute("""CREATE OR REPLACE TABLE codigos_pedidos AS
+                   SELECT codigo, row_number() OVER (ORDER BY codigo) AS k
+                   FROM (SELECT DISTINCT codigo FROM sem_retido)""")
+    # os destaques de cada código pedido, em todas as filiais: as entradas do
+    # período e as de antes do inventário que a abertura já separou
+    # dois cursores, lidos juntos em ordem de código: um `execute` na mesma
+    # conexão descartaria o resultado do outro
+    c_destaques, c_pedidos = con.cursor(), con.cursor()
+    c_destaques.execute("""
+        SELECT p.k, x.cnpj, x.data, x.quantidade, x.suportado FROM (
+            SELECT l.cnpj, l.codigo, l.data, coalesce(l.chave, '') AS chave,
+                   coalesce(l.numero_item, 0) AS numero_item, l.quantidade * l.fator AS quantidade,
+                   l.suportado
+            FROM lancamentos l
+            WHERE l.especie = 'entrada' AND NOT l.devolucao AND l.quantidade > 0
+              AND coalesce(l.suportado, 0) > 0
+            UNION ALL
+            SELECT a.cnpj, a.codigo, a.data, a.chave, a.numero_item, a.quantidade, a.suportado
+            FROM anteriores a WHERE a.quantidade > 0 AND coalesce(a.suportado, 0) > 0
+        ) x JOIN codigos_pedidos p ON p.codigo = x.codigo
+        ORDER BY p.k, x.cnpj, x.data, x.chave, x.numero_item
     """)
-    # por (estabelecimento, código), da mais antiga para a mais recente; o valor
-    # fica num dicionário à parte porque a transferência valorada aqui muda o
-    # valor da entrada de quem a recebeu, que pode ser remetente mais adiante
-    entradas: dict[tuple[str, str], list[tuple]] = {}
-    datas: dict[tuple[str, str], list[date]] = {}
-    valor_de: dict[tuple, Decimal] = {}
-    while lote := cursor.fetchmany(LINHAS_POR_LOTE):
-        for cnpj, codigo, data_, chave, item, quantidade, suportado in lote:
-            id_ = (cnpj, codigo, chave, item)
-            entradas.setdefault((cnpj, codigo), []).append((data_, id_, Decimal(quantidade)))
-            datas.setdefault((cnpj, codigo), []).append(data_)
-            valor_de[id_] = Decimal(suportado)
+    c_pedidos.execute("""
+        SELECT p.k, s.cnpj, s.codigo, s.data, s.chave, s.numero_item, s.remetente, s.quantidade
+        FROM sem_retido s JOIN codigos_pedidos p ON p.codigo = s.codigo
+        ORDER BY p.k, s.data, s.chave, s.numero_item
+    """)
+
+    def linhas(cursor):
+        while lote := cursor.fetchmany(LINHAS_POR_LOTE):
+            yield from lote
+
+    ufs = uf_por_cnpj or {}
+    por_uf: dict[str, set[str]] = {}
+    for c, u in ufs.items():
+        por_uf.setdefault(u, set()).add(c)
+    mesma_uf = (lambda c: por_uf.get(ufs.get(c, ""), set())) if ufs else (lambda c: None)  # noqa: E731
 
     saida = {n: [] for n in ESQUEMA_TRANSFERENCIAS_VALORADAS.names}
-    cursor = con.execute("""SELECT cnpj, codigo, data, chave, numero_item, remetente, quantidade
-                            FROM sem_retido ORDER BY data, chave, numero_item""")
-    while lote := cursor.fetchmany(LINHAS_POR_LOTE):
-        for cnpj, codigo, data_, chave, item, remetente, quantidade in lote:
+    fonte = linhas(c_destaques)
+    proxima = next(fonte, None)
+    k_atual, do_codigo = None, {}
+    try:
+        for k, cnpj, codigo, data_, chave, item, remetente, quantidade in linhas(c_pedidos):
+            if k != k_atual:
+                # junta os destaques deste código (os dois lados vêm em ordem de k)
+                por_filial: dict[str, list[EntradaAnterior]] = {}
+                while proxima is not None and proxima[0] <= k:
+                    kk, cnpj_e, dia_e, q_e, v_e = proxima
+                    if kk == k:
+                        lista_f = por_filial.setdefault(cnpj_e, [])
+                        lista_f.append(EntradaAnterior(dia_e, Decimal(q_e), Decimal(v_e),
+                                                       ordem=len(lista_f)))
+                    proxima = next(fonte, None)
+                k_atual, do_codigo = k, {f: DestaquesDaFilial(e) for f, e in por_filial.items()}
             quantidade = Decimal(quantidade)
-            usadas: list[EntradaAnterior] = []
-            coberto = Decimal(0)
-            # da mais recente para trás, até cobrir a quantidade; a do mesmo dia
-            # vale (o remetente recebeu e transferiu no dia). O ponto de partida
-            # sai por busca binária na data: no CD um código tem centenas de
-            # entradas e milhares de transferências, e varrer a lista inteira a
-            # cada uma seria quadrático
-            do_remetente = entradas.get((remetente, codigo), [])
-            i = bisect_right(datas.get((remetente, codigo), []), data_)
-            while i > 0 and coberto < quantidade:
-                i -= 1
-                dia, id_, q = do_remetente[i]
-                usadas.append(EntradaAnterior(dia, q, valor_de[id_], ordem=i))
-                coberto += q
-            v = valor_pelas_entradas_do_remetente(quantidade, usadas)
-            valor_de[(cnpj, codigo, chave, item)] = v.valor
+            e = escolher_destaque(quantidade, data_, cnpj, remetente, do_codigo, mesma_uf(cnpj))
             for nome, x in (("cnpj", cnpj), ("codigo", codigo), ("data", data_), ("chave", chave),
                             ("numero_item", item), ("remetente", remetente), ("quantidade", quantidade),
-                            ("suportado", v.valor.quantize(Decimal("0.000000000000001"))),
-                            ("coberta", v.coberta), ("entradas_usadas", len(usadas))):
+                            ("suportado", e.valor.valor.quantize(Decimal("0.000000000000001"))),
+                            ("coberta", e.valor.coberta), ("entradas_usadas", e.entradas_usadas),
+                            ("criterio", e.criterio.value), ("filial_do_destaque", e.filial)):
                 saida[nome].append(x)
-            if v.sem_valor:
+            por_criterio = resumo.transferencias_por_criterio
+            por_criterio[e.criterio.value] = por_criterio.get(e.criterio.value, 0) + 1
+            if e.precisa_estimar:
                 resumo.transferencias_sem_entrada += 1
             else:
                 resumo.transferencias_valoradas += 1
-                resumo.transferencias_parciais += int(v.parcial)
-                resumo.icms_das_transferencias += v.valor
+                resumo.transferencias_parciais += int(e.valor.parcial)
+                resumo.icms_das_transferencias += e.valor.valor
+    finally:
+        c_destaques.close()
+        c_pedidos.close()
 
     caminho = os.path.join(destino, ARQUIVO_TRANSFERENCIAS_VALORADAS)
     pq.write_table(pa.Table.from_pydict(saida, schema=ESQUEMA_TRANSFERENCIAS_VALORADAS), caminho)
     # o valor volta ao lançamento; a quantidade da ficha é `quantidade * fator`,
-    # e o suportado é o da linha inteira, então nada a converter
+    # e o suportado é o da linha inteira, então nada a converter. A linha que
+    # precisa ser estimada recebe só a marca: o suportado continua zero
     con.execute(f"""
-        UPDATE lancamentos l SET suportado = CAST(v.suportado AS DECIMAL(18, 6))
+        UPDATE lancamentos l SET
+            suportado = CASE WHEN v.criterio = 'precisa_estimar' THEN l.suportado
+                             ELSE CAST(v.suportado AS DECIMAL(18, 6)) END,
+            criterio_do_suportado = v.criterio,
+            filial_do_destaque = v.filial_do_destaque
         FROM read_parquet('{_escapar(caminho)}') v
-        WHERE v.cnpj = l.cnpj AND v.codigo = l.codigo AND v.chave = l.chave AND v.numero_item = l.numero_item
+        WHERE v.cnpj = l.cnpj AND v.codigo = l.codigo AND v.chave = coalesce(l.chave, '')
+          AND v.numero_item IS NOT DISTINCT FROM l.numero_item
           AND l.especie = 'entrada' AND NOT l.devolucao AND l.cfop IN ({recebidas})
           AND coalesce(l.suportado, 0) = 0
     """)
-    log.info("transferências recebidas sem retido, valoradas pelo remetente",
+    log.info("transferências recebidas sem retido, valoradas por destaque",
              extra={"linhas": total, "valoradas": resumo.transferencias_valoradas,
                     "parciais": resumo.transferencias_parciais,
-                    "sem_entrada": resumo.transferencias_sem_entrada,
-                    "icms": str(resumo.icms_das_transferencias)})
+                    "a_estimar": resumo.transferencias_sem_entrada,
+                    "por_criterio": resumo.transferencias_por_criterio})
 
 
 def _completar_ficha3(con, ficha3: str, itens: str, xml_itens: str = "") -> None:
@@ -1848,6 +1886,8 @@ class DadosDaLinha:
     valor_item: Decimal | None = None
     aliquota_documento: Decimal | None = None
     corrigida: bool = False
+    criterio_do_suportado: str = ""
+    filial_do_destaque: str = ""
 
 
 def _documento(linha: dict) -> tuple:
@@ -1879,7 +1919,9 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
         ncm=(linha.get("ncm") or "").strip(),
         unidade_estoque=(linha.get("unidade_estoque") or "").strip(),
         valor_item=linha.get("valor"), aliquota_documento=linha.get("aliquota_documento"),
-        corrigida=bool(linha.get("corrigida")), **kw)
+        corrigida=bool(linha.get("corrigida")),
+        criterio_do_suportado=linha.get("criterio_do_suportado") or "",
+        filial_do_destaque=linha.get("filial_do_destaque") or "", **kw)
     # a ficha é na unidade do inventário
     quantidade = quantidade * fator
     enq, indefinido, faltou, pendente, efetivo = EnquadramentoLegal.DEMAIS_SAIDAS, False, False, False, None
@@ -1973,6 +2015,9 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, dados: DadosDaLinha,
     lote["serie"].append(doc[5] if len(doc) > 5 else "")
     lote["codigo_original"].append(doc[6] if len(doc) > 6 else None)
     lote["credito_operacao_propria"].append(ln.credito_operacao_propria.quantize(_Q15))
+    lote["criterio_do_suportado"].append(dados.criterio_do_suportado or None)
+    lote["filial_do_destaque"].append(dados.filial_do_destaque or None)
+    lote["suportado_a_estimar"].append(dados.criterio_do_suportado == "precisa_estimar")
 
 
 # ---------------------------------------------------------------------------

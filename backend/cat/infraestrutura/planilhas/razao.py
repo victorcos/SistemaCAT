@@ -44,6 +44,8 @@ import os
 import duckdb
 import pyarrow.parquet as pq
 
+from cat.dominio.icms.cat42.razao import CriterioDoSuportado
+
 from cat.infraestrutura.planilhas.conferencia import (
     Coluna,
     _literal,
@@ -93,6 +95,10 @@ COLUNAS_FICHA3 = (
     Coluna("suportado_entrada",
            "Valor Total do ICMS Suportado na Retenção ou Antecipação por Substituição Tributária",
            "numero", 17, ENTRADAS, "12"),
+    # transferência recebida sem retido: por que critério o suportado foi achado
+    # e de que filial veio o destaque (decisão de 25/11/2026)
+    Coluna("criterio_do_suportado", "Critério do ICMS Suportado", "texto", 24, ENTRADAS),
+    Coluna("filial_do_destaque", "Filial do Destaque", "texto", 18, ENTRADAS),
 
     Coluna("cod_legal", "COD_LEGAL", "numero_inteiro", 10, SAIDAS),
     Coluna("qtd_saida", "Quantidade (Saída)", "quantidade", 12, SAIDAS, "13"),
@@ -136,6 +142,8 @@ COLUNAS_FICHA3 = (
     Coluna("unidade_sem_fator", "Unidade sem Fator de Conversão", "texto", 12, INCONSISTENCIAS),
     Coluna("ficha_retirada", "Ficha Retirada do Total", "texto", 12, INCONSISTENCIAS),
     Coluna("corrigida", "Corrigida à Mão", "texto", 12, INCONSISTENCIAS),
+    # sem destaque nenhum: o suportado não foi estimado, precisa ser
+    Coluna("suportado_a_estimar", "ICMS Suportado a Estimar", "texto", 12, INCONSISTENCIAS),
 
     # as duas colunas que saem vazias de propósito: são as que a pessoa
     # preenche para devolver a planilha corrigida
@@ -177,7 +185,14 @@ DERIVACAO = {
     # corrigida, e o que volta é conferido em `planilhas/correcoes_da_planilha.py`
     "tirar_da_ficha": "NULL::VARCHAR",
     "motivo_da_correcao": "NULL::VARCHAR",
+    "criterio_do_suportado": "CASE criterio_do_suportado {} END".format(" ".join(
+        f"WHEN '{c.value}' THEN '{c.rotulo}'" for c in CriterioDoSuportado)),
 }
+
+
+# derivações que leem a coluna de mesmo nome: na ficha de uma rodada antiga,
+# que ainda não a tinha, saem nulas em vez de quebrar o download
+_DERIVA_DA_PROPRIA_COLUNA = frozenset({"criterio_do_suportado"})
 
 
 def _derivado(parquet: str, destino: str) -> str:
@@ -186,7 +201,8 @@ def _derivado(parquet: str, destino: str) -> str:
     partes = []
     for coluna in COLUNAS_FICHA3:
         expressao = DERIVACAO.get(coluna.campo, f'"{coluna.campo}"')
-        if coluna.campo not in DERIVACAO and coluna.campo not in tem:
+        if coluna.campo not in tem and (coluna.campo not in DERIVACAO
+                                        or coluna.campo in _DERIVA_DA_PROPRIA_COLUNA):
             expressao = "NULL"
         partes.append(f'{expressao} AS "{coluna.campo}"')
     rascunho = os.path.join(_pasta_de_rascunho(destino), "ficha3_leiaute.parquet")

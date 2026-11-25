@@ -369,3 +369,82 @@ class TestEntradasDoRemetente:
         assert {"1152", "1409", "2152", "2409"} <= CFOP_TRANSFERENCIA_RECEBIDA
         assert len(CFOP_TRANSFERENCIA_RECEBIDA) == len(CFOP_TRANSFERENCIA)
         assert not any(c[0] in "56" for c in CFOP_TRANSFERENCIA_RECEBIDA)
+
+
+
+class TestEscolherDestaque:
+    """Transferência recebida sem retido (decisão de 25/11/2026): 1º o destaque
+    do mesmo produto na mesma filial, 6 meses para trás com prioridade, senão 6
+    para frente; 2º o do remetente e o de outra filial da mesma UF, na mesma
+    janela; 3º sem nenhum, marcar para estimar."""
+
+    LOJA, CD, OUTRA, PR = "L", "CD", "O", "PR"
+    DIA = date(2026, 1, 22)
+
+    @staticmethod
+    def destaques(**por_filial):
+        from cat.dominio.icms.cat42.razao import DestaquesDaFilial, EntradaAnterior  # noqa: PLC0415
+        return {f: DestaquesDaFilial([EntradaAnterior(dia, Decimal(q), Decimal(v), ordem=i)
+                                      for i, (dia, q, v) in enumerate(sorted(e))])
+                for f, e in por_filial.items()}
+
+    def escolher(self, destaques, quantidade=10, remetente="CD", mesma_uf=None):
+        from cat.dominio.icms.cat42.razao import escolher_destaque  # noqa: PLC0415
+        return escolher_destaque(Decimal(quantidade), self.DIA, self.LOJA, remetente, destaques, mesma_uf)
+
+    def test_a_propria_filial_vence_o_remetente_mais_perto_no_tempo(self):
+        e = self.escolher(self.destaques(
+            L=[(date(2025, 11, 10), 10, 25)],          # 2,50/un, dois meses antes
+            CD=[(date(2026, 1, 15), 130, 383.04)]))    # uma semana antes
+        assert (e.criterio.value, e.filial, e.valor.valor) == ("mesma_filial_anterior", "L", Decimal(25))
+
+    def test_antes_e_depois_na_filial_vale_o_de_antes(self):
+        e = self.escolher(self.destaques(L=[(date(2026, 1, 25), 10, 30), (date(2025, 9, 1), 10, 20)]))
+        assert (e.criterio.value, e.valor.valor) == ("mesma_filial_anterior", Decimal(20))
+
+    def test_so_depois_na_filial_ainda_vence_o_remetente(self):
+        e = self.escolher(self.destaques(L=[(date(2026, 3, 1), 10, 30)], CD=[(date(2026, 1, 15), 10, 99)]))
+        assert (e.criterio.value, e.filial, e.valor.valor) == ("mesma_filial_posterior", "L", Decimal(30))
+
+    def test_fora_dos_6_meses_nao_conta(self):
+        e = self.escolher(self.destaques(L=[(date(2025, 7, 21), 10, 20), (date(2026, 7, 23), 10, 20)],
+                                         CD=[(date(2026, 1, 15), 10, 40)]))
+        assert (e.criterio.value, e.filial) == ("remetente_anterior", "CD")
+
+    def test_o_limite_de_6_meses_entra(self):
+        e = self.escolher(self.destaques(L=[(date(2025, 7, 22), 10, 20)]))
+        assert e.criterio.value == "mesma_filial_anterior"
+
+    def test_remetente_de_outra_uf_nao_serve(self):
+        e = self.escolher(self.destaques(PR=[(date(2026, 1, 20), 10, 99)], O=[(date(2025, 12, 1), 10, 40)]),
+                          remetente="PR", mesma_uf={"L", "O"})
+        assert (e.criterio.value, e.filial, e.valor.valor) == ("outra_filial_anterior", "O", Decimal(40))
+
+    def test_outra_filial_mais_proxima_antes(self):
+        e = self.escolher(self.destaques(A=[(date(2025, 10, 1), 10, 10)], B=[(date(2026, 1, 2), 10, 20)],
+                                         C=[(date(2026, 1, 25), 10, 30)]), remetente=None)
+        assert (e.criterio.value, e.filial) == ("outra_filial_anterior", "B")
+
+    def test_outra_filial_so_depois(self):
+        e = self.escolher(self.destaques(A=[(date(2026, 4, 1), 10, 10)], B=[(date(2026, 2, 1), 10, 20)]),
+                          remetente=None)
+        assert (e.criterio.value, e.filial) == ("outra_filial_posterior", "B")
+
+    def test_sem_destaque_nenhum_marca_para_estimar_e_nao_inventa_valor(self):
+        e = self.escolher(self.destaques(PR=[(date(2026, 1, 20), 10, 99)]), remetente="PR", mesma_uf={"L"})
+        assert e.precisa_estimar and e.filial is None and e.valor.valor == 0 and e.entradas_usadas == 0
+
+    def test_uma_nota_nao_basta_soma_a_seguinte_com_media_ponderada(self):
+        e = self.escolher(self.destaques(L=[(date(2026, 1, 10), 6, 18), (date(2025, 12, 1), 10, 20)]))
+        # 6 un a 3,00 + 4 un a 2,00 = 26
+        assert (e.entradas_usadas, e.valor.valor) == (2, Decimal(26))
+
+    def test_depois_compoe_a_partir_da_mais_proxima(self):
+        e = self.escolher(self.destaques(L=[(date(2026, 2, 1), 10, 30), (date(2026, 5, 1), 10, 50)]))
+        assert (e.criterio.value, e.entradas_usadas, e.valor.valor) == ("mesma_filial_posterior", 1, Decimal(30))
+
+    def test_somar_meses_no_fim_do_mes(self):
+        from cat.dominio.icms.cat42.razao import somar_meses  # noqa: PLC0415
+        assert somar_meses(date(2026, 8, 31), -6) == date(2026, 2, 28)
+        assert somar_meses(date(2026, 1, 22), -6) == date(2025, 7, 22)
+        assert somar_meses(date(2025, 12, 31), 2) == date(2026, 2, 28)

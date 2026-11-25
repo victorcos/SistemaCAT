@@ -45,6 +45,7 @@ def _linha(**campos) -> dict:
         "ressarcimento": d(0), "complemento": d(0), "chave": "4" * 44, "numero_item": 1,
         "modelo": "55", "participante": "F1", "numero_documento": "1", "serie": "1",
         "codigo_original": None, "credito_operacao_propria": d(0),
+        "criterio_do_suportado": None, "filial_do_destaque": None, "suportado_a_estimar": False,
     }
     base.update(campos)
     return base
