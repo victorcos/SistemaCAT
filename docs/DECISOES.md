@@ -9469,3 +9469,49 @@ O resumo da montagem conta essas linhas em `relatorio_registrado_em_cupom`.
 Por fim, o relatório que traz a loja como CNPJ da empresa diz direto de quem é
 a linha. Antes só a venda de PDV ensinava o CNPJ de cada loja, e o CD, que não
 tem PDV, mandava as baixas dele para "sem estabelecimento".
+
+## 2026-11-25 — Transferência sem retido: o destaque da própria filial primeiro
+
+**O problema.** Na conferência de uma Ficha 3 de varejo, uma loja recebia do
+CD uma transferência sem o retido, e o suportado não batia com a entrada
+destacada mais próxima da própria loja. A regra de 19/11 olhava só o
+remetente (§ 5º): a compra do CD, uma semana antes, vencia a da loja, dois
+meses antes. E nada impedia o remetente de ser de outra UF: o código aceita
+os CFOP 2.xxx de transferência recebida.
+
+**A decisão (do Victor).** A transferência recebida sem retido procura o
+destaque nesta ordem:
+
+1. **o mesmo produto na mesma filial**, até 6 meses antes da transferência
+   (prioridade) ou, se não houver nenhum, até 6 meses depois;
+2. **sem destaque na filial, outra filial da mesma UF**: primeiro o
+   remetente, depois a filial com o destaque mais próximo da data, na mesma
+   janela de 6 meses. A linha diz de que filial ele veio;
+3. **sem destaque nenhum, nada é estimado.** O suportado fica zero e a linha
+   leva a marca "ICMS Suportado a Estimar".
+
+A composição não muda: as notas da janela, a partir da mais próxima, até cobrir
+a quantidade, com média ponderada quando uma não basta (item 3.3.8).
+
+**"Destaque" é o retido que a nota trouxe.** Uma transferência valorada por
+esta regra não serve de destaque para outra. Por isso a cadeia (fornecedor →
+CD → loja → loja) deixou de existir: a loja que recebe de outra loja, que só
+tem transferências, vai à filial com compra destacada mais próxima. No teste
+da cadeia o valor foi de R$ 11 para R$ 12.
+
+**Onde aparece.** A Ficha 3 ganhou "Critério do ICMS Suportado" e "Filial do
+Destaque" (ao lado do suportado da entrada) e "ICMS Suportado a Estimar" (nas
+inconsistências). A prova (`transferencias_valoradas.parquet`) ganhou
+`criterio` e `filial_do_destaque`, e o resumo, `transferencias_por_criterio`.
+A ficha de uma rodada antiga sai com as colunas vazias.
+
+**Por que não o remetente sempre.** O § 5º fala nas entradas mais recentes,
+suficientes para comportar a quantidade, sem dizer de quem. A filial que
+recebeu e já comprou o mesmo produto com destaque tem a prova mais direta do
+imposto daquela mercadoria naquela loja.
+
+**O que fica de fora.** As entradas de antes do inventário só entram para os
+códigos que têm abertura na filial (a tabela `anteriores` é a da abertura).
+Um destaque de antes do período, num código sem estoque inicial naquela
+filial, não é visto. A regra vale só para a transferência recebida, e não para
+a compra de fornecedor sem retido.
