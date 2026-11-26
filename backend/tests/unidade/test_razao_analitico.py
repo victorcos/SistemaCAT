@@ -1478,6 +1478,17 @@ class TestAberturaPelaFichaAnterior:
         # B não tem movimento de X, mas a ficha começa com o saldo anterior
         assert fichas[(B, "X")]["abertura_origem"] == "ficha_anterior"
 
+    def test_item_que_a_ficha_anterior_nunca_listou_comeca_do_zero(self, fontes, tmp_path):
+        """A loja A tem ficha anterior, mas sem o X: o bloco H não é reserva."""
+        fichas, resumo = self.montar_com(fontes, tmp_path, [
+            {"cnpj": A, "codigo": "W", "unidade": "UN", "competencia": date(2020, 12, 1),
+             "quantidade": Decimal(0), "valor": Decimal(0)}])
+        f = fichas[(A, "X")]
+        assert (f["abertura_quantidade"], f["abertura_valor"], f["abertura_origem"]) == (
+            Decimal(0), Decimal(0), "sem_ficha_anterior")
+        assert f["abertura_bloco_h"] == Decimal(10)
+        assert resumo.fichas_abertura_da_ficha_anterior == 0
+
     def test_item_zerado_na_ficha_anterior_comeca_do_zero(self, fontes, tmp_path):
         fichas, _ = self.montar_com(fontes, tmp_path, [
             {"cnpj": A, "codigo": "X", "unidade": "UN", "competencia": date(2020, 12, 1),

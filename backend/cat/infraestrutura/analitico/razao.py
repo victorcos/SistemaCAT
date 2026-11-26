@@ -784,11 +784,13 @@ def _juntar_saldo_anterior(con, saldo_anterior: str | None) -> None:
     """A abertura começa onde a Ficha 3 anterior terminou (decisão do Victor,
     26/11/2026; até ali valia sempre o bloco H).
 
-    Onde a ficha anterior tem o item, a quantidade e o ICMS são os do saldo
-    final dela, mesmo que seja zero: a ficha nova começa ali. O bloco H, já
-    convertido, fica como reserva para o item que a ficha anterior não tem e
-    para o estabelecimento que não tem ficha anterior. A quantidade dele fica
-    ao lado nos dois casos, para o quadro de conciliação.
+    Onde a ficha anterior tem o item, em qualquer mês, a quantidade e o ICMS são
+    os da última linha dele, mesmo que seja zero: a ficha nova começa ali. No
+    estabelecimento que tem ficha anterior, o item que ela nunca listou começa
+    do zero (`sem_ficha_anterior`): o bloco H não é reserva, corrigido pelo
+    Victor no mesmo dia. O bloco H, já convertido, só abre o estabelecimento
+    que não tem ficha anterior nenhuma. A quantidade dele fica ao lado em
+    todos os casos, para o quadro de conciliação.
 
     A ficha anterior está na unidade da ficha (UNID_INV) e com o código do
     cliente: o de-para vale para ela como para o inventário.
@@ -799,6 +801,10 @@ def _juntar_saldo_anterior(con, saldo_anterior: str | None) -> None:
     con.execute("UPDATE abertura SET origem = 'bloco_h', quantidade_bloco_h = quantidade")
     if not saldo_anterior or not os.path.isfile(saldo_anterior):
         return
+    con.execute(f"""
+        CREATE OR REPLACE TABLE cnpjs_da_ficha_anterior AS
+        SELECT DISTINCT cnpj FROM read_parquet('{_escapar(saldo_anterior)}')
+    """)
     con.execute(f"""
         CREATE OR REPLACE TABLE saldo_anterior AS
         SELECT s.cnpj, coalesce(d.codigo_destino, s.codigo) AS codigo,
@@ -815,7 +821,13 @@ def _juntar_saldo_anterior(con, saldo_anterior: str | None) -> None:
                CAST(NULL AS DECIMAL(38, 15)) AS valor_anterior,
                CAST(a.quantidade AS DECIMAL(38, 9)) AS quantidade_bloco_h
         FROM abertura a
-        WHERE NOT EXISTS (SELECT 1 FROM saldo_anterior s WHERE s.cnpj = a.cnpj AND s.codigo = a.codigo)
+        WHERE a.cnpj NOT IN (SELECT cnpj FROM cnpjs_da_ficha_anterior)
+        UNION ALL
+        SELECT a.cnpj, a.codigo, 0, false, 'sem_ficha_anterior', 0,
+               CAST(a.quantidade AS DECIMAL(38, 9))
+        FROM abertura a
+        WHERE a.cnpj IN (SELECT cnpj FROM cnpjs_da_ficha_anterior) AND a.quantidade <> 0
+          AND NOT EXISTS (SELECT 1 FROM saldo_anterior s WHERE s.cnpj = a.cnpj AND s.codigo = a.codigo)
         UNION ALL
         SELECT s.cnpj, s.codigo, s.quantidade, false, 'ficha_anterior', s.valor,
                CAST(a.quantidade AS DECIMAL(38, 9))

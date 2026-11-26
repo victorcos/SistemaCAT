@@ -338,8 +338,8 @@ def _gravar_saldo_anterior(projeto_id: int, periodo, destino: str, sessao: Sessi
                            diario) -> str | None:
     """O saldo final da Ficha 3 anterior, quando o trabalho a importou.
 
-    A abertura começa onde ela terminou (decisão do Victor, 26/11/2026). Sem
-    ficha anterior, ou sem período no cadastro, vale o bloco H, como antes.
+    A abertura começa onde ela deixou cada item (decisão do Victor, 26/11/2026).
+    Sem ficha anterior, ou sem período no cadastro, vale o bloco H, como antes.
     """
     if not periodo or not periodo[0]:
         return None
@@ -350,13 +350,17 @@ def _gravar_saldo_anterior(projeto_id: int, periodo, destino: str, sessao: Sessi
     lidos = gravar_saldos(list(arquivos), periodo[0], caminho)
     diario.base["ficha_anterior"] = {"arquivos": lidos.arquivos, "ignorados": lidos.ignorados,
                                      "itens": lidos.itens, "icms": round(lidos.icms, 2),
-                                     "defasados": lidos.defasados}
-    diario.anotar("info", f"Ficha 3 anterior: o saldo final de {milhar(lidos.itens)} itens em "
-                          f"{lidos.arquivos} estabelecimentos é a abertura; o bloco H fica para "
-                          "o que ela não tem.")
+                                     "defasados": lidos.defasados,
+                                     "de_meses_anteriores": lidos.de_meses_anteriores}
+    diario.anotar("info", f"Ficha 3 anterior: a última linha de {milhar(lidos.itens)} itens, lida em "
+                          f"{milhar(lidos.arquivos)} arquivos, é a abertura. O item que ela nunca listou "
+                          "começa do zero, e o bloco H só abre o estabelecimento sem ficha anterior.")
+    if lidos.de_meses_anteriores:
+        diario.anotar("info", f"{milhar(lidos.de_meses_anteriores)} itens com saldo saíram da ficha "
+                              "anterior antes do último mês: a abertura deles é a última linha em que aparecem.")
     if lidos.defasados:
         diario.anotar("aviso", f"{len(lidos.defasados)} estabelecimentos têm a Ficha 3 anterior "
-                               "terminando antes do mês que precede o período; vale o último mês dela.")
+                               "terminando antes do mês que precede o período; vale a última linha de cada item.")
     return caminho if lidos.itens else None
 
 

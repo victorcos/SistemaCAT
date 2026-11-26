@@ -50,7 +50,9 @@ def escrever(caminho, linhas):
 @pytest.fixture
 def arquivos(tmp_path):
     nov = escrever(tmp_path / "Ficha3 A - 2020-11.txt", [
-        linha("X", 1, "01/11/2020", "0001", "50,000", "100,00", "11/2020")])
+        linha("X", 1, "01/11/2020", "0001", "50,000", "100,00", "11/2020"),
+        # Z sai da ficha em novembro, ainda com saldo: dezembro não o lista
+        linha("Z", 2, "01/11/2020", "0001", "6,000", "3,00", "11/2020")])
     dez = escrever(tmp_path / "Ficha3 A - 2020-12.txt", [
         linha("X", 3, "01/12/2020", "0001", "8,000", "16,00", "12/2020"),
         # a última linha do item, pela ordem, é o saldo final
@@ -74,17 +76,20 @@ class TestLeitura:
         i = identificar(arquivos[1])
         assert (i.cnpj, i.competencia) == (A, date(2020, 12, 1))
 
-    def test_vale_o_ultimo_mes_antes_do_periodo_e_a_ultima_linha(self, arquivos, tmp_path):
+    def test_vale_a_ultima_linha_de_cada_item_em_qualquer_mes(self, arquivos, tmp_path):
         destino = str(tmp_path / "saldo.parquet")
         r = gravar_saldos(arquivos, date(2021, 1, 1), destino)
         saldos = {(s["cnpj"], s["codigo"]): (s["competencia"], s["quantidade"], s["valor"])
                   for s in pq.read_table(destino).to_pylist()}
         # jan/2021 já é do período: não conta; dez/2020 vence nov/2020
         assert saldos[(A, "X")] == (date(2020, 12, 1), Decimal(7), Decimal("21.5"))
+        # o item que dezembro não lista fica com a última linha de novembro
+        assert saldos[(A, "Z")] == (date(2020, 11, 1), Decimal(6), Decimal(3))
         assert saldos[(A, "W")][1:] == (Decimal(0), Decimal(0))
         # a ficha de B terminou em jun/2020: vale assim mesmo, e é contada
         assert saldos[(B, "X")] == (date(2020, 6, 1), Decimal(4), Decimal(8))
-        assert (r.arquivos, r.itens, r.defasados) == (2, 3, {B: "2020-06-01"})
+        assert (r.arquivos, r.itens, r.defasados, r.de_meses_anteriores) == (
+            3, 4, {B: "2020-06-01"}, 1)
 
     def test_o_classificador_reconhece_a_ficha(self, arquivos):
         a = classificar(arquivos[1])

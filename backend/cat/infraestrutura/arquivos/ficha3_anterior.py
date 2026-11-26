@@ -4,8 +4,8 @@ começa.
 A Ficha 3 é contínua. O período novo transcreve o saldo de quantidade e de ICMS
 suportado com que o anterior terminou (item 3.3.1 do manual). Quando o cliente
 já transmitiu fichas feitas por outra ferramenta, a abertura do nosso período é
-o saldo final delas, e não o inventário. O inventário só entra onde a ficha
-anterior não tem o item (decisão do Victor, 26/11/2026).
+o saldo final delas, e não o inventário (decisão do Victor, 26/11/2026). O
+inventário só entra no estabelecimento que não tem ficha anterior nenhuma.
 
 ## O arquivo
 
@@ -29,10 +29,16 @@ as posições saem do cabeçalho a partir do "Valor Total do Saldo", e não do n
 
 ## Qual mês vale
 
-Para cada estabelecimento, vale o mês mais recente ANTES do início do período.
-Normalmente é o mês imediatamente anterior. Quando o último arquivo é mais
-antigo (uma loja que fechou, ou um mês que falta), ele vale do mesmo jeito,
-porque é ali que a ficha terminou. A competência usada fica gravada e é contada.
+Para cada item, vale a **última linha dele em toda a ficha anterior**, em
+qualquer mês antes do início do período. Não basta o último mês: a ficha de
+outra ferramenta deixa de listar itens que ainda têm saldo. Na loja 0330 do
+projeto 1, 443 itens saíram da ficha com saldo (306 em jul/2025, 110 em
+set/2024, 27 em dez/2020) e não estão no dez/2025. Decisão do Victor,
+26/11/2026: o estoque começa de onde a ficha anterior deixou cada item. A
+competência da linha usada fica gravada por item.
+
+O estabelecimento cujo último mês não é o imediatamente anterior ao período é
+contado em `defasados`.
 """
 
 from __future__ import annotations
@@ -125,17 +131,22 @@ def identificar(caminho: str) -> Identificacao | None:
 
 @dataclass
 class SaldosLidos:
-    arquivos: int = 0                  # arquivos escolhidos, um por estabelecimento
+    arquivos: int = 0                  # arquivos lidos: todos os meses antes do período
     ignorados: int = 0                 # não são a ficha achatada
     itens: int = 0
     icms: float = 0.0
     # estabelecimento cujo último mês não é o imediatamente anterior ao período
     defasados: dict = field(default_factory=dict)
+    # itens com saldo que vieram de um mês anterior ao último do estabelecimento:
+    # a ficha anterior deixou de listá-los
+    de_meses_anteriores: int = 0
 
 
-def escolher_arquivos(caminhos: list[str], inicio: date) -> tuple[dict[str, tuple[date, str]], int]:
-    """Para cada estabelecimento, o arquivo do mês mais recente antes de `inicio`."""
-    escolhidos: dict[str, tuple[date, str]] = {}
+def escolher_arquivos(caminhos: list[str], inicio: date
+                      ) -> tuple[dict[str, list[tuple[date, str, Colunas]]], int]:
+    """Por estabelecimento, todos os arquivos de antes de `inicio`, do mês mais
+    recente para o mais antigo."""
+    escolhidos: dict[str, list[tuple[date, str, Colunas]]] = {}
     ignorados = 0
     for caminho in caminhos:
         ident = identificar(caminho)
@@ -144,9 +155,9 @@ def escolher_arquivos(caminhos: list[str], inicio: date) -> tuple[dict[str, tupl
             continue
         if ident.competencia >= inicio:
             continue
-        atual = escolhidos.get(ident.cnpj)
-        if atual is None or ident.competencia > atual[0]:
-            escolhidos[ident.cnpj] = (ident.competencia, caminho)
+        escolhidos.setdefault(ident.cnpj, []).append((ident.competencia, caminho, ident.colunas))
+    for lista in escolhidos.values():
+        lista.sort(key=lambda x: (x[0], x[1]), reverse=True)
     return escolhidos, ignorados
 
 
@@ -154,9 +165,34 @@ def _escapar(caminho: str) -> str:
     return caminho.replace("\\", "/").replace("'", "''")
 
 
+def _ultimas_do_mes(cnpj: str, competencia: date, caminho: str, c: Colunas) -> str:
+    """O INSERT da última linha de cada item de um arquivo, para os itens que
+    um mês mais recente ainda não deu."""
+    col = {f"c{i:02d}": "VARCHAR" for i in range(c.total)}
+    ordem = f"TRY_CAST(c{c.ordem:02d} AS BIGINT)"
+
+    def num(i: int) -> str:
+        return f"CAST(replace(nullif(trim(c{i:02d}), ''), ',', '.') AS DECIMAL(38, 15))"
+
+    return f"""
+        INSERT INTO ultimas
+        SELECT * FROM (
+            SELECT '{cnpj}' AS cnpj, trim(c{c.codigo:02d}) AS codigo,
+                   arg_max(trim(c{c.unidade:02d}), {ordem}) AS unidade,
+                   DATE '{competencia.isoformat()}' AS competencia,
+                   arg_max({num(c.quantidade)}, {ordem}) AS quantidade,
+                   arg_max({num(c.valor)}, {ordem}) AS valor
+            FROM read_csv('{_escapar(caminho)}', delim='|', header=false, skip=1, quote='',
+                          escape='', columns={col}, null_padding=true, encoding='latin-1')
+            WHERE nullif(trim(c{c.codigo:02d}), '') IS NOT NULL
+            GROUP BY 2) n
+        WHERE NOT EXISTS (SELECT 1 FROM ultimas u WHERE u.cnpj = n.cnpj AND u.codigo = n.codigo)"""
+
+
 def gravar_saldos(caminhos: list[str], inicio: date, destino: str) -> SaldosLidos:
     """Grava `cnpj, codigo, unidade, competencia, quantidade, valor`: o saldo com
-    que a ficha anterior terminou, um por item e estabelecimento."""
+    que a ficha anterior deixou cada item (a última linha dele, no mês mais
+    recente em que aparece), um por item e estabelecimento."""
     import duckdb  # noqa: PLC0415
     import pyarrow as pa  # noqa: PLC0415
     import pyarrow.parquet as pq  # noqa: PLC0415
@@ -173,31 +209,28 @@ def gravar_saldos(caminhos: list[str], inicio: date, destino: str) -> SaldosLido
         return resumo
     con = duckdb.connect()
     try:
-        partes = []
-        for cnpj, (competencia, caminho) in sorted(escolhidos.items()):
-            resumo.arquivos += 1
-            if competencia != anterior:
-                resumo.defasados[cnpj] = competencia.isoformat()
-            c = identificar(caminho).colunas
-            col = {f"c{i:02d}": "VARCHAR" for i in range(c.total)}
-            num = lambda i: f"CAST(replace(nullif(trim(c{i:02d}), ''), ',', '.') AS DECIMAL(38, 15))"  # noqa: E731
-            partes.append(f"""
-                SELECT '{cnpj}' AS cnpj, trim(c{c.codigo:02d}) AS codigo,
-                       arg_max(trim(c{c.unidade:02d}), TRY_CAST(c{c.ordem:02d} AS BIGINT)) AS unidade,
-                       DATE '{competencia.isoformat()}' AS competencia,
-                       arg_max({num(c.quantidade)}, TRY_CAST(c{c.ordem:02d} AS BIGINT)) AS quantidade,
-                       arg_max({num(c.valor)}, TRY_CAST(c{c.ordem:02d} AS BIGINT)) AS valor
-                FROM read_csv('{_escapar(caminho)}', delim='|', header=false, skip=1, quote='',
-                              escape='', columns={col}, null_padding=true, encoding='latin-1')
-                WHERE nullif(trim(c{c.codigo:02d}), '') IS NOT NULL
-                GROUP BY 2""")
+        con.execute("CREATE TABLE ultimas (cnpj VARCHAR, codigo VARCHAR, unidade VARCHAR, "
+                    "competencia DATE, quantidade DECIMAL(38, 15), valor DECIMAL(38, 15))")
+        for cnpj, arquivos in sorted(escolhidos.items()):
+            if arquivos[0][0] != anterior:
+                resumo.defasados[cnpj] = arquivos[0][0].isoformat()
+            # do mês mais recente para o mais antigo: o item já achado num mês
+            # mais novo não entra de novo
+            for competencia, caminho, c in arquivos:
+                resumo.arquivos += 1
+                con.execute(_ultimas_do_mes(cnpj, competencia, caminho, c))
         con.execute(f"""COPY (SELECT cnpj, codigo, unidade, competencia,
                                      CAST(quantidade AS DECIMAL(38, 9)) AS quantidade, valor
-                              FROM ({' UNION ALL '.join(partes)}) ORDER BY cnpj, codigo)
+                              FROM ultimas ORDER BY cnpj, codigo)
                         TO '{_escapar(destino)}' (FORMAT PARQUET, COMPRESSION ZSTD)""")
         resumo.itens, icms = con.execute(
             f"SELECT count(*), coalesce(sum(valor), 0) FROM read_parquet('{_escapar(destino)}')").fetchone()
         resumo.icms = float(icms)
+        resumo.de_meses_anteriores = con.execute("""
+            SELECT count(*) FROM ultimas u
+            WHERE (quantidade <> 0 OR valor <> 0)
+              AND competencia < (SELECT max(competencia) FROM ultimas v WHERE v.cnpj = u.cnpj)
+        """).fetchone()[0]
     finally:
         con.close()
     return resumo

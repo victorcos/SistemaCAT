@@ -9630,3 +9630,27 @@ linhas: 18 inversões com a opção desligada e nenhuma com ela ligada (o
 apuração do suportado também usa o leitor Arrow, mas apura linha a linha, sem
 depender da ordem. Os resultados de 3 filiais anteriores a esta correção (v1 a
 v4) têm fichas partidas.
+
+## 2026-11-26 — A abertura é a última linha de cada item na Ficha 3 anterior
+
+**Contexto.** A entrada "A abertura começa onde a Ficha 3 anterior terminou",
+do mesmo dia, lia só o último mês de cada estabelecimento e usava o bloco H
+como reserva para o item que esse mês não tinha. Na loja 0330 do projeto 1,
+694 fichas abriam assim. Ao cruzar com todos os meses da ficha anterior
+(jun/2018 a dez/2025), 443 desses itens estavam lá: a ferramenta anterior
+deixou de listá-los com saldo (306 em jul/2025, 110 em set/2024, 27 em
+dez/2020).
+
+**Decisão do Victor** (corrige a reserva pelo bloco H): o início do estoque
+vem da Ficha 3 anterior.
+
+- Para cada item, vale a última linha dele em qualquer mês antes do período.
+  O mês mais recente vence, e dentro do mês vence a maior ordem.
+- No estabelecimento que tem ficha anterior, o item que ela nunca listou
+  começa do zero. Ele fica com a origem `sem_ficha_anterior` e com a quantidade
+  do bloco H ao lado, para a conciliação.
+- O bloco H só abre o estabelecimento que não tem ficha anterior nenhuma.
+- O leitor agora lê todos os arquivos de antes do período, do mais recente
+  para o mais antigo, e não relê o item já achado. O resumo conta
+  `de_meses_anteriores`, os itens com saldo que vieram de um mês anterior ao
+  último.
