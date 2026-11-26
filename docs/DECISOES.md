@@ -9613,3 +9613,20 @@ relatório do ERP vinham sem chave.
 relatório não traz), então ainda não vira registro do arquivo digital. A regra
 vale para todos os trabalhos, não só para o projeto 1.
 
+## 2026-11-26 — A leitura do razão precisa chegar em ordem
+
+**Contexto.** No teste de 3 filiais, a lista tinha 15.832 fichas para 15.690
+pares de estabelecimento e item (na v4 eram 15.790). Algumas fichas saíam em
+dois ou três pedaços, e cada pedaço recomeçava da abertura: o saldo herdado
+entrava mais de uma vez e o custo médio não continuava de um pedaço ao outro.
+
+**Causa.** `_abrir` desliga `preserve_insertion_order`. Com ela desligada, o
+leitor Arrow do DuckDB 2.0 (`to_arrow_reader`) entrega os lotes de um
+`ORDER BY` fora de ordem. Reproduzido numa tabela sintética de 3 milhões de
+linhas: 18 inversões com a opção desligada e nenhuma com ela ligada (o
+`fetchmany` não tem o problema).
+
+**Correção.** A ordem é ligada só durante a leitura dos lançamentos do razão. A
+apuração do suportado também usa o leitor Arrow, mas apura linha a linha, sem
+depender da ordem. Os resultados de 3 filiais anteriores a esta correção (v1 a
+v4) têm fichas partidas.

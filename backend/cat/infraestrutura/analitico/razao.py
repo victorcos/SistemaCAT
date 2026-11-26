@@ -697,13 +697,25 @@ def montar(
                 f"a base vai de {info['base_inicio']:%m/%Y} a {info['base_fim']:%m/%Y}. "
                 "Corrija o cadastro do trabalho ou a base importada.")
 
+        # A ficha é montada em fluxo e fecha quando o item muda: a leitura
+        # precisa chegar na ordem do ORDER BY. Com `preserve_insertion_order`
+        # desligado (o padrão de `_abrir`), o leitor Arrow do DuckDB 2.0 entrega
+        # os lotes fora de ordem, e a ficha saía partida em pedaços, cada um
+        # recomeçando da abertura — 142 fichas a mais no teste de 3 filiais de
+        # 26/11/2026. A ordem é ligada só para esta leitura.
+        con.execute("SET preserve_insertion_order = true")
         leitor = con.execute("""
             SELECT * FROM lancamentos
             ORDER BY cnpj, codigo, data, prioridade, origem, documento
         """).to_arrow_reader(LINHAS_POR_LOTE)
-        _percorrer(leitor, aberturas, ficha3, fichas, resumo, total,
-                   uf_por_cnpj, descricoes or {}, avisar, deve_parar, venda_a_consumidor, valores,
-                   origens, resolver_sem_destaque=info["tem_icms_proprio"])
+        try:
+            _percorrer(leitor, aberturas, ficha3, fichas, resumo, total,
+                       uf_por_cnpj, descricoes or {}, avisar, deve_parar, venda_a_consumidor, valores,
+                       origens, resolver_sem_destaque=info["tem_icms_proprio"])
+        finally:
+            # o leitor aberto (no cancelamento) prende a conexão
+            leitor.close()
+            con.execute("SET preserve_insertion_order = false")
         # conexão nova para a conferência: a do percurso ainda segura o leitor
         # (a lição do índice da etapa 4). O banco é em arquivo, as tabelas ficam
         del leitor
