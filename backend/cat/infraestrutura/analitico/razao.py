@@ -307,6 +307,11 @@ ESQUEMA_FICHAS = pa.schema([
     ("saidas_com_reducao", pa.int32()),
     ("saidas_indefinidas", pa.int32()),
     ("linhas_sem_fator", pa.int32()),
+    # de onde veio a abertura: `ficha_anterior` (o saldo final da Ficha 3 do
+    # período anterior) ou `bloco_h` (o inventário, valorado pelas entradas). A
+    # quantidade do bloco H fica ao lado para conciliar as duas
+    ("abertura_origem", pa.string()),
+    ("abertura_bloco_h", pa.decimal128(24, 6)),
 ])
 
 # o que a conferência com o inventário acrescenta a cada ficha
@@ -495,6 +500,9 @@ class Fontes:
     depara: str | None = None
     # o parquet com as correções à mão do trabalho, escrito pela etapa
     correcoes: str | None = None
+    # o saldo com que a Ficha 3 de um período anterior terminou (cnpj, codigo,
+    # quantidade, valor): onde ele tem o item, a abertura é ele, e não o bloco H
+    saldo_anterior: str | None = None
 
 
 class PeriodoSemMovimento(ValueError):
@@ -546,6 +554,8 @@ class ResumoDaMontagem:
     fichas_abertura_valorada: int = 0
     fichas_abertura_parcial: int = 0
     icms_da_abertura: Decimal = Decimal(0)
+    fichas_abertura_da_ficha_anterior: int = 0
+    icms_da_ficha_anterior: Decimal = Decimal(0)
     # transferências recebidas sem o retido, valoradas pelas entradas mais
     # recentes do remetente (§ 5º da CAT 42/2018): inteiras, só em parte, e as
     # que o remetente não tinha entrada para cobrir
@@ -634,9 +644,18 @@ def montar(
             "SELECT count(*), count(DISTINCT (cnpj, codigo_original)) FROM lancamentos "
             "WHERE codigo_original <> codigo").fetchone()
         _valorar_transferencias(con, destino, resumo, uf_por_cnpj)
-        aberturas = {(c, k): q for c, k, q in con.execute(
-            "SELECT cnpj, codigo, quantidade FROM abertura").fetchall()}
-        valores = _valorar_aberturas(con, aberturas)
+        aberturas, origens, do_bloco_h, da_ficha = {}, {}, {}, {}
+        for c, k, q, origem, valor, q_bloco in con.execute(
+                "SELECT cnpj, codigo, quantidade, origem, valor_anterior, quantidade_bloco_h "
+                "FROM abertura").fetchall():
+            aberturas[(c, k)] = q
+            origens[(c, k)] = (origem, q_bloco)
+            if origem == "ficha_anterior":
+                da_ficha[(c, k)] = ValorDaAbertura(Decimal(valor or 0), Decimal(q), Decimal(q))
+            else:
+                do_bloco_h[(c, k)] = q
+        # o saldo da ficha anterior já vem com o ICMS: só o bloco H é valorado
+        valores = {**_valorar_aberturas(con, do_bloco_h), **da_ficha}
         total = con.execute("SELECT count(*) FROM lancamentos").fetchone()[0]
         if total == 0 and not aberturas and info["base_inicio"] is not None and fontes.periodo:
             raise PeriodoSemMovimento(
@@ -649,7 +668,8 @@ def montar(
             ORDER BY cnpj, codigo, data, prioridade, origem, documento
         """).to_arrow_reader(LINHAS_POR_LOTE)
         _percorrer(leitor, aberturas, ficha3, fichas, resumo, total,
-                   uf_por_cnpj, descricoes or {}, avisar, deve_parar, venda_a_consumidor, valores)
+                   uf_por_cnpj, descricoes or {}, avisar, deve_parar, venda_a_consumidor, valores,
+                   origens)
         # conexão nova para a conferência: a do percurso ainda segura o leitor
         # (a lição do índice da etapa 4). O banco é em arquivo, as tabelas ficam
         del leitor
@@ -679,6 +699,50 @@ def montar(
     return resumo
 
 
+def _juntar_saldo_anterior(con, saldo_anterior: str | None) -> None:
+    """A abertura começa onde a Ficha 3 anterior terminou (decisão do Victor,
+    26/11/2026; até ali valia sempre o bloco H).
+
+    Onde a ficha anterior tem o item, a quantidade e o ICMS são os do saldo
+    final dela, mesmo que seja zero: a ficha nova começa ali. O bloco H, já
+    convertido, fica como reserva para o item que a ficha anterior não tem e
+    para o estabelecimento que não tem ficha anterior. A quantidade dele fica
+    ao lado nos dois casos, para o quadro de conciliação.
+
+    A ficha anterior está na unidade da ficha (UNID_INV) e com o código do
+    cliente: o de-para vale para ela como para o inventário.
+    """
+    con.execute("ALTER TABLE abertura ADD COLUMN IF NOT EXISTS origem VARCHAR")
+    con.execute("ALTER TABLE abertura ADD COLUMN IF NOT EXISTS valor_anterior DECIMAL(38, 15)")
+    con.execute("ALTER TABLE abertura ADD COLUMN IF NOT EXISTS quantidade_bloco_h DECIMAL(38, 9)")
+    con.execute("UPDATE abertura SET origem = 'bloco_h', quantidade_bloco_h = quantidade")
+    if not saldo_anterior or not os.path.isfile(saldo_anterior):
+        return
+    con.execute(f"""
+        CREATE OR REPLACE TABLE saldo_anterior AS
+        SELECT s.cnpj, coalesce(d.codigo_destino, s.codigo) AS codigo,
+               sum(s.quantidade * coalesce(d.fator, 1)) AS quantidade, sum(s.valor) AS valor
+        FROM read_parquet('{_escapar(saldo_anterior)}') s
+        LEFT JOIN depara d ON d.cnpj = s.cnpj AND d.codigo_origem = s.codigo
+        WHERE s.cnpj IN (SELECT cnpj FROM estabs)
+          AND coalesce(d.codigo_destino, s.codigo) IN (SELECT codigo FROM codigos)
+        GROUP BY 1, 2
+    """)
+    con.execute("""
+        CREATE OR REPLACE TABLE abertura AS
+        SELECT a.cnpj, a.codigo, a.quantidade, a.sem_fator, 'bloco_h' AS origem,
+               CAST(NULL AS DECIMAL(38, 15)) AS valor_anterior,
+               CAST(a.quantidade AS DECIMAL(38, 9)) AS quantidade_bloco_h
+        FROM abertura a
+        WHERE NOT EXISTS (SELECT 1 FROM saldo_anterior s WHERE s.cnpj = a.cnpj AND s.codigo = a.codigo)
+        UNION ALL
+        SELECT s.cnpj, s.codigo, s.quantidade, false, 'ficha_anterior', s.valor,
+               CAST(a.quantidade AS DECIMAL(38, 9))
+        FROM saldo_anterior s LEFT JOIN abertura a ON a.cnpj = s.cnpj AND a.codigo = s.codigo
+        WHERE s.quantidade <> 0 OR s.valor <> 0
+    """)
+
+
 def _valorar_aberturas(con, aberturas: dict) -> dict[tuple[str, str], ValorDaAbertura]:
     """O ICMS de cada abertura pelas entradas mais recentes até o inventário.
 
@@ -691,8 +755,10 @@ def _valorar_aberturas(con, aberturas: dict) -> dict[tuple[str, str], ValorDaAbe
     entradas: list[EntradaAnterior] = []
     coberto = Decimal(0)
     cursor = con.execute("""
-        SELECT cnpj, codigo, data, quantidade, suportado FROM anteriores
-        ORDER BY cnpj, codigo, data DESC, chave DESC, numero_item DESC
+        SELECT x.cnpj, x.codigo, x.data, x.quantidade, x.suportado FROM anteriores x
+        WHERE EXISTS (SELECT 1 FROM abertura a WHERE a.cnpj = x.cnpj AND a.codigo = x.codigo
+                      AND a.origem = 'bloco_h')
+        ORDER BY x.cnpj, x.codigo, x.data DESC, x.chave DESC, x.numero_item DESC
     """)
     while lote := cursor.fetchmany(LINHAS_POR_LOTE):
         for cnpj, codigo, data_, quantidade, suportado in lote:
@@ -1305,6 +1371,7 @@ def _preparar(con, fontes: Fontes) -> dict:
     else:
         con.execute("CREATE OR REPLACE TABLE abertura (cnpj VARCHAR, codigo VARCHAR, "
                     "quantidade DECIMAL(38, 9), sem_fator BOOLEAN)")
+    _juntar_saldo_anterior(con, fontes.saldo_anterior)
     abertura_sem_fator = con.execute("SELECT count(*) FROM abertura WHERE sem_fator").fetchone()[0]
 
     # as entradas até o dia do inventário, na unidade da ficha: é delas que o
@@ -1677,7 +1744,7 @@ def _confronto(enq: EnquadramentoLegal, linha: dict,
 def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: ResumoDaMontagem,
                total: int, uf_por_cnpj: dict, descricoes: dict, avisar, deve_parar,
                venda_a_consumidor: VendaAConsumidor = VendaAConsumidor.ENQUADRAMENTO_1,
-               valores: dict | None = None) -> None:
+               valores: dict | None = None, origens: dict | None = None) -> None:
     escritor = pq.ParquetWriter(ficha3, ESQUEMA_FICHA3)
     escritor_fichas = pq.ParquetWriter(fichas, ESQUEMA_FICHAS)
     lote: dict[str, list] = {c: [] for c in ESQUEMA_FICHA3.names}
@@ -1771,6 +1838,7 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
 
         ultima = linhas[-1] if linhas else None
         uf = uf_por_cnpj.get(cnpj, "")
+        origem_abertura, q_bloco_h = (origens or {}).get(chave, (None, None))
         for k, val in (("cnpj", cnpj), ("uf", uf), ("codigo", codigo),
                        ("descricao", descricao),
                        ("linhas", len(linhas)),
@@ -1787,7 +1855,10 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                        ("abertura_por_saldo_negativo", aberta_por_negativo.quantize(_Q6)),
                        ("saidas_sem_aliquota", sem_aliq),
                        ("saidas_com_reducao", com_reducao),
-                       ("saidas_indefinidas", indef), ("linhas_sem_fator", sem_fator)):
+                       ("saidas_indefinidas", indef), ("linhas_sem_fator", sem_fator),
+                       ("abertura_origem", origem_abertura),
+                       ("abertura_bloco_h",
+                        None if q_bloco_h is None else Decimal(q_bloco_h).quantize(_Q6))):
             lote_fichas[k].append(val)
         resumo.fichas += 1
         resumo.linhas += len(linhas)
@@ -1811,6 +1882,9 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         resumo.fichas_abertura_valorada += valor_abertura != 0
         resumo.fichas_abertura_parcial += bool(va is not None and va.parcial)
         resumo.icms_da_abertura += valor_abertura
+        if origem_abertura == "ficha_anterior":
+            resumo.fichas_abertura_da_ficha_anterior += 1
+            resumo.icms_da_ficha_anterior += valor_abertura
         resumo.fichas_fora_de_sp += bool(uf) and uf != "SP"
         estabelecimentos.add(cnpj)
         vistos.add(chave)
@@ -2183,6 +2257,8 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
             "fichas_parciais": resumo.fichas_abertura_parcial,
             "fichas_sem_valor": resumo.fichas_abertura_sem_valor,
             "icms": texto(resumo.icms_da_abertura),
+            "fichas_da_ficha_anterior": resumo.fichas_abertura_da_ficha_anterior,
+            "icms_da_ficha_anterior": texto(resumo.icms_da_ficha_anterior),
         },
         "fora_da_ficha": {"uso_e_consumo": resumo.lancamentos_de_uso_e_consumo, "x949": resumo.lancamentos_x949},
         "conferencia_inventario": resumo.conferencia,

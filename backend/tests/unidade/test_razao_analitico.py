@@ -1364,3 +1364,52 @@ class TestTransferenciaSemRetido:
         # a compra com destaque não leva critério nenhum
         cd = linhas[(CD, "X", date(2021, 1, 5))]
         assert (cd["criterio_do_suportado"], cd["suportado_a_estimar"]) == (None, False)
+
+
+class TestAberturaPelaFichaAnterior:
+    """A base de `test_razao_analitico`: o item X da loja A tem 10 un no bloco H
+    de 31/12/2020, valoradas pelas entradas anteriores."""
+
+    @staticmethod
+    def montar_com(fontes, tmp_path, saldos):
+        from dataclasses import replace  # noqa: PLC0415
+        caminho = tmp_path / "saldo_anterior.parquet"
+        pq.write_table(pa.Table.from_pylist(saldos, schema=pa.schema([
+            ("cnpj", pa.string()), ("codigo", pa.string()), ("unidade", pa.string()),
+            ("competencia", pa.date32()), ("quantidade", pa.decimal128(38, 9)),
+            ("valor", pa.decimal128(38, 15))])), str(caminho))
+        destino = tmp_path / "razao"
+        destino.mkdir()
+        resumo = montar(replace(fontes, saldo_anterior=str(caminho)), str(destino),
+                        uf_por_cnpj={A: "SP", B: "SP"})
+        fichas = {(f["cnpj"], f["codigo"]): f for f in pq.read_table(str(destino / ARQUIVO_FICHAS)).to_pylist()}
+        return fichas, resumo
+
+    def test_o_saldo_da_ficha_anterior_e_a_abertura(self, fontes, tmp_path):
+        fichas, resumo = self.montar_com(fontes, tmp_path, [
+            {"cnpj": A, "codigo": "X", "unidade": "UN", "competencia": date(2020, 12, 1),
+             "quantidade": Decimal(7), "valor": Decimal("21.5")}])
+        f = fichas[(A, "X")]
+        assert (f["abertura_quantidade"], f["abertura_valor"], f["abertura_origem"]) == (
+            Decimal(7), Decimal("21.5"), "ficha_anterior")
+        # o bloco H fica ao lado, para conciliar
+        assert f["abertura_bloco_h"] == Decimal(10)
+        assert (resumo.fichas_abertura_da_ficha_anterior, resumo.icms_da_ficha_anterior) == (
+            1, Decimal("21.5"))
+
+    def test_sem_o_item_na_ficha_anterior_vale_o_bloco_h(self, fontes, tmp_path):
+        fichas, resumo = self.montar_com(fontes, tmp_path, [
+            {"cnpj": B, "codigo": "X", "unidade": "UN", "competencia": date(2020, 12, 1),
+             "quantidade": Decimal(3), "valor": Decimal(6)}])
+        f = fichas[(A, "X")]
+        assert (f["abertura_quantidade"], f["abertura_origem"], f["abertura_bloco_h"]) == (
+            Decimal(10), "bloco_h", Decimal(10))
+        # B não tem movimento de X, mas a ficha começa com o saldo anterior
+        assert fichas[(B, "X")]["abertura_origem"] == "ficha_anterior"
+
+    def test_item_zerado_na_ficha_anterior_comeca_do_zero(self, fontes, tmp_path):
+        fichas, _ = self.montar_com(fontes, tmp_path, [
+            {"cnpj": A, "codigo": "X", "unidade": "UN", "competencia": date(2020, 12, 1),
+             "quantidade": Decimal(0), "valor": Decimal(0)}])
+        # o bloco H não entra: a ficha nova começa onde a anterior terminou
+        assert fichas[(A, "X")]["abertura_quantidade"] == Decimal(0)

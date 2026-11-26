@@ -60,6 +60,7 @@ from cat.infraestrutura.analitico.razao import (
     serializar,
 )
 from cat.infraestrutura.analitico.suportado import ARQUIVO_SUPORTADO, ApuracaoCancelada
+from cat.infraestrutura.arquivos.ficha3_anterior import ARQUIVO_SALDO_ANTERIOR, gravar_saldos
 from cat.infraestrutura.arquivos.gerencial import relatorios_do_lote
 from cat.infraestrutura.repositorios.banco import Sessao
 from cat.infraestrutura.repositorios.modelos import (
@@ -235,12 +236,14 @@ def _rodar(execucao: ExecucaoDB, destino: str, sessao: Session, diario: Diario) 
     correcoes = gravar_correcoes(execucao.projeto_id, os.path.join(destino, ARQUIVO_CORRECOES), sessao)
     if correcoes:
         diario.anotar("info", f"{milhar(correcoes)} correções à mão do trabalho entram na montagem.")
+    saldo_anterior = _gravar_saldo_anterior(execucao.projeto_id, periodo, destino, sessao, diario)
     fontes = Fontes(movimentacao=movimentos.pasta_de_trabalho,
                     apuracao=apuracao.pasta_de_trabalho,
                     saidas_do_relatorio=caminho_saidas,
                     periodo=periodo,
                     depara=os.path.join(destino, ARQUIVO_DEPARA) if depara else None,
-                    correcoes=os.path.join(destino, ARQUIVO_CORRECOES) if correcoes else None)
+                    correcoes=os.path.join(destino, ARQUIVO_CORRECOES) if correcoes else None,
+                    saldo_anterior=saldo_anterior)
     venda = venda_a_consumidor_do_projeto(execucao.projeto_id, sessao)
     diario.anotar("info", f"Venda a consumidor final: {venda.rotulo.lower()} (escolha do trabalho).")
     resumo = montar(fontes, destino, uf_por_cnpj=ufs,
@@ -329,6 +332,32 @@ def gravar_correcoes(projeto_id: int, destino: str, sessao: Session) -> int:
                           ("valor", pa.string())])), destino)
     log.info("correções à mão na montagem", extra={"projeto_id": projeto_id, "correcoes": len(ativas)})
     return len(ativas)
+
+
+def _gravar_saldo_anterior(projeto_id: int, periodo, destino: str, sessao: Session,
+                           diario) -> str | None:
+    """O saldo final da Ficha 3 anterior, quando o trabalho a importou.
+
+    A abertura começa onde ela terminou (decisão do Victor, 26/11/2026). Sem
+    ficha anterior, ou sem período no cadastro, vale o bloco H, como antes.
+    """
+    if not periodo or not periodo[0]:
+        return None
+    arquivos = caminhos_do_projeto(projeto_id, (TipoDeArquivo.FICHA3_ANTERIOR,), sessao)
+    if not arquivos:
+        return None
+    caminho = os.path.join(destino, ARQUIVO_SALDO_ANTERIOR)
+    lidos = gravar_saldos(list(arquivos), periodo[0], caminho)
+    diario.base["ficha_anterior"] = {"arquivos": lidos.arquivos, "ignorados": lidos.ignorados,
+                                     "itens": lidos.itens, "icms": round(lidos.icms, 2),
+                                     "defasados": lidos.defasados}
+    diario.anotar("info", f"Ficha 3 anterior: o saldo final de {milhar(lidos.itens)} itens em "
+                          f"{lidos.arquivos} estabelecimentos é a abertura; o bloco H fica para "
+                          "o que ela não tem.")
+    if lidos.defasados:
+        diario.anotar("aviso", f"{len(lidos.defasados)} estabelecimentos têm a Ficha 3 anterior "
+                               "terminando antes do mês que precede o período; vale o último mês dela.")
+    return caminho if lidos.itens else None
 
 
 def venda_a_consumidor_do_projeto(projeto_id: int, sessao: Session) -> VendaAConsumidor:

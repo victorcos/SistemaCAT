@@ -137,6 +137,9 @@ class TipoDeArquivo(str, Enum):
     CAT42_ARQUIVO_DIGITAL = "cat42_arquivo_digital"
     # lista de chaves canceladas na SEFAZ (TXT, CSV ou planilha com "cancel" no nome)
     LISTA_DE_CANCELADAS = "lista_de_canceladas"
+    # a Ficha 3 de um período anterior, achatada (uma por estabelecimento e
+    # mês): o saldo final dela é a abertura do trabalho (decisão de 26/11/2026)
+    FICHA3_ANTERIOR = "ficha3_anterior"
     COMPACTADO = "compactado"
     NAO_BAIXADO = "nao_baixado"
     DESCONHECIDO = "desconhecido"
@@ -159,6 +162,7 @@ class TipoDeArquivo(str, Enum):
             TipoDeArquivo.GERENCIAL_RESUMO: "Resumo por produto",
             TipoDeArquivo.CAT42_ARQUIVO_DIGITAL: "Arquivo digital da CAT 42",
             TipoDeArquivo.LISTA_DE_CANCELADAS: "Lista de notas canceladas",
+            TipoDeArquivo.FICHA3_ANTERIOR: "Ficha 3 de período anterior",
             TipoDeArquivo.COMPACTADO: "Compactado",
             TipoDeArquivo.NAO_BAIXADO: "Não baixado do OneDrive",
             TipoDeArquivo.DESCONHECIDO: "Não reconhecido",
@@ -217,6 +221,7 @@ _MODULOS_POR_TIPO: dict[TipoDeArquivo, tuple[str, ...]] = {
     TipoDeArquivo.GERENCIAL_SEM_ST: ("icms",),
     TipoDeArquivo.GERENCIAL_INVENTARIO: ("icms",),
     TipoDeArquivo.LISTA_DE_CANCELADAS: ("icms",),
+    TipoDeArquivo.FICHA3_ANTERIOR: ("icms",),
 }
 
 # Os relatórios que trazem **movimento** — linha de item de documento. São dois

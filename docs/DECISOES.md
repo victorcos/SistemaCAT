@@ -9540,3 +9540,37 @@ a saída com CST 40/41/50. Não há complemento.
 - `VendaAConsumidor.cupom_no_zero` vale para as duas escolhas que põem o cupom
   no 0. É ela que deixa a devolução de venda interna no COD_LEGAL 0 do arquivo.
   A devolução vinda de fora do estado (2.xxx) continua no 4.
+
+---
+
+## 2026-11-26 — A abertura começa onde a Ficha 3 anterior terminou
+
+**Contexto.** Até aqui, a abertura do razão era sempre o bloco H do dia
+anterior ao período, valorado pelas entradas mais recentes (item 3.3.8). No
+projeto 1, em 19/11/2026, essa regra foi mantida mesmo com as Fichas 3 de
+2018–2025 já transmitidas, porque o saldo delas diverge muito do inventário.
+
+**Decisão do Victor.** A Ficha 3 é contínua: o período novo transcreve o saldo
+do anterior (item 3.3.1). Quando o trabalho importa a Ficha 3 anterior, a
+abertura é o **saldo final dela**, em quantidade e ICMS suportado. O bloco H
+fica como reserva para o item que a ficha anterior não tem e para o
+estabelecimento que não tem ficha anterior. Isso reverte a decisão de 19/11.
+
+- O arquivo é a ficha achatada de outra ferramenta, uma por estabelecimento e
+  mês. Ele ganha um tipo próprio, `ficha3_anterior` (`ficha3_anterior.py`), que
+  o classificador reconhece pelo cabeçalho. As posições do saldo saem do
+  "Valor Total do Saldo", porque o cabeçalho repete "Quantidade" três vezes.
+- Para cada estabelecimento vale o mês mais recente antes do início do
+  período, e dentro dele a última linha de cada item pela ordem. O
+  estabelecimento cuja ficha termina antes do mês anterior ao período é contado
+  em `defasados`.
+- O item que está zerado na ficha anterior começa do zero, e o bloco H não
+  entra. O de-para vale para a ficha anterior como vale para o inventário.
+- A lista de fichas ganha `abertura_origem` (`ficha_anterior` ou `bloco_h`) e
+  `abertura_bloco_h`, a quantidade do inventário ao lado, que é o quadro de
+  conciliação. O resumo conta as fichas abertas pela ficha anterior e o ICMS
+  delas.
+
+**O que fica de fora.** A unidade da ficha anterior (UNID_INV) é tomada como a
+da nossa ficha: não há conversão. O item zerado na ficha anterior e sem
+movimento no período não gera ficha.

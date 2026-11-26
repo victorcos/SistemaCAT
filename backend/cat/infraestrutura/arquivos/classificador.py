@@ -313,6 +313,19 @@ def _da_planilha_de_canceladas(caminho: str, tamanho: int) -> ArquivoDoLote | No
                          detalhe=f"{chaves} chaves nas primeiras linhas")
 
 
+def _da_ficha3_anterior(caminho: str, tamanho: int, texto: str) -> ArquivoDoLote | None:
+    """A Ficha 3 achatada de outra ferramenta: o cabeçalho diz (ver `ficha3_anterior`)."""
+    from cat.infraestrutura.arquivos.ficha3_anterior import colunas_do_cabecalho, identificar  # noqa: PLC0415
+    if colunas_do_cabecalho(next(iter(texto.splitlines()), "")) is None:
+        return None
+    ident = identificar(caminho)
+    return ArquivoDoLote(caminho=caminho, nome=os.path.basename(caminho), tamanho=tamanho,
+                         tipo=TipoDeArquivo.FICHA3_ANTERIOR,
+                         cnpj=ident.cnpj if ident else None,
+                         competencia=ident.competencia if ident else None, uf="SP",
+                         detalhe="saldo final vira a abertura do trabalho")
+
+
 def _do_gerencial(caminho: str, tamanho: int) -> ArquivoDoLote:
     try:
         insp = inspecionar(caminho)
@@ -391,6 +404,9 @@ def classificar(caminho: str, tamanho: int | None = None) -> ArquivoDoLote:
         return da_cat42
 
     if minusculo.endswith(EXTENSOES_TEXTO) or minusculo.endswith(".csv"):
+        anterior = _da_ficha3_anterior(caminho, tamanho, texto)
+        if anterior is not None:
+            return anterior
         lista = _da_lista_de_canceladas(caminho, tamanho, texto)
         if lista is not None:
             return lista

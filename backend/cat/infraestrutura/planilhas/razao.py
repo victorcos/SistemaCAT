@@ -225,6 +225,11 @@ COLUNAS_FICHAS = (
     Coluna("linhas", "Linhas", "numero_inteiro", 8),
     Coluna("abertura_quantidade", "Abertura (quantidade)", "quantidade", 14),
     Coluna("abertura_sem_valor", "Abertura sem ICMS suportado", "texto", 12),
+    # ficha_anterior: o saldo final da Ficha 3 do período anterior; bloco_h: o
+    # inventário valorado pelas entradas. O bloco H ao lado concilia os dois
+    Coluna("abertura_origem", "Origem da abertura", "texto", 16),
+    Coluna("abertura_valor", "Abertura (ICMS suportado)", "numero", 16),
+    Coluna("abertura_bloco_h", "Bloco H na abertura (quantidade)", "quantidade", 14),
     Coluna("entradas", "Entradas", "quantidade", 14),
     Coluna("saidas", "Saídas", "quantidade", 14),
     Coluna("saldo_quantidade", "Saldo final (quantidade)", "quantidade", 14),
