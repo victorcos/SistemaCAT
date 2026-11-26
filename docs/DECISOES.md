@@ -9515,3 +9515,28 @@ códigos que têm abertura na filial (a tabela `anteriores` é a da abertura).
 Um destaque de antes do período, num código sem estoque inicial naquela
 filial, não é visto. A regra vale só para a transferência recebida, e não para
 a compra de fornecedor sem retido.
+
+---
+
+## 2026-11-26 — Venda a consumidor: só a perda e o 6.409 apuram
+
+**Contexto.** No teste de 3 filiais do projeto 1, que estava em
+`enquadramento_1`, o complemento ficou alto: o cupom ia para o enquadramento 1
+e, quando a venda saía acima da base presumida, gerava complemento.
+
+**Decisão do Victor.** Há uma terceira escolha por trabalho, `so_perda_e_6409`.
+Nela só duas saídas apuram: a baixa de estoque (5.927, enquadramento 2) e a
+transferência interestadual com ST (6.409, enquadramento 4). Todo o resto vai no
+**0**: o cupom, a revenda, a transferência interna, as outras interestaduais e
+a saída com CST 40/41/50. Não há complemento.
+
+- A diferença para `demais_saidas` está nas saídas com CST 40/41/50 e nas
+  outras interestaduais. Em `demais_saidas` elas vão para o 3 e o 4 e pedem
+  ressarcimento. Nas 3 filiais do teste, em 2026, eram 483 mil saídas com CST
+  40/41.
+- A regra fica no domínio (`classificar`, `CFOP_INTERESTADUAL_QUE_APURA`). Ela é
+  espelhada em `Cat.Dominio/Projeto/VendaAConsumidor.cs`, que manda as opções
+  para a tela.
+- `VendaAConsumidor.cupom_no_zero` vale para as duas escolhas que põem o cupom
+  no 0. É ela que deixa a devolução de venda interna no COD_LEGAL 0 do arquivo.
+  A devolução vinda de fora do estado (2.xxx) continua no 4.

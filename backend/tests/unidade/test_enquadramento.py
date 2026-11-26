@@ -149,6 +149,34 @@ class TestVendaAConsumidorEEscolhaDoTrabalho:
             VendaAConsumidor.de("enquadramento_9")
 
 
+class TestSoPerdaE6409:
+    """Decisão de 26/11/2026: só a perda (5.927) e a transferência interestadual
+    com ST (6.409) apuram; todo o resto vai no 0, sem complemento."""
+
+    SO = VendaAConsumidor.SO_PERDA_E_6409
+
+    def test_os_dois_que_apuram(self):
+        assert classificar("5927", venda_a_consumidor=self.SO) is E.FATO_GERADOR_NAO_REALIZADO
+        assert classificar("6.409", venda_a_consumidor=self.SO) is E.OUTRO_ESTADO
+
+    @pytest.mark.parametrize("cfop, cst, modelo", [
+        ("5405", "060", "65"),     # cupom
+        ("5102", "000", "55"),     # revenda
+        ("5405", "040", "59"),     # isenta: em DEMAIS_SAIDAS iria para o 3
+        ("5102", "041", "55"),
+        ("6404", "060", "55"),     # outra interestadual: em DEMAIS_SAIDAS iria para o 4
+        ("6152", "000", "55"),
+        ("5409", "060", "55"),     # transferência interna
+    ])
+    def test_o_resto_vai_no_zero(self, cfop, cst, modelo):
+        assert classificar(cfop, cst, modelo=modelo, venda_a_consumidor=self.SO) is E.DEMAIS_SAIDAS
+
+    def test_cupom_no_zero(self):
+        assert self.SO.cupom_no_zero and VendaAConsumidor.DEMAIS_SAIDAS.cupom_no_zero
+        assert not VendaAConsumidor.ENQUADRAMENTO_1.cupom_no_zero
+        assert VendaAConsumidor.de("so_perda_e_6409") is self.SO
+
+
 class TestEntradaMalFormada:
     def test_sem_cfop_nao_enquadra(self):
         assert classificar("") is None

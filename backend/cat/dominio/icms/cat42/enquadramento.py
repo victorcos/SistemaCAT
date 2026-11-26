@@ -70,13 +70,25 @@ class VendaAConsumidor(str, Enum):
 
     ENQUADRAMENTO_1 = "enquadramento_1"
     DEMAIS_SAIDAS = "demais_saidas"
+    # Decisão do Victor, 26/11/2026, para o projeto 1: o cupom e a revenda vão
+    # no 0 e só DOIS CFOPs apuram — a perda (5.927, enquadramento 2) e a
+    # transferência interestadual com ST (6.409, enquadramento 4). A saída com
+    # CST 40/41/50 e as demais interestaduais também ficam no 0: em
+    # `DEMAIS_SAIDAS` elas iriam para o 3 e o 4 e pediriam ressarcimento.
+    SO_PERDA_E_6409 = "so_perda_e_6409"
 
     @property
     def rotulo(self) -> str:
         return {
             VendaAConsumidor.ENQUADRAMENTO_1: "Enquadramento 1: pede ressarcimento e recolhe complemento",
             VendaAConsumidor.DEMAIS_SAIDAS: "Demais saídas (0): só as perdas e as interestaduais",
+            VendaAConsumidor.SO_PERDA_E_6409: "Só 5.927 e 6.409: o resto no 0, sem complemento",
         }[self]
+
+    @property
+    def cupom_no_zero(self) -> bool:
+        """A venda comum vai no enquadramento 0 (não há complemento)."""
+        return self is not VendaAConsumidor.ENQUADRAMENTO_1
 
     @classmethod
     def de(cls, valor: str | None) -> "VendaAConsumidor":
@@ -86,6 +98,10 @@ class VendaAConsumidor(str, Enum):
 # Baixa de estoque: perecimento, deterioração, roubo, furto, extravio. O manual
 # manda uma única nota por período, um item por mercadoria.
 CFOP_BAIXA_DE_ESTOQUE = frozenset({"5927", "5.927"})
+
+# Em `VendaAConsumidor.SO_PERDA_E_6409`, a única saída para outro estado que
+# apura: a transferência de mercadoria com ST já retida.
+CFOP_INTERESTADUAL_QUE_APURA = frozenset({"6409"})
 
 # Transferência entre estabelecimentos do mesmo titular. Não é saída a
 # consumidor: a mercadoria segue para revenda, então é "demais saídas".
@@ -206,6 +222,12 @@ def classificar(
     # 1. o que o manual fixa
     if limpo in {_limpo(c) for c in CFOP_BAIXA_DE_ESTOQUE}:
         return EnquadramentoLegal.FATO_GERADOR_NAO_REALIZADO
+
+    # o trabalho que só apura a perda e o 6.409: todo o resto é 0
+    if venda_a_consumidor is VendaAConsumidor.SO_PERDA_E_6409:
+        if limpo in CFOP_INTERESTADUAL_QUE_APURA:
+            return EnquadramentoLegal.OUTRO_ESTADO
+        return EnquadramentoLegal.DEMAIS_SAIDAS
 
     if e_interestadual(limpo):
         return EnquadramentoLegal.OUTRO_ESTADO

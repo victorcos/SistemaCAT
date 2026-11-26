@@ -679,7 +679,7 @@ def _registro_da_linha(l: dict, venda: VendaAConsumidor, n: _Contagem) -> tuple 
                 if vl_confr is None:
                     n.confronto_pendente += 1
     elif not entrada and devolucao:                         # devolução de venda
-        cod_legal = cod_legal_da_devolucao_de_venda(l["cfop"] or "", venda is VendaAConsumidor.DEMAIS_SAIDAS)
+        cod_legal = cod_legal_da_devolucao_de_venda(l["cfop"] or "", venda.cupom_no_zero)
         if cod_legal is None:
             n.devolucoes_sem_venda += 1
         elif cod_legal > 0:
