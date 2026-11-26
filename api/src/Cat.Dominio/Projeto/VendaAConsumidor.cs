@@ -17,6 +17,7 @@ public static class VendaAConsumidor
 {
     public const string Enquadramento1 = "enquadramento_1";
     public const string DemaisSaidas = "demais_saidas";
+    public const string SoPerdaE6409 = "so_perda_e_6409";
 
     public static readonly IReadOnlyList<DefinicaoDeVendaAConsumidor> Todas =
     [
@@ -28,6 +29,11 @@ public static class VendaAConsumidor
         new(DemaisSaidas, "Demais saídas (0): só as perdas e as interestaduais",
             "Como a SEFAZ já aceitou em entregas reais. O cupom vai com enquadramento 0 e não há " +
             "complemento; o ressarcimento vem da baixa de estoque (5.927) e da venda para outro estado."),
+        // decisão do Victor, 26/11/2026: só dois CFOPs apuram
+        new(SoPerdaE6409, "Só 5.927 e 6.409: o resto no 0, sem complemento",
+            "O cupom, a revenda, a saída isenta (CST 40/41/50) e as demais interestaduais vão com " +
+            "enquadramento 0. Só a baixa de estoque (5.927) e a transferência interestadual com ST " +
+            "(6.409) pedem ressarcimento; não há complemento."),
     ];
 
     public static DefinicaoDeVendaAConsumidor? Buscar(string? valor) => Todas.FirstOrDefault(v => v.Valor == valor);

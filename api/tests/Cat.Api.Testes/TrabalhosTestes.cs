@@ -438,7 +438,7 @@ public sealed class TrabalhosTestes(BancoDeTeste banco, MotorInternoFalso _motor
         var projeto = await Projeto(c, empresa);
 
         var opcoes = await Json(await c.GetAsync("/api/venda-a-consumidor"));
-        Assert.Equal(["enquadramento_1", "demais_saidas"], opcoes.EnumerateArray().Select(o => o.GetProperty("valor").GetString()));
+        Assert.Equal(["enquadramento_1", "demais_saidas", "so_perda_e_6409"], opcoes.EnumerateArray().Select(o => o.GetProperty("valor").GetString()));
 
         var r = await c.PutAsJsonAsync($"/api/projetos/{projeto}/venda-a-consumidor", new { valor = "demais_saidas" });
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
@@ -458,7 +458,7 @@ public sealed class TrabalhosTestes(BancoDeTeste banco, MotorInternoFalso _motor
         Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
         r = await c.PutAsJsonAsync($"/api/projetos/{projeto}/venda-a-consumidor", new { valor = "enquadramento_9" });
         Assert.Equal(HttpStatusCode.UnprocessableEntity, r.StatusCode);
-        Assert.Contains("enquadramento_1, demais_saidas", await Detalhe(r));
+        Assert.Contains("enquadramento_1, demais_saidas, so_perda_e_6409", await Detalhe(r));
 
         // quem não enxerga a empresa não muda
         var (_, _, outro) = await Pessoa("analista");

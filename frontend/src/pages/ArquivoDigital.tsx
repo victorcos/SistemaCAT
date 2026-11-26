@@ -82,6 +82,7 @@ const tamanho = (bytes: number | undefined) => {
 const VENDA: Record<string, string> = {
   enquadramento_1: "enquadramento 1 (ressarcimento e complemento)",
   demais_saidas: "demais saídas (0), só perdas e interestaduais",
+  so_perda_e_6409: "0, só 5.927 e 6.409 apuram",
 };
 
 /** a chave desta etapa no servidor: decide a frente a que o "voltar" leva */

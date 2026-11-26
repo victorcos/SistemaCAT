@@ -65,7 +65,7 @@ export interface Projeto {
   responsavel: string | null;
   responsavel_id: number | null;
   comentarios: number;
-  /** como o cupom entra no razão: "enquadramento_1" (o manual) ou "demais_saidas" (como a empresa 17) */
+  /** como o cupom entra no razão: "enquadramento_1" (o manual) ou "demais_saidas" (como a empresa 17) ou "so_perda_e_6409" (só 5.927 e 6.409 apuram) */
   venda_a_consumidor: string;
   venda_a_consumidor_rotulo: string;
 }
