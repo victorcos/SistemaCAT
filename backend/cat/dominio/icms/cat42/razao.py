@@ -306,6 +306,17 @@ def valor_da_abertura(quantidade: Decimal, entradas) -> ValorDaAbertura:
     return _compor(quantidade, sorted(entradas, key=lambda e: (e.data, e.ordem), reverse=True))
 
 
+def valor_pelas_entradas_seguintes(quantidade: Decimal, entradas) -> ValorDaAbertura:
+    """O ICMS das primeiras entradas a partir de uma data, da mais antiga para a
+    mais nova.
+
+    É o caminho da saída de enquadramento 2 ou 4 que aconteceu antes de qualquer
+    entrada com destaque do ICMS próprio: vale a primeira que veio depois, e as
+    seguintes se uma não basta (decisão do Victor, 26/11/2026).
+    """
+    return _compor(quantidade, sorted(entradas, key=lambda e: (e.data, e.ordem)))
+
+
 def _compor(quantidade: Decimal, entradas_em_ordem) -> ValorDaAbertura:
     """Usa as entradas NA ORDEM DADA até cobrir a quantidade, com média
     ponderada quando uma não basta (item 3.3.8)."""

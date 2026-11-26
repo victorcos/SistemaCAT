@@ -51,6 +51,7 @@ def _linha(**campos) -> dict:
         "numero_documento": "1", "serie": "1", "codigo_original": None,
         "credito_operacao_propria": d(0),
         "criterio_do_suportado": None, "filial_do_destaque": None, "suportado_a_estimar": False,
+        "criterio_do_efetivo": None,
     }
     base.update(campos)
     return base

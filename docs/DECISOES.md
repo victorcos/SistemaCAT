@@ -9574,3 +9574,42 @@ estabelecimento que não tem ficha anterior. Isso reverte a decisão de 19/11.
 **O que fica de fora.** A unidade da ficha anterior (UNID_INV) é tomada como a
 da nossa ficha: não há conversão. O item zerado na ficha anterior e sem
 movimento no período não gera ficha.
+
+## 2026-11-26 — Coluna 21 só com destaque, 40% sem ele, e a chave do C100
+
+**Contexto.** Na v4 do teste de 3 filiais, 18.783 baixas de 5.927 tinham o
+ICMS efetivo da entrada (coluna 21) zero e devolviam o suportado inteiro de
+ressarcimento. A causa era a transferência CST 60: ela entra com ICMS próprio
+zero e diluía a média do item 3.3.8. Além disso, 364 notas de 5.927 do
+relatório do ERP vinham sem chave.
+
+**Decisão do Victor** (anotada na planilha da v3):
+
+1. Nos enquadramentos 2 e 4, a coluna 21 é o ICMS próprio unitário da entrada
+   vezes a quantidade baixada. Só conta a entrada **com destaque** do ICMS
+   próprio (maior que zero). Continua valendo o item 3.3.8: as mais recentes
+   até a saída, com média ponderada.
+2. Se a ficha não tem entrada com destaque **em momento nenhum**, a coluna 21 é
+   40% do valor unitário do saldo vezes a quantidade
+   (`PERCENTUAL_SEM_DESTAQUE`). O ressarcimento dessa saída fica em 60% do
+   suportado. Se a ficha tem entrada com destaque, mas só depois da saída, vale
+   a primeira depois dela (`valor_pelas_entradas_seguintes`), e as seguintes se
+   uma não basta.
+3. A nota do relatório sem chave ganha a chave do C100 da EFD por
+   estabelecimento, número e data. A NF-e própria vai para a EFD sem C170, por
+   isso o relatório é a fonte da quantidade. Só entra NF-e (modelo 55) de saída
+   e regular, e só quando o par aponta uma nota só. A NFC-e repete números
+   entre séries e anos, e a nota cancelada não é baixa.
+
+- A Ficha 3 ganha `criterio_do_efetivo` (`entrada_anterior`,
+  `entrada_posterior`, `percentual_do_saldo`), e a planilha ganha a coluna
+  "Critério do ICMS Efetivo da Entrada".
+- O resumo ganha `confronto_pela_entrada_posterior`,
+  `confronto_pelo_percentual` e `relatorio_chave_do_c100`.
+- Uma apuração de antes da v0.53, sem a coluna de ICMS próprio, não sabe se
+  houve destaque. Nela, o confronto de 2 e 4 continua pendente, como era.
+
+**O que fica de fora.** A nota que ganha a chave continua sem o nº do item (o
+relatório não traz), então ainda não vira registro do arquivo digital. A regra
+vale para todos os trabalhos, não só para o projeto 1.
+

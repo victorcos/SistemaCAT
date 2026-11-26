@@ -118,6 +118,9 @@ COLUNAS_FICHA3 = (
            "numero", 15, CONFRONTO, "20"),
     Coluna("confronto_entrada", "ICMS Efetivo da Entrada nas Demais Hipóteses",
            "numero", 15, CONFRONTO, "21"),
+    # de onde veio a coluna 21: a entrada com destaque até a saída, a primeira
+    # depois dela, ou 40% do unitário do saldo (decisão de 26/11/2026)
+    Coluna("criterio_do_efetivo", "Critério do ICMS Efetivo da Entrada", "texto", 24, CONFRONTO),
     Coluna("aliquota", "Alíquota do Confronto (%)", "quantidade", 12, CONFRONTO),
     # vazio é o 0200 do cliente; o resto diz onde a alíquota foi buscada e com
     # que prova, para o revisor ver o que foi lido e o que foi deduzido
@@ -187,12 +190,16 @@ DERIVACAO = {
     "motivo_da_correcao": "NULL::VARCHAR",
     "criterio_do_suportado": "CASE criterio_do_suportado {} END".format(" ".join(
         f"WHEN '{c.value}' THEN '{c.rotulo}'" for c in CriterioDoSuportado)),
+    "criterio_do_efetivo": """CASE criterio_do_efetivo
+        WHEN 'entrada_anterior' THEN 'Entrada com destaque até a saída'
+        WHEN 'entrada_posterior' THEN 'Primeira entrada com destaque depois'
+        WHEN 'percentual_do_saldo' THEN '40% do unitário do saldo' END""",
 }
 
 
 # derivações que leem a coluna de mesmo nome: na ficha de uma rodada antiga,
 # que ainda não a tinha, saem nulas em vez de quebrar o download
-_DERIVA_DA_PROPRIA_COLUNA = frozenset({"criterio_do_suportado"})
+_DERIVA_DA_PROPRIA_COLUNA = frozenset({"criterio_do_suportado", "criterio_do_efetivo"})
 
 
 def _derivado(parquet: str, destino: str) -> str:

@@ -293,6 +293,7 @@ class TestCorrecoesPelaPlanilha:
             "numero_item": 1, "modelo": "55", "participante": "C1", "numero_documento": "900",
             "serie": "1", "codigo_original": None, "credito_operacao_propria": Decimal(0),
             "criterio_do_suportado": None, "filial_do_destaque": None, "suportado_a_estimar": False,
+            "criterio_do_efetivo": None,
         }
         parquet = os.path.join(pasta, ARQUIVO_FICHA3)
         pq.write_table(pa.Table.from_pydict({c: [linha[c]] for c in ESQUEMA_FICHA3.names},

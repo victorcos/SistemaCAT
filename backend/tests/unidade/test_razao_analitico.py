@@ -292,6 +292,32 @@ class TestRelatorioSemChave:
         assert not [l for l in ficha(destino) if l["cfop"] == "5929"]
         assert serializar(r)["pendencias"]["relatorio_registrado_em_cupom"] == 1
 
+    def test_a_baixa_ganha_a_chave_do_c100_pelo_numero_e_pela_data(self, fontes, tmp_path):
+        """Decisão do Victor, 26/11/2026: a NF-e própria está na EFD só como C100."""
+        chave = "35210111111111000191550030000408991000000017"
+        doc = {"cnpj": A, "operacao": "saida", "situacao": "00", "data": date(2021, 1, 6)}
+        gravar(os.path.join(fontes.movimentacao, "documentos.parquet"), [
+            ("cnpj", pa.string()), ("chave", pa.string()), ("modelo", pa.string()),
+            ("situacao", pa.string()), ("numero_documento", pa.string()), ("data", pa.date32()),
+            ("operacao", pa.string())], [
+            {**doc, "chave": chave, "modelo": "55", "numero_documento": "000040899"},
+            # a NFC-e de mesmo número não é a nota, e a cancelada não baixa estoque
+            {**doc, "chave": "3" * 44, "modelo": "65", "numero_documento": "40899"},
+            {**doc, "chave": "8" * 44, "modelo": "55", "numero_documento": "40900", "situacao": "02"},
+        ])
+        base = {"cnpj_participante": "", "chave": "", "codigo": "X", "cst_icms": "060",
+                "valor": d(0), "suportado": d(0), "pdv": False, "unidade": A, "data": date(2021, 1, 6),
+                "cfop": "5927", "quantidade": d(1)}
+        acrescentar_linhas(fontes.saidas_do_relatorio, [
+            {**base, "numero_documento": "40899"}, {**base, "numero_documento": "40900"}])
+        destino = tmp_path / "c100"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP"})
+        baixas = {l["numero_documento"]: l for l in ficha(destino) if l["cfop"] == "5927"}
+        assert (baixas["40899"]["chave"], baixas["40899"]["modelo"]) == (chave, "55")
+        assert baixas["40900"]["chave"] in ("", None)
+        assert r.relatorio_chave_do_c100 == 1
+
     def test_a_baixa_sem_item_na_efd_entra_pela_loja_do_relatorio(self, montado):
         destino, _ = montado
         baixas = [l for l in ficha(destino) if l["cfop"] == "5927"]
@@ -790,6 +816,51 @@ class TestConfrontoPelaEntrada:
         venda = next(l for l in ficha(destino) if l["cfop"] == "6102")
         assert venda["icms_efetivo"] is None and venda["credito_operacao_propria"] == 0
         assert (r.confronto_pendente, r.credito_operacao_propria) == (1, 0)
+
+
+class TestEfetivoSemDestaque:
+    """Decisão do Victor, 26/11/2026: só a entrada com destaque do ICMS próprio
+    confronta 2 e 4; sem nenhuma em momento nenhum, 40% do unitário do saldo."""
+
+    def test_sem_destaque_nenhum_vale_40_por_cento_do_saldo(self, fontes, tmp_path):
+        # a entrada tem o ICMS próprio, mas zero: não houve destaque
+        com_venda_para_outro_estado(fontes, d(0))
+        destino = tmp_path / "quarenta"
+        destino.mkdir()
+        r = montar(fontes, str(destino), uf_por_cnpj={A: "SP"})
+        venda = next(l for l in ficha(destino) if l["cfop"] == "6102")
+        # baixou 3,00 de suportado (1,00 a unidade): 40% é 1,20
+        assert (venda["icms_efetivo"], venda["ressarcimento"]) == (d("1.2"), d("1.8"))
+        assert venda["criterio_do_efetivo"] == "percentual_do_saldo"
+        assert (r.confronto_pendente, r.confronto_pelo_percentual, r.confronto_pela_entrada) == (0, 1, 0)
+        assert serializar(r)["confronto_pelo_percentual"] == 1
+
+    def test_com_destaque_marca_a_entrada(self, fontes, tmp_path):
+        com_venda_para_outro_estado(fontes, d(6))
+        destino = tmp_path / "destaque"
+        destino.mkdir()
+        montar(fontes, str(destino), uf_por_cnpj={A: "SP"})
+        venda = next(l for l in ficha(destino) if l["cfop"] == "6102")
+        assert (venda["icms_efetivo"], venda["criterio_do_efetivo"]) == (d("1.8"), "entrada_anterior")
+
+    def test_saida_antes_da_primeira_entrada_com_destaque_usa_as_seguintes(self):
+        from cat.dominio.icms.cat42.razao import EntradaAnterior, Especie, Movimento
+        from cat.infraestrutura.analitico.razao import DadosDaLinha, _resolver_sem_destaque
+        baixa = Movimento(data=date(2021, 1, 1), especie=Especie.SAIDA, quantidade=d(4),
+                          enquadramento=EnquadramentoLegal.FATO_GERADOR_NAO_REALIZADO)
+        venda = Movimento(data=date(2021, 1, 2), especie=Especie.SAIDA, quantidade=d(1),
+                          enquadramento=EnquadramentoLegal.CONSUMIDOR_FINAL)
+        entradas = [EntradaAnterior(date(2021, 1, 5), d(10), d(10), 1),
+                    EntradaAnterior(date(2021, 1, 3), d(2), d(1), 0)]
+        movs, dados, pelo_percentual = _resolver_sem_destaque(
+            [baixa, venda], [DadosDaLinha(), DadosDaLinha()], entradas)
+        # 2 un da de 03/01 (0,50 cada) e 2 da de 05/01 (1,00 cada)
+        assert movs[0].icms_efetivo == d(3) and dados[0].criterio_do_efetivo == "entrada_posterior"
+        # o enquadramento 1 confronta com a saída: não é com ele
+        assert movs[1] is venda and dados[1].criterio_do_efetivo == ""
+        assert pelo_percentual == set()
+        _, _, sem = _resolver_sem_destaque([baixa], [DadosDaLinha()], [])
+        assert sem == {id(baixa)}
 
 
 class TestReducaoDeBase:

@@ -46,11 +46,18 @@ de embalagem é marcada como suspeita de unidade.
 A coluna 21 é o ICMS da operação própria da entrada. Como a saída não diz de
 que nota veio, vale a regra do item 3.3.8: as entradas mais recentes da ficha,
 até a data da saída, suficientes para a quantidade, com média ponderada — a
-mesma regra que valora a abertura (`valor_da_abertura`). Sem entrada com esse
-valor antes da saída, o confronto fica pendente, contado. No enquadramento 4, a
+mesma regra que valora a abertura (`valor_da_abertura`). No enquadramento 4, a
 coluna 21 também é o crédito do art. 271 (coluna 27). Conferido contra a Ficha 3
 da RVZ na empresa 04: 2,15 suportado, 0,63 da entrada, 1,52 de ressarcimento e
 0,63 de crédito.
+
+Decisão do Victor, 26/11/2026: só conta a entrada **com destaque** do ICMS
+próprio (a transferência CST 60, de próprio zero, não dilui mais a média e não
+devolve o suportado inteiro). Sem entrada com destaque até a saída, vale a
+primeira com destaque depois dela; se a ficha não teve entrada com destaque em
+momento nenhum, o efetivo é `PERCENTUAL_SEM_DESTAQUE` (40%) do valor unitário
+do saldo vezes a quantidade baixada. A coluna `criterio_do_efetivo` diz qual
+das três valeu.
 
 ## Ficha com estoque negativo sai do total
 
@@ -101,7 +108,7 @@ import os
 import shutil
 from bisect import bisect_right
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 from decimal import Decimal
 from statistics import median
@@ -127,6 +134,7 @@ from cat.dominio.icms.cat42.razao import (
     ValorDaAbertura,
     valor_da_abertura,
     valor_pelas_entradas_do_remetente,
+    valor_pelas_entradas_seguintes,
     Especie,
     Movimento,
     MovimentoInvalido,
@@ -138,14 +146,23 @@ from cat.dominio.icms.cat42.reducao import (
     icms_efetivo as icms_efetivo_da_saida,
     reducao_da_entrada,
 )
-from cat.infraestrutura.analitico.confronto import _abrir, _escapar, _limpar
+from cat.infraestrutura.analitico.confronto import (
+    SITUACOES_COM_DOCUMENTO,
+    _abrir,
+    _escapar,
+    _limpar,
+)
 from cat.infraestrutura.analitico.itens_do_xml import ARQUIVO_ITENS_DO_XML
 from cat.infraestrutura.analitico.movimentacao import (
     ARQUIVO_CONVERSOES,
     ARQUIVO_ITENS,
     ARQUIVO_MOVIMENTOS,
 )
-from cat.infraestrutura.analitico.movimentos import ARQUIVO_INVENTARIO, ARQUIVO_ITENS_DA_EFD
+from cat.infraestrutura.analitico.movimentos import (
+    ARQUIVO_DOCUMENTOS,
+    ARQUIVO_INVENTARIO,
+    ARQUIVO_ITENS_DA_EFD,
+)
 from cat.infraestrutura.analitico.suportado import (
     ARQUIVO_SUPORTADO,
     ApuracaoCancelada,
@@ -193,6 +210,13 @@ _DEVOLUCAO_DE_COMPRA = frozenset(c for c in CFOP_DEVOLUCAO if c[0] in "567")
 
 _Q4 = Decimal("0.0001")
 _Q6 = Decimal("0.000001")
+# enquadramentos 2 e 4 sem entrada com destaque em momento nenhum da ficha: o
+# ICMS efetivo da entrada é esta fração do valor unitário do saldo vezes a
+# quantidade da saída (decisão do Victor, 26/11/2026)
+PERCENTUAL_SEM_DESTAQUE = Decimal("0.40")
+EFETIVO_PELA_ENTRADA = "entrada_anterior"
+EFETIVO_PELA_ENTRADA_POSTERIOR = "entrada_posterior"
+EFETIVO_PELO_PERCENTUAL = "percentual_do_saldo"
 _Q15 = Decimal("0.000000000000001")
 
 ESQUEMA_SAIDA_DO_RELATORIO = pa.schema([
@@ -277,6 +301,9 @@ ESQUEMA_FICHA3 = pa.schema([
     ("criterio_do_suportado", pa.string()),
     ("filial_do_destaque", pa.string()),
     ("suportado_a_estimar", pa.bool_()),
+    # enquadramentos 2 e 4: de onde veio o ICMS efetivo da entrada (coluna 21) —
+    # `entrada_anterior`, `entrada_posterior` ou `percentual_do_saldo`
+    ("criterio_do_efetivo", pa.string()),
 ])
 
 ESQUEMA_FICHAS = pa.schema([
@@ -533,6 +560,12 @@ class ResumoDaMontagem:
     credito_operacao_propria: Decimal = Decimal(0)
     # saídas de enquadramento 2 e 4 confrontadas com o ICMS próprio das entradas
     confronto_pela_entrada: int = 0
+    # ... pela primeira entrada com destaque depois da saída, e pelo percentual
+    # do saldo, quando a ficha não teve entrada com destaque nenhuma
+    confronto_pela_entrada_posterior: int = 0
+    confronto_pelo_percentual: int = 0
+    # notas do relatório sem chave que ganharam a do C100 da EFD
+    relatorio_chave_do_c100: int = 0
     por_enquadramento: dict = field(default_factory=dict)
     por_competencia: dict = field(default_factory=dict)
     saidas_por_origem: dict = field(default_factory=dict)
@@ -632,6 +665,7 @@ def montar(
         resumo.codigos_com_st = info["codigos"]
         resumo.relatorio_sem_estabelecimento = info["sem_estabelecimento"]
         resumo.relatorio_trocado_pela_efd = info["trocado_pela_efd"]
+        resumo.relatorio_chave_do_c100 = info.get("chave_do_c100", 0)
         resumo.relatorio_registrado_em_cupom = info["registrado_em_cupom"]
         resumo.abertura_sem_fator = info["abertura_sem_fator"]
         resumo.saidas_com_aliquota_do_mes = con.execute(
@@ -669,7 +703,7 @@ def montar(
         """).to_arrow_reader(LINHAS_POR_LOTE)
         _percorrer(leitor, aberturas, ficha3, fichas, resumo, total,
                    uf_por_cnpj, descricoes or {}, avisar, deve_parar, venda_a_consumidor, valores,
-                   origens)
+                   origens, resolver_sem_destaque=info["tem_icms_proprio"])
         # conexão nova para a conferência: a do percurso ainda segura o leitor
         # (a lição do índice da etapa 4). O banco é em arquivo, as tabelas ficam
         del leitor
@@ -697,6 +731,41 @@ def montar(
         "fichas": resumo.fichas, "linhas": resumo.linhas,
         "ressarcimento": str(resumo.ressarcimento), "complemento": str(resumo.complemento)})
     return resumo
+
+
+def _chave_do_c100(con, fontes: "Fontes", inicio: date, fim: date) -> int:
+    """A nota do relatório que veio sem chave ganha a do C100 da EFD.
+
+    A NF-e emitida pela própria loja vai para a EFD sem C170: o C100 tem a
+    chave, o número e a data, mas nenhum item, e por isso o relatório é a única
+    fonte das quantidades. A perda (5.927) do projeto 1 é toda assim: 352 das
+    364 notas do teste estavam na EFD só como C100. Decisão do Victor,
+    26/11/2026: a chave se acha por estabelecimento, número e data.
+
+    Só NF-e (modelo 55) de saída e regular, e só quando o par aponta uma nota
+    só: o número da NFC-e se repete entre séries e anos, e a nota cancelada não
+    é baixa de estoque. Devolve quantas linhas ganharam a chave.
+    """
+    docs = os.path.join(fontes.movimentacao, ARQUIVO_DOCUMENTOS)
+    if not os.path.isfile(docs):
+        return 0
+    situacoes = ", ".join(f"'{x}'" for x in SITUACOES_COM_DOCUMENTO)
+    con.execute(f"""
+        CREATE OR REPLACE TABLE chave_do_c100 AS
+        SELECT cnpj, ltrim(numero_documento, '0') AS numero, data, min(chave) AS chave
+        FROM read_parquet('{_escapar(docs)}')
+        WHERE operacao = 'saida' AND modelo = '55' AND length(chave) = 44
+          AND situacao IN ({situacoes}) AND cnpj IN (SELECT cnpj FROM estabs)
+          AND data BETWEEN DATE '{inicio}' AND DATE '{fim}'
+          AND coalesce(numero_documento, '') <> ''
+        GROUP BY 1, 2, 3 HAVING count(DISTINCT chave) = 1
+    """)
+    return con.execute("""
+        UPDATE rel_com_cnpj r SET chave = c.chave
+        FROM chave_do_c100 c
+        WHERE coalesce(length(r.chave), 0) <> 44 AND c.cnpj = r.cnpj
+          AND c.numero = ltrim(r.numero_documento, '0') AND c.data = r.data
+    """).fetchone()[0]
 
 
 def _juntar_saldo_anterior(con, saldo_anterior: str | None) -> None:
@@ -1162,7 +1231,7 @@ def _preparar(con, fontes: Fontes) -> dict:
         FROM {mov} s WHERE s.operacao = 'saida'
     """)
 
-    sem_estab = trocado = do_cupom = 0
+    sem_estab = trocado = do_cupom = chave_do_c100 = 0
     if tem_rel:
         con.execute(f"""
             CREATE OR REPLACE TABLE rel AS
@@ -1191,6 +1260,7 @@ def _preparar(con, fontes: Fontes) -> dict:
             FROM rel r LEFT JOIN unidade_cnpj u ON u.unidade = r.unidade
         """)
         sem_estab = con.execute("SELECT count(*) FROM rel_com_cnpj WHERE cnpj IS NULL").fetchone()[0]
+        chave_do_c100 = _chave_do_c100(con, fontes, inicio, fim)
         # documento da EFD vence o relatório: a nota que tem item lá não entra
         # duas vezes. Pela chave, e — para o relatório que não traz chave — por
         # estabelecimento, número e data. Sem a segunda regra, as transferências
@@ -1409,9 +1479,13 @@ def _preparar(con, fontes: Fontes) -> dict:
     return {"inicio": inicio, "fim": fim, "abertura_em": abertura_em, "codigos": codigos,
             "correcoes": correcoes,
             "sem_estabelecimento": sem_estab, "trocado_pela_efd": trocado,
+            "chave_do_c100": chave_do_c100,
             "registrado_em_cupom": do_cupom,
             "abertura_sem_fator": abertura_sem_fator, "uso_e_consumo": uso_e_consumo, "x949": x949,
-            "base_inicio": base_inicio, "base_fim": base_fim}
+            "base_inicio": base_inicio, "base_fim": base_fim,
+            # apuração de antes da v0.53: sem o ICMS próprio, não se sabe se houve
+            # destaque, e o confronto de 2 e 4 fica pendente como era
+            "tem_icms_proprio": "icms_proprio" in colunas_sup}
 
 
 # ---------------------------------------------------------------------------
@@ -1717,8 +1791,9 @@ def _confronto(enq: EnquadramentoLegal, linha: dict,
 
     Enquadramentos 1 e 3 confrontam com a alíquota interna vezes o valor da
     saída (leiaute, VL_CONFR). Os 2 e 4 confrontam com o ICMS da operação
-    própria das entradas mais recentes da ficha até a saída (item 3.3.8); sem
-    entrada com esse valor, ficam pendentes, contados, sem ressarcimento inventado.
+    própria das entradas com destaque mais recentes da ficha até a saída (item
+    3.3.8); sem nenhuma, ficam pendentes aqui e `_resolver_sem_destaque` decide
+    no fechamento da ficha.
 
     No enquadramento 1 — e só nele, por decisão do Victor de 17/09/2026 — a
     alíquota incide sobre a base já reduzida, quando a entrada da mercadoria
@@ -1744,7 +1819,8 @@ def _confronto(enq: EnquadramentoLegal, linha: dict,
 def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: ResumoDaMontagem,
                total: int, uf_por_cnpj: dict, descricoes: dict, avisar, deve_parar,
                venda_a_consumidor: VendaAConsumidor = VendaAConsumidor.ENQUADRAMENTO_1,
-               valores: dict | None = None, origens: dict | None = None) -> None:
+               valores: dict | None = None, origens: dict | None = None,
+               resolver_sem_destaque: bool = True) -> None:
     escritor = pq.ParquetWriter(ficha3, ESQUEMA_FICHA3)
     escritor_fichas = pq.ParquetWriter(fichas, ESQUEMA_FICHAS)
     lote: dict[str, list] = {c: [] for c in ESQUEMA_FICHA3.names}
@@ -1764,8 +1840,17 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         qtd_abertura = Decimal(aberturas.get(chave) or 0)
         va = (valores or {}).get(chave)
         valor_abertura = va.valor if va is not None else Decimal(0)
-        razao = RazaoDoItem(codigo, SaldoInicial(qtd_abertura, valor_abertura))
-        razao.lancar_varios(movimentos)
+        movs, dados_movs, pelo_percentual = (
+            _resolver_sem_destaque(movimentos, extras, entradas_da_ficha) if resolver_sem_destaque
+            else (movimentos, extras, set()))
+        resumo.confronto_pendente -= sum(1 for d in dados_movs if d.criterio_do_efetivo in (
+            EFETIVO_PELA_ENTRADA_POSTERIOR, EFETIVO_PELO_PERCENTUAL))
+        resumo.confronto_pela_entrada_posterior += sum(
+            1 for d in dados_movs if d.criterio_do_efetivo == EFETIVO_PELA_ENTRADA_POSTERIOR)
+        resumo.confronto_pelo_percentual += len(pelo_percentual)
+        inicial = SaldoInicial(qtd_abertura, valor_abertura)
+        razao = RazaoDoItem(codigo, inicial)
+        razao.lancar_varios(movs)
         linhas = razao.apurar()
         # Estoque negativo não tira mais a ficha do total (decisão do Victor,
         # 17/09/2026): ela abre com a quantidade que faltaria, sem ICMS
@@ -1776,10 +1861,21 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
         aberta_por_negativo = Decimal(0)
         if negativo:
             aberta_por_negativo = -min(ln.saldo_quantidade for ln in linhas)
-            razao = RazaoDoItem(codigo, SaldoInicial(qtd_abertura + aberta_por_negativo, valor_abertura))
-            razao.lancar_varios(movimentos)
+            inicial = SaldoInicial(qtd_abertura + aberta_por_negativo, valor_abertura)
+            razao = RazaoDoItem(codigo, inicial)
+            razao.lancar_varios(movs)
             linhas = razao.apurar()
-        indice = {id(m): x for m, x in zip(movimentos, extras)}
+        if pelo_percentual:
+            # o efetivo é a fração do suportado que a própria saída levou (o
+            # unitário do saldo vezes a quantidade): o saldo não muda, e o razão
+            # roda de novo só para apurar o ressarcimento com ele
+            efetivos = {id(ln.movimento): (abs(ln.icms_suportado) * PERCENTUAL_SEM_DESTAQUE).quantize(_Q6)
+                        for ln in linhas if id(ln.movimento) in pelo_percentual}
+            movs = [replace(m, icms_efetivo=efetivos[id(m)]) if id(m) in efetivos else m for m in movs]
+            razao = RazaoDoItem(codigo, inicial)
+            razao.lancar_varios(movs)
+            linhas = razao.apurar()
+        indice = {id(m): x for m, x in zip(movs, dados_movs)}
         entradas = saidas = ressarc = compl = credito = Decimal(0)
         retirada = False
         sem_aliq = indef = sem_fator = com_reducao = com_aliq_entrada = 0
@@ -1908,8 +2004,9 @@ def _percorrer(leitor, aberturas: dict, ficha3: str, fichas: str, resumo: Resumo
                     linha, len(movimentos), resumo, venda_a_consumidor, entradas_da_ficha)
                 if m is None:
                     continue
+                # só a entrada com destaque do ICMS próprio confronta (26/11/2026)
                 if (m.especie is Especie.ENTRADA and not m.devolucao and linha.get("icms_proprio") is not None
-                        and m.quantidade > 0):
+                        and Decimal(linha["icms_proprio"]) > 0 and m.quantidade > 0):
                     entradas_da_ficha.append(EntradaAnterior(m.data, m.quantidade, Decimal(linha["icms_proprio"]),
                                                              len(entradas_da_ficha)))
                 resumo.confronto_pendente += pendente
@@ -1962,6 +2059,7 @@ class DadosDaLinha:
     corrigida: bool = False
     criterio_do_suportado: str = ""
     filial_do_destaque: str = ""
+    criterio_do_efetivo: str = ""
 
 
 def _documento(linha: dict) -> tuple:
@@ -1972,6 +2070,42 @@ def _documento(linha: dict) -> tuple:
             (linha.get("modelo") or "").strip(), (linha.get("participante") or "").strip(),
             (linha.get("numero_documento") or "").strip(), (linha.get("serie") or "").strip(),
             original if original and original != linha.get("codigo") else None)
+
+
+def _sem_confronto(m: Movimento) -> bool:
+    """Saída de enquadramento 2 ou 4 que não achou entrada com destaque até ela."""
+    return (not m.especie.e_entrada and not m.devolucao and m.icms_efetivo is None
+            and m.enquadramento.gera_ressarcimento and not m.enquadramento.confronta_com_saida)
+
+
+def _resolver_sem_destaque(movimentos: list, extras: list, entradas: list[EntradaAnterior]
+                           ) -> tuple[list, list, set]:
+    """As saídas de 2 e 4 que ficaram sem entrada com destaque antes delas.
+
+    Com a ficha inteira lida, `entradas` tem todas as entradas com destaque do
+    período. Havendo alguma, vale a primeira depois da saída (as seguintes, em
+    ordem, se uma não basta). Não havendo nenhuma, a saída vai para o
+    percentual do saldo, que só o razão sabe calcular: devolve o conjunto dos
+    `id` desses movimentos para o fechamento aplicar depois de apurar.
+    """
+    if not any(_sem_confronto(m) for m in movimentos):
+        return movimentos, extras, set()
+    em_ordem = sorted(entradas, key=lambda e: (e.data, e.ordem))
+    movs, dados, pelo_percentual = [], [], set()
+    for m, d in zip(movimentos, extras):
+        if _sem_confronto(m):
+            if em_ordem:
+                depois = [e for e in em_ordem if e.data >= m.data]
+                valor = (valor_pelas_entradas_seguintes(m.quantidade, depois) if depois
+                         else valor_da_abertura(m.quantidade, em_ordem))
+                m = replace(m, icms_efetivo=valor.valor.quantize(_Q6))
+                d = replace(d, criterio_do_efetivo=EFETIVO_PELA_ENTRADA_POSTERIOR)
+            else:
+                pelo_percentual.add(id(m))
+                d = replace(d, criterio_do_efetivo=EFETIVO_PELO_PERCENTUAL)
+        movs.append(m)
+        dados.append(d)
+    return movs, dados, pelo_percentual
 
 
 def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
@@ -2000,6 +2134,7 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
     quantidade = quantidade * fator
     enq, indefinido, faltou, pendente, efetivo = EnquadramentoLegal.DEMAIS_SAIDAS, False, False, False, None
     reducao = aliquota = None
+    criterio_efetivo = ""
     da_entrada = False
     origem_da_aliquota = ""
     if especie is Especie.SAIDA and not linha["devolucao"]:
@@ -2017,6 +2152,7 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
                 origem_da_aliquota = linha.get("aliquota_origem") or ""
             if efetivo is not None and not enq.confronta_com_saida:
                 resumo.confronto_pela_entrada += 1
+                criterio_efetivo = EFETIVO_PELA_ENTRADA
     try:
         m = Movimento(
             data=linha["data"],
@@ -2037,7 +2173,7 @@ def _movimento(linha: dict, ordem: int, resumo: ResumoDaMontagem,
         return None, False, dados()
     return m, pendente, dados(indefinido=indefinido, faltou_aliquota=faltou, aliquota=aliquota,
                               reducao=reducao, aliquota_da_entrada=da_entrada,
-                              aliquota_origem=origem_da_aliquota)
+                              aliquota_origem=origem_da_aliquota, criterio_do_efetivo=criterio_efetivo)
 
 
 def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, dados: DadosDaLinha,
@@ -2092,6 +2228,7 @@ def _acrescentar(lote: dict, cnpj: str, codigo: str, ln, dados: DadosDaLinha,
     lote["criterio_do_suportado"].append(dados.criterio_do_suportado or None)
     lote["filial_do_destaque"].append(dados.filial_do_destaque or None)
     lote["suportado_a_estimar"].append(dados.criterio_do_suportado == "precisa_estimar")
+    lote["criterio_do_efetivo"].append(dados.criterio_do_efetivo or None)
 
 
 # ---------------------------------------------------------------------------
@@ -2194,6 +2331,8 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
         "complemento": texto(resumo.complemento),
         "credito_operacao_propria": texto(resumo.credito_operacao_propria),
         "confronto_pela_entrada": resumo.confronto_pela_entrada,
+        "confronto_pela_entrada_posterior": resumo.confronto_pela_entrada_posterior,
+        "confronto_pelo_percentual": resumo.confronto_pelo_percentual,
         # fora do total até os dados chegarem: o valor delas não é confiável
         "abertas_por_saldo_negativo": {
             "fichas": resumo.fichas_abertas_por_negativo,
@@ -2240,6 +2379,7 @@ def serializar(resumo: ResumoDaMontagem) -> dict:
             "fichas_fora_de_sp": resumo.fichas_fora_de_sp,
             "relatorio_sem_estabelecimento": resumo.relatorio_sem_estabelecimento,
             "relatorio_trocado_pela_efd": resumo.relatorio_trocado_pela_efd,
+            "relatorio_chave_do_c100": resumo.relatorio_chave_do_c100,
             "relatorio_registrado_em_cupom": resumo.relatorio_registrado_em_cupom,
             "linhas_com_depara": resumo.linhas_com_depara,
             "codigos_trocados_pelo_depara": resumo.codigos_trocados_pelo_depara,
