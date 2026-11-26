@@ -42,6 +42,11 @@ from cat.log import obter_log
 
 log = obter_log(__name__)
 
+# quanto antes do começo do bloco a data do destino ainda conta como "escrito
+# durante": cobre o tique grosso do relógio de arquivos do Windows, e fica longe
+# o bastante do arquivo que já estava lá antes (esse é de minutos ou horas atrás)
+_FOLGA_DO_RELOGIO = 0.5
+
 
 def apagar(caminho: str) -> None:
     """Remove o arquivo se der, e nunca estraga o motivo real da falha."""
@@ -128,7 +133,12 @@ def materializando(caminho: str) -> Iterator[str]:
         # outra falha sobe, porque aí ninguém produziu o arquivo e esconder
         # isso entregaria ao chamador um caminho que não existe.
         apagar(provisorio)
-        if not (os.path.isfile(caminho) and os.path.getmtime(caminho) >= comeco):
+        # a folga é do relógio, não da regra: no Windows a data de modificação
+        # anda no tique do sistema (~15,6 ms) e o `time.time()` não, então um
+        # arquivo escrito DEPOIS do começo do bloco podia sair com data de
+        # alguns milissegundos ANTES — e o teste desta troca falhava uma vez em
+        # cada duas ou três rodadas
+        if not (os.path.isfile(caminho) and os.path.getmtime(caminho) >= comeco - _FOLGA_DO_RELOGIO):
             raise
         log.info("outro pedido materializou primeiro; o nosso rascunho foi descartado",
                  extra={"arquivo": os.path.basename(caminho)})
