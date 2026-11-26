@@ -40,6 +40,9 @@ public static class TiposDeArquivo
         Novo("gerencial_resumo", "Resumo por produto"),
         Novo("cat42_arquivo_digital", "Arquivo digital da CAT 42"),
         Novo("lista_de_canceladas", "Lista de notas canceladas", Icms),
+        // a Ficha 3 achatada de um período anterior: o saldo final dela é a
+        // abertura do trabalho (decisão de 26/11/2026)
+        Novo("ficha3_anterior", "Ficha 3 de período anterior", Icms),
         Novo("compactado", "Compactado"),
         Novo("nao_baixado", "Não baixado do OneDrive"),
         Novo("desconhecido", "Não reconhecido"),
