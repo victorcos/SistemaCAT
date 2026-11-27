@@ -353,7 +353,7 @@ def _gravar_saldo_anterior(projeto_id: int, periodo, destino: str, sessao: Sessi
                                      "defasados": lidos.defasados}
     diario.anotar("info", f"Ficha 3 anterior: o saldo final de {milhar(lidos.itens)} itens em "
                           f"{lidos.arquivos} estabelecimentos é a abertura. O item que ela não lista "
-                          "começa do zero, e o bloco H só abre o estabelecimento sem ficha anterior.")
+                          "abre pelo bloco H de 31/12, e sem ele começa do zero.")
     if lidos.defasados:
         diario.anotar("aviso", f"{len(lidos.defasados)} estabelecimentos têm a Ficha 3 anterior "
                                "terminando antes do mês que precede o período; vale o último mês dela.")

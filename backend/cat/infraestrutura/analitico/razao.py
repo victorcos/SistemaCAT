@@ -780,17 +780,36 @@ def _chave_do_c100(con, fontes: "Fontes", inicio: date, fim: date) -> int:
     """).fetchone()[0]
 
 
+MESES_DO_BLOCO_H_DA_ABERTURA = 2
+
+
+def _inventario_completo(con, caminho: str) -> str:
+    """Os H010 do inventário completo (motivo 01 do H005), como subconsulta.
+
+    O inventário de motivo 02 (mudança na forma de tributação) e os outros
+    cobrem só parte dos itens e repetem a data do completo: no projeto 1, o de
+    31/12/2025 vem com motivo 02 na EFD de janeiro e com motivo 01 na de
+    fevereiro, e somar os dois dobrava a quantidade. A base sem a coluna do
+    motivo vale inteira.
+    """
+    origem = f"read_parquet('{_escapar(caminho)}')"
+    colunas = {r[0] for r in con.execute(f"DESCRIBE SELECT * FROM {origem}").fetchall()}
+    if "motivo" not in colunas:
+        return f"(SELECT * FROM {origem})"
+    return f"(SELECT * FROM {origem} WHERE coalesce(nullif(trim(motivo), ''), '01') = '01')"
+
+
 def _juntar_saldo_anterior(con, saldo_anterior: str | None) -> None:
     """A abertura começa onde a Ficha 3 anterior terminou (decisão do Victor,
     26/11/2026; até ali valia sempre o bloco H).
 
     Onde a ficha anterior tem o item, a quantidade e o ICMS são os do saldo
-    final dela, mesmo que seja zero: a ficha nova começa ali. No
-    estabelecimento que tem ficha anterior, o item que ela não lista começa do
-    zero (`sem_ficha_anterior`): o bloco H não é reserva (decisão do Victor,
-    27/11/2026). O bloco H, já convertido, só abre o estabelecimento
-    que não tem ficha anterior nenhuma. A quantidade dele fica ao lado em
-    todos os casos, para o quadro de conciliação.
+    final dela, mesmo que seja zero: a ficha nova começa ali. O item que ela
+    não lista abre pelo bloco H, valorado pelas entradas, como o
+    estabelecimento que não tem ficha anterior nenhuma (decisão do Victor,
+    27/11/2026; de manhã, esse item começava do zero). Sem bloco H, começa do
+    zero. A quantidade do bloco H fica ao lado em todos os casos, para o
+    quadro de conciliação.
 
     A ficha anterior está na unidade da ficha (UNID_INV) e com o código do
     cliente: o de-para vale para ela como para o inventário.
@@ -801,10 +820,6 @@ def _juntar_saldo_anterior(con, saldo_anterior: str | None) -> None:
     con.execute("UPDATE abertura SET origem = 'bloco_h', quantidade_bloco_h = quantidade")
     if not saldo_anterior or not os.path.isfile(saldo_anterior):
         return
-    con.execute(f"""
-        CREATE OR REPLACE TABLE cnpjs_da_ficha_anterior AS
-        SELECT DISTINCT cnpj FROM read_parquet('{_escapar(saldo_anterior)}')
-    """)
     con.execute(f"""
         CREATE OR REPLACE TABLE saldo_anterior AS
         SELECT s.cnpj, coalesce(d.codigo_destino, s.codigo) AS codigo,
@@ -821,13 +836,7 @@ def _juntar_saldo_anterior(con, saldo_anterior: str | None) -> None:
                CAST(NULL AS DECIMAL(38, 15)) AS valor_anterior,
                CAST(a.quantidade AS DECIMAL(38, 9)) AS quantidade_bloco_h
         FROM abertura a
-        WHERE a.cnpj NOT IN (SELECT cnpj FROM cnpjs_da_ficha_anterior)
-        UNION ALL
-        SELECT a.cnpj, a.codigo, 0, false, 'sem_ficha_anterior', 0,
-               CAST(a.quantidade AS DECIMAL(38, 9))
-        FROM abertura a
-        WHERE a.cnpj IN (SELECT cnpj FROM cnpjs_da_ficha_anterior) AND a.quantidade <> 0
-          AND NOT EXISTS (SELECT 1 FROM saldo_anterior s WHERE s.cnpj = a.cnpj AND s.codigo = a.codigo)
+        WHERE NOT EXISTS (SELECT 1 FROM saldo_anterior s WHERE s.cnpj = a.cnpj AND s.codigo = a.codigo)
         UNION ALL
         SELECT s.cnpj, s.codigo, s.quantidade, false, 'ficha_anterior', s.valor,
                CAST(a.quantidade AS DECIMAL(38, 9))
@@ -1109,7 +1118,7 @@ def _conferir_inventario(con, fontes: Fontes, ficha3: str, fichas: str, destino:
         CREATE OR REPLACE TABLE inv_periodo AS
         SELECT v.cnpj, v.codigo, v.data_inventario,
                sum(v.quantidade * {_FATOR.format(t="v")}) AS inventario
-        FROM read_parquet('{_escapar(inventario)}') v
+        FROM {_inventario_completo(con, inventario)} v
         LEFT JOIN unid u ON u.cnpj = v.cnpj AND u.codigo = v.codigo
         LEFT JOIN conv cv ON cv.cnpj = v.cnpj AND cv.codigo = v.codigo AND cv.unidade = upper(trim(v.unidade))
         WHERE v.data_inventario BETWEEN DATE '{inicio}' AND DATE '{fim}'
@@ -1441,23 +1450,36 @@ def _preparar(con, fontes: Fontes) -> dict:
     if x949:
         con.execute(f"DELETE FROM lancamentos WHERE cfop IN ({lista(CFOP_OUTRAS_X949)})")
 
+    # O bloco H da abertura: o inventário completo (motivo 01) de cada
+    # estabelecimento nos dois meses antes do período, o mais recente. Quem
+    # declara todo mês tem o de novembro ou dezembro; quem declara por
+    # trimestre (o projeto 1) tem o de 31/12, que vem na EFD de fevereiro e é
+    # obrigatório. O inventário de setembro já não é o estoque de janeiro:
+    # o estabelecimento que não declarou o de 31/12 fica sem bloco H
+    # (decisão do Victor, 27/11/2026).
     abertura_em = None
+    con.execute("CREATE OR REPLACE TABLE data_do_inventario (cnpj VARCHAR, data DATE)")
     if os.path.isfile(inventario):
-        abertura_em = con.execute(f"""
-            SELECT max(data_inventario) FROM read_parquet('{_escapar(inventario)}')
+        con.execute(f"""
+            INSERT INTO data_do_inventario
+            SELECT cnpj, max(data_inventario) FROM {_inventario_completo(con, inventario)}
             WHERE data_inventario < DATE '{inicio}'
-        """).fetchone()[0]
+              AND data_inventario >= DATE '{inicio}' - INTERVAL {MESES_DO_BLOCO_H_DA_ABERTURA} MONTH
+            GROUP BY cnpj
+        """)
+        abertura_em = con.execute("SELECT max(data) FROM data_do_inventario").fetchone()[0]
     if abertura_em is not None:
         con.execute(f"""
             CREATE OR REPLACE TABLE abertura AS
             SELECT v.cnpj, coalesce(d.codigo_destino, v.codigo) AS codigo,
                    sum(v.quantidade * {_FATOR.format(t="v")} * coalesce(d.fator, 1)) AS quantidade,
                    bool_or({_SEM_FATOR.format(t="v")}) AS sem_fator
-            FROM read_parquet('{_escapar(inventario)}') v
+            FROM {_inventario_completo(con, inventario)} v
+            JOIN data_do_inventario di ON di.cnpj = v.cnpj AND di.data = v.data_inventario
             LEFT JOIN unid u ON u.cnpj = v.cnpj AND u.codigo = v.codigo
             LEFT JOIN conv cv ON cv.cnpj = v.cnpj AND cv.codigo = v.codigo AND cv.unidade = upper(trim(v.unidade))
             LEFT JOIN depara d ON d.cnpj = v.cnpj AND d.codigo_origem = v.codigo
-            WHERE v.data_inventario = DATE '{abertura_em}'
+            WHERE true
               AND coalesce(d.codigo_destino, v.codigo) IN (SELECT codigo FROM codigos)
               AND v.cnpj IN (SELECT cnpj FROM estabs)
             GROUP BY v.cnpj, coalesce(d.codigo_destino, v.codigo) HAVING sum(v.quantidade) <> 0
@@ -1482,10 +1504,11 @@ def _preparar(con, fontes: Fontes) -> dict:
                 SELECT s.cnpj, s.codigo, s.data, s.cfop, s.chave, s.numero_item, s.quantidade, s.suportado,
                        ue.unidade
                 FROM {sup} s
+                JOIN data_do_inventario di ON di.cnpj = s.cnpj
                 LEFT JOIN unidade_das_entradas ue
                   ON ue.cnpj = s.cnpj AND ue.chave = s.chave AND ue.numero_documento = s.numero_documento
                  AND ue.data = s.data AND ue.numero_item = s.numero_item AND ue.codigo = s.codigo
-                WHERE s.data <= DATE '{abertura_em}'
+                WHERE s.data <= di.data
             ) e
             LEFT JOIN unid u ON u.cnpj = e.cnpj AND u.codigo = e.codigo
             LEFT JOIN conv cv ON cv.cnpj = e.cnpj AND cv.codigo = e.codigo AND cv.unidade = upper(trim(e.unidade))

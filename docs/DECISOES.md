@@ -9680,3 +9680,39 @@ própria RVC deixou para trás.
   (`sem_ficha_anterior`). O bloco H não é reserva e fica só para a
   conciliação.
 - O bloco H só abre o estabelecimento que não tem ficha anterior nenhuma.
+
+## 2026-11-27 — O item fora da ficha anterior abre pelo bloco H de 31/12
+
+**Contexto.** Com a regra da manhã, 1.477 fichas das 3 filiais de teste do
+projeto 1 começavam do zero: itens que o bloco H de 31/12/2025 declara e que o
+último mês da ficha anterior não lista. Ao olhar o bloco H, apareceram mais
+duas coisas:
+
+- O cliente declara o inventário por trimestre (motivo 01). Cada um vem na EFD
+  de dois meses depois: o de 31/12 vem na de fevereiro.
+- O de 31/12/2025 vem duas vezes: com motivo 02 (mudança na forma de
+  tributação) na EFD de janeiro, para parte dos itens, e com motivo 01 na de
+  fevereiro, completo. A abertura pegava a maior data e somava os dois. Com
+  isso, 1.714 itens ficavam com quantidade em dobro. A conferência de
+  inventário somava os dois do mesmo jeito.
+
+**Decisão do Victor:**
+- O item que a ficha anterior não lista abre pelo bloco H, valorado pelas
+  entradas.
+- Quem declara o inventário todo mês usa o de novembro ou dezembro. Quem não
+  declara todo mês usa o de 31/12, que é obrigatório e vem na EFD de fevereiro.
+
+**No código:**
+- O bloco H da abertura é escolhido por estabelecimento: o inventário de
+  motivo 01 mais recente com data nos dois meses antes do período
+  (`MESES_DO_BLOCO_H_DA_ABERTURA`).
+- O estabelecimento sem inventário nesses dois meses fica sem bloco H, e o item
+  que a ficha anterior não lista começa do zero.
+- Abertura e conferência usam só o motivo 01. A base sem a coluna do motivo
+  vale inteira.
+- A origem `sem_ficha_anterior` deixa de existir. O item volta a ter a origem
+  `bloco_h`.
+
+**Efeito no teste:** o ressarcimento passa de R$ 273.170,69 para
+R$ 272.916,96. A maior parte das 1.477 fichas não tem entrada com ICMS
+suportado até 31/12, e por isso abre só com quantidade.

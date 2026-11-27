@@ -5,7 +5,8 @@ A Ficha 3 é contínua. O período novo transcreve o saldo de quantidade e de IC
 suportado com que o anterior terminou (item 3.3.1 do manual). Quando o cliente
 já transmitiu fichas feitas por outra ferramenta, a abertura do nosso período é
 o saldo final delas, e não o inventário (decisão do Victor, 26/11/2026). O
-inventário só entra no estabelecimento que não tem ficha anterior nenhuma.
+inventário (bloco H) só abre o item que a ficha anterior não lista, e o
+estabelecimento que não tem ficha anterior nenhuma (27/11/2026).
 
 ## O arquivo
 

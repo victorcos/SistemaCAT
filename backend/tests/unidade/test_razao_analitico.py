@@ -1478,16 +1478,42 @@ class TestAberturaPelaFichaAnterior:
         # B não tem movimento de X, mas a ficha começa com o saldo anterior
         assert fichas[(B, "X")]["abertura_origem"] == "ficha_anterior"
 
-    def test_item_que_a_ficha_anterior_nunca_listou_comeca_do_zero(self, fontes, tmp_path):
-        """A loja A tem ficha anterior, mas sem o X: o bloco H não é reserva."""
+    def test_item_que_a_ficha_anterior_nao_lista_abre_pelo_bloco_h(self, fontes, tmp_path):
+        """A loja A tem ficha anterior, mas sem o X: o X abre pelo bloco H."""
         fichas, resumo = self.montar_com(fontes, tmp_path, [
             {"cnpj": A, "codigo": "W", "unidade": "UN", "competencia": date(2020, 12, 1),
              "quantidade": Decimal(0), "valor": Decimal(0)}])
         f = fichas[(A, "X")]
-        assert (f["abertura_quantidade"], f["abertura_valor"], f["abertura_origem"]) == (
-            Decimal(0), Decimal(0), "sem_ficha_anterior")
-        assert f["abertura_bloco_h"] == Decimal(10)
+        assert (f["abertura_quantidade"], f["abertura_origem"], f["abertura_bloco_h"]) == (
+            Decimal(10), "bloco_h", Decimal(10))
         assert resumo.fichas_abertura_da_ficha_anterior == 0
+
+    @staticmethod
+    def reescrever_inventario(fontes, linhas):
+        caminho = os.path.join(fontes.movimentacao, ARQUIVO_INVENTARIO)
+        pq.write_table(pa.Table.from_pylist(linhas, schema=pa.schema([
+            ("cnpj", pa.string()), ("codigo", pa.string()), ("data_inventario", pa.date32()),
+            ("motivo", pa.string()), ("unidade", pa.string()), ("quantidade", pa.decimal128(20, 5))])),
+            caminho)
+
+    def test_o_inventario_de_motivo_02_nao_soma_com_o_completo(self, fontes, tmp_path):
+        """31/12 com motivo 02 (EFD de janeiro) e 01 (EFD de fevereiro): vale o 01."""
+        self.reescrever_inventario(fontes, [
+            {"cnpj": A, "codigo": "X", "data_inventario": date(2020, 12, 31), "motivo": "02",
+             "unidade": "UN", "quantidade": Decimal(10)},
+            {"cnpj": A, "codigo": "X", "data_inventario": date(2020, 12, 31), "motivo": "01",
+             "unidade": "UN", "quantidade": Decimal(10)}])
+        fichas, _ = self.montar_com(fontes, tmp_path, [])
+        assert fichas[(A, "X")]["abertura_quantidade"] == Decimal(10)
+
+    def test_inventario_de_mais_de_dois_meses_antes_nao_abre(self, fontes, tmp_path):
+        """Quem não declarou o 31/12 não abre pelo de 30/09."""
+        self.reescrever_inventario(fontes, [
+            {"cnpj": A, "codigo": "X", "data_inventario": date(2020, 9, 30), "motivo": "01",
+             "unidade": "UN", "quantidade": Decimal(10)}])
+        fichas, resumo = self.montar_com(fontes, tmp_path, [])
+        assert fichas[(A, "X")]["abertura_quantidade"] == Decimal(0)
+        assert resumo.abertura_em is None
 
     def test_item_zerado_na_ficha_anterior_comeca_do_zero(self, fontes, tmp_path):
         fichas, _ = self.montar_com(fontes, tmp_path, [
