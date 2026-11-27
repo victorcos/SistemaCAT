@@ -9654,3 +9654,29 @@ vem da Ficha 3 anterior.
   para o mais antigo, e não relê o item já achado. O resumo conta
   `de_meses_anteriores`, os itens com saldo que vieram de um mês anterior ao
   último.
+
+## 2026-11-27 — A abertura continua onde a RVC terminou: só o último mês
+
+**Contexto.** A entrada anterior, "A abertura é a última linha de cada item na
+Ficha 3 anterior", buscava cada item em qualquer mês. Ao rodar com os 265
+arquivos das 3 filiais do teste, 14.882 itens vieram de meses anteriores a
+dez/2025. Eles saem em três cortes, nos mesmos meses nas 3 filiais:
+
+- **dez/2020 → jan/2021:** a RVC reiniciou o estoque. Na 0330, só 1.834 de
+  3.573 itens abrem com o saldo do mês anterior.
+- **set/2024 → out/2024 e jul/2025 → ago/2025:** os itens que ficaram
+  continuam com o mesmo saldo, e os outros foram retirados ainda com saldo.
+
+Trazer esses itens de volta daria a 4.874 fichas uma abertura de R$ 14,1 mi de
+ICMS que a ficha transmitida não carrega.
+
+**Decisão do Victor:** herdar só o que está em dez/2025. A Ficha 3 de 2026
+continua a ficha que a RVC transmitiu no fim. Ela não traz de volta o que a
+própria RVC deixou para trás.
+
+- O leitor volta a usar só o último mês de cada estabelecimento.
+- Continua valendo o que foi decidido em 26/11: no estabelecimento que tem
+  ficha anterior, o item que ela não lista começa do zero
+  (`sem_ficha_anterior`). O bloco H não é reserva e fica só para a
+  conciliação.
+- O bloco H só abre o estabelecimento que não tem ficha anterior nenhuma.

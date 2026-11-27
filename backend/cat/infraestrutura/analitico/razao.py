@@ -784,11 +784,11 @@ def _juntar_saldo_anterior(con, saldo_anterior: str | None) -> None:
     """A abertura começa onde a Ficha 3 anterior terminou (decisão do Victor,
     26/11/2026; até ali valia sempre o bloco H).
 
-    Onde a ficha anterior tem o item, em qualquer mês, a quantidade e o ICMS são
-    os da última linha dele, mesmo que seja zero: a ficha nova começa ali. No
-    estabelecimento que tem ficha anterior, o item que ela nunca listou começa
-    do zero (`sem_ficha_anterior`): o bloco H não é reserva, corrigido pelo
-    Victor no mesmo dia. O bloco H, já convertido, só abre o estabelecimento
+    Onde a ficha anterior tem o item, a quantidade e o ICMS são os do saldo
+    final dela, mesmo que seja zero: a ficha nova começa ali. No
+    estabelecimento que tem ficha anterior, o item que ela não lista começa do
+    zero (`sem_ficha_anterior`): o bloco H não é reserva (decisão do Victor,
+    27/11/2026). O bloco H, já convertido, só abre o estabelecimento
     que não tem ficha anterior nenhuma. A quantidade dele fica ao lado em
     todos os casos, para o quadro de conciliação.
 

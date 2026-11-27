@@ -29,16 +29,17 @@ as posições saem do cabeçalho a partir do "Valor Total do Saldo", e não do n
 
 ## Qual mês vale
 
-Para cada item, vale a **última linha dele em toda a ficha anterior**, em
-qualquer mês antes do início do período. Não basta o último mês: a ficha de
-outra ferramenta deixa de listar itens que ainda têm saldo. Na loja 0330 do
-projeto 1, 443 itens saíram da ficha com saldo (306 em jul/2025, 110 em
-set/2024, 27 em dez/2020) e não estão no dez/2025. Decisão do Victor,
-26/11/2026: o estoque começa de onde a ficha anterior deixou cada item. A
-competência da linha usada fica gravada por item.
+Para cada estabelecimento, vale o mês mais recente ANTES do início do período,
+e dentro dele a última linha de cada item. É onde a ficha anterior terminou, e
+é dali que a nossa continua (decisão do Victor, 27/11/2026). O item que esse
+mês não lista não volta de um mês mais antigo. No projeto 1, a ficha da RVC
+tira itens em três cortes: dez/2020, quando ela reiniciou o estoque, e set/2024
+e jul/2025, quando retirou itens ainda com saldo. Continuar a RVC é continuar o
+que ela transmitiu no fim, e não ressuscitar o que ela mesma deixou para trás.
 
-O estabelecimento cujo último mês não é o imediatamente anterior ao período é
-contado em `defasados`.
+O estabelecimento cujo último mês não é o imediatamente anterior ao período
+(uma loja que fechou, um mês que falta) vale do mesmo jeito, com o último mês
+dele, e é contado em `defasados`.
 """
 
 from __future__ import annotations
@@ -131,15 +132,12 @@ def identificar(caminho: str) -> Identificacao | None:
 
 @dataclass
 class SaldosLidos:
-    arquivos: int = 0                  # arquivos lidos: todos os meses antes do período
+    arquivos: int = 0                  # arquivos lidos: o último mês de cada estabelecimento
     ignorados: int = 0                 # não são a ficha achatada
     itens: int = 0
     icms: float = 0.0
     # estabelecimento cujo último mês não é o imediatamente anterior ao período
     defasados: dict = field(default_factory=dict)
-    # itens com saldo que vieram de um mês anterior ao último do estabelecimento:
-    # a ficha anterior deixou de listá-los
-    de_meses_anteriores: int = 0
 
 
 def escolher_arquivos(caminhos: list[str], inicio: date
@@ -166,8 +164,7 @@ def _escapar(caminho: str) -> str:
 
 
 def _ultimas_do_mes(cnpj: str, competencia: date, caminho: str, c: Colunas) -> str:
-    """O INSERT da última linha de cada item de um arquivo, para os itens que
-    um mês mais recente ainda não deu."""
+    """O INSERT da última linha de cada item de um arquivo."""
     col = {f"c{i:02d}": "VARCHAR" for i in range(c.total)}
     ordem = f"TRY_CAST(c{c.ordem:02d} AS BIGINT)"
 
@@ -185,14 +182,13 @@ def _ultimas_do_mes(cnpj: str, competencia: date, caminho: str, c: Colunas) -> s
             FROM read_csv('{_escapar(caminho)}', delim='|', header=false, skip=1, quote='',
                           escape='', columns={col}, null_padding=true, encoding='latin-1')
             WHERE nullif(trim(c{c.codigo:02d}), '') IS NOT NULL
-            GROUP BY 2) n
-        WHERE NOT EXISTS (SELECT 1 FROM ultimas u WHERE u.cnpj = n.cnpj AND u.codigo = n.codigo)"""
+            GROUP BY 2) n"""
 
 
 def gravar_saldos(caminhos: list[str], inicio: date, destino: str) -> SaldosLidos:
     """Grava `cnpj, codigo, unidade, competencia, quantidade, valor`: o saldo com
-    que a ficha anterior deixou cada item (a última linha dele, no mês mais
-    recente em que aparece), um por item e estabelecimento."""
+    que a ficha anterior terminou (a última linha de cada item no último mês do
+    estabelecimento), um por item e estabelecimento."""
     import duckdb  # noqa: PLC0415
     import pyarrow as pa  # noqa: PLC0415
     import pyarrow.parquet as pq  # noqa: PLC0415
@@ -214,11 +210,9 @@ def gravar_saldos(caminhos: list[str], inicio: date, destino: str) -> SaldosLido
         for cnpj, arquivos in sorted(escolhidos.items()):
             if arquivos[0][0] != anterior:
                 resumo.defasados[cnpj] = arquivos[0][0].isoformat()
-            # do mês mais recente para o mais antigo: o item já achado num mês
-            # mais novo não entra de novo
-            for competencia, caminho, c in arquivos:
-                resumo.arquivos += 1
-                con.execute(_ultimas_do_mes(cnpj, competencia, caminho, c))
+            competencia, caminho, c = arquivos[0]
+            resumo.arquivos += 1
+            con.execute(_ultimas_do_mes(cnpj, competencia, caminho, c))
         con.execute(f"""COPY (SELECT cnpj, codigo, unidade, competencia,
                                      CAST(quantidade AS DECIMAL(38, 9)) AS quantidade, valor
                               FROM ultimas ORDER BY cnpj, codigo)
@@ -226,11 +220,6 @@ def gravar_saldos(caminhos: list[str], inicio: date, destino: str) -> SaldosLido
         resumo.itens, icms = con.execute(
             f"SELECT count(*), coalesce(sum(valor), 0) FROM read_parquet('{_escapar(destino)}')").fetchone()
         resumo.icms = float(icms)
-        resumo.de_meses_anteriores = con.execute("""
-            SELECT count(*) FROM ultimas u
-            WHERE (quantidade <> 0 OR valor <> 0)
-              AND competencia < (SELECT max(competencia) FROM ultimas v WHERE v.cnpj = u.cnpj)
-        """).fetchone()[0]
     finally:
         con.close()
     return resumo
