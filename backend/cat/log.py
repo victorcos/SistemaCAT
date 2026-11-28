@@ -43,11 +43,36 @@ _SEGREDOS = frozenset(
 )
 
 
+def _e_segredo(chave: Any) -> bool:
+    """Se esta chave não pode ser escrita no log.
+
+    A chave pode não ser texto: `suportado.py` loga `{f.value: n}` e a enum
+    `Fonte` tem valores inteiros, o que fazia `k.lower()` estourar
+    `AttributeError` dentro do formatador — o Python engole o erro do handler,
+    então a etapa seguia e a linha de log sumia sem ninguém notar. Chave que
+    não é texto nunca nomeia segredo, logo não precisa ser mascarada.
+    """
+    return isinstance(chave, str) and chave.lower() in _SEGREDOS
+
+
+# o que o json aceita como chave; qualquer outra coisa vira texto antes de ir
+_CHAVES_DO_JSON = (str, int, float, bool, type(None))
+
+
+def _chave(chave: Any) -> Any:
+    """A chave como o json a aceita.
+
+    `default=str` do `json.dumps` só alcança valores: chave de tupla ou de
+    objeto estoura `TypeError` no encoder e derruba a linha inteira.
+    """
+    return chave if isinstance(chave, _CHAVES_DO_JSON) else str(chave)
+
+
 def _limpar(valor: Any) -> Any:
     """Remove segredo de dicionário aninhado, preservando o resto."""
     if isinstance(valor, dict):
         return {
-            k: ("***" if k.lower() in _SEGREDOS else _limpar(v))
+            _chave(k): ("***" if _e_segredo(k) else _limpar(v))
             for k, v in valor.items()
         }
     if isinstance(valor, (list, tuple)):
@@ -75,7 +100,7 @@ class FormatadorJson(logging.Formatter):
         for chave, valor in record.__dict__.items():
             if chave in _RESERVADOS or chave.startswith("_"):
                 continue
-            linha[chave] = "***" if chave.lower() in _SEGREDOS else _limpar(valor)
+            linha[chave] = "***" if _e_segredo(chave) else _limpar(valor)
 
         if record.exc_info:
             linha["excecao"] = self.formatException(record.exc_info)
